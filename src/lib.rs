@@ -417,6 +417,24 @@ impl BigFloat {
         return Self::abs_cmp(&self.m, &d2.m) * self.sign as i16;
     }
 
+
+    /// Return raw parts of BigFloat: mantissa, number of decimal positions in mantissa, sing, and
+    /// exponent.
+    pub fn to_raw_parts(&self) -> ([i16; DECIMAL_PARTS], i16, i8, i8) {
+        (self.m, self.n, self.sign, self.e)
+    }
+
+    /// Construct BigFloat from raw parts.
+    pub fn from_raw_parts(mantissa: [i16; DECIMAL_PARTS], mantissa_len: i16, sign: i8, exponent: i8) -> Self {
+        return BigFloat {
+            sign: sign,
+            e: exponent,
+            n: mantissa_len,
+            m: mantissa,
+        };
+    }
+
+
     // auxiliary functions
 
     // compare absolute values of two big floats
@@ -620,7 +638,7 @@ impl BigFloat {
         assert!(0 == c);
     }
 
-    // shift decimal m to the right by n digits
+    // shift m to the right by n digits
     fn shift_right(m: &mut [i16], mut n: usize) {
         assert!(n > 0 && n <= DECIMAL_POSITIONS);
 
@@ -656,7 +674,7 @@ impl BigFloat {
         }
     }
 
-    // shift decimal m to the left by n digits
+    // shift m to the left by n digits
     fn shift_left(m: &mut [i16], mut n: usize) {
         assert!(n > 0 && n <= DECIMAL_POSITIONS);
 
@@ -775,6 +793,11 @@ mod tests {
         assert!(d4.get_mantissa_len() == 40);
         assert!(d4.get_sign() == -1);
         assert!(d4.get_exponent() == exp2);
+
+        // raw parts
+        let (m,n,s,e) = d4.to_raw_parts();
+        let d5 = BigFloat::from_raw_parts(m,n,s,e);
+        assert!(d5.cmp(&d4) == 0);
 
 
         println!("Testing comparisons");
@@ -962,7 +985,7 @@ mod tests {
         assert!(d3.cmp(&ref_num) == 0);
 
 
-        println!("Testing decimal subtraction");
+        println!("Testing subtraction");
 
         d2.sign = DECIMAL_SIGN_POS;
         d1.sign = DECIMAL_SIGN_NEG;
