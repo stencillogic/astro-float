@@ -2,7 +2,11 @@
 name = "num-bigfloat"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["stencillogic <stencillogic@gmail.com>"]
+license = "MIT"
+description = "Multiple precision floating point numbers implemented purely in Rust."
+categories = ["algorithms", "data-structures", "science"]
+keywords = ["big float", "big number", "numeric", "decimal", "mathematics"]
+readme = "README.md"
 
 [dependencies]
