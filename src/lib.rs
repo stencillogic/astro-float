@@ -51,6 +51,68 @@ impl BigFloat {
         };
     }
 
+    /// Create a BigFloat value from a sequence of `bytes`. Each byte must represent a decimal digit.
+    /// First byte is the most significant. The length of `bytes` can be any. If the length of
+    /// `bytes` is greater than required, then the remaining part is ignored.
+    /// If `sign` is negative, then the resulting BigFloat will be
+    /// negative.
+    pub fn from_bytes(bytes: &[u8], sign: i8, exponent: i8) -> BigFloat {
+        let mut mantissa = [0; DECIMAL_PARTS];
+        let mut n: usize = 0;
+        let mut p: i16 = 1;
+        let d = if bytes.len() > DECIMAL_POSITIONS { DECIMAL_POSITIONS } else { bytes.len() };
+        for i in 1..d+1 {
+            mantissa[n] += (bytes[d - i] % 10) as i16 * p;
+            p *= 10;
+            if p == DECIMAL_BASE as i16 {
+                n += 1;
+                p = 1;
+            }
+        }
+
+        return BigFloat {
+            sign: if sign >= 0 { DECIMAL_SIGN_POS } else { DECIMAL_SIGN_NEG },
+            e: exponent,
+            n: d as i16,
+            m: mantissa,
+        };
+    }
+
+    /// Get BigFloat's mantissa as bytes. Each byte represents a decimal digit.
+    /// First byte is the most significant. The length of `bytes` can be any. If the length of
+    /// `bytes` is smaller than required, then remaining part of mantissa will be omitted.
+    ///
+    /// The length of mantissa can be determined using `get_mantissa_len`.
+    pub fn get_mantissa_bytes(&self, bytes: &mut [u8]) {
+        let mut n: usize = 0;
+        let mut p: i16 = 1;
+        let d = if bytes.len() < self.n as usize { bytes.len() } else { self.n as usize };
+        for i in 1..d+1 {
+            bytes[d - i] = ((self.m[n] / p) % 10) as u8;
+            p *= 10;
+            if p == DECIMAL_BASE as i16 {
+                n += 1;
+                p = 1;
+            }
+        }
+    }
+
+    /// Return the number of decimal positions filled in the mantissa.
+    pub fn get_mantissa_len(&self) -> usize {
+        self.n as usize
+    }
+
+    /// Return 1 if BigFloat is positive, -1 otherwise.
+    pub fn get_sign(&self) -> i8 {
+        self.sign
+    }
+
+    /// Return exponent part.
+    pub fn get_exponent(&self) -> i8 {
+        self.e
+    }
+
+
     /// Add d2 and return result of addition.
     ///
     /// # Errors
@@ -677,12 +739,43 @@ mod tests {
 
     #[test]
     fn test_bigfloat() {
+
+
+        println!("Testing creation and deconstruction");
+
         let mut d1 = BigFloat::new(); 
         let mut d2 = BigFloat::new(); 
         let mut d3: BigFloat; 
         let mut ref_num = BigFloat::new();
 
         assert!(DECIMAL_PARTS >= 10);
+
+        // regular buf
+        let bytes1: [u8; 20] = [1,2,3,4,5,6,7,8,9,10,11,112,13,14,15,16,17,18,19,20];
+        let expected1: [u8; 30] = [1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,0,0,0,0,0,0,0,0,0,0];
+        let exp1 = 123;
+        let d4 = BigFloat::from_bytes(&bytes1, 1, exp1);
+
+        let mut mantissa_buf1 = [0; 30];
+        d4.get_mantissa_bytes(&mut mantissa_buf1);
+        assert!(mantissa_buf1 == expected1);
+        assert!(d4.get_mantissa_len() == bytes1.len());
+        assert!(d4.get_sign() == 1);
+        assert!(d4.get_exponent() == exp1);
+
+        // too long buf
+        let bytes2: [u8; 45] = [1,2,3,4,5,6,7,8,9,10,11,112,13,14,15,16,17,18,19,20,1,2,3,4,5,6,7,8,9,10,11,112,13,14,15,16,17,18,19,20,21,22,3,4,5];
+        let expected2: [u8; 42] = [1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,0,0];
+        let exp2 = -128;
+        let d4 = BigFloat::from_bytes(&bytes2, -2, exp2);
+
+        let mut mantissa_buf2 = [0; 42];
+        d4.get_mantissa_bytes(&mut mantissa_buf2);
+        assert!(mantissa_buf2 == expected2);
+        assert!(d4.get_mantissa_len() == 40);
+        assert!(d4.get_sign() == -1);
+        assert!(d4.get_exponent() == exp2);
+
 
         println!("Testing comparisons");
 
