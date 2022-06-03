@@ -11,7 +11,15 @@
 //!
 
 
-const DECIMAL_PARTS: usize = 10;
+mod defs;
+mod sqrt_const;
+
+use crate::defs::DECIMAL_PARTS;
+use crate::sqrt_const::SQRT_VALUES;
+
+pub use crate::defs::BigFloat;
+
+
 const DECIMAL_BASE_LOG10: usize = 4;
 const DECIMAL_POSITIONS: usize = DECIMAL_PARTS * DECIMAL_BASE_LOG10;
 const DECIMAL_BASE: usize = 10000;
@@ -19,6 +27,11 @@ const DECIMAL_SIGN_POS: i8 = 1;
 const DECIMAL_SIGN_NEG: i8 = -1;
 const DECIMAL_MIN_EXPONENT: i8 = -128;
 const DECIMAL_MAX_EXPONENT: i8 = 127;
+const SQRT_10_M: [i16; DECIMAL_PARTS] = [3364, 7185, 4432, 9354, 9988, 9331, 6837, 6601, 2277, 316];
+const SQRT_10_E: i8 = -38;
+const SQRT_10_N: i16 = 39;
+const ZEROED_MANTISSA: [i16; DECIMAL_PARTS] = [0; DECIMAL_PARTS];
+
 
 /// Possible errors.
 #[derive(Eq, PartialEq, Debug)]
@@ -28,15 +41,9 @@ pub enum Error {
 
     /// Divizor is zero.
     DivisionByZero,     
-}
 
-/// Number representation.
-#[derive(Copy, Clone, Debug)]
-pub struct BigFloat {
-    sign: i8,                // sign
-    e: i8,                   // exponent
-    n: i16,                  // the number of decimal positions in the mantissa excluding leading zeroes
-    m: [i16; DECIMAL_PARTS], // mantissa
+    /// Argument must not be a negative number.
+    ArgumentIsNegative,
 }
 
 impl BigFloat {
@@ -47,7 +54,7 @@ impl BigFloat {
             sign: DECIMAL_SIGN_POS,
             e: 0,
             n: 0,
-            m: [0; DECIMAL_PARTS],
+            m: ZEROED_MANTISSA,
         };
     }
 
@@ -57,7 +64,7 @@ impl BigFloat {
     /// If `sign` is negative, then the resulting BigFloat will be
     /// negative.
     pub fn from_bytes(bytes: &[u8], sign: i8, exponent: i8) -> BigFloat {
-        let mut mantissa = [0; DECIMAL_PARTS];
+        let mut mantissa = ZEROED_MANTISSA;
         let mut n: usize = 0;
         let mut p: i16 = 1;
         let d = if bytes.len() > DECIMAL_POSITIONS { DECIMAL_POSITIONS } else { bytes.len() };
@@ -112,6 +119,15 @@ impl BigFloat {
         self.e
     }
 
+    /// Return absolute value. 
+    pub fn abs(&self) -> BigFloat {
+        let mut ret = *self;
+        if ret.sign == DECIMAL_SIGN_NEG {
+            ret.sign = DECIMAL_SIGN_POS;
+        }
+        return ret;
+    }
+
 
     /// Add d2 and return result of addition.
     ///
@@ -144,7 +160,7 @@ impl BigFloat {
         let mut nd: i32;
         let mut e: i32 = self.e as i32 + d2.e as i32;
         let mut d1mi: i32;
-        let mut m3 = [0i16; DECIMAL_PARTS * 2];
+        let mut m3 = [0i16; DECIMAL_PARTS * 2 + 1];
 
         for i in 0..DECIMAL_PARTS {
             d1mi = self.m[i] as i32;
@@ -161,7 +177,7 @@ impl BigFloat {
                 k = m / DECIMAL_BASE as i32;
                 j += 1;
             }
-            m3[i + j] = m3[i + j] + k as i16;
+            m3[i + j] += k as i16;
         }
 
         n = Self::num_digits(&m3[DECIMAL_PARTS..]) as i32;
@@ -176,8 +192,7 @@ impl BigFloat {
             // save as much digits as we can
             e += n - DECIMAL_POSITIONS as i32;
             nd = n % DECIMAL_BASE_LOG10 as i32;
-            n = (n + DECIMAL_BASE_LOG10 as i32 - 1) / DECIMAL_BASE_LOG10 as i32
-                - DECIMAL_PARTS as i32;
+            n = n / DECIMAL_BASE_LOG10 as i32 - DECIMAL_PARTS as i32 + 1;
 
             Self::shift_left(&mut m3[n as usize..], DECIMAL_BASE_LOG10 - nd as usize);
 
@@ -394,6 +409,36 @@ impl BigFloat {
         return Ok(d3);
     }
 
+    /// Return square root of a number.
+    ///
+    /// # Errors
+    ///
+    /// Returns ArgumentIsNegative if `self` is less than 0.
+    pub fn sqrt(&self) -> Result<BigFloat, Error> {
+        if self.sign == DECIMAL_SIGN_NEG {
+            return Err(Error::ArgumentIsNegative);
+        }
+
+        if self.n == 0 || self.m == ZEROED_MANTISSA {
+            return Ok(*self);
+        }
+
+        let mut int_num = *self;
+        int_num.e = 0;
+        let mut ret = Self::sqrt_int(&int_num)?;
+
+        if self.e & 1 != 0 {
+            let sqrt_of_10 = Self::from_raw_parts(SQRT_10_M, SQRT_10_N, DECIMAL_SIGN_POS, SQRT_10_E);
+            if self.e < 0 {
+                ret = ret.div(&sqrt_of_10)?;
+            } else {
+                ret = ret.mul(&sqrt_of_10)?;
+            }
+        }
+        ret.e += self.e/2;
+        return Ok(ret);
+    }
+
     /// Compare to d2.
     /// Returns positive if self > d2, negative if self < d2, 0 otherwise.
     pub fn cmp(&self, d2: &BigFloat) -> i16 {
@@ -459,15 +504,21 @@ impl BigFloat {
         let mut v1: i16;
         let mut v2: i16;
 
-        s = n1 / DECIMAL_BASE_LOG10 as i16;
+        s = DECIMAL_BASE_LOG10 as i16 - n1 % DECIMAL_BASE_LOG10 as i16;
         while s > 0 {
             s -= 1;
-            t1 /= 10
+            t1 /= 10;
+            if t1 == 0 {
+                t1 = DECIMAL_BASE as i16 / 10;
+            };
         }
-        s = n2 / DECIMAL_BASE_LOG10 as i16;
+        s = DECIMAL_BASE_LOG10 as i16 - n2 % DECIMAL_BASE_LOG10 as i16;
         while s > 0 {
             s -= 1;
-            t2 /= 10
+            t2 /= 10;
+            if t2 == 0 {
+                t2 = DECIMAL_BASE as i16 / 10;
+            };
         }
 
         n1 -= 1;
@@ -480,12 +531,12 @@ impl BigFloat {
             }
             t1 /= 10;
             if t1 == 0 {
-                t1 = DECIMAL_BASE as i16 / 10
-            };
+                t1 = DECIMAL_BASE as i16 / 10;
+            }
             t2 /= 10;
             if t2 == 0 {
-                t2 = DECIMAL_BASE as i16 / 10
-            };
+                t2 = DECIMAL_BASE as i16 / 10;
+            }
             n1 -= 1;
             n2 -= 1;
         }
@@ -747,6 +798,36 @@ impl BigFloat {
             d3[i] = (m % DECIMAL_BASE as i32) as i16;
         }
         d3[DECIMAL_PARTS] = (m / DECIMAL_BASE as i32) as i16;
+    }
+
+    // sqrt of integer
+    fn sqrt_int(d1: &BigFloat) -> Result<BigFloat, Error> {
+
+        // choose initial value
+        let mut i = DECIMAL_PARTS - 1;
+        while d1.m[i] == 0 && i > 0 {
+            i -= 1;
+        }
+        let j = d1.m[i] / 100;
+        let mut n = SQRT_VALUES[i*99 + j as usize];
+
+        // Newton's method
+        let mut two = BigFloat::new();
+        two.m[0] = 2;
+        two.n = 1;
+        let mut err = *d1;
+        loop {
+            let nsq = n.mul(&n)?;
+            let nd = n.mul(&two)?;
+            let n2 = d1.add(&nsq)?.div(&nd)?;
+            let err2 = n.sub(&n2)?;
+            if err2.cmp(&err) >= 0 {
+                break;
+            }
+            err = err2;
+            n = n2;
+        }
+        return Ok(n);
     }
 }
 
@@ -1486,5 +1567,108 @@ mod tests {
         d2.e = -37;
         d1.e = DECIMAL_MAX_EXPONENT;
         assert!(d1.div(&d2).unwrap_err() == Error::ExponentOverflow);
+
+
+        println!("Testing abs");
+
+        d1 = BigFloat::new();
+        d1.sign = DECIMAL_SIGN_NEG;
+        assert!(d1.abs().sign == DECIMAL_SIGN_POS);
+        d1.sign = DECIMAL_SIGN_POS;
+        assert!(d1.abs().sign == DECIMAL_SIGN_POS);
+
+
+        println!("Testing sqrt");
+
+        let mut epsilon = BigFloat::new();
+        epsilon.m[0] = 1000;
+        epsilon.n = 4;
+
+        d1 = BigFloat::new();
+        d1.m[0] = 10;
+        d1.n = 2;
+        let ret = d1.sqrt().unwrap();
+        let ret = ret.mul(&ret).unwrap();
+        assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
+
+
+        // sqrt(1234567890.1234567 = 1.2345...+10^9)
+        d1 = BigFloat::new();
+        d1.m[0] = 4567;
+        d1.m[1] = 123;
+        d1.m[2] = 6789;
+        d1.m[3] = 2345;
+        d1.m[4] = 1;
+        d1.n = 17;
+        d1.e = -7;
+        let ret = d1.sqrt().unwrap();
+        let ret = ret.mul(&ret).unwrap();
+        assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
+
+        // positive exponent
+        d1 = BigFloat::new();
+        d1.m[0] = 4567;
+        d1.m[1] = 123;
+        d1.m[2] = 6789;
+        d1.m[3] = 2345;
+        d1.m[4] = 1;
+        d1.n = 17;
+        d1.e = 7;
+        let ret = d1.sqrt().unwrap();
+        let ret = ret.mul(&ret).unwrap();
+        assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
+
+        // value less than 1
+        d1 = BigFloat::new();
+        d1.m[0] = 4567;
+        d1.m[1] = 123;
+        d1.m[2] = 6789;
+        d1.m[3] = 2345;
+        d1.m[4] = 1;
+        d1.n = 17;
+        d1.e = -20;
+        let ret = d1.sqrt().unwrap();
+        let ret = ret.mul(&ret).unwrap();
+        assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
+
+        // value is negative
+        d1 = BigFloat::new();
+        d1.sign = DECIMAL_SIGN_NEG;
+        assert!(d1.sqrt().unwrap_err() == Error::ArgumentIsNegative);
+
+/*
+        d1 = BigFloat::new();
+        d1.m[0] = 4567;
+        d1.m[1] = 123;
+        d1.m[2] = 6789;
+        d1.m[3] = 2345;
+        d1.m[4] = 1;
+        d1.m[5] = 1;
+        d1.m[6] = 1;
+        d1.m[7] = 1;
+        d1.m[8] = 1;
+        d1.e = -7;
+        for i in 1..10000 {
+            d1.m[9] = i;
+            d1.m[0] = i;
+            d1.n = 36 + if i < 10 {1} else if i < 100 {2} else if i < 1000 {3} else {4} ;
+            let ret = d1.sqrt().unwrap();
+            let ret = ret.mul(&ret).unwrap();
+            assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
+        }
+
+        // print precalculated values
+        println!("const SQRT_VALUES: [990; BigFloat] = [");
+        let mut idx = 0;
+        for i in 0..10 {
+            for j in 1..100 {
+                d1 = BigFloat::new();
+                d1.m[i] = j*100;
+                d1.n = (i*DECIMAL_BASE_LOG10 + if j < 10 {3} else {4} ) as i16;
+                idx += 1;
+                let ret = d1.sqrt().unwrap();
+            }
+        }
+*/
     }
 }
