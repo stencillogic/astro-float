@@ -10,6 +10,7 @@ Characteristics:
 | Exponent minimum value        |   -128 |
 | Exponent maximum value        |    127 |
 
+The implementation does not rely heavily on the capabilities of the standard library, and can be adapted for use without the standard library.
 
 ## Usage
 
@@ -17,3 +18,4 @@ Characteristics:
 [dependencies]
 num-bigfloat = "0.1.1"
 ```
+

@@ -20,16 +20,23 @@ use crate::sqrt_const::SQRT_VALUES;
 pub use crate::defs::BigFloat;
 
 
-const DECIMAL_BASE_LOG10: usize = 4;
+const DECIMAL_BASE_LOG10: usize = 4;    // number decimal positions in a digit = log10(DECIMAL_BASE)
 const DECIMAL_POSITIONS: usize = DECIMAL_PARTS * DECIMAL_BASE_LOG10;
-const DECIMAL_BASE: usize = 10000;
-const DECIMAL_SIGN_POS: i8 = 1;
-const DECIMAL_SIGN_NEG: i8 = -1;
-const DECIMAL_MIN_EXPONENT: i8 = -128;
-const DECIMAL_MAX_EXPONENT: i8 = 127;
+const DECIMAL_BASE: usize = 10000;      // 9999 is the maximum of a digit
+const DECIMAL_SIGN_POS: i8 = 1;         // + sign
+const DECIMAL_SIGN_NEG: i8 = -1;        // - sign
+const DECIMAL_MIN_EXPONENT: i8 = -128;  // min exponent value
+const DECIMAL_MAX_EXPONENT: i8 = 127;   // max exponent value
+const DECIMAL_MAX_EXPONENT_POSITIONS: i16 = 3;  // max decimal positions in exponent
 const SQRT_10_M: [i16; DECIMAL_PARTS] = [3364, 7185, 4432, 9354, 9988, 9331, 6837, 6601, 2277, 316];
 const SQRT_10_E: i8 = -38;
 const SQRT_10_N: i16 = 39;
+const SQRT_OF_10: BigFloat = BigFloat {
+    m: SQRT_10_M, 
+    n: SQRT_10_N, 
+    sign: DECIMAL_SIGN_POS, 
+    e: SQRT_10_E,
+};
 const ZEROED_MANTISSA: [i16; DECIMAL_PARTS] = [0; DECIMAL_PARTS];
 
 
@@ -56,6 +63,14 @@ impl BigFloat {
             n: 0,
             m: ZEROED_MANTISSA,
         };
+    }
+    
+    /// Return BigFloat with the value of 1
+    pub fn one() -> Self {
+        let mut val = Self::new();
+        val.m[0] = 1;
+        val.n = 1;
+        return val;
     }
 
     /// Create a BigFloat value from a sequence of `bytes`. Each byte must represent a decimal digit.
@@ -133,7 +148,7 @@ impl BigFloat {
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - in case of too big or too small numbers.
+    /// ExponentOverflow - when result is too big or too small.
     pub fn add(&self, d2: &BigFloat) -> Result<BigFloat, Error> {
         return self.add_sub(d2, 1);
     }
@@ -142,7 +157,7 @@ impl BigFloat {
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - in case of too big or too small numbers.
+    /// ExponentOverflow - when result is too big or too small.
     pub fn sub(&self, d2: &BigFloat) -> Result<BigFloat, Error> {
         return self.add_sub(d2, -1);
     }
@@ -151,9 +166,9 @@ impl BigFloat {
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - in case of too big or too small numbers.
+    /// ExponentOverflow - when result is too big or too small.
     pub fn mul(&self, d2: &BigFloat) -> Result<BigFloat, Error> {
-        let mut d3 = BigFloat::new();
+        let mut d3 = Self::new();
         let mut m: i32;
         let mut k: i32;
         let mut n: i32;
@@ -230,11 +245,11 @@ impl BigFloat {
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - in case of too big or too small numbers.
+    /// ExponentOverflow - when result is too big or too small.
     /// DivisionByZero - in case of d2 equal to zero.
     pub fn div(&self, d2: &BigFloat) -> Result<BigFloat, Error> {
         // Knuth's division
-        let mut d3 = BigFloat::new();
+        let mut d3 = Self::new();
         let mut d: i32;
         let mut c: i16;
         let mut i: i32;
@@ -428,14 +443,104 @@ impl BigFloat {
         let mut ret = Self::sqrt_int(&int_num)?;
 
         if self.e & 1 != 0 {
-            let sqrt_of_10 = Self::from_raw_parts(SQRT_10_M, SQRT_10_N, DECIMAL_SIGN_POS, SQRT_10_E);
             if self.e < 0 {
-                ret = ret.div(&sqrt_of_10)?;
+                ret = ret.div(&SQRT_OF_10)?;
             } else {
-                ret = ret.mul(&sqrt_of_10)?;
+                ret = ret.mul(&SQRT_OF_10)?;
             }
         }
         ret.e += self.e/2;
+        return Ok(ret);
+    }
+
+    /// Return BigFloat to the power of `d1`.
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big or too small.
+    /// ArgumentIsNegative - when `d1` has fractional part and `self` is negative.
+    pub fn pow(&self, d1: &BigFloat) -> Result<BigFloat, Error> {
+        if self.n == 0 {
+            return Ok(*self);
+        }
+
+        if d1.n == 0 {
+            return Ok(Self::one());
+        }
+
+        if d1.n + d1.e as i16 > DECIMAL_MAX_EXPONENT_POSITIONS {
+            return Err(Error::ExponentOverflow);
+        }
+
+        // fractional part of d1 
+        let mut fractional = Self::new();
+        let mut i = -(d1.e as i32);
+        if i > 0 && i < (DECIMAL_POSITIONS*2) as i32 {
+            fractional.m = d1.m;
+            fractional.n = DECIMAL_POSITIONS as i16;
+            if i < DECIMAL_POSITIONS as i32 {
+                Self::shift_left(&mut fractional.m, DECIMAL_POSITIONS - i as usize);
+            } else if i > DECIMAL_POSITIONS as i32 {
+                Self::shift_right(&mut fractional.m, i as usize - DECIMAL_POSITIONS);
+            }
+        }
+
+        // integer part of d1
+        let mut int = Self::new();
+        let mut t = Self::get_div_factor(-(d1.e as i16));
+        if i < 0 {
+            i = 0;
+        }
+        let mut t2 = 1;
+        while i < d1.n as i32 {
+            int.m[int.n as usize / DECIMAL_BASE_LOG10] += (d1.m[i as usize / DECIMAL_BASE_LOG10 as usize] / t % 10) * t2;
+            int.n += 1;
+            i += 1;
+            t *= 10;
+            if t == DECIMAL_BASE as i16 {
+                t = 1;
+            }
+            t2 *= 10;
+            if t2 == DECIMAL_BASE as i16 {
+                t2 = 1;
+            }
+        }
+
+        let mut ret = Self::one();
+        let one = ret;
+        let mut ml = *self;
+        while int.n > 0 {
+            if int.m[0] & 1 != 0 {
+                ret = ret.mul(&ml)?;
+            }
+            ml = ml.mul(&ml)?;
+            Self::divide_by_two_int(&mut int);
+        }
+        let mut m = [0; DECIMAL_PARTS + 1];
+        let mut sq = self.sqrt()?;
+        let mut err = sq;
+        if fractional.m != ZEROED_MANTISSA {
+            loop {
+                Self::mul_by_digit(&fractional.m, 2, &mut m);
+                if m[DECIMAL_PARTS] != 0 {
+                    ret = ret.mul(&sq)?;
+                    m[DECIMAL_PARTS] = 0;
+                }
+                fractional.m.as_mut_slice().copy_from_slice(&m[0..DECIMAL_PARTS]);
+                let sq2 = sq.sqrt()?;
+                let err2 = sq.sub(&sq2)?.abs();
+                if fractional.m == ZEROED_MANTISSA || err2.cmp(&err) >= 0 {
+                    break;
+                }
+                sq = sq2;
+                err = err2;
+            }
+        }
+
+        if d1.sign == DECIMAL_SIGN_NEG {
+            ret = one.div(&ret)?;
+        }
+
         return Ok(ret);
     }
 
@@ -461,7 +566,6 @@ impl BigFloat {
 
         return Self::abs_cmp(&self.m, &d2.m) * self.sign as i16;
     }
-
 
     /// Return raw parts of BigFloat: mantissa, number of decimal positions in mantissa, sing, and
     /// exponent.
@@ -496,7 +600,7 @@ impl BigFloat {
     }
 
     // compare absolute values of two floats with shifts n1, n2
-    // return positive if self > d2, negative if self < d2, 0 otherwise
+    // return positive if d1 > d2, negative if d1 < d2, 0 otherwise
     fn abs_cmp_with_shift(d1: &[i16], mut n1: i16, d2: &[i16], mut n2: i16) -> i16 {
         let mut t1: i16 = DECIMAL_BASE as i16 / 10;
         let mut t2: i16 = DECIMAL_BASE as i16 / 10;
@@ -540,12 +644,26 @@ impl BigFloat {
             n1 -= 1;
             n2 -= 1;
         }
+        while n1 >=0 {
+            v1 = (d1[n1 as usize / DECIMAL_BASE_LOG10] / t1) % 10;
+            if v1 != 0 {
+                return 1;
+            }
+            n1 -= 1;
+        }
+        while n2 >=0 {
+            v2 = (d2[n2 as usize / DECIMAL_BASE_LOG10] / t2) % 10;
+            if v2 != 0 {
+                return -1;
+            }
+            n2 -= 1;
+        }
         return 0;
     }
 
     // add if op >= 0 subtract if op < 0
     fn add_sub(&self, d2: &BigFloat, op: i8) -> Result<BigFloat, Error> {
-        let mut d3 = BigFloat::new();
+        let mut d3 = Self::new();
         let shift: i32;
         let free: i32;
         let mut e: i32;
@@ -812,7 +930,7 @@ impl BigFloat {
         let mut n = SQRT_VALUES[i*99 + j as usize];
 
         // Newton's method
-        let mut two = BigFloat::new();
+        let mut two = Self::new();
         two.m[0] = 2;
         two.n = 1;
         let mut err = *d1;
@@ -828,6 +946,29 @@ impl BigFloat {
             n = n2;
         }
         return Ok(n);
+    }
+
+    // divide BigFloat by two as integer
+    fn divide_by_two_int(d1: &mut BigFloat) {
+        d1.m[0] >>= 1;
+        for i in 1..(d1.n as usize + DECIMAL_BASE_LOG10 - 1) / DECIMAL_BASE_LOG10 {
+            if d1.m[i] & 1 != 0 {
+                d1.m[i - 1] += DECIMAL_BASE as i16 / 2;
+            }
+            d1.m[i] >>= 1;
+        }
+        d1.n = Self::num_digits(&d1.m);
+    }
+
+    // factor to divide by to get a digit at position n
+    fn get_div_factor(n: i16) -> i16 {
+        let mut x = n % DECIMAL_BASE_LOG10 as i16;
+        let mut t = 1;
+        while x > 0 {
+            t *= 10;
+            x -= 1;
+        }
+        return t;
     }
 }
 
@@ -846,6 +987,7 @@ mod tests {
         let mut d2 = BigFloat::new(); 
         let mut d3: BigFloat; 
         let mut ref_num = BigFloat::new();
+        let one = BigFloat::one();
 
         assert!(DECIMAL_PARTS >= 10);
 
@@ -1581,8 +1723,9 @@ mod tests {
         println!("Testing sqrt");
 
         let mut epsilon = BigFloat::new();
-        epsilon.m[0] = 1000;
-        epsilon.n = 4;
+        epsilon.m[0] = 1;
+        epsilon.n = 1;
+        epsilon.e = -35;
 
         d1 = BigFloat::new();
         d1.m[0] = 10;
@@ -1603,6 +1746,7 @@ mod tests {
         d1.e = -7;
         let ret = d1.sqrt().unwrap();
         let ret = ret.mul(&ret).unwrap();
+        epsilon.e = -d1.n as i8 + 1;
         assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
 
         // positive exponent
@@ -1616,6 +1760,7 @@ mod tests {
         d1.e = 7;
         let ret = d1.sqrt().unwrap();
         let ret = ret.mul(&ret).unwrap();
+        epsilon.e = -d1.n as i8 + d1.e;
         assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
 
         // value less than 1
@@ -1629,6 +1774,7 @@ mod tests {
         d1.e = -20;
         let ret = d1.sqrt().unwrap();
         let ret = ret.mul(&ret).unwrap();
+        epsilon.e = -d1.n as i8 + 1;
         assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
 
         // value is negative
@@ -1670,5 +1816,130 @@ mod tests {
             }
         }
 */
+
+
+        println!("Testing pow");
+
+        d1 = BigFloat::new();
+        d2 = BigFloat::new();
+        d2.m[0] = 2;
+        d2.n = 1;
+        d1.m[0] = 2345;
+        d1.m[1] = 8901;
+        d1.m[2] = 4567;
+        d1.m[3] = 123;
+        d1.n = 15;
+        d1.e = -12;
+        d2.pow(&d1).unwrap();
+
+
+        // zero number
+        d1 = BigFloat::new();
+        d2 = BigFloat::new();
+        ref_num = BigFloat::new();
+        d1.m[0] = 123;
+        d1.n = 3;
+        d1.e = -1;
+        assert!(d2.pow(&d1).unwrap().cmp(&ref_num) == 0);
+
+        // zero argument
+        d1 = BigFloat::new();
+        d2 = BigFloat::new();
+        ref_num = BigFloat::new();
+        ref_num.m[0] = 1;
+        ref_num.n = 1;
+        d2.m[0] = 123;
+        d2.n = 3;
+        d2.e = -1;
+        assert!(d2.pow(&d1).unwrap().cmp(&ref_num) == 0);
+
+        // argument is too large
+        d1 = BigFloat::new();
+        d2 = BigFloat::new();
+        d2.m[0] = 2;
+        d2.n = 1;
+        d1.m[0] = 123;
+        d1.n = 3;
+        d1.e = 1;
+        assert!(d2.pow(&d1).unwrap_err() == Error::ExponentOverflow);
+
+        // argument is too small
+        d1 = BigFloat::new();
+        d2 = BigFloat::new();
+        ref_num = BigFloat::new();
+        ref_num.m[0] = 1;
+        ref_num.n = 1;
+        d1.m[0] = 123;
+        d1.m[1] = 123;
+        d1.n = 7;
+        d1.e = -47;
+        d2.m[0] = 2;
+        d2.n = 1;
+        assert!(d2.pow(&d1).unwrap().cmp(&ref_num) == 0);
+
+        // 2^123.4567890
+        d1 = BigFloat::new();
+        d2 = BigFloat::new();
+        ref_num = BigFloat::new();
+        ref_num.m[0] = 5002;
+        ref_num.m[1] = 7855;
+        ref_num.m[2] = 6147;
+        ref_num.m[3] = 8828;
+        ref_num.m[4] = 46;
+        ref_num.m[5] = 873;
+        ref_num.m[6] = 5984; 
+        ref_num.m[7] = 9057; 
+        ref_num.m[8] = 4749; 
+        ref_num.m[9] = 1459;
+        ref_num.n = 40;
+        ref_num.e = -2;
+        d1.m[0] = 7890;
+        d1.m[1] = 3456;
+        d1.m[2] = 12;
+        d1.n = 10;
+        d1.e = -7;
+        d2.m[0] = 2;
+        d2.n = 1;
+        assert!(d2.pow(&d1).unwrap().cmp(&ref_num) == 0);
+
+        // negative argument
+        ref_num = one.div(&ref_num).unwrap();
+        d1.sign = DECIMAL_SIGN_NEG;
+        assert!(d2.pow(&d1).unwrap().cmp(&ref_num) == 0);
+
+        let mut ret;
+        let mut inv;
+        d2 = BigFloat::new();
+        d2.m[0] = 4567;
+        d2.m[1] = 123;
+        d2.m[2] = 6789;
+        d2.m[3] = 2345;
+        d2.m[4] = 651;
+        d2.m[5] = 41;
+        d2.m[6] = 671;
+        d2.m[7] = 100;
+        d2.m[8] = 10;
+        d2.m[9] = 9999;
+        d2.n = DECIMAL_POSITIONS as i16;
+        d2.e = -38;
+        d1 = BigFloat::new();
+        d1.m[0] = 2;
+        d1.m[1] = 0;
+        d1.m[2] = 0;
+        d1.n = 1;
+        epsilon.e = -34;
+        d1.e = 0;
+        for i in 1..1000 {
+            for j in 0..10 {
+                d2.m[2] = i;
+                d2.m[5] = i;
+                d1.m[1] = j*1000;
+                d1.m[2] = 10+j;
+                inv = one.div(&d1).unwrap();
+                ret = d2.pow(&d1).unwrap();
+                ret = ret.pow(&inv).unwrap();
+                assert!(d2.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
+            }
+        }
     }
 }
