@@ -65,7 +65,7 @@ impl BigFloat {
         };
     }
     
-    /// Return BigFloat with the value of 1
+    /// Return BigFloat with the value of 1.
     pub fn one() -> Self {
         let mut val = Self::new();
         val.m[0] = 1;
@@ -458,6 +458,7 @@ impl BigFloat {
     /// # Errors
     ///
     /// ExponentOverflow - when result is too big or too small.
+    ///
     /// ArgumentIsNegative - when `d1` has fractional part and `self` is negative.
     pub fn pow(&self, d1: &BigFloat) -> Result<BigFloat, Error> {
         if self.n == 0 {
