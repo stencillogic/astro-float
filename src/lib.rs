@@ -28,16 +28,28 @@ const DECIMAL_SIGN_NEG: i8 = -1;        // - sign
 const DECIMAL_MIN_EXPONENT: i8 = -128;  // min exponent value
 const DECIMAL_MAX_EXPONENT: i8 = 127;   // max exponent value
 const DECIMAL_MAX_EXPONENT_POSITIONS: i16 = 3;  // max decimal positions in exponent
-const SQRT_10_M: [i16; DECIMAL_PARTS] = [3364, 7185, 4432, 9354, 9988, 9331, 6837, 6601, 2277, 316];
-const SQRT_10_E: i8 = -38;
-const SQRT_10_N: i16 = 39;
 const SQRT_OF_10: BigFloat = BigFloat {
-    m: SQRT_10_M, 
-    n: SQRT_10_N, 
+    m: [3364, 7185, 4432, 9354, 9988, 9331, 6837, 6601, 2277, 316], 
+    n: 39, 
     sign: DECIMAL_SIGN_POS, 
-    e: SQRT_10_E,
+    e: -38,
 };
 const ZEROED_MANTISSA: [i16; DECIMAL_PARTS] = [0; DECIMAL_PARTS];
+const LN_OF_10: BigFloat = BigFloat {
+    m: [7601, 6420, 6843, 1454, 1799, 6840, 4045, 9299, 5850, 2302] , 
+    n: 40, 
+    sign: DECIMAL_SIGN_POS, 
+    e: -39,
+};
+
+/// Eulers number.
+pub const E: BigFloat = BigFloat {
+    m: [7757, 6249, 3526, 7471, 6028, 2353, 9045, 2845, 2818, 2718],
+    n: DECIMAL_POSITIONS as i16, 
+    sign: DECIMAL_SIGN_POS, 
+    e: 1 - (DECIMAL_POSITIONS as i8),
+};
+
 
 
 /// Possible errors.
@@ -51,6 +63,9 @@ pub enum Error {
 
     /// Argument must not be a negative number.
     ArgumentIsNegative,
+
+    /// Invalid argument.
+    InvalidArgument,
 }
 
 impl BigFloat {
@@ -68,8 +83,9 @@ impl BigFloat {
     /// Return BigFloat with the value of 1.
     pub fn one() -> Self {
         let mut val = Self::new();
-        val.m[0] = 1;
-        val.n = 1;
+        val.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/10;
+        val.n = DECIMAL_POSITIONS as i16;
+        val.e = 1 - DECIMAL_POSITIONS as i8;
         return val;
     }
 
@@ -543,6 +559,61 @@ impl BigFloat {
         }
 
         return Ok(ret);
+    }
+
+    /// Returns natural logarithm of a number.
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big or too small.
+    ///
+    /// InvalidArgument - when `self` is negative or zero.
+    pub fn ln(&self) -> Result<BigFloat, Error> {
+        if self.sign == DECIMAL_SIGN_NEG || self.n == 0 {
+            return Err(Error::InvalidArgument);
+        }
+
+        // factoring: ln(d) = ln(d.m ^ (d.n-1)) + (d.e + 1 - d.n) * ln(10)
+        let mut add = BigFloat::new();
+        let mut s = self.e as i16 - 1 + self.n;
+        if s != 0 {
+            assert!(DECIMAL_MAX_EXPONENT as i16 - DECIMAL_MIN_EXPONENT as i16 + 1 - (DECIMAL_POSITIONS as i16) < DECIMAL_BASE as i16);
+            if s > 0 {
+                add.m[0] = s;
+            } else {
+                add.m[0] = -s;
+                add.sign = DECIMAL_SIGN_NEG;
+            }
+            while s != 0 {
+                add.n += 1;
+                s /= 10;
+            }
+            add = add.mul(&LN_OF_10)?;
+        }
+
+        // artanh series
+        let one = Self::one();
+        let mut ml = *self;
+        ml.e = 1 - ml.n as i8;
+        ml = ml.sub(&one)?.div(&ml.add(&one)?)?;    // (x-1)/(x+1)
+        let mut ret = ml;
+        let mlq = ml.mul(&ml)?;
+        let mut d = one;
+        let mut two = Self::new();
+        two.m[DECIMAL_PARTS-1] = (DECIMAL_BASE/5) as i16;
+        two.n = DECIMAL_POSITIONS as i16;
+        two.e = 1 - DECIMAL_POSITIONS as i8;
+        loop {
+            d = d.add(&two)?;
+            ml = ml.mul(&mlq)?;
+            let p = &ml.div(&d)?;
+            let val = ret.add(&p)?;
+            if val.cmp(&ret) == 0 {
+                break;
+            }
+            ret = val;
+        }
+        return Ok(ret.mul(&two)?.add(&add)?);
     }
 
     /// Compare to d2.
@@ -1723,10 +1794,8 @@ mod tests {
 
         println!("Testing sqrt");
 
-        let mut epsilon = BigFloat::new();
-        epsilon.m[0] = 1;
-        epsilon.n = 1;
-        epsilon.e = -35;
+        let mut epsilon = BigFloat::one();
+        epsilon.e = -35 - epsilon.n as i8 + 1;
 
         d1 = BigFloat::new();
         d1.m[0] = 10;
@@ -1882,7 +1951,7 @@ mod tests {
         d1 = BigFloat::new();
         d2 = BigFloat::new();
         ref_num = BigFloat::new();
-        ref_num.m[0] = 5002;
+        ref_num.m[0] = 2002;
         ref_num.m[1] = 7855;
         ref_num.m[2] = 6147;
         ref_num.m[3] = 8828;
@@ -1930,7 +1999,7 @@ mod tests {
         d1.n = 1;
         epsilon.e = -34;
         d1.e = 0;
-        for i in 1..1000 {
+        for i in 1..100 {
             for j in 0..10 {
                 d2.m[2] = i;
                 d2.m[5] = i;
@@ -1941,6 +2010,46 @@ mod tests {
                 ret = ret.pow(&inv).unwrap();
                 assert!(d2.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
             }
+        }
+
+
+        println!("Testing ln");
+
+        // arg = 0
+        d1 = BigFloat::new();
+        assert!(d1.ln().unwrap_err() == Error::InvalidArgument);
+
+        // arg < 0
+        d1 = BigFloat::one();
+        d1.sign = DECIMAL_SIGN_NEG;
+        assert!(d1.ln().unwrap_err() == Error::InvalidArgument);
+
+        // ln of E = 1
+        epsilon.e = -36;
+        assert!(E.ln().unwrap().sub(&one).unwrap().abs().cmp(&epsilon) < 0);
+
+        d2 = BigFloat::new();
+        d2.m[0] = 4567;
+        d2.m[1] = 123;
+        d2.m[2] = 6789;
+        d2.m[3] = 2345;
+        d2.m[4] = 651;
+        d2.m[5] = 41;
+        d2.m[6] = 671;
+        d2.m[7] = 100;
+        d2.m[8] = 10;
+        d2.m[9] = 9999;
+        d2.n = DECIMAL_POSITIONS as i16;
+        d2.e = -10;
+        for i in 0..100 {
+            d2.m[2] = i;
+            d2.m[5] = i;
+            d2.e = -50 + (i%100) as i8;
+            epsilon.e = d2.e - 33;
+            ret = d2.ln().unwrap();
+            d2.get_mantissa_bytes(&mut mantissa_buf2);
+            d1 = E.pow(&ret).unwrap();
+            assert!(d2.sub(&d1).unwrap().abs().cmp(&epsilon) < 0);
         }
     }
 }
