@@ -8,16 +8,19 @@
 //! | Exponent minimum value        |   -128 |
 //! | Exponent maximum value        |    127 |
 //!
-//!
+//! The implementation does not rely heavily on the capabilities of the standard library, and can be adapted for use without the standard library.
 
 
 mod defs;
 mod sqrt_const;
+mod increased;
 
 use crate::defs::DECIMAL_PARTS;
 use crate::sqrt_const::SQRT_VALUES;
+use crate::increased::BigFloatInc;
 
 pub use crate::defs::BigFloat;
+pub use crate::defs::Error;
 
 
 const DECIMAL_BASE_LOG10: usize = 4;    // number decimal positions in a digit = log10(DECIMAL_BASE)
@@ -28,19 +31,26 @@ const DECIMAL_SIGN_NEG: i8 = -1;        // - sign
 const DECIMAL_MIN_EXPONENT: i8 = -128;  // min exponent value
 const DECIMAL_MAX_EXPONENT: i8 = 127;   // max exponent value
 const DECIMAL_MAX_EXPONENT_POSITIONS: i16 = 3;  // max decimal positions in exponent
-const SQRT_OF_10: BigFloat = BigFloat {
-    m: [3364, 7185, 4432, 9354, 9988, 9331, 6837, 6601, 2277, 316], 
-    n: 39, 
+const SQRT_OF_10: BigFloatInc = BigFloatInc {
+    m: [5551, 3719, 1853, 4327, 3544, 9889, 3319, 8379, 6016, 2776, 3162], 
+    n: 44, 
     sign: DECIMAL_SIGN_POS, 
-    e: -38,
+    e: -43,
 };
 const ZEROED_MANTISSA: [i16; DECIMAL_PARTS] = [0; DECIMAL_PARTS];
-const LN_OF_10: BigFloat = BigFloat {
-    m: [7601, 6420, 6843, 1454, 1799, 6840, 4045, 9299, 5850, 2302] , 
-    n: 40, 
+const LN_OF_10: BigFloatInc = BigFloatInc {
+    m: [1015, 7601, 6420, 6843, 1454, 1799, 6840, 4045, 9299, 5850, 2302] , 
+    n: 44, 
     sign: DECIMAL_SIGN_POS, 
-    e: -39,
+    e: -43,
 };
+const LN_OF_2: BigFloatInc = BigFloatInc {
+    m: [0013, 755, 6568, 5817, 1214, 7232, 941, 9453, 559, 4718, 6931],
+    n: 44, 
+    sign: DECIMAL_SIGN_POS, 
+    e: -44,
+};
+
 
 /// Eulers number.
 pub const E: BigFloat = BigFloat {
@@ -50,23 +60,6 @@ pub const E: BigFloat = BigFloat {
     e: 1 - (DECIMAL_POSITIONS as i8),
 };
 
-
-
-/// Possible errors.
-#[derive(Eq, PartialEq, Debug)]
-pub enum Error {
-    /// Exponent value becomes greater than the upper bound or smaller than the lower bound for exponent value.
-    ExponentOverflow,   
-
-    /// Divizor is zero.
-    DivisionByZero,     
-
-    /// Argument must not be a negative number.
-    ArgumentIsNegative,
-
-    /// Invalid argument.
-    InvalidArgument,
-}
 
 impl BigFloat {
 
@@ -228,6 +221,7 @@ impl BigFloat {
             Self::shift_left(&mut m3[n as usize..], DECIMAL_BASE_LOG10 - nd as usize);
 
             k = DECIMAL_BASE as i32;
+            nd = DECIMAL_BASE_LOG10 as i32 - nd;
             while nd > 0 {
                 k /= 10;
                 nd -= 1;
@@ -454,17 +448,18 @@ impl BigFloat {
             return Ok(*self);
         }
 
-        let mut int_num = *self;
+        let mut int_num = Self::to_big_float_inc(self);
         int_num.e = 0;
-        let mut ret = Self::sqrt_int(&int_num)?;
+        let mut sq = Self::sqrt_int(&int_num)?;
 
         if self.e & 1 != 0 {
             if self.e < 0 {
-                ret = ret.div(&SQRT_OF_10)?;
+                sq = sq.div(&SQRT_OF_10)?;
             } else {
-                ret = ret.mul(&SQRT_OF_10)?;
+                sq = sq.mul(&SQRT_OF_10)?;
             }
         }
+        let mut ret = Self::from_big_float_inc(&mut sq);
         ret.e += self.e/2;
         return Ok(ret);
     }
@@ -573,11 +568,13 @@ impl BigFloat {
             return Err(Error::InvalidArgument);
         }
 
-        // factoring: ln(d) = ln(d.m ^ (d.n-1)) + (d.e + 1 - d.n) * ln(10)
-        let mut add = BigFloat::new();
+        // factoring: ln(d) = ln(d.m ^ (1 - d.n)) + (d.e - 1 + d.n) * ln(10)
+        let mut add = BigFloatInc::new();
         let mut s = self.e as i16 - 1 + self.n;
         if s != 0 {
-            assert!(DECIMAL_MAX_EXPONENT as i16 - DECIMAL_MIN_EXPONENT as i16 + 1 - (DECIMAL_POSITIONS as i16) < DECIMAL_BASE as i16);
+            // check if s fits in single "digit"
+            assert!(DECIMAL_MAX_EXPONENT as i16 + 1 + (DECIMAL_POSITIONS as i16) < DECIMAL_BASE as i16 && 
+               DECIMAL_POSITIONS as i16 + 1 - (DECIMAL_MIN_EXPONENT as i16) < DECIMAL_BASE as i16);
             if s > 0 {
                 add.m[0] = s;
             } else {
@@ -591,29 +588,35 @@ impl BigFloat {
             add = add.mul(&LN_OF_10)?;
         }
 
-        // artanh series
-        let one = Self::one();
-        let mut ml = *self;
+        let one = BigFloatInc::one();
+        let two = BigFloatInc::two();
+        let mut ml = Self::to_big_float_inc(self);
         ml.e = 1 - ml.n as i8;
+
+        // additional factoring
+        while ml.cmp(&two) >= 0 {
+            add = add.add(&LN_OF_2)?;
+            ml = ml.div(&two)?;
+        }
+
+        // artanh series
         ml = ml.sub(&one)?.div(&ml.add(&one)?)?;    // (x-1)/(x+1)
         let mut ret = ml;
         let mlq = ml.mul(&ml)?;
         let mut d = one;
-        let mut two = Self::new();
-        two.m[DECIMAL_PARTS-1] = (DECIMAL_BASE/5) as i16;
-        two.n = DECIMAL_POSITIONS as i16;
-        two.e = 1 - DECIMAL_POSITIONS as i8;
         loop {
             d = d.add(&two)?;
             ml = ml.mul(&mlq)?;
-            let p = &ml.div(&d)?;
+            let p = ml.div(&d)?;
             let val = ret.add(&p)?;
             if val.cmp(&ret) == 0 {
                 break;
             }
             ret = val;
         }
-        return Ok(ret.mul(&two)?.add(&add)?);
+        ret = ret.mul(&two)?.add(&add)?;
+
+        return Ok(Self::from_big_float_inc(&mut ret));
     }
 
     /// Compare to d2.
@@ -623,8 +626,17 @@ impl BigFloat {
             return self.sign as i16;
         }
 
-        let diff: i32 = self.e as i32 + self.n as i32 - d2.e as i32 - d2.n as i32;
+        if self.n == 0 || d2.n == 0 {
+            if d2.n != 0 {
+                return -d2.sign as i16;
+            } else if self.n != 0 {
+                return self.sign as i16;
+            } else {
+                return 0;
+            }
+        }
 
+        let diff: i32 = self.e as i32 + self.n as i32 - d2.e as i32 - d2.n as i32;
         if diff > 0 {
             return 1;
         }
@@ -991,7 +1003,7 @@ impl BigFloat {
     }
 
     // sqrt of integer
-    fn sqrt_int(d1: &BigFloat) -> Result<BigFloat, Error> {
+    fn sqrt_int(d1: &BigFloatInc) -> Result<BigFloatInc, Error> {
 
         // choose initial value
         let mut i = DECIMAL_PARTS - 1;
@@ -999,10 +1011,10 @@ impl BigFloat {
             i -= 1;
         }
         let j = d1.m[i] / 100;
-        let mut n = SQRT_VALUES[i*99 + j as usize];
+        let mut n = Self::to_big_float_inc(&SQRT_VALUES[i*99 + j as usize]);
 
         // Newton's method
-        let mut two = Self::new();
+        let mut two = BigFloatInc::new();
         two.m[0] = 2;
         two.n = 1;
         let mut err = *d1;
@@ -1041,6 +1053,28 @@ impl BigFloat {
             x -= 1;
         }
         return t;
+    }
+
+    // Convert to BigFloatInc.
+    fn to_big_float_inc(d1: &BigFloat) -> BigFloatInc {
+        let mut ret = BigFloatInc::new();
+        (&mut ret.m[0..DECIMAL_PARTS]).copy_from_slice(&d1.m);
+        ret.n = d1.n;
+        ret.e = d1.e;
+        ret.sign = d1.sign;
+        return ret;
+    }
+
+    // Convert from BigFloatInc.
+    fn from_big_float_inc(d1: &mut BigFloatInc) -> BigFloat {
+        let mut ret = BigFloat::new();
+        d1.maximize_mantissa();
+        d1.round();
+        (&mut ret.m).copy_from_slice(&d1.m[1..]);
+        ret.n = if d1.n > DECIMAL_PARTS as i16 { d1.n - DECIMAL_BASE_LOG10 as i16 } else { 0 };
+        ret.e = d1.e + DECIMAL_BASE_LOG10 as i8;
+        ret.sign = d1.sign;
+        return ret;
     }
 }
 
@@ -1795,7 +1829,7 @@ mod tests {
         println!("Testing sqrt");
 
         let mut epsilon = BigFloat::one();
-        epsilon.e = -35 - epsilon.n as i8 + 1;
+        epsilon.e = - epsilon.n as i8 + 1 - (DECIMAL_POSITIONS as i8);
 
         d1 = BigFloat::new();
         d1.m[0] = 10;
@@ -1816,8 +1850,8 @@ mod tests {
         d1.e = -7;
         let ret = d1.sqrt().unwrap();
         let ret = ret.mul(&ret).unwrap();
-        epsilon.e = -d1.n as i8 + 1;
-        assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
+        epsilon.e = -69;    // 1*10^(-30)
+        assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) <= 0);
 
         // positive exponent
         d1 = BigFloat::new();
@@ -1830,8 +1864,8 @@ mod tests {
         d1.e = 7;
         let ret = d1.sqrt().unwrap();
         let ret = ret.mul(&ret).unwrap();
-        epsilon.e = -d1.n as i8 + d1.e;
-        assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
+        epsilon.e = -55;    // 1*10^(-16)
+        assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) <= 0);
 
         // value less than 1
         d1 = BigFloat::new();
@@ -1844,8 +1878,8 @@ mod tests {
         d1.e = -20;
         let ret = d1.sqrt().unwrap();
         let ret = ret.mul(&ret).unwrap();
-        epsilon.e = -d1.n as i8 + 1;
-        assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
+        epsilon.e = -82;    // 1*10^(-43)
+        assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) <= 0);
 
         // value is negative
         d1 = BigFloat::new();
@@ -1951,8 +1985,8 @@ mod tests {
         d1 = BigFloat::new();
         d2 = BigFloat::new();
         ref_num = BigFloat::new();
-        ref_num.m[0] = 2002;
-        ref_num.m[1] = 7855;
+        ref_num.m[0] = 5307;
+        ref_num.m[1] = 7857;
         ref_num.m[2] = 6147;
         ref_num.m[3] = 8828;
         ref_num.m[4] = 46;
@@ -1980,7 +2014,7 @@ mod tests {
         let mut ret;
         let mut inv;
         d2 = BigFloat::new();
-        d2.m[0] = 4567;
+        d2.m[0] = 4560;
         d2.m[1] = 123;
         d2.m[2] = 6789;
         d2.m[3] = 2345;
@@ -1997,7 +2031,7 @@ mod tests {
         d1.m[1] = 0;
         d1.m[2] = 0;
         d1.n = 1;
-        epsilon.e = -34;
+        epsilon.e = -77; // 1*10^(-38)
         d1.e = 0;
         for i in 1..100 {
             for j in 0..10 {
@@ -2008,7 +2042,7 @@ mod tests {
                 inv = one.div(&d1).unwrap();
                 ret = d2.pow(&d1).unwrap();
                 ret = ret.pow(&inv).unwrap();
-                assert!(d2.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
+                assert!(d2.sub(&ret).unwrap().abs().cmp(&epsilon) <= 0);
             }
         }
 
@@ -2025,8 +2059,8 @@ mod tests {
         assert!(d1.ln().unwrap_err() == Error::InvalidArgument);
 
         // ln of E = 1
-        epsilon.e = -36;
-        assert!(E.ln().unwrap().sub(&one).unwrap().abs().cmp(&epsilon) < 0);
+        epsilon.e = -77;    // 1*10^(-39)
+        assert!(E.ln().unwrap().sub(&one).unwrap().abs().cmp(&epsilon) <= 0);
 
         d2 = BigFloat::new();
         d2.m[0] = 4567;
@@ -2045,11 +2079,10 @@ mod tests {
             d2.m[2] = i;
             d2.m[5] = i;
             d2.e = -50 + (i%100) as i8;
-            epsilon.e = d2.e - 33;
+            epsilon.e = d2.e - 36;  // 1*10^(1 + d2.e)
             ret = d2.ln().unwrap();
-            d2.get_mantissa_bytes(&mut mantissa_buf2);
             d1 = E.pow(&ret).unwrap();
-            assert!(d2.sub(&d1).unwrap().abs().cmp(&epsilon) < 0);
+            assert!(d2.sub(&d1).unwrap().abs().cmp(&epsilon) <= 0);
         }
     }
 }
