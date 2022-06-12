@@ -6,7 +6,7 @@ authors = ["stencillogic <stencillogic@gmail.com>"]
 license = "MIT"
 description = "Multiple precision floating point numbers implemented purely in Rust."
 categories = ["algorithms", "data-structures", "science"]
-keywords = ["big-float", "big-number", "numeric", "decimal", "mathematics", "bignum"]
+keywords = ["big-float", "numeric", "decimal", "mathematics", "bignum"]
 readme = "README.md"
 repository = "https://github.com/stencillogic/num-bigfloat"
 
