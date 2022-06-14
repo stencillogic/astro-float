@@ -13,10 +13,13 @@
 
 mod defs;
 mod sqrt_const;
+mod sin_const;
 mod increased;
 
 use crate::defs::DECIMAL_PARTS;
 use crate::sqrt_const::SQRT_VALUES;
+use crate::sin_const::SIN_VALUES1;
+use crate::sin_const::SIN_VALUES2;
 use crate::increased::BigFloatInc;
 
 pub use crate::defs::BigFloat;
@@ -50,11 +53,30 @@ const LN_OF_2: BigFloatInc = BigFloatInc {
     sign: DECIMAL_SIGN_POS, 
     e: -44,
 };
-
+const HALF_PI: BigFloatInc = BigFloatInc {
+    m: [5846, 2098, 5144, 6397, 1691, 3132, 6192, 4896, 2679, 7963, 1570],
+    n: 44, 
+    sign: DECIMAL_SIGN_POS, 
+    e: -43,
+};
+const PI2: BigFloatInc = BigFloatInc {
+    m: [1694, 4197, 0288, 2795, 3383, 6264, 2384, 9793, 5358, 5926, 3141],
+    n: 44, 
+    sign: DECIMAL_SIGN_POS, 
+    e: -43,
+};
 
 /// Eulers number.
 pub const E: BigFloat = BigFloat {
     m: [7757, 6249, 3526, 7471, 6028, 2353, 9045, 2845, 2818, 2718],
+    n: DECIMAL_POSITIONS as i16, 
+    sign: DECIMAL_SIGN_POS, 
+    e: 1 - (DECIMAL_POSITIONS as i8),
+};
+
+/// Pi number.
+pub const PI: BigFloat = BigFloat {
+    m: [4197, 0288, 2795, 3383, 6264, 2384, 9793, 5358, 5926, 3141],
     n: DECIMAL_POSITIONS as i16, 
     sign: DECIMAL_SIGN_POS, 
     e: 1 - (DECIMAL_POSITIONS as i8),
@@ -489,12 +511,12 @@ impl BigFloat {
         let mut i = -(d1.e as i32);
         if i > 0 && i < (DECIMAL_POSITIONS*2) as i32 {
             fractional.m = d1.m;
-            fractional.n = DECIMAL_POSITIONS as i16;
             if i < DECIMAL_POSITIONS as i32 {
                 Self::shift_left(&mut fractional.m, DECIMAL_POSITIONS - i as usize);
             } else if i > DECIMAL_POSITIONS as i32 {
                 Self::shift_right(&mut fractional.m, i as usize - DECIMAL_POSITIONS);
             }
+            fractional.n = Self::num_digits(&fractional.m);
         }
 
         // integer part of d1
@@ -618,6 +640,88 @@ impl BigFloat {
 
         return Ok(Self::from_big_float_inc(&mut ret));
     }
+
+    /// Returns sine of a number. Argument is an angle in radians.
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big or too small.
+    pub fn sin(&self) -> Result<BigFloat, Error> {
+        // calculation:
+        // x = s + dx, x is in [0, pi/2)
+        // use series: sin(x) = sin(s) + sum( der(sin(s), n) * (dx)^n / n! )
+        // where: der(sin(s), n) = sin(s + n*pi/2) - n'th derivative of sin
+        // use precalculated values: sin(s), sin(s + pi/2), sin(s + pi) = -sin(s), sin(s + 3*pi/2)
+        //   = -sin(s + pi/2)
+        // do calculation only for angles [0, pi/2)
+        let mut x = Self::to_big_float_inc(self);
+
+        // determine quadrant
+        let mut quadrant = 0;
+        x = x.div(&PI2)?;
+        let fractional = x.get_fractional_part()?;
+        x = PI2.mul(&fractional)?;
+        while x.cmp(&HALF_PI) > 0 {
+            x = x.sub(&HALF_PI)?;
+            quadrant += 1;
+        }
+        if x.sign == DECIMAL_SIGN_NEG {
+            quadrant = 3 - quadrant;
+        }
+        x.maximize_mantissa();
+        let mut i = 1 - (x.n as i32 + x.e as i32);
+        let mut idx = 0;
+        let mut dx = x;
+
+        // x = s + dx
+        if i < DECIMAL_BASE_LOG10 as i32 {
+            idx = x.m[DECIMAL_PARTS] as usize;
+            let mut m = 1;
+            while i > 0 {
+                idx /= 10;
+                i -= 1;
+                m *= 10;
+            }
+            dx.m[DECIMAL_PARTS] = x.m[DECIMAL_PARTS] % m;
+        }
+
+        // determine closest precomputed values of derivatives
+        let mut s = [BigFloatInc::new(), BigFloatInc::new(), BigFloatInc::new(), BigFloatInc::new(),];
+        s[0] = SIN_VALUES1[idx];
+        s[1] = SIN_VALUES2[idx];
+        s[2] = s[0];
+        s[2].sign = DECIMAL_SIGN_NEG;
+        s[3] = s[1];
+        s[3].sign = DECIMAL_SIGN_NEG;
+
+        let mut ret = s[quadrant];
+        let mut dxn = dx;
+        let one = BigFloatInc::one();
+        let mut fct = one;
+        let mut inc = one;
+        let mut der_n = (quadrant + 1) % 4;
+        loop {
+            let p = dxn.div(&fct)?;
+            let der = s[der_n];
+            if der.n != 0 {
+                let add = der.mul(&p)?;
+                let val = ret.add(&add)?;
+                if val.cmp(&ret) == 0 {
+                    break;
+                }
+                ret = val;
+            }
+            dxn = dxn.mul(&dx)?;
+            inc = inc.add(&one)?;
+            fct = fct.mul(&inc)?;
+            der_n += 1;
+            if der_n > 3 {
+                der_n = 0;
+            }
+        }
+        return Ok(Self::from_big_float_inc(&mut ret));
+    }
+
 
     /// Compare to d2.
     /// Returns positive if self > d2, negative if self < d2, 0 otherwise.
@@ -2083,6 +2187,25 @@ mod tests {
             ret = d2.ln().unwrap();
             d1 = E.pow(&ret).unwrap();
             assert!(d2.sub(&d1).unwrap().abs().cmp(&epsilon) <= 0);
+        }
+
+
+        println!("Testing sin");
+
+        d1 = BigFloat::new();
+        d1.e = -39;
+        d1.m[8] = 123;
+        epsilon.e = -77; // 1*10^(-38)
+        for i in 0..9999 {
+            d1.m[9] = i;
+            d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
+            d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
+            let mut hpi = HALF_PI;
+            d2 = d1.add(&BigFloat::from_big_float_inc(&mut hpi)).unwrap();
+            let s = d1.sin().unwrap();
+            let c = d2.sin().unwrap();
+            let p = s.mul(&s).unwrap().add(&c.mul(&c).unwrap()).unwrap();
+            assert!(p.sub(&one).unwrap().abs().cmp(&epsilon) <= 0);
         }
     }
 }
