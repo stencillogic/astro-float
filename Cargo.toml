@@ -11,3 +11,6 @@ readme = "README.md"
 repository = "https://github.com/stencillogic/num-bigfloat"
 
 [dependencies]
+
+[dev-dependencies]
+rand = "0.8.5"

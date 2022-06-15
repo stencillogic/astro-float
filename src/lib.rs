@@ -131,6 +131,92 @@ impl BigFloat {
         };
     }
 
+    /// Construct BigFloat from f64.
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big or too small.
+    pub fn from_f64(mut f: f64) -> Result<Self, Error> {
+        let mut e: i32 = 0;
+        let mut ret = BigFloat::new();
+        if f == 0f64 {
+            return Ok(ret);
+        }
+        if f == f64::INFINITY || f == f64::NAN {
+            return Err(Error::ExponentOverflow);
+        } 
+        if f < 0f64 {
+            ret.sign = DECIMAL_SIGN_NEG;
+            f = -f;
+        }
+        // bring to 0.xxxxxxxxx
+        while f >= 1.0f64 {
+            f /= 10f64;
+            e += 1;
+        }
+        while f < 0.1f64 {
+            f *= 10f64;
+            e -= 1;
+        }
+        // fill-in mantissa
+        ret.n = DECIMAL_POSITIONS as i16;
+        let mut p = DECIMAL_PARTS - 1;
+        loop {
+            f *= DECIMAL_BASE as f64;
+            let d = f as i16;
+            f = f - d as f64;
+            ret.m[p] = d;
+            p -= 1;
+            if f == 0f64 || p == 0 {
+                break;
+            }
+        }
+        
+        e -= DECIMAL_POSITIONS as i32;
+        if e < DECIMAL_MIN_EXPONENT as i32 || e > DECIMAL_MAX_EXPONENT as i32 {
+            return Err(Error::ExponentOverflow);
+        }
+        ret.e = e as i8;
+
+        return Ok(ret);
+    }
+
+    /// Convert BigFloat to f64.
+    pub fn to_f64(&self) -> f64 {
+        let mut f: f64 = 0f64;
+        for i in 0..DECIMAL_PARTS {
+            f += self.m[i] as f64;
+            f /= DECIMAL_BASE as f64;
+        }
+        let mut e = self.n + self.e as i16;
+        while e < 0 {
+            f /= 10f64;
+            e += 1;
+        }
+        while e > 0 {
+            f *= 10f64;
+            e -= 1;
+        }
+        if self.sign == DECIMAL_SIGN_NEG {
+            f = -f;
+        }
+        return f;
+    }
+
+    /// Construct BigFloat from f32. Wrapper for from_f64.
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big or too small.
+    pub fn from_f32(f: f32) -> Result<Self, Error> {
+        Self::from_f64(f as f64)
+    }
+
+    /// Convert BigFloat to f32. Wrapper for to_f64
+    pub fn to_f32(&self) -> f32 {
+        self.to_f64() as f32
+    }
+
     /// Get BigFloat's mantissa as bytes. Each byte represents a decimal digit.
     /// First byte is the most significant. The length of `bytes` can be any. If the length of
     /// `bytes` is smaller than required, then remaining part of mantissa will be omitted.
@@ -1202,6 +1288,7 @@ impl BigFloat {
 mod tests {
 
     use super::*;
+    use rand::random;
 
     #[test]
     fn test_bigfloat() {
@@ -2220,6 +2307,39 @@ mod tests {
             let c = d1.cos().unwrap();
             let p = s.mul(&s).unwrap().add(&c.mul(&c).unwrap()).unwrap();
             assert!(p.sub(&one).unwrap().abs().cmp(&epsilon) <= 0);
+        }
+
+
+        println!("Testing conversions");
+
+        for _ in 0..1000 {
+            let i: i8 = random::<i8>() % 10i8;
+            let mut f: f64 = random::<f64>().powf(i as f64);
+            if i & 1 == 0 {
+                f = -f;
+            }
+            d1 = BigFloat::from_f64(f).unwrap();
+            let f2 = d1.to_f64();
+            if f2 != 0f64 {
+                assert!((1f64 - f/f2).abs() < 0.000000000000001f64);
+            } else {
+                assert!((f - f2).abs() < 0.000000000000001f64);
+            }
+        }
+
+        for _ in 0..1000 {
+            let i: i8 = random::<i8>() % 10i8;
+            let mut f: f32 = random::<f32>().powf(i as f32);
+            if i & 1 == 0 {
+                f = -f;
+            }
+            d1 = BigFloat::from_f32(f).unwrap();
+            let f2 = d1.to_f32();
+            if f2 != 0f32 {
+                assert!((1f32 - f/f2).abs() < 0.000001f32);
+            } else {
+                assert!((f - f2).abs() < 0.000001f32);
+            }
         }
     }
 }
