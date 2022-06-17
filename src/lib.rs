@@ -14,12 +14,14 @@
 mod defs;
 mod sqrt_const;
 mod sin_const;
+mod tan_const;
 mod increased;
 
 use crate::defs::DECIMAL_PARTS;
 use crate::sqrt_const::SQRT_VALUES;
 use crate::sin_const::SIN_VALUES1;
 use crate::sin_const::SIN_VALUES2;
+use crate::tan_const::TAN_VALUES;
 use crate::increased::BigFloatInc;
 
 pub use crate::defs::BigFloat;
@@ -745,6 +747,72 @@ impl BigFloat {
         self.sin_cos(1)
     }
 
+    /// Returns tangent of a number. Argument is an angle in radians.
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big or too small.
+    /// DivisionByZero - in case of number is equal to PI/2.
+    pub fn tan(&self) -> Result<BigFloat, Error> {
+        // tan(x) = tan(s + dx) = tan(s) + tan(dx) / (1 - tan(s)*tan(dx));
+        // tan(s) = sin(s)/cos(s)
+        // tan(dx) = x + 1/3*x^3 + 2/15*x^5 + ... (tailor series)
+        // do calculation only for angles [0, pi/2)
+        let mut x = Self::to_big_float_inc(self);
+
+        // determine quadrant
+        let mut quadrant = 0;
+        x = x.div(&PI2)?;
+        let fractional = x.get_fractional_part()?;
+        x = PI2.mul(&fractional)?;
+        while x.cmp(&HALF_PI) > 0 {
+            x = PI2.sub(&x)?;
+            quadrant = 1;
+        }
+        x.maximize_mantissa();
+        let mut i = 1 - (x.n as i32 + x.e as i32);
+        let mut idx = 0;
+        let mut dx = x;
+
+        // x = s + dx
+        if i < DECIMAL_BASE_LOG10 as i32 {
+            idx = x.m[DECIMAL_PARTS] as usize;
+            let mut m = 1;
+            while i > 0 {
+                idx /= 10;
+                i -= 1;
+                m *= 10;
+            }
+            dx.m[DECIMAL_PARTS] = x.m[DECIMAL_PARTS] % m;
+        }
+
+        // sin(s) / cos(s) = sin(s) / sin(s + pi/2)
+        let tan_s = SIN_VALUES1[idx].div(&SIN_VALUES2[idx])?;
+
+        // tailor series
+        let mut tan_dx = dx;
+        let dxq = dx.mul(&dx)?;
+        let mut i = 0;
+        while i < TAN_VALUES.len() {
+            dx = dx.mul(&dxq)?;
+            let p = dx.mul(&TAN_VALUES[i])?;
+            let val = tan_dx.add(&p)?;
+            if val.cmp(&tan_dx) == 0 {
+                break;
+            }
+            tan_dx = val;
+            i += 1;
+        }
+
+        // tan(x)
+        let d = BigFloatInc::one().sub(&tan_s.mul(&tan_dx)?)?;
+        let mut ret = tan_s.add(&tan_dx)?.div(&d)?;
+        if (quadrant == 1 && self.sign == DECIMAL_SIGN_POS) || (quadrant == 0 && self.sign == DECIMAL_SIGN_NEG) {
+            ret.sign = DECIMAL_SIGN_NEG;
+        }
+        return Ok(Self::from_big_float_inc(&mut ret));
+    }
+
     /// Compare to d2.
     /// Returns positive if self > d2, negative if self < d2, 0 otherwise.
     pub fn cmp(&self, d2: &BigFloat) -> i16 {
@@ -1279,6 +1347,9 @@ impl BigFloat {
             if der_n > 3 {
                 der_n = 0;
             }
+        }
+        if q == 0 {
+            ret.sign = self.sign;
         }
         return Ok(Self::from_big_float_inc(&mut ret));
     }
@@ -2299,13 +2370,31 @@ mod tests {
         d1.e = -39;
         d1.m[8] = 123;
         epsilon.e = -77; // 1*10^(-38)
-        for i in 0..9999 {
+        for i in 1..9999 {
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
             d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
             let s = d1.sin().unwrap();
             let c = d1.cos().unwrap();
             let p = s.mul(&s).unwrap().add(&c.mul(&c).unwrap()).unwrap();
+            assert!(p.sub(&one).unwrap().abs().cmp(&epsilon) <= 0);
+        }
+
+
+        println!("Testing tan");
+
+        d1 = BigFloat::new();
+        d1.e = -39;
+        d1.m[0] = 5678;
+        d1.m[8] = 1234;
+        epsilon.e = -73; // 1*10^(-34) for arguments close to pi/2 the precision is lost
+        for i in 0..9999 {
+            d1.m[9] = i;
+            d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
+            d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
+            let t1 = d1.tan().unwrap();
+            let t2 = d1.sin().unwrap().div(&d1.cos().unwrap()).unwrap();
+            let p = t1.div(&t2).unwrap();
             assert!(p.sub(&one).unwrap().abs().cmp(&epsilon) <= 0);
         }
 
