@@ -594,9 +594,9 @@ impl BigFloat {
             return Err(Error::ExponentOverflow);
         }
 
-        // fractional part of d1 
+        // split to fractional and integer parts 
         let mut fractional = Self::new();
-        let mut i = -(d1.e as i32);
+        let i = -(d1.e as i32);
         if i > 0 && i < (DECIMAL_POSITIONS*2) as i32 {
             fractional.m = d1.m;
             if i < DECIMAL_POSITIONS as i32 {
@@ -606,27 +606,7 @@ impl BigFloat {
             }
             fractional.n = Self::num_digits(&fractional.m);
         }
-
-        // integer part of d1
-        let mut int = Self::new();
-        let mut t = Self::get_div_factor(-(d1.e as i16));
-        if i < 0 {
-            i = 0;
-        }
-        let mut t2 = 1;
-        while i < d1.n as i32 {
-            int.m[int.n as usize / DECIMAL_BASE_LOG10] += (d1.m[i as usize / DECIMAL_BASE_LOG10 as usize] / t % 10) * t2;
-            int.n += 1;
-            i += 1;
-            t *= 10;
-            if t == DECIMAL_BASE as i16 {
-                t = 1;
-            }
-            t2 *= 10;
-            if t2 == DECIMAL_BASE as i16 {
-                t2 = 1;
-            }
-        }
+        let mut int = Self::extract_int_part(&d1);
 
         let mut ret = Self::one();
         let one = ret;
@@ -752,7 +732,6 @@ impl BigFloat {
     /// # Errors
     ///
     /// ExponentOverflow - when result is too big or too small.
-    /// DivisionByZero - in case of number is equal to PI/2.
     pub fn tan(&self) -> Result<BigFloat, Error> {
         // tan(x) = tan(s + dx) = tan(s) + tan(dx) / (1 - tan(s)*tan(dx));
         // tan(s) = sin(s)/cos(s)
@@ -763,7 +742,7 @@ impl BigFloat {
         // determine quadrant
         let mut quadrant = 0;
         x = x.div(&PI2)?;
-        let fractional = x.get_fractional_part()?;
+        let fractional = x.get_fractional_part();
         x = PI2.mul(&fractional)?;
         while x.cmp(&HALF_PI) > 0 {
             x = PI2.sub(&x)?;
@@ -811,6 +790,64 @@ impl BigFloat {
             ret.sign = DECIMAL_SIGN_NEG;
         }
         return Ok(Self::from_big_float_inc(&mut ret));
+    }
+
+    /// Returns the largest integer less than or equal to a number.
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big or too small.
+    pub fn floor(&self) -> Result<Self, Error> {
+        self.floor_ceil(DECIMAL_SIGN_POS)
+    }
+
+    /// Returns the smallest integer greater than or equal to a number. 
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big or too small.
+    pub fn ceil(&self) -> Result<Self, Error> {
+        self.floor_ceil(DECIMAL_SIGN_NEG)
+    }
+
+    /// Return fractional part of a number,
+    /// i.e. having self=12.345 it will return 0.345.
+    pub fn frac(&self) -> Self {
+        let mut ret = Self::extract_fract_part(self);
+        ret.sign = self.sign;
+        return ret;
+    }
+
+    /// Return integer part of a number,
+    /// i.e. having self=12.345 it will return 12.0.
+    pub fn int(&self) -> Self {
+        let mut ret = Self::extract_int_part(self);
+        ret.sign = self.sign;
+        return ret;
+    }
+
+    /// Returns the rounded number with `n` decimal positions in the fractional part of the number.
+    pub fn round(&self, n: usize) -> Self {
+        let mut ret = *self;
+        let e = (-self.e) as usize;
+        if self.e < 0 && e > n {
+            let mut c = 0;
+            let mut t = 1;
+            let n = e - n + 1;
+            for i in 0..n {
+                let d = ret.m[i / DECIMAL_BASE_LOG10] / t;
+                ret.m[i / DECIMAL_BASE_LOG10] = (d + c) * t;
+                c = if d % 10 + c >= 5 {1} else {0};
+                t *= 10;
+                if t == DECIMAL_BASE as i16 {
+                    if i < n - 1 {
+                        ret.m[i / DECIMAL_BASE_LOG10] = 0;
+                    }
+                    t = 1;
+                }
+            }
+        }
+        return ret;
     }
 
     /// Compare to d2.
@@ -862,7 +899,12 @@ impl BigFloat {
     }
 
 
+    //
+    //
     // auxiliary functions
+    // 
+    //
+
 
     // compare absolute values of two big floats
     // return positive if d1 > d2, negative if d1 < d2, 0 otherwise
@@ -1285,7 +1327,7 @@ impl BigFloat {
         // determine quadrant
         let mut quadrant = q;
         x = x.div(&PI2)?;
-        let fractional = x.get_fractional_part()?;
+        let fractional = x.get_fractional_part();
         x = PI2.mul(&fractional)?;
         while x.cmp(&HALF_PI) > 0 {
             x = x.sub(&HALF_PI)?;
@@ -1353,7 +1395,86 @@ impl BigFloat {
         }
         return Ok(Self::from_big_float_inc(&mut ret));
     }
+
+    // fractional part of d1 
+    fn extract_fract_part(d1: &Self) -> Self {
+        let mut fractional = Self::new();
+        let e = -(d1.e as i16);
+        if e >= d1.n {
+            fractional = *d1;
+            fractional.sign = DECIMAL_SIGN_POS;
+        } else if e > 0 {
+            let mut i = 0;
+            while i + (DECIMAL_BASE_LOG10 as i16) <= e {
+                fractional.m[i as usize / DECIMAL_BASE_LOG10] = d1.m[i as usize / DECIMAL_BASE_LOG10];
+                i += DECIMAL_BASE_LOG10 as i16;
+            }
+            if i < e {
+                let mut t = 1;
+                while i < e {
+                    t *= 10;
+                    i += 1;
+                }
+                fractional.m[i as usize / DECIMAL_BASE_LOG10] += d1.m[i as usize / DECIMAL_BASE_LOG10 as usize] % t;
+            }
+            fractional.n = Self::num_digits(&fractional.m);
+            if fractional.n > 0 {
+                fractional.e = d1.e;
+            }
+        }
+        return fractional;
+    }
+
+    // integer part of d1
+    fn extract_int_part(d1: &Self) -> Self {
+        let mut int = Self::new();
+        let mut i = -(d1.e as i16);
+        let mut t = Self::get_div_factor(i);
+        if i < 0 {
+            i = 0;
+        }
+        let mut t2 = 1;
+        while i < d1.n {
+            int.m[int.n as usize / DECIMAL_BASE_LOG10] += (d1.m[i as usize / DECIMAL_BASE_LOG10 as usize] / t % 10) * t2;
+            int.n += 1;
+            i += 1;
+            t *= 10;
+            if t == DECIMAL_BASE as i16 {
+                t = 1;
+            }
+            t2 *= 10;
+            if t2 == DECIMAL_BASE as i16 {
+                t2 = 1;
+            }
+        }
+        if int.n > 0 {
+            int.e = d1.e + (i - int.n) as i8;
+        }
+        return int;
+    }
+
+    // floor and ceil computation
+    fn floor_ceil(&self, sign_check: i8) -> Result<Self, Error> {
+        let mut int = Self::extract_int_part(self);
+        int.sign = self.sign;
+        if self.sign == sign_check {
+            if self.e as i16 + self.n <= 0 {
+                return Ok(Self::new());
+            } else if self.e < 0 {
+                return Ok(int);
+            }
+        } else {
+            let fractional = Self::extract_fract_part(self);
+            if fractional.n > 0 {
+                let mut one = Self::one();
+                one.sign = sign_check;
+                return int.sub(&one);
+            }
+        }
+        return Ok(int);
+    }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -2430,5 +2551,176 @@ mod tests {
                 assert!((f - f2).abs() < 0.000001f32);
             }
         }
+
+
+        println!("Testing ceil & floor");
+
+        // 0
+        d1 = BigFloat::new();
+        assert!(d1.floor().unwrap().cmp(&d1) == 0);
+        assert!(d1.ceil().unwrap().cmp(&d1) == 0);
+
+        // positive
+        d1 = BigFloat::new();
+        d1.m[0] = 4560;
+        d1.m[1] = 123;
+        d1.m[2] = 6789;
+        d1.m[3] = 2345;
+        d1.m[4] = 651;
+        d1.m[5] = 41;
+        d1.m[6] = 671;
+        d1.m[7] = 100;
+        d1.m[8] = 10;
+        d1.m[9] = 1234;
+        d1.n = DECIMAL_POSITIONS as i16;
+        d1.e = -38;
+        d2 = BigFloat::new();
+        d2.m[9] = 1200;
+        d2.n = DECIMAL_POSITIONS as i16;
+        d2.e = -38;
+        assert!(d1.floor().unwrap().cmp(&d2) == 0);
+        d2.m[9] = 1300;
+        assert!(d1.ceil().unwrap().cmp(&d2) == 0);
+        d1.e = -40;
+        assert!(d1.floor().unwrap().n == 0);
+        assert!(d1.ceil().unwrap().cmp(&one) == 0);
+        d1 = BigFloat::new();
+        d1.m[9] = 130;
+        d1.n = DECIMAL_POSITIONS as i16-1;
+        d1.e = -36;
+        assert!(d1.ceil().unwrap().cmp(&d1) == 0);
+        assert!(d1.floor().unwrap().cmp(&d1) == 0);
+
+        // negative
+        d1 = BigFloat::new();
+        d1.m[8] = 10;
+        d1.m[9] = 1234;
+        d1.n = DECIMAL_POSITIONS as i16;
+        d1.e = -38;
+        d1.sign = DECIMAL_SIGN_NEG;
+        d2 = BigFloat::new();
+        d2.m[9] = 1300;
+        d2.n = DECIMAL_POSITIONS as i16;
+        d2.sign = DECIMAL_SIGN_NEG;
+        d2.e = -38;
+        assert!(d1.floor().unwrap().cmp(&d2) == 0);
+        d2.m[9] = 1200;
+        assert!(d1.ceil().unwrap().cmp(&d2) == 0);
+        d1.e = -40;
+        d2 = one;
+        d2.sign = DECIMAL_SIGN_NEG;
+        assert!(d1.floor().unwrap().cmp(&d2) == 0);
+        assert!(d1.ceil().unwrap().n == 0);
+        d1 = BigFloat::new();
+        d1.m[9] = 130;
+        d1.n = DECIMAL_POSITIONS as i16-1;
+        d1.e = -36;
+        d2.sign = DECIMAL_SIGN_NEG;
+        assert!(d1.ceil().unwrap().cmp(&d1) == 0);
+        assert!(d1.floor().unwrap().cmp(&d1) == 0);
+
+
+        println!("Testing int & frac");
+
+        // frac: no fractional
+        d1 = BigFloat::new();
+        d1.m[8] = 4567;
+        d1.m[9] = 123;
+        d1.n = DECIMAL_POSITIONS as i16-1;
+        assert!(d1.frac().n == 0);
+        d1.e = 123;
+        assert!(d1.frac().n == 0);
+        d1.e = -32;
+        assert!(d1.frac().n == 0);
+
+        // frac: some fractional
+        d1.e = -37;
+        d2 = BigFloat::new();
+        d2.m[8] = 7000;
+        d2.m[9] = 3456;
+        d2.e = -40;
+        d2.n = 40;
+        assert!(d1.frac().cmp(&d2) == 0);
+
+        // frac: fully fractional
+        d1.e = -(d1.n as i8);
+        assert!(d1.frac().cmp(&d1) == 0);
+        d1.e -= 50;
+        assert!(d1.frac().cmp(&d1) == 0);
+
+        // negative
+        d1.sign = DECIMAL_SIGN_NEG;
+        assert!(d1.frac().cmp(&d1) == 0);
+
+
+        // int: no fractional
+        d1 = BigFloat::new();
+        d1.m[8] = 4567;
+        d1.m[9] = 123;
+        d1.n = DECIMAL_POSITIONS as i16-1;
+        assert!(d1.int().cmp(&d1) == 0);
+        d1.e = 123;
+        assert!(d1.int().cmp(&d1) == 0);
+        d1.e = -32;
+        assert!(d1.int().cmp(&d1) == 0);
+
+        // negative
+        d1.sign = DECIMAL_SIGN_NEG;
+        assert!(d1.int().cmp(&d1) == 0);
+
+        // int: some fractional
+        d1.sign = DECIMAL_SIGN_POS;
+        d1.e = -37;
+        d2 = BigFloat::new();
+        d2.m[9] = 1200;
+        d2.e = -38;
+        d2.n = 40;
+        assert!(d1.int().cmp(&d2) == 0);
+
+        // int: fully fractional
+        d1.e = -(d1.n as i8);
+        assert!(d1.int().n == 0);
+        d1.e -= 50;
+        assert!(d1.int().n == 0);
+
+
+        println!("Testing rounding");
+
+        d1 = BigFloat::new();
+        d1.m[7] = 1234;
+        d1.m[8] = 4527;
+        d1.m[9] = 123;
+        d1.e = -37;
+        d1.n = 39;
+        d2 = d1;
+        assert!(d1.round(123).cmp(&d2) == 0);
+        assert!(d1.round(9).cmp(&d2) == 0);
+        d2.m[7] = 1230;
+        assert!(d1.round(8).cmp(&d2) == 0);
+        d2.m[7] = 1200;
+        assert!(d1.round(7).cmp(&d2) == 0);
+        d2.m[7] = 1000;
+        assert!(d1.round(6).cmp(&d2) == 0);
+        d2.m[7] = 0;
+        assert!(d1.round(5).cmp(&d2) == 0);
+        d2.m[8] = 4530;
+        assert!(d1.round(4).cmp(&d2) == 0);
+        d2.m[8] = 4500;
+        assert!(d1.round(3).cmp(&d2) == 0);
+        d2.m[8] = 5000;
+        assert!(d1.round(2).cmp(&d2) == 0);
+        d2.m[8] = 0;
+        d2.m[9] = 124;
+        assert!(d1.round(1).cmp(&d2) == 0);
+        d2.m[9] = 120;
+        assert!(d1.round(0).cmp(&d2) == 0);
+        d2.sign = DECIMAL_SIGN_NEG;
+        d1.sign = DECIMAL_SIGN_NEG;
+        assert!(d1.round(0).cmp(&d2) == 0);
+        d1 = BigFloat::new();
+        d1.m[9] = 1234;
+        d1.n = 39;
+        d1.e = 10;
+        assert!(d1.round(2).cmp(&d1) == 0);
     }
 }

@@ -379,30 +379,33 @@ impl BigFloatInc {
         self.m[1] += c;
     }
 
-    /// Return fractional part of number. 
-    pub fn get_fractional_part(&self) -> Result<Self, Error> {
-        let mut fractional = BigFloatInc::new();
-        let i = -(self.e as i32);
-        let dp = DECIMAL_POSITIONS;
-        if i > 0 && i < (dp*2) as i32 {
-            fractional.m = self.m;
-            fractional.e = self.e;
-            if i < dp as i32 {
-                BigFloatInc::shift_left(&mut fractional.m, dp - i as usize);
-                if fractional.e as i32 - dp as i32 + i < DECIMAL_MIN_EXPONENT as i32 {
-                    return Err(Error::ExponentOverflow);
+    /// Return fractional part of number with positive sign.
+    pub fn get_fractional_part(&self) -> Self {
+        let mut fractional = Self::new();
+        let e = -(self.e as i16);
+        if e >= self.n {
+            fractional = *self;
+            fractional.sign = DECIMAL_SIGN_POS;
+        } else if e > 0 {
+            let mut i = 0;
+            while i + (DECIMAL_BASE_LOG10 as i16) <= e {
+                fractional.m[i as usize / DECIMAL_BASE_LOG10] = self.m[i as usize / DECIMAL_BASE_LOG10];
+                i += DECIMAL_BASE_LOG10 as i16;
+            }
+            if i < e {
+                let mut t = 1;
+                while i < e {
+                    t *= 10;
+                    i += 1;
                 }
-                fractional.e -= (dp - i as usize) as i8; 
-            } else if i > dp as i32 {
-                BigFloatInc::shift_right(&mut fractional.m, i as usize - dp);
-                if fractional.e as i32 + i - dp as i32 > DECIMAL_MAX_EXPONENT as i32 {
-                    return Err(Error::ExponentOverflow);
-                }
-                fractional.e += (i as usize - dp) as i8; 
+                fractional.m[i as usize / DECIMAL_BASE_LOG10] += self.m[i as usize / DECIMAL_BASE_LOG10 as usize] % t;
             }
             fractional.n = Self::num_digits(&fractional.m);
+            if fractional.n > 0 {
+                fractional.e = self.e;
+            }
         }
-        return Ok(fractional);
+        return fractional;
     }
 
 
