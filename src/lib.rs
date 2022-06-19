@@ -793,6 +793,7 @@ impl BigFloat {
             }
             tan_dx = val;
             i += 1;
+            assert!(i != TAN_VALUES.lenh() - 2);
         }
 
         // tan(x)
