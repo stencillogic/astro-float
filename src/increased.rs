@@ -54,6 +54,15 @@ impl BigFloatInc {
         return val;
     }
 
+    /// Return absolute value.
+    pub fn abs(&self) -> Self {
+        let mut ret = *self;
+        if ret.sign == DECIMAL_SIGN_NEG {
+            ret.sign = DECIMAL_SIGN_POS;
+        }
+        return ret;
+    }
+
     /// Add d2 and return result of addition.
     ///
     /// # Errors
@@ -86,6 +95,10 @@ impl BigFloatInc {
         let mut e: i32 = self.e as i32 + d2.e as i32;
         let mut d1mi: i32;
         let mut m3 = [0i16; DECIMAL_PARTS * 2 + 1];
+
+        if self.n == 0 || d2.n == 0 {
+            return Ok(Self::new());
+        }
 
         for i in 0..DECIMAL_PARTS {
             d1mi = self.m[i] as i32;
@@ -121,9 +134,9 @@ impl BigFloatInc {
 
             Self::shift_left(&mut m3[n as usize..], DECIMAL_BASE_LOG10 - nd as usize);
 
-            k = DECIMAL_BASE as i32;
+            k = 1;
             while nd > 0 {
-                k /= 10;
+                k *= 10;
                 nd -= 1;
             }
             m3[n as usize] += m3[n as usize - 1] / k as i16;
@@ -367,7 +380,7 @@ impl BigFloatInc {
     }
 
     /// Use extra digits to increase precision by rounding.
-    pub fn round(&mut self) {
+    pub fn round(&mut self) -> Result<(), Error> {
         let mut c = 0;
         let mut t = 1;
         let dd = self.m[0];
@@ -376,7 +389,23 @@ impl BigFloatInc {
             c = if d >= 5 { 1 } else { 0 };
             t *= 10;
         }
-        self.m[1] += c;
+        if c > 0 {
+            for i in 1..DECIMAL_PARTS {
+                if self.m[i] < DECIMAL_BASE as i16 - 1 {
+                    self.m[i] += 1;
+                    return Ok(());
+                } else {
+                    self.m[i] = 0;
+                }
+            }
+            if self.e == DECIMAL_MAX_EXPONENT {
+                return Err(Error::ExponentOverflow);
+            }
+            self.e += 1;
+            Self::shift_right(&mut self.m, 1);
+            self.m[DECIMAL_PARTS - 1] += DECIMAL_BASE as i16 / 10;
+        }
+        return Ok(());
     }
 
     /// Return fractional part of number with positive sign.

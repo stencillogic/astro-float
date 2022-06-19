@@ -13,12 +13,15 @@
 
 mod defs;
 mod sqrt_const;
+mod atan_const;
 mod sin_const;
 mod tan_const;
 mod increased;
 
 use crate::defs::DECIMAL_PARTS;
 use crate::sqrt_const::SQRT_VALUES;
+use crate::atan_const::ATAN_VALUES1;
+use crate::atan_const::ATAN_VALUES2;
 use crate::sin_const::SIN_VALUES1;
 use crate::sin_const::SIN_VALUES2;
 use crate::tan_const::TAN_VALUES;
@@ -60,6 +63,12 @@ const HALF_PI: BigFloatInc = BigFloatInc {
     n: 44, 
     sign: DECIMAL_SIGN_POS, 
     e: -43,
+};
+const HALF_PI2: BigFloat = BigFloat {
+    m: [2099, 5144, 6397, 1691, 3132, 6192, 4896, 2679, 7963, 1570],
+    n: DECIMAL_POSITIONS as i16, 
+    sign: DECIMAL_SIGN_POS, 
+    e: -(DECIMAL_POSITIONS as i8 - 1),
 };
 const PI2: BigFloatInc = BigFloatInc {
     m: [1694, 4197, 0288, 2795, 3383, 6264, 2384, 9793, 5358, 5926, 3141],
@@ -107,6 +116,15 @@ impl BigFloat {
     pub fn one() -> Self {
         let mut val = Self::new();
         val.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/10;
+        val.n = DECIMAL_POSITIONS as i16;
+        val.e = 1 - DECIMAL_POSITIONS as i8;
+        return val;
+    }
+
+    /// Return new BigFloat with value two.
+    pub fn two() -> Self {
+        let mut val = Self::new();
+        val.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/5;
         val.n = DECIMAL_POSITIONS as i16;
         val.e = 1 - DECIMAL_POSITIONS as i8;
         return val;
@@ -260,7 +278,7 @@ impl BigFloat {
     }
 
     /// Return absolute value. 
-    pub fn abs(&self) -> BigFloat {
+    pub fn abs(&self) -> Self {
         let mut ret = *self;
         if ret.sign == DECIMAL_SIGN_NEG {
             ret.sign = DECIMAL_SIGN_POS;
@@ -336,10 +354,9 @@ impl BigFloat {
 
             Self::shift_left(&mut m3[n as usize..], DECIMAL_BASE_LOG10 - nd as usize);
 
-            k = DECIMAL_BASE as i32;
-            nd = DECIMAL_BASE_LOG10 as i32 - nd;
+            k = 1;
             while nd > 0 {
-                k /= 10;
+                k *= 10;
                 nd -= 1;
             }
             m3[n as usize] += m3[n as usize - 1] / k as i16;
@@ -575,7 +592,7 @@ impl BigFloat {
                 sq = sq.mul(&SQRT_OF_10)?;
             }
         }
-        let mut ret = Self::from_big_float_inc(&mut sq);
+        let mut ret = Self::from_big_float_inc(&mut sq)?;
         ret.e += self.e/2;
         return Ok(ret);
     }
@@ -712,7 +729,7 @@ impl BigFloat {
         }
         ret = ret.mul(&two)?.add(&add)?;
 
-        return Ok(Self::from_big_float_inc(&mut ret));
+        return Ok(Self::from_big_float_inc(&mut ret)?);
     }
 
     /// Returns sine of a number. Argument is an angle in radians.
@@ -754,22 +771,7 @@ impl BigFloat {
             x = PI2.sub(&x)?;
             quadrant = 1;
         }
-        x.maximize_mantissa();
-        let mut i = 1 - (x.n as i32 + x.e as i32);
-        let mut idx = 0;
-        let mut dx = x;
-
-        // x = s + dx
-        if i < DECIMAL_BASE_LOG10 as i32 {
-            idx = x.m[DECIMAL_PARTS] as usize;
-            let mut m = 1;
-            while i > 0 {
-                idx /= 10;
-                i -= 1;
-                m *= 10;
-            }
-            dx.m[DECIMAL_PARTS] = x.m[DECIMAL_PARTS] % m;
-        }
+        let (idx, mut dx) = Self::get_trig_params(&mut x, 1);
 
         // sin(s) / cos(s) = sin(s) / sin(s + pi/2)
         let tan_s = SIN_VALUES1[idx].div(&SIN_VALUES2[idx])?;
@@ -795,7 +797,86 @@ impl BigFloat {
         if (quadrant == 1 && self.sign == DECIMAL_SIGN_POS) || (quadrant == 0 && self.sign == DECIMAL_SIGN_NEG) {
             ret.sign = DECIMAL_SIGN_NEG;
         }
-        return Ok(Self::from_big_float_inc(&mut ret));
+        return Ok(Self::from_big_float_inc(&mut ret)?);
+    }
+
+    /// Returns arcsine of a number. Result is an angle in radians ranging from `-pi` to `pi`.
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big or too small.
+    /// InvalidArgument - when |`self`| > 1.
+    pub fn asin(&self) -> Result<BigFloat, Error> {
+        let one = Self::one();
+        if self.abs().cmp(&one) > 0 {
+            return Err(Error::InvalidArgument);
+        }
+
+        // arcsin(x) = 2*arctan(x / ( 1 + sqrt(1 - x^2)))
+        let x = *self;
+        let arg = x.div(&one.add(&one.sub(&x.mul(&x)?)?.sqrt()?)?)?;
+        Self::two().mul(&arg.atan()?)
+    }
+
+    /// Returns arccosine of a number.
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big or too small.
+    /// InvalidArgument - when |`self`| > 1.
+    pub fn acos(&self) -> Result<BigFloat, Error> {
+        HALF_PI2.sub(&self.asin()?)
+    }
+
+    /// Returns arctangent of a number. 
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big or too small.
+    pub fn atan(&self) -> Result<BigFloat, Error> {
+        let one = BigFloatInc::one();
+        let mut x = Self::to_big_float_inc(self);
+        x.sign = DECIMAL_SIGN_POS;
+
+        // if x > 1 then arctan(x) = pi/2 - arctan(1/x)
+        let mut inverse_arg = false;
+        if x.abs().cmp(&one) > 0 {
+            x = one.div(&x)?;
+            inverse_arg = true;
+        }
+
+        if x.n == 0 {
+            return Ok(Self::new());
+        }
+
+        // further reduction: arctan(x) = arctan(s) + arctan((x - s) / (1 + x*s))
+        let (idx, mut dx) = Self::get_trig_params(&mut x, 0);
+        let atan_s = ATAN_VALUES2[idx];
+        let s = x.sub(&dx)?;
+        dx = dx.div(&one.add(&x.mul(&s)?)?)?;
+
+        // taylor series
+        let mut ret = dx;
+        let dxx = dx.mul(&dx)?;
+        for i in 0..ATAN_VALUES1.len() {
+            dx = dx.mul(&dxx)?;
+            let p = ATAN_VALUES1[i].mul(&dx)?;
+            let val = ret.add(&p)?;
+            if val.cmp(&ret) == 0 {
+                break;
+            }
+            ret = val;
+            assert!(i != ATAN_VALUES1.len()-2);
+        }
+
+        ret = ret.add(&atan_s)?;
+
+        if inverse_arg {
+            ret = HALF_PI.sub(&ret)?;
+        }
+        ret.sign = self.sign;
+
+        return Ok(Self::from_big_float_inc(&mut ret)?);
     }
 
     /// Returns hyperbolic sine of a number.
@@ -1406,15 +1487,36 @@ impl BigFloat {
     }
 
     // Convert from BigFloatInc.
-    fn from_big_float_inc(d1: &mut BigFloatInc) -> BigFloat {
+    fn from_big_float_inc(d1: &mut BigFloatInc) -> Result<BigFloat, Error> {
         let mut ret = BigFloat::new();
         d1.maximize_mantissa();
-        d1.round();
+        d1.round()?;
         (&mut ret.m).copy_from_slice(&d1.m[1..]);
         ret.n = if d1.n > DECIMAL_PARTS as i16 { d1.n - DECIMAL_BASE_LOG10 as i16 } else { 0 };
         ret.e = d1.e + DECIMAL_BASE_LOG10 as i8;
         ret.sign = d1.sign;
-        return ret;
+        return Ok(ret);
+    }
+
+    // determine parameters for computation of trig function
+    fn get_trig_params(x: &mut BigFloatInc, add: i32) -> (usize, BigFloatInc) {
+        x.maximize_mantissa();
+        let mut i = add - (x.n as i32 + x.e as i32);
+        let mut idx = 0;
+        let mut dx = *x;
+
+        // x = s + dx
+        if i < DECIMAL_BASE_LOG10 as i32 {
+            idx = x.m[DECIMAL_PARTS] as usize;
+            let mut m = 1;
+            while i > 0 {
+                idx /= 10;
+                i -= 1;
+                m *= 10;
+            }
+            dx.m[DECIMAL_PARTS] = x.m[DECIMAL_PARTS] % m;
+        }
+        return (idx, dx);
     }
 
     // sin: q=0, cos: q=1; 
@@ -1443,22 +1545,7 @@ impl BigFloat {
         if x.sign == DECIMAL_SIGN_NEG {
             quadrant = 3 - quadrant;
         }
-        x.maximize_mantissa();
-        let mut i = 1 - (x.n as i32 + x.e as i32);
-        let mut idx = 0;
-        let mut dx = x;
-
-        // x = s + dx
-        if i < DECIMAL_BASE_LOG10 as i32 {
-            idx = x.m[DECIMAL_PARTS] as usize;
-            let mut m = 1;
-            while i > 0 {
-                idx /= 10;
-                i -= 1;
-                m *= 10;
-            }
-            dx.m[DECIMAL_PARTS] = x.m[DECIMAL_PARTS] % m;
-        }
+        let (idx, dx) = Self::get_trig_params(&mut x, 1);
 
         // determine closest precomputed values of derivatives
         let mut s = [BigFloatInc::new(), BigFloatInc::new(), BigFloatInc::new(), BigFloatInc::new(),];
@@ -1497,7 +1584,10 @@ impl BigFloat {
         if q == 0 {
             ret.sign = self.sign;
         }
-        return Ok(Self::from_big_float_inc(&mut ret));
+        if ret.abs().cmp(&one) > 0 {
+            ret = one;
+        }
+        return Ok(Self::from_big_float_inc(&mut ret)?);
     }
 
     // fractional part of d1 
@@ -2589,12 +2679,12 @@ mod tests {
         }
 
 
-        println!("Testing sin and cos");
+        println!("Testing sin and cos, asin and acos");
 
         d1 = BigFloat::new();
         d1.e = -39;
         d1.m[8] = 123;
-        epsilon.e = -77; // 1*10^(-38)
+        epsilon.e = -69; // 1*10^(-30)
         for i in 1..9999 {
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
@@ -2605,6 +2695,33 @@ mod tests {
             assert!(p.sub(&one).unwrap().abs().cmp(&epsilon) <= 0);
         }
 
+        // asin
+        d1 = BigFloat::new();
+        d1.e = -39;
+        d1.m[8] = 123;
+        epsilon.e = -75; // 1*10^(-36)
+        for i in 1..1571 {  // -pi/2..pi/2
+            d1.m[9] = i;
+            d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
+            d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
+            let s = d1.sin().unwrap();
+            let asn = s.asin().unwrap();
+            assert!(d1.sub(&asn).unwrap().abs().cmp(&epsilon) <= 0);
+        }
+
+        // acos
+        d1 = BigFloat::new();
+        d1.e = -39;
+        d1.m[8] = 123;
+        epsilon.e = -75; // 1*10^(-36)
+        for i in 1..1571*2 {  // 0..pi
+            d1.m[9] = i;
+            d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
+            d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
+            let c = d1.cos().unwrap();
+            let acs = c.acos().unwrap();
+            assert!(d1.abs().sub(&acs).unwrap().abs().cmp(&epsilon) <= 0);
+        }
 
         println!("Testing tan");
 
@@ -2613,7 +2730,7 @@ mod tests {
         d1.m[0] = 5678;
         d1.m[8] = 1234;
         epsilon.e = -73; // 1*10^(-34) for arguments close to pi/2 the precision is lost
-        for i in 0..9999 {
+        for i in 1..9999 {
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
             d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
@@ -2621,6 +2738,20 @@ mod tests {
             let t2 = d1.sin().unwrap().div(&d1.cos().unwrap()).unwrap();
             let p = t1.div(&t2).unwrap();
             assert!(p.sub(&one).unwrap().abs().cmp(&epsilon) <= 0);
+        }
+
+        d1 = BigFloat::new();
+        d1.e = -39;
+        d1.m[0] = 5678;
+        d1.m[8] = 1234;
+        epsilon.e = -78; // 1*10^(-39) for arguments close to pi/2 the precision is lost
+        for i in 1..1571 {
+            d1.m[9] = i;
+            d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
+            d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
+            let t1 = d1.tan().unwrap();
+            let atn = t1.atan().unwrap();
+            assert!(atn.sub(&d1).unwrap().abs().cmp(&epsilon) <= 0);
         }
 
 
