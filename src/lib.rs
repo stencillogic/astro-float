@@ -320,6 +320,10 @@ impl BigFloat {
         let mut d1mi: i32;
         let mut m3 = [0i16; DECIMAL_PARTS * 2 + 1];
 
+        if self.n == 0 || d2.n == 0 {
+            return Ok(Self::new());
+        }
+
         for i in 0..DECIMAL_PARTS {
             d1mi = self.m[i] as i32;
             if d1mi == 0 {
@@ -1002,27 +1006,44 @@ impl BigFloat {
     }
 
     /// Returns the rounded number with `n` decimal positions in the fractional part of the number.
-    pub fn round(&self, n: usize) -> Self {
+    pub fn round(&self, n: usize) -> Result<Self, Error> {
         let mut ret = *self;
         let e = (-self.e) as usize;
         if self.e < 0 && e > n {
+            let mut i = 0;
+            let mut n = e - n;
             let mut c = 0;
-            let mut t = 1;
-            let n = e - n + 1;
-            for i in 0..n {
-                let d = ret.m[i / DECIMAL_BASE_LOG10] / t;
-                ret.m[i / DECIMAL_BASE_LOG10] = (d + c) * t;
-                c = if d % 10 + c >= 5 {1} else {0};
-                t *= 10;
-                if t == DECIMAL_BASE as i16 {
-                    if i < n - 1 {
-                        ret.m[i / DECIMAL_BASE_LOG10] = 0;
+            while n > 0 {
+                let s = if n > DECIMAL_BASE_LOG10 {
+                    DECIMAL_BASE_LOG10
+                } else {
+                    n
+                };
+                n -= s;
+                let (p1, p2) = Self::round_digit(ret.m[i] + c, s);
+                ret.m[i] = p1;
+                c = p2;
+                i += 1;
+            }
+            if c > 0 {
+                while i < DECIMAL_PARTS {
+                    if ret.m[i] < DECIMAL_BASE as i16 - 1 {
+                        ret.m[i] += 1;
+                        return Ok(ret);
+                    } else {
+                        ret.m[i] = 0;
                     }
-                    t = 1;
+                    i += 1;
                 }
+                if ret.e == DECIMAL_MAX_EXPONENT {
+                    return Err(Error::ExponentOverflow);
+                }
+                ret.e += 1;
+                Self::shift_right(&mut ret.m, 1);
+                ret.m[DECIMAL_PARTS - 1] += DECIMAL_BASE as i16 / 10;
             }
         }
-        return ret;
+        return Ok(ret);
     }
 
     /// Compare to d2.
@@ -1666,6 +1687,27 @@ impl BigFloat {
             }
         }
         return Ok(int);
+    }
+
+    // round n positions in a single digit
+    fn round_digit(d: i16, n: usize) -> (i16, i16) {
+        if d == DECIMAL_BASE as i16 {
+            return (0, 1);
+        }
+        let mut t = 1;
+        let mut c = 0;
+        for _ in 0..n {
+            c = if (d / t % 10) + c >= 5 { 1 } else { 0 };
+            t *= 10;
+        }
+        let ret = (d / t + c) * t;
+        if ret == DECIMAL_BASE as i16 {
+            return (0, 1);
+        }
+        if n == DECIMAL_BASE_LOG10 {
+            return (0, if DECIMAL_BASE as i16/2 <= ret {1} else {0});
+        }
+        return (ret, 0)
     }
 }
 
@@ -2714,7 +2756,7 @@ mod tests {
         d1.e = -39;
         d1.m[8] = 123;
         epsilon.e = -75; // 1*10^(-36)
-        for i in 1..1571*2 {  // 0..pi
+        for i in 1..3142 {  // 0..pi
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
             d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
@@ -2722,6 +2764,7 @@ mod tests {
             let acs = c.acos().unwrap();
             assert!(d1.abs().sub(&acs).unwrap().abs().cmp(&epsilon) <= 0);
         }
+
 
         println!("Testing tan");
 
@@ -2928,35 +2971,44 @@ mod tests {
         d1.e = -37;
         d1.n = 39;
         d2 = d1;
-        assert!(d1.round(123).cmp(&d2) == 0);
-        assert!(d1.round(9).cmp(&d2) == 0);
+        assert!(d1.round(123).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(9).unwrap().cmp(&d2) == 0);
         d2.m[7] = 1230;
-        assert!(d1.round(8).cmp(&d2) == 0);
+        assert!(d1.round(8).unwrap().cmp(&d2) == 0);
         d2.m[7] = 1200;
-        assert!(d1.round(7).cmp(&d2) == 0);
+        assert!(d1.round(7).unwrap().cmp(&d2) == 0);
         d2.m[7] = 1000;
-        assert!(d1.round(6).cmp(&d2) == 0);
+        assert!(d1.round(6).unwrap().cmp(&d2) == 0);
         d2.m[7] = 0;
-        assert!(d1.round(5).cmp(&d2) == 0);
+        assert!(d1.round(5).unwrap().cmp(&d2) == 0);
         d2.m[8] = 4530;
-        assert!(d1.round(4).cmp(&d2) == 0);
+        assert!(d1.round(4).unwrap().cmp(&d2) == 0);
         d2.m[8] = 4500;
-        assert!(d1.round(3).cmp(&d2) == 0);
+        assert!(d1.round(3).unwrap().cmp(&d2) == 0);
         d2.m[8] = 5000;
-        assert!(d1.round(2).cmp(&d2) == 0);
+        assert!(d1.round(2).unwrap().cmp(&d2) == 0);
         d2.m[8] = 0;
         d2.m[9] = 124;
-        assert!(d1.round(1).cmp(&d2) == 0);
+        assert!(d1.round(1).unwrap().cmp(&d2) == 0);
         d2.m[9] = 120;
-        assert!(d1.round(0).cmp(&d2) == 0);
+        assert!(d1.round(0).unwrap().cmp(&d2) == 0);
         d2.sign = DECIMAL_SIGN_NEG;
         d1.sign = DECIMAL_SIGN_NEG;
-        assert!(d1.round(0).cmp(&d2) == 0);
+        assert!(d1.round(0).unwrap().cmp(&d2) == 0);
         d1 = BigFloat::new();
         d1.m[9] = 1234;
         d1.n = 39;
         d1.e = 10;
-        assert!(d1.round(2).cmp(&d1) == 0);
+        assert!(d1.round(2).unwrap().cmp(&d1) == 0);
+
+        for i in 0..DECIMAL_PARTS {
+            d1.m[i] = DECIMAL_BASE as i16 - 1;
+        }
+        d1.n = DECIMAL_POSITIONS as i16;
+        d1.e = -10;
+        d2 = BigFloat::one();
+        d2.e = -9;
+        assert!(d1.round(2).unwrap().cmp(&d2) == 0);
 
 
         println!("Testing sinh, asinh");
