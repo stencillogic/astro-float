@@ -16,6 +16,7 @@ mod sqrt_const;
 mod atan_const;
 mod sin_const;
 mod tan_const;
+mod ln_const;
 mod increased;
 
 use crate::defs::DECIMAL_PARTS;
@@ -23,6 +24,7 @@ use crate::sqrt_const::SQRT_VALUES;
 use crate::atan_const::ATAN_VALUES1;
 use crate::atan_const::ATAN_VALUES2;
 use crate::sin_const::SIN_VALUES1;
+use crate::ln_const::LN_VALUES;
 use crate::sin_const::SIN_VALUES2;
 use crate::tan_const::TAN_VALUES;
 use crate::increased::BigFloatInc;
@@ -51,12 +53,6 @@ const LN_OF_10: BigFloatInc = BigFloatInc {
     n: 44, 
     sign: DECIMAL_SIGN_POS, 
     e: -43,
-};
-const LN_OF_2: BigFloatInc = BigFloatInc {
-    m: [0013, 755, 6568, 5817, 1214, 7232, 941, 9453, 559, 4718, 6931],
-    n: 44, 
-    sign: DECIMAL_SIGN_POS, 
-    e: -44,
 };
 const HALF_PI: BigFloatInc = BigFloatInc {
     m: [5846, 2098, 5144, 6397, 1691, 3132, 6192, 4896, 2679, 7963, 1570],
@@ -710,28 +706,30 @@ impl BigFloat {
         let mut ml = Self::to_big_float_inc(self);
         ml.e = 1 - ml.n as i8;
 
-        // additional factoring
-        while ml.cmp(&two) >= 0 {
-            add = add.add(&LN_OF_2)?;
-            ml = ml.div(&two)?;
-        }
-
         // arctanh series
         ml = ml.sub(&one)?.div(&ml.add(&one)?)?;    // (x-1)/(x+1)
-        let mut ret = ml;
-        let mlq = ml.mul(&ml)?;
-        let mut d = one;
-        loop {
-            d = d.add(&two)?;
-            ml = ml.mul(&mlq)?;
-            let p = ml.div(&d)?;
+        
+        // further reduction: arctanh(x) = arctanh(s) + arctanh((x - s) / (1 - x*s))
+        let (idx, mut dx) = Self::get_trig_params(&mut ml, 0);
+        let atanh_s = LN_VALUES[idx];
+        let s = ml.sub(&dx)?;
+        dx = dx.div(&one.sub(&ml.mul(&s)?)?)?;
+
+        let mut ret = dx;
+        let dxx = dx.mul(&dx)?;
+        for i in 0..ATAN_VALUES1.len() {
+            dx = dx.mul(&dxx)?;
+            let mut poly_coeff = ATAN_VALUES1[i];
+            poly_coeff.sign = DECIMAL_SIGN_POS;     // same as for atan, but always positive
+            let p = poly_coeff.mul(&dx)?;
             let val = ret.add(&p)?;
             if val.cmp(&ret) == 0 {
                 break;
             }
             ret = val;
+            assert!(i != ATAN_VALUES1.len()-2);
         }
-        ret = ret.mul(&two)?.add(&add)?;
+        ret = ret.add(&atanh_s)?.mul(&two)?.add(&add)?;
 
         return Ok(Self::from_big_float_inc(&mut ret)?);
     }
@@ -793,7 +791,7 @@ impl BigFloat {
             }
             tan_dx = val;
             i += 1;
-            assert!(i != TAN_VALUES.lenh() - 2);
+            assert!(i != TAN_VALUES.len() - 2);
         }
 
         // tan(x)
