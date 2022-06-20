@@ -17,7 +17,7 @@ impl BigFloat {
         if ret.sign == DECIMAL_SIGN_NEG {
             ret.sign = DECIMAL_SIGN_POS;
         }
-        return ret;
+        ret
     }
 
     /// Returns the largest integer less than or equal to a number.
@@ -43,7 +43,7 @@ impl BigFloat {
     pub fn frac(&self) -> Self {
         let mut ret = Self::extract_fract_part(self);
         ret.sign = self.sign;
-        return ret;
+        ret
     }
 
     /// Return integer part of a number,
@@ -51,7 +51,7 @@ impl BigFloat {
     pub fn int(&self) -> Self {
         let mut ret = Self::extract_int_part(self);
         ret.sign = self.sign;
-        return ret;
+        ret
     }
 
     /// Returns the rounded number with `n` decimal positions in the fractional part of the number.
@@ -92,7 +92,7 @@ impl BigFloat {
                 ret.m[DECIMAL_PARTS - 1] += DECIMAL_BASE as i16 / 10;
             }
         }
-        return Ok(ret);
+        Ok(ret)
     }
 
     /// Compare to d2.
@@ -186,7 +186,7 @@ impl BigFloat {
             }
             n2 -= 1;
         }
-        return 0;
+        0
     }
 
     // floor and ceil computation
@@ -207,7 +207,7 @@ impl BigFloat {
                 return int.sub(&one);
             }
         }
-        return Ok(int);
+        Ok(int)
     }
 
     // round n positions in a single digit
@@ -228,7 +228,7 @@ impl BigFloat {
         if n == DECIMAL_BASE_LOG10 {
             return (0, if DECIMAL_BASE as i16/2 <= ret {1} else {0});
         }
-        return (ret, 0)
+        (ret, 0)
     }
 }
 

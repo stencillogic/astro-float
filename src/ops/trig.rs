@@ -25,7 +25,7 @@ const HALF_PI2: BigFloat = BigFloat {
     e: -(DECIMAL_POSITIONS as i8 - 1),
 };
 const PI2: BigFloatInc = BigFloatInc {
-    m: [1694, 4197, 0288, 2795, 3383, 6264, 2384, 9793, 5358, 5926, 3141],
+    m: [1694, 4197, 288, 2795, 3383, 6264, 2384, 9793, 5358, 5926, 3141],
     n: 44, 
     sign: DECIMAL_SIGN_POS, 
     e: -43,
@@ -99,7 +99,7 @@ impl BigFloat {
         if (quadrant == 1 && self.sign == DECIMAL_SIGN_POS) || (quadrant == 0 && self.sign == DECIMAL_SIGN_NEG) {
             ret.sign = DECIMAL_SIGN_NEG;
         }
-        return Ok(Self::from_big_float_inc(&mut ret)?);
+        Self::from_big_float_inc(&mut ret)
     }
 
     /// Returns arcsine of a number. Result is an angle in radians ranging from `-pi` to `pi`.
@@ -178,7 +178,7 @@ impl BigFloat {
         }
         ret.sign = self.sign;
 
-        return Ok(Self::from_big_float_inc(&mut ret)?);
+        Self::from_big_float_inc(&mut ret)
     }
 
 
@@ -279,7 +279,7 @@ mod tests {
         for i in 1..9999 {
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
             let s = d1.sin().unwrap();
             let c = d1.cos().unwrap();
             let p = s.mul(&s).unwrap().add(&c.mul(&c).unwrap()).unwrap();
@@ -294,7 +294,7 @@ mod tests {
         for i in 1..1571 {  // -pi/2..pi/2
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
             let s = d1.sin().unwrap();
             let asn = s.asin().unwrap();
             assert!(d1.sub(&asn).unwrap().abs().cmp(&epsilon) <= 0);
@@ -308,7 +308,7 @@ mod tests {
         for i in 1..3142 {  // 0..pi
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
             let c = d1.cos().unwrap();
             let acs = c.acos().unwrap();
             assert!(d1.abs().sub(&acs).unwrap().abs().cmp(&epsilon) <= 0);
@@ -328,7 +328,7 @@ mod tests {
         for i in 1..9999 {
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
             let t1 = d1.tan().unwrap();
             let t2 = d1.sin().unwrap().div(&d1.cos().unwrap()).unwrap();
             let p = t1.div(&t2).unwrap();
@@ -343,7 +343,7 @@ mod tests {
         for i in 1..1571 {
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
             let t1 = d1.tan().unwrap();
             let atn = t1.atan().unwrap();
             assert!(atn.sub(&d1).unwrap().abs().cmp(&epsilon) <= 0);

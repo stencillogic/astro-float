@@ -45,7 +45,7 @@ impl BigFloat {
             }
             fractional.n = Self::num_digits(&fractional.m);
         }
-        let mut int = Self::extract_int_part(&d1);
+        let mut int = Self::extract_int_part(d1);
 
         let mut ret = Self::one();
         let one = ret;
@@ -82,7 +82,7 @@ impl BigFloat {
             ret = one.div(&ret)?;
         }
 
-        return Ok(ret);
+        Ok(ret)
     }
 
     // divide BigFloat by two as integer

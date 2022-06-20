@@ -93,7 +93,7 @@ impl BigFloat {
             DECIMAL_SIGN_NEG
         };
 
-        return Ok(d3);
+        Ok(d3)
     }
 
     /// Divide by d2 and return result of division.
@@ -276,7 +276,7 @@ impl BigFloat {
             DECIMAL_SIGN_NEG
         };
 
-        return Ok(d3);
+        Ok(d3)
     }
 }
 
@@ -536,9 +536,7 @@ mod tests {
         // 3333 3..3 3333 / 9999
         for i in 0..DECIMAL_PARTS {
             d1.m[i] = 3333;
-            ref_num.m[i] = if i%3 == 1 { 0 } else { 
-                if i%3 == 2 { 6667 } else { 3333 }
-            };
+            ref_num.m[i] = if i%3 == 1 { 0 } else if i%3 == 2 { 6667 } else { 3333 };
         }
         d2.m[0] = 9999;
         d2.n = 4;

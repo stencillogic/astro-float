@@ -21,7 +21,7 @@ impl BigFloat {
     /// ExponentOverflow - when result is too big or too small.
     pub fn sinh(&self) -> Result<BigFloat, Error> {
         // 0.5*(e^x - e^-x)
-        let e_x1 = E.pow(&self)?;
+        let e_x1 = E.pow(self)?;
         let e_x2 = Self::one().div(&e_x1)?;
         e_x1.sub(&e_x2)?.mul(&ONE_HALF)
     }
@@ -33,7 +33,7 @@ impl BigFloat {
     /// ExponentOverflow - when result is too big or too small.
     pub fn cosh(&self) -> Result<BigFloat, Error> {
         // 0.5*(e^x + e^-x)
-        let e_x1 = E.pow(&self)?;
+        let e_x1 = E.pow(self)?;
         let e_x2 = Self::one().div(&e_x1)?;
         e_x1.add(&e_x2)?.mul(&ONE_HALF)
     }
@@ -45,7 +45,7 @@ impl BigFloat {
     /// ExponentOverflow - when result is too big or too small.
     pub fn tanh(&self) -> Result<BigFloat, Error> {
         // (e^x - e^-x) / (e^x + x^-x)
-        let e_x1 = E.pow(&self)?;
+        let e_x1 = E.pow(self)?;
         let e_x2 = Self::one().div(&e_x1)?;
         e_x1.sub(&e_x2)?.div(&e_x1.add(&e_x2)?)
     }
@@ -131,7 +131,7 @@ mod tests {
         for i in 1..100 {
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
             let s = d1.sinh().unwrap();
             let c = s.asinh().unwrap();
             assert!(d1.sub(&c).unwrap().abs().cmp(&epsilon) <= 0);
@@ -150,7 +150,7 @@ mod tests {
         for i in 0..100 {
             d1.m[9] = 10 + i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i<100 {2} else {if i<1000 {3} else {4}} + 36;
+            d1.n = if i<100 {2} else if i<1000 {3} else {4} + 36;
             let s = d1.cosh().unwrap();
             let mut c = s.acosh().unwrap();
             assert!(c.sign == DECIMAL_SIGN_POS);
@@ -177,7 +177,7 @@ mod tests {
         for i in 0..100 {
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else {if i<100 {2} else {if i<1000 {3} else {4}}} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
             let s = d1.tanh().unwrap();
             let c = s.atanh().unwrap();
             assert!(d1.sub(&c).unwrap().abs().cmp(&epsilon) <= 0);

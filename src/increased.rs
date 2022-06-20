@@ -28,12 +28,12 @@ impl BigFloatInc {
 
     /// Return new BigFloatInc with value zero.
     pub fn new() -> Self {
-        return BigFloatInc {
+        BigFloatInc {
             sign: DECIMAL_SIGN_POS,
             e: 0,
             n: 0,
             m: ZEROED_MANTISSA,
-        };
+        }
     }
 
     /// Return new BigFloatInc with value one.
@@ -42,7 +42,7 @@ impl BigFloatInc {
         val.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/10;
         val.n = DECIMAL_POSITIONS as i16;
         val.e = 1 - DECIMAL_POSITIONS as i8;
-        return val;
+        val
     }
 
     /// Return new BigFloat with value two.
@@ -51,7 +51,7 @@ impl BigFloatInc {
         val.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/5;
         val.n = DECIMAL_POSITIONS as i16;
         val.e = 1 - DECIMAL_POSITIONS as i8;
-        return val;
+        val
     }
 
     /// Return absolute value.
@@ -60,7 +60,7 @@ impl BigFloatInc {
         if ret.sign == DECIMAL_SIGN_NEG {
             ret.sign = DECIMAL_SIGN_POS;
         }
-        return ret;
+        ret
     }
 
     /// Add d2 and return result of addition.
@@ -69,7 +69,7 @@ impl BigFloatInc {
     ///
     /// ExponentOverflow - when result is too big or too small.
     pub fn add(&self, d2: &BigFloatInc) -> Result<Self, Error> {
-        return self.add_sub(d2, 1);
+        self.add_sub(d2, 1)
     }
 
     /// Subtract d2 and return result of subtraction.
@@ -78,7 +78,7 @@ impl BigFloatInc {
     ///
     /// ExponentOverflow - when result is too big or too small.
     pub fn sub(&self, d2: &BigFloatInc) -> Result<Self, Error> {
-        return self.add_sub(d2, -1);
+        self.add_sub(d2, -1)
     }
 
     /// Multiply by d2 and return result of multiplication.
@@ -161,7 +161,7 @@ impl BigFloatInc {
             DECIMAL_SIGN_NEG
         };
 
-        return Ok(d3);
+        Ok(d3)
     }
 
     /// Compare to d2.
@@ -184,7 +184,7 @@ impl BigFloatInc {
             return Self::abs_cmp_with_shift(&self.m, self.n, &d2.m, d2.n) * self.sign as i16;
         }
 
-        return Self::abs_cmp(&self.m, &d2.m) * self.sign as i16;
+        Self::abs_cmp(&self.m, &d2.m) * self.sign as i16
     }
 
     /// Divide by d2 and return result of division.
@@ -366,8 +366,7 @@ impl BigFloatInc {
         } else {
             DECIMAL_SIGN_NEG
         };
-
-        return Ok(d3);
+        Ok(d3)
     }
 
     /// Shift to the left as much as possibe.
@@ -405,7 +404,7 @@ impl BigFloatInc {
             Self::shift_right(&mut self.m, 1);
             self.m[DECIMAL_PARTS - 1] += DECIMAL_BASE as i16 / 10;
         }
-        return Ok(());
+        Ok(())
     }
 
     /// Return fractional part of number with positive sign.
@@ -434,7 +433,7 @@ impl BigFloatInc {
                 fractional.e = self.e;
             }
         }
-        return fractional;
+        fractional
     }
 
 
@@ -450,7 +449,7 @@ impl BigFloatInc {
             }
             i -= 1;
         }
-        return 0;
+        0
     }
 
     // compare absolute values of two floats with shifts n1, n2
@@ -512,7 +511,7 @@ impl BigFloatInc {
             }
             n2 -= 1;
         }
-        return 0;
+        0
     }
 
     // add if op >= 0 subtract if op < 0
@@ -620,7 +619,7 @@ impl BigFloatInc {
                 d3.n = Self::num_digits(&d3.m);
             }
         }
-        return Ok(d3);
+        Ok(d3)
     }
 
     fn abs_add(d1: &[i16], d2: &[i16], d3: &mut [i16]) -> u32 {
@@ -639,8 +638,7 @@ impl BigFloatInc {
             d3[i] = s as i16;
             i += 1;
         }
-
-        return c;
+        c
     }
 
     // subtract absolute value of d2 from d1
@@ -668,7 +666,7 @@ impl BigFloatInc {
         let mut s: i16;
         let mut t: i16;
         let mut x: i32 = (n % DECIMAL_BASE_LOG10) as i32;
-        n = n / DECIMAL_BASE_LOG10;
+        n /= DECIMAL_BASE_LOG10;
         if x == 0 {
             if n > 0 {
                 for i in 0..DECIMAL_PARTS - n {
@@ -705,7 +703,7 @@ impl BigFloatInc {
         let mut s: i16;
         let mut t: i16;
         let mut x: i32 = (n % DECIMAL_BASE_LOG10) as i32;
-        n = n / DECIMAL_BASE_LOG10;
+        n /= DECIMAL_BASE_LOG10;
         if x == 0 {
             if n > 0 {
                 i = DECIMAL_PARTS - 1;
@@ -758,8 +756,7 @@ impl BigFloatInc {
                 }
             }
         }
-
-        return n;
+        n
     }
 
     // multiply d1 by digit d and put result to d3 with overflow

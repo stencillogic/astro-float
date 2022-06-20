@@ -50,7 +50,7 @@ pub const E: BigFloat = BigFloat {
 
 /// Pi number.
 pub const PI: BigFloat = BigFloat {
-    m: [4197, 0288, 2795, 3383, 6264, 2384, 9793, 5358, 5926, 3141],
+    m: [4197, 288, 2795, 3383, 6264, 2384, 9793, 5358, 5926, 3141],
     n: DECIMAL_POSITIONS as i16, 
     sign: DECIMAL_SIGN_POS, 
     e: 1 - (DECIMAL_POSITIONS as i8),
@@ -62,12 +62,12 @@ impl BigFloat {
 
     /// Return new BigFloat with value zero.
     pub fn new() -> Self {
-        return BigFloat {
+        BigFloat {
             sign: DECIMAL_SIGN_POS,
             e: 0,
             n: 0,
             m: ZEROED_MANTISSA,
-        };
+        }
     }
     
     /// Return BigFloat with the value of 1.
@@ -76,7 +76,7 @@ impl BigFloat {
         val.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/10;
         val.n = DECIMAL_POSITIONS as i16;
         val.e = 1 - DECIMAL_POSITIONS as i8;
-        return val;
+        val
     }
 
     /// Return new BigFloat with value two.
@@ -85,7 +85,7 @@ impl BigFloat {
         val.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/5;
         val.n = DECIMAL_POSITIONS as i16;
         val.e = 1 - DECIMAL_POSITIONS as i8;
-        return val;
+        val
     }
 
     /// Create a BigFloat value from a sequence of `bytes`. Each byte must represent a decimal digit.
@@ -107,12 +107,12 @@ impl BigFloat {
             }
         }
 
-        return BigFloat {
+        BigFloat {
             sign: if sign >= 0 { DECIMAL_SIGN_POS } else { DECIMAL_SIGN_NEG },
             e: exponent,
             n: d as i16,
             m: mantissa,
-        };
+        }
     }
 
     /// Construct BigFloat from f64.
@@ -126,7 +126,7 @@ impl BigFloat {
         if f == 0f64 {
             return Ok(ret);
         }
-        if f == f64::INFINITY || f == f64::NAN {
+        if f.is_infinite() || f.is_nan() {
             return Err(Error::ExponentOverflow);
         } 
         if f < 0f64 {
@@ -148,7 +148,7 @@ impl BigFloat {
         loop {
             f *= DECIMAL_BASE as f64;
             let d = f as i16;
-            f = f - d as f64;
+            f -= d as f64;
             ret.m[p] = d;
             p -= 1;
             if f == 0f64 || p == 0 {
@@ -162,7 +162,7 @@ impl BigFloat {
         }
         ret.e = e as i8;
 
-        return Ok(ret);
+        Ok(ret)
     }
 
     /// Convert BigFloat to f64.
@@ -184,7 +184,7 @@ impl BigFloat {
         if self.sign == DECIMAL_SIGN_NEG {
             f = -f;
         }
-        return f;
+        f
     }
 
     /// Construct BigFloat from f32. Wrapper for from_f64.
@@ -243,11 +243,11 @@ impl BigFloat {
 
     /// Construct BigFloat from raw parts.
     pub fn from_raw_parts(mantissa: [i16; DECIMAL_PARTS], mantissa_len: i16, sign: i8, exponent: i8) -> Self {
-        return BigFloat {
-            sign: sign,
+        BigFloat {
+            sign,
             e: exponent,
             n: mantissa_len,
             m: mantissa,
-        };
+        }
     }
 }

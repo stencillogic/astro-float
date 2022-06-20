@@ -83,7 +83,7 @@ impl BigFloat {
         }
         ret = ret.add(&atanh_s)?.mul(&two)?.add(&add)?;
 
-        return Ok(Self::from_big_float_inc(&mut ret)?);
+        Self::from_big_float_inc(&mut ret)
     }
 }
 

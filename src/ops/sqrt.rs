@@ -45,7 +45,7 @@ impl BigFloat {
         }
         let mut ret = Self::from_big_float_inc(&mut sq)?;
         ret.e += self.e/2;
-        return Ok(ret);
+        Ok(ret)
     }
 
     // sqrt of integer
@@ -75,7 +75,7 @@ impl BigFloat {
             err = err2;
             n = n2;
         }
-        return Ok(n);
+        Ok(n)
     }
 
 }

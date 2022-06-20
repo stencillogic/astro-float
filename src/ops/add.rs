@@ -18,7 +18,7 @@ impl BigFloat {
     ///
     /// ExponentOverflow - when result is too big or too small.
     pub fn add(&self, d2: &BigFloat) -> Result<BigFloat, Error> {
-        return self.add_sub(d2, 1);
+        self.add_sub(d2, 1)
     }
 
     /// Subtract d2 and return result of subtraction.
@@ -27,7 +27,7 @@ impl BigFloat {
     ///
     /// ExponentOverflow - when result is too big or too small.
     pub fn sub(&self, d2: &BigFloat) -> Result<BigFloat, Error> {
-        return self.add_sub(d2, -1);
+        self.add_sub(d2, -1)
     }
 
 
@@ -146,7 +146,7 @@ impl BigFloat {
         if invert_sign {
             d3.sign = if d3.sign == DECIMAL_SIGN_POS { DECIMAL_SIGN_NEG } else { DECIMAL_SIGN_POS };
         }
-        return Ok(d3);
+        Ok(d3)
     }
 
     fn abs_add(d1: &[i16], d2: &[i16], d3: &mut [i16]) -> u32 {
@@ -165,8 +165,7 @@ impl BigFloat {
             d3[i] = s as i16;
             i += 1;
         }
-
-        return c;
+        c
     }
 
     // subtract absolute value of d2 from d1
