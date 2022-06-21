@@ -1,4 +1,4 @@
-/// Increased precision float to prevent error accumulation.
+//! Increased precision float to prevent error accumulation.
 use crate::defs::DECIMAL_PARTS as DECIMAL_PARTS_BASE;
 use crate::defs::Error;
 

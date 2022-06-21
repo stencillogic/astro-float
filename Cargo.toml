@@ -10,7 +10,9 @@ keywords = ["big-float", "numeric", "decimal", "mathematics", "bignum"]
 readme = "README.md"
 repository = "https://github.com/stencillogic/num-bigfloat"
 
-[dependencies]
-
 [dev-dependencies]
 rand = "0.8.5"
+
+[features]
+default = ["std"]
+std = []

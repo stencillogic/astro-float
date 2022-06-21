@@ -1,6 +1,6 @@
 //! Multiple precision floating point numbers implemented purely in Rust. 
 //!
-//! Characteristics:
+//! Number characteristics:
 //!
 //! | Name                          | Value  |
 //! |:------------------------------|-------:|
@@ -8,7 +8,28 @@
 //! | Exponent minimum value        |   -128 |
 //! | Exponent maximum value        |    127 |
 //!
-//! The implementation does not rely heavily on the capabilities of the standard library, and can be adapted for use without the standard library.
+//! ## Examples
+//! 
+//! ```
+//! use num_bigfloat::ext::BigFloatExt;
+//! use num_bigfloat::ext::ONE;
+//! use num_bigfloat::ext::PI;
+//!
+//! // compute pi: pi = 6*arctan(1/sqrt(3))
+//! let six: BigFloatExt = 6.0.into();
+//! let three: BigFloatExt = 3.0.into();
+//! let pi = six * (ONE / three.sqrt()).atan();
+//! let epsilon = 1.0e-39.into();
+//! 
+//! assert!((pi - PI).abs() < epsilon);
+//! 
+//! println!("{}", pi);
+//! // output: 3.141592653589793238462643383279502884196e-39
+//! ```
+//! 
+//! ## no_std
+//!
+//! Library can be used without the standard Rust library. This can be achieved by turning off `std` feature.
 
 #![deny(clippy::suspicious)]
 
@@ -36,6 +57,7 @@ mod tests {
     use super::*;
     use rand::random;
     use crate::defs::DECIMAL_PARTS;
+
 
     #[test]
     fn test_bigfloat() {

@@ -56,6 +56,14 @@ pub const ONE: BigFloat = BigFloat {
     e: 1 - (DECIMAL_POSITIONS as i8),
 };
 
+/// Two.
+pub const TWO: BigFloat = BigFloat {
+    m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 2000],
+    n: DECIMAL_POSITIONS as i16, 
+    sign: DECIMAL_SIGN_POS, 
+    e: 1 - (DECIMAL_POSITIONS as i8),
+};
+
 /// Eulers number.
 pub const E: BigFloat = BigFloat {
     m: [7757, 6249, 3526, 7471, 6028, 2353, 9045, 2845, 2818, 2718],

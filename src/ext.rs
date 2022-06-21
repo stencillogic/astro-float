@@ -1,7 +1,6 @@
-///! `BigFloat` by default does not support `NaN`, and `Inf`. 
-///! `BigFloatExt` is a wrapper for `BigFloat` which supports `NaN`, and `Inf` 
-///! values in addition to functionality of `BigFloat`, 
-///! and also implements `std::ops` traits from the standard library.  
+//! Extended BigFloat, which supports `NaN`, and `Inf` 
+//! values, and implements `std::ops` traits from the standard library.
+//! This is preferred to use with respect to the future changes in the library.
 
 use crate::defs::{BigFloat, Error, DECIMAL_SIGN_POS, DECIMAL_PARTS, DECIMAL_SIGN_NEG, DECIMAL_POSITIONS,
     DECIMAL_MAX_EXPONENT, DECIMAL_MIN_EXPONENT};
@@ -36,8 +35,11 @@ pub const INF_NEG: BigFloatExt = BigFloatExt { inner: Flavor::Inf(DECIMAL_SIGN_N
 /// Value of zero.
 pub const ZERO: BigFloatExt = BigFloatExt { inner: Flavor::Value(crate::defs::ZERO) };
 
-/// Value of one
+/// Value of one.
 pub const ONE: BigFloatExt = BigFloatExt { inner: Flavor::Value(crate::defs::ONE) };
+
+/// Value of two.
+pub const TWO: BigFloatExt = BigFloatExt { inner: Flavor::Value(crate::defs::TWO) };
 
 /// Eulers number.
 pub const E: BigFloatExt = BigFloatExt { inner: Flavor::Value(crate::defs::E) };
@@ -538,144 +540,216 @@ macro_rules! gen_wrapper4 {
 }
 
 impl BigFloatExt {
-
-gen_wrapper1!("Construct BigFloat from f32.", from_f32, Self, f, f32);
-gen_wrapper1!("Construct BigFloat from f64.", from_f64, Self, f, f64);
-
-gen_wrapper4!("Return absolute value.", abs, Self, {Flavor::Inf(DECIMAL_SIGN_POS)}, {Flavor::Inf(DECIMAL_SIGN_POS)},);
-gen_wrapper4!("Return integer part of a number,", int, Self, {Flavor::NaN}, {Flavor::NaN},);
-gen_wrapper4!("Return fractional part of a number.", frac, Self, {Flavor::NaN}, {Flavor::NaN},);
-gen_wrapper2!("Returns the smallest integer greater than or equal to a number.", ceil, Self, {INF_POS}, {INF_NEG},);
-gen_wrapper2!("Returns the largest integer less than or equal to a number.", floor, Self, {INF_POS}, {INF_NEG},);
-gen_wrapper2!("Returns the rounded number with `n` decimal positions in the fractional part of the number.", round, Self, {INF_POS}, {INF_NEG}, n, usize);
-
-gen_wrapper2!("Return square root of a number.", sqrt, Self, {INF_POS}, {NAN},);
-gen_wrapper2!("Returns natural logarithm of a number.", ln, Self, {INF_POS}, {NAN},);
-
-gen_wrapper2!("Returns sine of a number. Argument is an angle in radians.", sin, Self, {NAN}, {NAN},);
-gen_wrapper2!("Returns cosine of a number. Argument is an angle in radians.", cos, Self, {NAN}, {NAN},);
-gen_wrapper2!("Returns tangent of a number. Argument is an angle in radians.", tan, Self, {NAN}, {NAN},);
-gen_wrapper2!("Returns arcsine of a number. Result is an angle in radians ranging from `-pi` to `pi`.", asin, Self, {NAN}, {NAN},);
-gen_wrapper2!("Returns arccosine of a number.", acos, Self, {NAN}, {NAN},);
-gen_wrapper2!("Returns arctangent of a number. ", atan, Self, {HALF_PI}, {HALF_PI.inv_sign()},);
-
-gen_wrapper2!("Returns hyperbolic sine of a number.", sinh, Self, {INF_POS}, {INF_NEG},);
-gen_wrapper2!("Returns hyperbolic cosine of a number.", cosh, Self, {INF_POS}, {INF_POS},);
-gen_wrapper2!("Returns hyperbolic tangent of a number.", tanh, Self, {ONE}, {ONE.inv_sign()},);
-gen_wrapper2!("Returns inverse hyperbolic sine of a number.", asinh, Self, {INF_POS}, {INF_NEG},);
-gen_wrapper2!("Returns inverse hyperbolic cosine of a number.", acosh, Self, {ZERO}, {ZERO},);
-gen_wrapper2!("Returns inverse hyperbolic tangent of a number.", atanh, Self, {ZERO}, {ZERO},);
-
+    gen_wrapper1!("Construct BigFloat from f32.", from_f32, Self, f, f32);
+    gen_wrapper1!("Construct BigFloat from f64.", from_f64, Self, f, f64);
+    
+    gen_wrapper4!("Return absolute value.", abs, Self, {Flavor::Inf(DECIMAL_SIGN_POS)}, {Flavor::Inf(DECIMAL_SIGN_POS)},);
+    gen_wrapper4!("Return integer part of a number,", int, Self, {Flavor::NaN}, {Flavor::NaN},);
+    gen_wrapper4!("Return fractional part of a number.", frac, Self, {Flavor::NaN}, {Flavor::NaN},);
+    gen_wrapper2!("Returns the smallest integer greater than or equal to a number.", ceil, Self, {INF_POS}, {INF_NEG},);
+    gen_wrapper2!("Returns the largest integer less than or equal to a number.", floor, Self, {INF_POS}, {INF_NEG},);
+    gen_wrapper2!("Returns the rounded number with `n` decimal positions in the fractional part of the number.", round, Self, {INF_POS}, {INF_NEG}, n, usize);
+    
+    gen_wrapper2!("Return square root of a number.", sqrt, Self, {INF_POS}, {NAN},);
+    gen_wrapper2!("Returns natural logarithm of a number.", ln, Self, {INF_POS}, {NAN},);
+    
+    gen_wrapper2!("Returns sine of a number. Argument is an angle in radians.", sin, Self, {NAN}, {NAN},);
+    gen_wrapper2!("Returns cosine of a number. Argument is an angle in radians.", cos, Self, {NAN}, {NAN},);
+    gen_wrapper2!("Returns tangent of a number. Argument is an angle in radians.", tan, Self, {NAN}, {NAN},);
+    gen_wrapper2!("Returns arcsine of a number. Result is an angle in radians ranging from `-pi` to `pi`.", asin, Self, {NAN}, {NAN},);
+    gen_wrapper2!("Returns arccosine of a number.", acos, Self, {NAN}, {NAN},);
+    gen_wrapper2!("Returns arctangent of a number. ", atan, Self, {HALF_PI}, {HALF_PI.inv_sign()},);
+    
+    gen_wrapper2!("Returns hyperbolic sine of a number.", sinh, Self, {INF_POS}, {INF_NEG},);
+    gen_wrapper2!("Returns hyperbolic cosine of a number.", cosh, Self, {INF_POS}, {INF_POS},);
+    gen_wrapper2!("Returns hyperbolic tangent of a number.", tanh, Self, {ONE}, {ONE.inv_sign()},);
+    gen_wrapper2!("Returns inverse hyperbolic sine of a number.", asinh, Self, {INF_POS}, {INF_NEG},);
+    gen_wrapper2!("Returns inverse hyperbolic cosine of a number.", acosh, Self, {ZERO}, {ZERO},);
+    gen_wrapper2!("Returns inverse hyperbolic tangent of a number.", atanh, Self, {ZERO}, {ZERO},);
 }
 
-//
-// ops traits
-//
+/// Standard library features
+#[cfg(feature = "std")]
+pub mod std_ops {
 
-use std::ops::Add;
-use std::ops::AddAssign;
-use std::ops::Div;
-use std::ops::DivAssign;
-use std::ops::Mul;
-use std::ops::MulAssign;
-use std::ops::Neg;
-use std::ops::Sub;
-use std::ops::SubAssign;
+    use crate::defs::DECIMAL_POSITIONS;
+    use crate::defs::DECIMAL_SIGN_NEG;
 
+    use super::BigFloatExt;
+    use super::Flavor;
 
-impl Add for BigFloatExt {
-    type Output = Self;
-    fn add(self, rhs: Self) -> Self::Output {
-        BigFloatExt::add(&self, &rhs)
+    //
+    // ops traits
+    //
+
+    use std::ops::Add;
+    use std::ops::AddAssign;
+    use std::ops::Div;
+    use std::ops::DivAssign;
+    use std::ops::Mul;
+    use std::ops::MulAssign;
+    use std::ops::Neg;
+    use std::ops::Sub;
+    use std::ops::SubAssign;
+    
+    
+    impl Add for BigFloatExt {
+        type Output = Self;
+        fn add(self, rhs: Self) -> Self::Output {
+            BigFloatExt::add(&self, &rhs)
+        }
     }
-}
-
-impl AddAssign for BigFloatExt {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = BigFloatExt::add(self, &rhs)
+    
+    impl AddAssign for BigFloatExt {
+        fn add_assign(&mut self, rhs: Self) {
+            *self = BigFloatExt::add(self, &rhs)
+        }
     }
-}
-
-
-impl Div for BigFloatExt {
-    type Output = Self;
-    fn div(self, rhs: Self) -> Self::Output {
-        BigFloatExt::div(&self, &rhs)
+    
+    
+    impl Div for BigFloatExt {
+        type Output = Self;
+        fn div(self, rhs: Self) -> Self::Output {
+            BigFloatExt::div(&self, &rhs)
+        }
     }
-}
-
-impl DivAssign for BigFloatExt {
-    fn div_assign(&mut self, rhs: Self) {
-        *self = BigFloatExt::div(self, &rhs)
+    
+    impl DivAssign for BigFloatExt {
+        fn div_assign(&mut self, rhs: Self) {
+            *self = BigFloatExt::div(self, &rhs)
+        }
     }
-}
-
-impl Mul for BigFloatExt {
-    type Output = Self;
-    fn mul(self, rhs: Self) -> Self::Output {
-        BigFloatExt::mul(&self, &rhs)
+    
+    impl Mul for BigFloatExt {
+        type Output = Self;
+        fn mul(self, rhs: Self) -> Self::Output {
+            BigFloatExt::mul(&self, &rhs)
+        }
     }
-}
-
-impl MulAssign for BigFloatExt {
-    fn mul_assign(&mut self, rhs: Self) {
-        *self = BigFloatExt::mul(self, &rhs)
+    
+    impl MulAssign for BigFloatExt {
+        fn mul_assign(&mut self, rhs: Self) {
+            *self = BigFloatExt::mul(self, &rhs)
+        }
     }
-}
-
-impl Neg for BigFloatExt {
-    type Output = Self;
-    fn neg(self) -> Self::Output {
-        self.inv_sign()
+    
+    impl Neg for BigFloatExt {
+        type Output = Self;
+        fn neg(self) -> Self::Output {
+            self.inv_sign()
+        }
     }
-}
-
-impl Sub for BigFloatExt {
-    type Output = Self;
-    fn sub(self, rhs: Self) -> Self::Output {
-        BigFloatExt::sub(&self, &rhs)
+    
+    impl Sub for BigFloatExt {
+        type Output = Self;
+        fn sub(self, rhs: Self) -> Self::Output {
+            BigFloatExt::sub(&self, &rhs)
+        }
     }
-}
-
-impl SubAssign for BigFloatExt {
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = BigFloatExt::sub(self, &rhs)
+    
+    impl SubAssign for BigFloatExt {
+        fn sub_assign(&mut self, rhs: Self) {
+            *self = BigFloatExt::sub(self, &rhs)
+        }
     }
-}
-
-//
-// ordering traits
-//
-
-use std::cmp::PartialEq;
-use std::cmp::Eq;
-use std::cmp::PartialOrd;
-use std::cmp::Ordering;
-
-
-impl PartialEq for BigFloatExt {
-    fn eq(&self, other: &Self) -> bool {
-        let cmp_result = BigFloatExt::cmp(self, other);
-        matches!(cmp_result, Some(0))
+    
+    //
+    // ordering traits
+    //
+    
+    use std::cmp::PartialEq;
+    use std::cmp::Eq;
+    use std::cmp::PartialOrd;
+    use std::cmp::Ordering;
+    
+    
+    impl PartialEq for BigFloatExt {
+        fn eq(&self, other: &Self) -> bool {
+            let cmp_result = BigFloatExt::cmp(self, other);
+            matches!(cmp_result, Some(0))
+        }
     }
-}
+    
+    impl Eq for BigFloatExt {}
+    
+    impl PartialOrd for BigFloatExt {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            let cmp_result = BigFloatExt::cmp(self, other);
+            match cmp_result {
+                Some(v) => {
+                    if v > 0 {
+                        Some(Ordering::Greater)
+                    } else if v < 0 {
+                        Some(Ordering::Less)
+                    } else {
+                        Some(Ordering::Equal)
+                    }
+                },
+                None => None,
+            }
+        }
+    }
 
-impl Eq for BigFloatExt {}
+    impl From<f64> for BigFloatExt {
+        fn from(f: f64) -> Self {
+            BigFloatExt::from_f64(f)
+        }
+    }
 
-impl PartialOrd for BigFloatExt {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let cmp_result = BigFloatExt::cmp(self, other);
-        match cmp_result {
-            Some(v) => {
-                if v > 0 {
-                    Some(Ordering::Greater)
-                } else if v < 0 {
-                    Some(Ordering::Less)
-                } else {
-                    Some(Ordering::Equal)
-                }
-            },
-            None => None,
+    impl From<f32> for BigFloatExt {
+        fn from(f: f32) -> Self {
+            BigFloatExt::from_f32(f)
+        }
+    }
+
+    use std::fmt::Display;
+    use std::fmt::Formatter;
+    use std::fmt::Error;
+
+    impl Display for BigFloatExt {
+        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+            let s = match self.inner {
+                Flavor::Value(v) => {
+                    if v.n == 0 {
+                        "0".to_owned()
+                    } else {
+                        let mut num = if v.sign == DECIMAL_SIGN_NEG {
+                            "-".to_owned()
+                        } else {
+                            "".to_owned()
+                        };
+                        let mut bytes = [0; DECIMAL_POSITIONS];
+                        v.get_mantissa_bytes(&mut bytes);
+                        num.push(std::char::from_digit(bytes[0] as u32, 10).unwrap());
+                        num += ".";
+                        for byte in &bytes[1..] {
+                            num.push(std::char::from_digit(*byte as u32, 10).unwrap());
+                        }
+                        let mut e = v.e as i32;
+                        let x = v.n as i32 + e - 1;
+                        e -= x;
+                        if e != 0 {
+                            num.push('e');
+                            if e > 0 {
+                                num.push('+');
+                            }
+                            num += &e.to_string();
+                        }
+                        num
+                    }
+                },
+                Flavor::Inf(sign) => {
+                    if sign == DECIMAL_SIGN_NEG {
+                        "-Inf".to_owned()
+                    } else {
+                        "Inf".to_owned()
+                    }
+                },
+                crate::ext::Flavor::NaN => {
+                    "NaN".to_owned()
+                },
+            };
+            write!(f, "{}", s)
         }
     }
 }
