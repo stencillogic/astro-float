@@ -40,6 +40,22 @@ pub const DECIMAL_MAX_EXPONENT_POSITIONS: i16 = 3;  // max decimal positions in 
 pub const ZEROED_MANTISSA: [i16; DECIMAL_PARTS] = [0; DECIMAL_PARTS];
 
 
+/// Zero.
+pub const ZERO: BigFloat = BigFloat {
+    m: ZEROED_MANTISSA,
+    n: 0, 
+    sign: DECIMAL_SIGN_POS, 
+    e: 0,
+};
+
+/// One.
+pub const ONE: BigFloat = BigFloat {
+    m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1000],
+    n: DECIMAL_POSITIONS as i16, 
+    sign: DECIMAL_SIGN_POS, 
+    e: 1 - (DECIMAL_POSITIONS as i8),
+};
+
 /// Eulers number.
 pub const E: BigFloat = BigFloat {
     m: [7757, 6249, 3526, 7471, 6028, 2353, 9045, 2845, 2818, 2718],
@@ -54,6 +70,30 @@ pub const PI: BigFloat = BigFloat {
     n: DECIMAL_POSITIONS as i16, 
     sign: DECIMAL_SIGN_POS, 
     e: 1 - (DECIMAL_POSITIONS as i8),
+};
+
+/// Largest value possible.
+pub const MAX: BigFloat = BigFloat {
+    m: [9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999,],
+    n: DECIMAL_POSITIONS as i16, 
+    sign: DECIMAL_SIGN_POS, 
+    e: DECIMAL_MAX_EXPONENT,
+};
+
+/// Smalles value possible.
+pub const MIN: BigFloat = BigFloat {
+    m: [9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999,],
+    n: DECIMAL_POSITIONS as i16, 
+    sign: DECIMAL_SIGN_NEG, 
+    e: DECIMAL_MAX_EXPONENT,
+};
+
+/// Smalles positive number.
+pub const MIN_POSITIVE: BigFloat = BigFloat {
+    m: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0,],
+    n: 1, 
+    sign: DECIMAL_SIGN_POS, 
+    e: DECIMAL_MIN_EXPONENT,
 };
 
 

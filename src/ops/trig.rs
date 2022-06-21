@@ -250,7 +250,7 @@ impl BigFloat {
         if ret.abs().cmp(&one) > 0 {
             ret = one;
         }
-        return Ok(Self::from_big_float_inc(&mut ret)?);
+        Self::from_big_float_inc(&mut ret)
     }
 }
 

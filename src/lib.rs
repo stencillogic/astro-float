@@ -10,10 +10,16 @@
 //!
 //! The implementation does not rely heavily on the capabilities of the standard library, and can be adapted for use without the standard library.
 
+#![deny(clippy::suspicious)]
 
 mod defs;
 mod increased;
 mod ops;
+
+/// Extended BigFloat, which supports `NaN`, and `Inf` 
+/// values, and implements `std::ops` traits from the standard library.
+/// This is preferred to use with respect to the future changes in the library.
+pub mod ext;
 
 
 pub use crate::defs::BigFloat;

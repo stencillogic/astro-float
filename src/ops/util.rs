@@ -21,7 +21,7 @@ impl BigFloat {
             }
             i -= 1;
         }
-        return 0;
+        0
     }
 
 
@@ -32,7 +32,7 @@ impl BigFloat {
         let mut s: i16;
         let mut t: i16;
         let mut x: i32 = (n % DECIMAL_BASE_LOG10) as i32;
-        n = n / DECIMAL_BASE_LOG10;
+        n /= DECIMAL_BASE_LOG10;
         if x == 0 {
             if n > 0 {
                 for i in 0..DECIMAL_PARTS - n {
@@ -69,7 +69,7 @@ impl BigFloat {
         let mut s: i16;
         let mut t: i16;
         let mut x: i32 = (n % DECIMAL_BASE_LOG10) as i32;
-        n = n / DECIMAL_BASE_LOG10;
+        n /= DECIMAL_BASE_LOG10;
         if x == 0 {
             if n > 0 {
                 i = DECIMAL_PARTS - 1;
@@ -122,8 +122,7 @@ impl BigFloat {
                 }
             }
         }
-
-        return n;
+        n
     }
 
     // multiply d1 by digit d and put result to d3 with overflow
@@ -143,7 +142,7 @@ impl BigFloat {
         ret.n = d1.n;
         ret.e = d1.e;
         ret.sign = d1.sign;
-        return ret;
+        ret
     }
 
     // Convert from BigFloatInc.
@@ -155,7 +154,7 @@ impl BigFloat {
         ret.n = if d1.n > DECIMAL_PARTS as i16 { d1.n - DECIMAL_BASE_LOG10 as i16 } else { 0 };
         ret.e = d1.e + DECIMAL_BASE_LOG10 as i8;
         ret.sign = d1.sign;
-        return Ok(ret);
+        Ok(ret)
     }
 
     // fractional part of d1 
@@ -184,7 +183,7 @@ impl BigFloat {
                 fractional.e = d1.e;
             }
         }
-        return fractional;
+        fractional
     }
 
     // integer part of d1
@@ -212,7 +211,7 @@ impl BigFloat {
         if int.n > 0 {
             int.e = d1.e + (i - int.n) as i8;
         }
-        return int;
+        int
     }
 
     // factor to divide by to get a digit at position n
@@ -223,7 +222,7 @@ impl BigFloat {
             t *= 10;
             x -= 1;
         }
-        return t;
+        t
     }
 
     // determine parameters for computation of trig function
@@ -244,7 +243,7 @@ impl BigFloat {
             }
             dx.m[DECIMAL_PARTS] = x.m[DECIMAL_PARTS] % m;
         }
-        return (idx, dx);
+        (idx, dx)
     }
 }
 
