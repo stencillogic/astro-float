@@ -567,3 +567,115 @@ gen_wrapper2!("Returns inverse hyperbolic cosine of a number.", acosh, Self, {ZE
 gen_wrapper2!("Returns inverse hyperbolic tangent of a number.", atanh, Self, {ZERO}, {ZERO},);
 
 }
+
+//
+// ops traits
+//
+
+use std::ops::Add;
+use std::ops::AddAssign;
+use std::ops::Div;
+use std::ops::DivAssign;
+use std::ops::Mul;
+use std::ops::MulAssign;
+use std::ops::Neg;
+use std::ops::Sub;
+use std::ops::SubAssign;
+
+
+impl Add for BigFloatExt {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        BigFloatExt::add(&self, &rhs)
+    }
+}
+
+impl AddAssign for BigFloatExt {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = BigFloatExt::add(self, &rhs)
+    }
+}
+
+
+impl Div for BigFloatExt {
+    type Output = Self;
+    fn div(self, rhs: Self) -> Self::Output {
+        BigFloatExt::div(&self, &rhs)
+    }
+}
+
+impl DivAssign for BigFloatExt {
+    fn div_assign(&mut self, rhs: Self) {
+        *self = BigFloatExt::div(self, &rhs)
+    }
+}
+
+impl Mul for BigFloatExt {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self::Output {
+        BigFloatExt::mul(&self, &rhs)
+    }
+}
+
+impl MulAssign for BigFloatExt {
+    fn mul_assign(&mut self, rhs: Self) {
+        *self = BigFloatExt::mul(self, &rhs)
+    }
+}
+
+impl Neg for BigFloatExt {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        self.inv_sign()
+    }
+}
+
+impl Sub for BigFloatExt {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        BigFloatExt::sub(&self, &rhs)
+    }
+}
+
+impl SubAssign for BigFloatExt {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = BigFloatExt::sub(self, &rhs)
+    }
+}
+
+//
+// ordering traits
+//
+
+use std::cmp::PartialEq;
+use std::cmp::Eq;
+use std::cmp::PartialOrd;
+use std::cmp::Ordering;
+
+
+impl PartialEq for BigFloatExt {
+    fn eq(&self, other: &Self) -> bool {
+        let cmp_result = BigFloatExt::cmp(self, other);
+        matches!(cmp_result, Some(0))
+    }
+}
+
+impl Eq for BigFloatExt {}
+
+impl PartialOrd for BigFloatExt {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let cmp_result = BigFloatExt::cmp(self, other);
+        match cmp_result {
+            Some(v) => {
+                if v > 0 {
+                    Some(Ordering::Greater)
+                } else if v < 0 {
+                    Some(Ordering::Less)
+                } else {
+                    Some(Ordering::Equal)
+                }
+            },
+            None => None,
+        }
+    }
+}
