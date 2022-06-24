@@ -59,7 +59,7 @@ impl BigFloat {
         ml.e = 1 - ml.n as i8;
 
         // arctanh series
-        ml = ml.sub(&one)?.div(&ml.add(&one)?)?;    // (x-1)/(x+1)
+        ml = ml.sub(&one)?.div(&ml.add(&one)?)?;    // (x-1)/(x+1),  1.0 <= x < 10.0
         
         // further reduction: arctanh(x) = arctanh(s) + arctanh((x - s) / (1 - x*s))
         let (idx, mut dx) = Self::get_trig_params(&mut ml, 0);

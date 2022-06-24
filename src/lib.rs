@@ -36,6 +36,7 @@
 mod defs;
 mod increased;
 mod ops;
+mod num;
 
 /// Extended BigFloat, which supports `NaN`, and `Inf` 
 /// values, and implements `std::ops` traits from the standard library.

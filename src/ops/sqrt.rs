@@ -9,6 +9,16 @@ use crate::defs::ZEROED_MANTISSA;
 use crate::increased::BigFloatInc;
 use crate::ops::tables::sqrt_const::SQRT_VALUES;
 
+
+// 0.5
+const ONE_HALF_INC: BigFloatInc = BigFloatInc {
+    m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5000],
+    n: 44, 
+    sign: DECIMAL_SIGN_POS, 
+    e: -44,
+};
+
+
 const SQRT_OF_10: BigFloatInc = BigFloatInc {
     m: [5551, 3719, 1853, 4327, 3544, 9889, 3319, 8379, 6016, 2776, 3162], 
     n: 44, 
@@ -58,6 +68,7 @@ impl BigFloat {
         }
         let j = d1.m[i] / 100;
         let mut n = Self::to_big_float_inc(&SQRT_VALUES[i*99 + j as usize]);
+        n.maximize_mantissa();
 
         // Newton's method
         let mut two = BigFloatInc::new();
@@ -65,9 +76,10 @@ impl BigFloat {
         two.n = 1;
         let mut err = *d1;
         loop {
-            let nsq = n.mul(&n)?;
-            let nd = n.mul(&two)?;
-            let n2 = d1.add(&nsq)?.div(&nd)?;
+            // n = 0.5*(n + d1/n)
+            // having d1 >= 1, n >= 1, d1 >= n -> n + d1/n >= 2 => 
+            // we don't expect exponent overflow or division by 0
+            let n2 = ONE_HALF_INC.mul(&n.add(&d1.div(&n)?)?)?;
             let err2 = n.sub(&n2)?;
             if err2.cmp(&err) >= 0 {
                 break;
@@ -77,7 +89,6 @@ impl BigFloat {
         }
         Ok(n)
     }
-
 }
 
 
@@ -96,8 +107,8 @@ mod tests {
         epsilon.e = - epsilon.n as i8 + 1 - (DECIMAL_POSITIONS as i8);
 
         d1 = BigFloat::new();
-        d1.m[0] = 10;
-        d1.n = 2;
+        d1.m[9] = 1000;
+        d1.n = 40;
         let ret = d1.sqrt().unwrap();
         let ret = ret.mul(&ret).unwrap();
         assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) < 0);
@@ -105,44 +116,44 @@ mod tests {
 
         // sqrt(1234567890.1234567 = 1.2345...+10^9)
         d1 = BigFloat::new();
-        d1.m[0] = 4567;
-        d1.m[1] = 123;
-        d1.m[2] = 6789;
-        d1.m[3] = 2345;
-        d1.m[4] = 1;
-        d1.n = 17;
-        d1.e = -7;
+        d1.m[5] = 7000;
+        d1.m[6] = 3456;
+        d1.m[7] = 9012;
+        d1.m[8] = 5678;
+        d1.m[9] = 1234;
+        d1.n = 40;
+        d1.e = -31;
+        epsilon.e = -39 + d1.e;
         let ret = d1.sqrt().unwrap();
         let ret = ret.mul(&ret).unwrap();
-        epsilon.e = -69;    // 1*10^(-30)
         assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) <= 0);
 
         // positive exponent
         d1 = BigFloat::new();
-        d1.m[0] = 4567;
-        d1.m[1] = 123;
-        d1.m[2] = 6789;
-        d1.m[3] = 2345;
-        d1.m[4] = 1;
-        d1.n = 17;
+        d1.m[5] = 7000;
+        d1.m[6] = 3456;
+        d1.m[7] = 9012;
+        d1.m[8] = 5678;
+        d1.m[9] = 1234;
+        d1.n = 40;
         d1.e = 7;
+        epsilon.e = -39 + d1.e;
         let ret = d1.sqrt().unwrap();
         let ret = ret.mul(&ret).unwrap();
-        epsilon.e = -55;    // 1*10^(-16)
         assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) <= 0);
 
         // value less than 1
         d1 = BigFloat::new();
-        d1.m[0] = 4567;
-        d1.m[1] = 123;
-        d1.m[2] = 6789;
-        d1.m[3] = 2345;
-        d1.m[4] = 1;
-        d1.n = 17;
-        d1.e = -20;
+        d1.m[5] = 7000;
+        d1.m[6] = 3456;
+        d1.m[7] = 9012;
+        d1.m[8] = 5678;
+        d1.m[9] = 1234;
+        d1.n = 40;
+        d1.e = -43;
+        epsilon.e = -39 + d1.e;
         let ret = d1.sqrt().unwrap();
         let ret = ret.mul(&ret).unwrap();
-        epsilon.e = -82;    // 1*10^(-43)
         assert!(d1.sub(&ret).unwrap().abs().cmp(&epsilon) <= 0);
 
         // value is negative

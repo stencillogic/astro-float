@@ -115,19 +115,6 @@ mod tests {
         let mut epsilon = BigFloat::one();
         epsilon.e = - epsilon.n as i8 + 1 - (DECIMAL_POSITIONS as i8);
 
-        d1 = BigFloat::new();
-        d2 = BigFloat::new();
-        d2.m[0] = 2;
-        d2.n = 1;
-        d1.m[0] = 2345;
-        d1.m[1] = 8901;
-        d1.m[2] = 4567;
-        d1.m[3] = 123;
-        d1.n = 15;
-        d1.e = -12;
-        d2.pow(&d1).unwrap();
-
-
         // zero number
         d1 = BigFloat::new();
         d2 = BigFloat::new();
@@ -188,19 +175,23 @@ mod tests {
         ref_num.m[9] = 1459;
         ref_num.n = 40;
         ref_num.e = -2;
-        d1.m[0] = 7890;
-        d1.m[1] = 3456;
-        d1.m[2] = 12;
-        d1.n = 10;
-        d1.e = -7;
-        d2.m[0] = 2;
-        d2.n = 1;
-        assert!(d2.pow(&d1).unwrap().cmp(&ref_num) == 0);
+        d1.m[7] = 9000;
+        d1.m[8] = 5678;
+        d1.m[9] = 1234;
+        d1.n = 40;
+        d1.e = -37;
+        d2.m[9] = 2000;
+        d2.n = 40;
+        d2.e = -39;
+        epsilon.e = -39;
+        let ret = d2.pow(&d1).unwrap();
+        assert!(ret.sub(&ref_num).unwrap().abs().cmp(&epsilon) <= 0);
 
         // negative argument
         ref_num = one.div(&ref_num).unwrap();
         d1.sign = DECIMAL_SIGN_NEG;
-        assert!(d2.pow(&d1).unwrap().cmp(&ref_num) == 0);
+        let ret = d2.pow(&d1).unwrap();
+        assert!(ret.sub(&ref_num).unwrap().abs().cmp(&epsilon) <= 0);
 
         let mut ret;
         let mut inv;
