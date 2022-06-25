@@ -33,17 +33,14 @@
 
 #![deny(clippy::suspicious)]
 
-mod defs;
-mod increased;
+//mod defs;
+//mod increased;
 mod ops;
 mod num;
 
-/// Extended BigFloat, which supports `NaN`, and `Inf` 
-/// values, and implements `std::ops` traits from the standard library.
-/// This is preferred to use with respect to the future changes in the library.
-pub mod ext;
+//pub mod ext;
 
-
+/* 
 pub use crate::defs::BigFloat;
 pub use crate::defs::Error;
 
@@ -140,3 +137,4 @@ mod tests {
         }
     }
 }
+*/

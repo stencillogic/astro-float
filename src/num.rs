@@ -1,4 +1,4 @@
-//! BigFloatNumber represents floating point number with mantissa of a fixed size, and exponent.
+/// BigFloatNumber definition and basic arithmetic, comparison, and number manipulation operations.
 
 use std::mem::size_of;
 
@@ -19,6 +19,9 @@ const DIGIT_BASE: DoubleDigit = DIGIT_MAX as DoubleDigit + 1;
 
 /// Size of a "digit" in bits.
 const DIGIT_BIT_SIZE: usize = size_of::<Digit>() * 8;
+
+/// Length of mantissa in bits.
+const NUM_BIT_LEN: usize = NUM_DIGITS*DIGIT_BIT_SIZE;
 
 const DIGIT_SIGNIFICANT_BIT: Digit = DIGIT_MAX << (DIGIT_BIT_SIZE - 1);
 const ZEROED_MANTISSA: [Digit; NUM_DIGITS] = [0; NUM_DIGITS];
@@ -62,28 +65,28 @@ const ONE: BigFloatNumber = BigFloatNumber {
     m: Mantissa { m:ONE_MANTISSA, n: DIGIT_BIT_SIZE*NUM_DIGITS },
 };
 
-
+/// BigFloatNumber represents floating point number with mantissa of a fixed size, and exponent.
 #[derive(Copy, Clone, Debug)]
-struct BigFloatNumber {
+pub struct BigFloatNumber {
     e: Exponent,
     s: Sign,
     m: Mantissa,
 }
 
-type Digit = u16;
+pub type Digit = u16;
+pub type Exponent = i16;
 type DoubleDigit = u32;
 type DigitSigned = i32;
-type Exponent = i16;
 type DoubleExponent = i32;
 
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
-enum Sign {
+pub enum Sign {
     Neg = -1,
     Pos = 1,
 }
 
 impl Sign {
-    fn invert(&self) -> Self {
+    pub fn invert(&self) -> Self {
         match *self {
             Sign::Pos => Sign::Neg,
             Sign::Neg => Sign::Pos,
@@ -104,6 +107,8 @@ pub enum Error {
     InvalidArgument,
 }
 
+
+/// Mantissa representation.
 #[derive(Copy, Clone, Debug)]
 struct Mantissa {
     m: [Digit; NUM_DIGITS],
@@ -125,7 +130,7 @@ impl Mantissa {
         self.n == 0
     }
 
-    /// Shift right by n bits
+    /// Shift right by n bits.
     fn shift_right(&mut self, n: usize) {
         let idx = n / DIGIT_BIT_SIZE;
         let shift = n % DIGIT_BIT_SIZE;
@@ -246,7 +251,7 @@ impl Mantissa {
         }
         assert!(c == 0);
         let e = Self::maximize(&mut m3.m);
-        m3.n = NUM_DIGITS*DIGIT_BIT_SIZE;
+        m3.n = NUM_BIT_LEN;
         (e, m3)
     }
 
@@ -270,7 +275,7 @@ impl Mantissa {
             m3.shift_right(1);
             m3.m[m3.m.len()-1] |= DIGIT_SIGNIFICANT_BIT;
         }
-        m3.n = NUM_DIGITS*DIGIT_BIT_SIZE;
+        m3.n = NUM_BIT_LEN;
         (c > 0, m3)
     }
 
@@ -298,71 +303,13 @@ impl Mantissa {
         // TODO: since leading digit is always >= 0x8000 (most significant bit is set),
         // then shift is always = 1
         let mut shift = Self::maximize(&mut m3);
-        if Self::round(&mut m3, NUM_DIGITS*DIGIT_BIT_SIZE) {
-            shift += 1;
-        }
         let mut truncated = ZEROED_MANTISSA;
         truncated.copy_from_slice(&m3[NUM_DIGITS..]);
         let ret = Mantissa {
             m: truncated, 
-            n: NUM_DIGITS*DIGIT_BIT_SIZE
+            n: NUM_BIT_LEN
         };
         (shift, ret)
-    }
-
-    /// Round n digits of matissa, return true if exponent shift is needed.
-    fn round(m: &mut [Digit], mut n: usize) -> bool {
-        let mut i = 0;
-        let mut c = false;
-        while n > 0 {
-            let (v1, v2) = Self::round_digit(m[i], n);
-            m[i] = v2;
-            c = v1;
-            if n > DIGIT_BIT_SIZE {
-                n -= DIGIT_BIT_SIZE;
-                i += 1;
-            } else {
-                break;
-            }
-        }
-        if c {
-            while i < m.len() {
-                if m[i] == DIGIT_MAX {
-                    m[i] = 0;
-                } else {
-                    m[i] += 1;
-                    c = false;
-                    break;
-                }
-                i += 1;
-            }
-            if c {
-                m[m.len() - 1] = DIGIT_SIGNIFICANT_BIT;
-            }
-        }
-        c
-    }
-
-    /// Round n bits of a digit and return carry bit.
-    fn round_digit(d: Digit, mut n: usize) -> (bool, Digit) {
-        let mut dd = d as DoubleDigit;
-        let mut c = false;
-        if n > DIGIT_BIT_SIZE {
-            n = DIGIT_BIT_SIZE;
-        }
-        for _ in 0..n {
-            c = dd & 1 != 0;
-            dd >>= 1;
-        }
-        if c {
-            dd += 1;
-        }
-        dd <<= n;
-        if dd > DIGIT_MAX as DoubleDigit {
-            (true, 0)
-        } else {
-            (false, dd as Digit)
-        }
     }
 
     /// Divide mantissa by mantissa, return result and exponent ajustment.
@@ -462,11 +409,11 @@ impl Mantissa {
             }
         }
         let _ = Self::maximize(&mut d3.m);
-        d3.n = NUM_DIGITS*DIGIT_BIT_SIZE;
+        d3.n = NUM_BIT_LEN;
         d3
     }
 
-    // Multiply d1 by digit d and put result to d3 with overflow
+    // Multiply d1 by digit d and put result to d3 with overflow.
     fn mul_by_digit(d1: &[Digit], d: DoubleDigit, d3: &mut [Digit]) {
         let mut m: DoubleDigit = 0;
         for i in 0..NUM_DIGITS {
@@ -486,37 +433,48 @@ impl Mantissa {
         let shift = Self::maximize(&mut m);
         let ret = Mantissa {
             m,
-            n: NUM_DIGITS*DIGIT_BIT_SIZE,
+            n: NUM_BIT_LEN,
         };
         (shift, ret)
     }
 
-    fn to_u64(&self) -> (bool, u64) {
-        let mut rounded = self.m;
-        let carry = Self::round(&mut rounded, 53);
+    fn to_u64(&self) -> u64 {
         let mut ret: u64 = 0;
         let nd = size_of::<u64>()/size_of::<Digit>();
-        ret |= rounded[NUM_DIGITS - 1] as u64;
+        ret |= self.m[NUM_DIGITS - 1] as u64;
         for i in 1..nd {
             ret <<= DIGIT_BIT_SIZE;
-            ret |= rounded[NUM_DIGITS - i - 1] as u64;
+            ret |= self.m[NUM_DIGITS - i - 1] as u64;
         }
-        (carry, ret)
+        ret
     }
 
     fn is_subnormal(&self)-> bool {
-        self.n < NUM_DIGITS*DIGIT_BIT_SIZE
+        self.n < NUM_BIT_LEN
     }
 
     /// Shift to the left and return shift value.
     fn normilize(&self) -> (usize, Mantissa) {
-        let shift = NUM_DIGITS*DIGIT_BIT_SIZE - self.n;
+        let shift = NUM_BIT_LEN - self.n;
         let mut m = *self;
         if shift > 0 {
             Self::shift_left(&mut m.m, shift);
-            m.n = NUM_DIGITS*DIGIT_BIT_SIZE;
+            m.n = NUM_BIT_LEN;
         }
         (shift, m)
+    }
+
+    /// Set n bits to 0 from the right.
+    fn mask_bits(&mut self, mut n: usize) {
+        for i in 0..NUM_DIGITS {
+            if n >= DIGIT_BIT_SIZE {
+                self.m[i] = 0;
+                n -= DIGIT_BIT_SIZE;
+            } else {
+                let mask = DIGIT_MAX << n;
+                self.m[i] &= mask;
+            }
+        }
     }
 }
 
@@ -629,6 +587,21 @@ impl BigFloatNumber {
         Ok(ret)
     }
 
+    /// Fast division by 2.
+    pub fn div_by_2(&self) -> Self {
+        let mut ret = *self;
+        if self.m.is_zero() {
+            return ret;
+        }
+        if ret.e > EXPONENT_MIN {
+            ret.e -= 1;
+        } else {
+            ret.m.shift_right(1);
+            ret.m.n -= 1;
+        }
+        ret
+    }
+
     /// Return normilized mantissa and exponent with corresponding shift.
     fn normalized(&self) -> (DoubleExponent, Mantissa) {
         if self.m.is_subnormal() {
@@ -711,11 +684,11 @@ impl BigFloatNumber {
     /// If exponent is too small try to present number in subnormal form.
     /// If sucessful return true.
     fn process_subnormal(m3: &mut Mantissa, e: &mut DoubleExponent) -> bool {
-        if ((NUM_DIGITS*DIGIT_BIT_SIZE) as DoubleExponent) + *e > EXPONENT_MIN as DoubleExponent {
+        if ((NUM_BIT_LEN) as DoubleExponent) + *e > EXPONENT_MIN as DoubleExponent {
             // subnormal
             let shift = EXPONENT_MIN as DoubleExponent - *e;
             m3.shift_right(shift as usize);
-            m3.n = ((NUM_DIGITS*DIGIT_BIT_SIZE) as DoubleExponent - shift) as usize;
+            m3.n = ((NUM_BIT_LEN) as DoubleExponent - shift) as usize;
             *e = EXPONENT_MIN as DoubleExponent;
             true
         } else {
@@ -749,6 +722,13 @@ impl BigFloatNumber {
         }
 
         self.m.abs_cmp(&d2.m) as i32 * self.s as i32
+    }
+
+    /// Return absolute value of a number.
+    pub fn abs(&self) -> Self {
+        let mut ret = *self;
+        ret.s = Sign::Pos;
+        ret
     }
 
     /// Construct from f64.
@@ -792,8 +772,8 @@ impl BigFloatNumber {
         if self.m.is_zero() {
             return 0.0;
         }
-        let (c, mantissa) = self.m.to_u64();
-        let mut e: DoubleExponent = self.e as DoubleExponent - if c {1} else {0} + 0b1111111111;
+        let mantissa = self.m.to_u64();
+        let mut e: DoubleExponent = self.e as DoubleExponent + 0b1111111111;
         let mut ret = 0;
         if e >= 0b11111111111 {
             match self.s {
@@ -837,7 +817,7 @@ impl BigFloatNumber {
         self.to_f64() as f32
     }
 
-    /// Return true if number is subnormal
+    /// Return true if number is subnormal.
     pub fn is_subnormal(&self) -> bool {
         self.m.is_subnormal()
     }
@@ -850,6 +830,83 @@ impl BigFloatNumber {
     /// Construct from raw parts.
     pub fn from_raw_parts(m: [Digit; NUM_DIGITS], n: usize, s: Sign, e: Exponent) -> Self {
         BigFloatNumber { e, s, m: Mantissa { m, n } }
+    }
+
+    /// Returns sign of a number.
+    pub fn get_sign(&self) -> Sign {
+        self.s
+    }
+
+    /// Returns true if number is positive.
+    pub fn is_positive(&self) -> bool {
+        self.s == Sign::Pos
+    }
+
+    /// Returns true if number is negative.
+    pub fn is_negative(&self) -> bool {
+        self.s == Sign::Neg
+    }
+
+    /// Returns exponent of a number.
+    pub fn get_exponent(&self) -> Exponent {
+        self.e
+    }
+
+    // Return true if number is zero.
+    pub fn is_zero(&self) -> bool {
+        self.m.is_zero()
+    }
+
+    /// Returns the largest integer less than or equal to a number.
+    pub fn floor(&self) -> Result<Self, Error> {
+        let int = self.int();
+        if self.is_negative() {
+            if !self.fract().m.is_zero() {
+                return int.sub(&ONE);
+            }
+        }
+        Ok(int)
+    }
+
+    /// Returns the smallest integer greater than or equal to a number.
+    pub fn ceil(&self) -> Result<Self, Error> {
+        let int = self.int();
+        if self.is_positive() {
+            if !self.fract().m.is_zero() {
+                return int.add(&ONE);
+            }
+        }
+        Ok(int)
+    }
+
+    /// Return fractional part of a number.
+    pub fn fract(&self) -> Self {
+        let mut ret = *self;
+        if self.e > 0 {
+            if (self.e as usize) < NUM_BIT_LEN {
+                // remove integer part of mantissa & normalize at the same time
+                Mantissa::shift_left(&mut ret.m.m, self.e as usize);
+                if ret.m.m == ZEROED_MANTISSA {
+                    return Self::new();
+                }
+                ret.e = 0;
+            } else {
+                return Self::new();
+            }
+        }
+        ret
+    }
+
+    /// Return integer part of a number.
+    pub fn int(&self) -> Self {
+        let mut ret = *self;
+        if self.e > 0 {
+            if (self.e as usize) < NUM_BIT_LEN {
+                ret.m.mask_bits(NUM_BIT_LEN - self.e as usize)
+            }
+            return ret;
+        }
+        Self::new()
     }
 }
 
@@ -1040,7 +1097,7 @@ mod tests {
 
         // overflow
         d1 = ONE;
-        d1.e = EXPONENT_MAX - (NUM_DIGITS*DIGIT_BIT_SIZE - 1) as Exponent;
+        d1.e = EXPONENT_MAX - (NUM_BIT_LEN - 1) as Exponent;
         assert!(MAX.add(&d1).unwrap_err() == Error::ExponentOverflow);
         assert!(MIN.sub(&d1).unwrap_err() == Error::ExponentOverflow);
         assert!(MAX.mul(&MAX).unwrap_err() == Error::ExponentOverflow);
@@ -1054,6 +1111,59 @@ mod tests {
         let (m,n,s,e) = d1.to_raw_parts();
         d2 = BigFloatNumber::from_raw_parts(m, n, s, e);
         assert!(d1.cmp(&d2) == 0);
+
+        // sign and exponent
+        d1 = ONE;
+        assert!(d1.get_sign() == Sign::Pos);
+        assert!(d1.is_positive());
+        d1 = d1.neg();
+        assert!(d1.get_sign() == Sign::Neg);
+        assert!(d1.is_negative());
+        assert!(d1.get_exponent() == 1);
+
+        // fract & int
+        let f1 = 12345.6789;
+        d1 = BigFloatNumber::from_f64(f1).unwrap();
+        assert!(d1.fract().to_f64() == f1.fract());
+        assert!(d1.int().to_f64() == (f1 as u64) as f64);
+
+        let f1 = -0.006789;
+        d1 = BigFloatNumber::from_f64(f1).unwrap();
+        assert!(d1.fract().cmp(&d1) == 0);
+        assert!(d1.int().is_zero());
+
+        let f1 = -1234567890.0;
+        d1 = BigFloatNumber::from_f64(f1).unwrap();
+        assert!(d1.fract().is_zero());
+        assert!(d1.int().cmp(&d1) == 0);
+
+        assert!(MIN_POSITIVE.fract().cmp(&MIN_POSITIVE) == 0);
+        assert!(MIN_POSITIVE.int().is_zero());
+
+        d1 = BigFloatNumber::new();
+        assert!(d1.fract().is_zero());
+        assert!(d1.int().is_zero());
+
+        // ceil & floor
+        d1 = BigFloatNumber::from_f64(12.3).unwrap();
+        assert!(d1.floor().unwrap().to_f64() == 12.0);
+        assert!(d1.ceil().unwrap().to_f64() == 13.0);
+        d1 = BigFloatNumber::from_f64(12.0).unwrap();
+        assert!(d1.floor().unwrap().to_f64() == 12.0);
+        assert!(d1.ceil().unwrap().to_f64() == 12.0);
+
+        d1 = BigFloatNumber::from_f64(-12.3).unwrap();
+        assert!(d1.floor().unwrap().to_f64() == -13.0);
+        assert!(d1.ceil().unwrap().to_f64() == -12.0);
+        d1 = BigFloatNumber::from_f64(-12.0).unwrap();
+        assert!(d1.floor().unwrap().to_f64() == -12.0);
+        assert!(d1.ceil().unwrap().to_f64() == -12.0);
+
+        // abs
+        d1 = BigFloatNumber::from_f64(12.3).unwrap();
+        assert!(d1.abs().to_f64() == 12.3);
+        d1 = BigFloatNumber::from_f64(-12.3).unwrap();
+        assert!(d1.abs().to_f64() == 12.3);
     }
 
     fn random_f64() -> f64 {

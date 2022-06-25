@@ -548,8 +548,7 @@ impl BigFloatExt {
     gen_wrapper4!("Return fractional part of a number.", frac, Self, {Flavor::NaN}, {Flavor::NaN},);
     gen_wrapper2!("Returns the smallest integer greater than or equal to a number.", ceil, Self, {INF_POS}, {INF_NEG},);
     gen_wrapper2!("Returns the largest integer less than or equal to a number.", floor, Self, {INF_POS}, {INF_NEG},);
-    gen_wrapper2!("Returns the rounded number with `n` decimal positions in the fractional part of the number.", round, Self, {INF_POS}, {INF_NEG}, n, usize);
-    
+
     gen_wrapper2!("Return square root of a number.", sqrt, Self, {INF_POS}, {NAN},);
     gen_wrapper2!("Returns natural logarithm of a number.", ln, Self, {INF_POS}, {NAN},);
     
