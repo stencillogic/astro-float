@@ -133,7 +133,7 @@ impl BigFloat {
             d3.e = e as i8;
             if Self::abs_add(&n1.m, &n2.m, &mut d3.m) > 0 {
                 if e == DECIMAL_MAX_EXPONENT as i32 {
-                    return Err(Error::ExponentOverflow);
+                    return Err(Error::ExponentOverflow(d3.sign));
                 }
                 d3.e += 1;
                 Self::shift_right(&mut d3.m, 1);
@@ -220,11 +220,11 @@ mod tests {
         d2.e = DECIMAL_MAX_EXPONENT;
         d1.e = DECIMAL_MAX_EXPONENT;
 
-        assert!(d1.add(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.add(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
 
         d2.sign = DECIMAL_SIGN_NEG;
         d1.sign = DECIMAL_SIGN_NEG;
-        assert!(d1.add(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.add(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_NEG));
 
         d2.e = 0;
         d1.e = 0;
@@ -362,11 +362,11 @@ mod tests {
         d2.n = 2;
         d1.e = DECIMAL_MAX_EXPONENT;
         d2.e = DECIMAL_MAX_EXPONENT;
-        assert!(d1.sub(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.sub(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_NEG));
 
         d2.sign = DECIMAL_SIGN_NEG;
         d1.sign = DECIMAL_SIGN_POS;
-        assert!(d1.sub(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.sub(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
 
         d1.e -= 1;
         ref_num.m.iter_mut().for_each(|x| *x = 0);

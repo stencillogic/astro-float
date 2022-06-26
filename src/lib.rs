@@ -7,7 +7,7 @@
 //! | Decimal positions in mantissa |     40 |
 //! | Exponent minimum value        |   -128 |
 //! | Exponent maximum value        |    127 |
-//!
+//! 
 //! ## Examples
 //! 
 //! ```
@@ -26,6 +26,20 @@
 //! println!("{}", pi);
 //! // output: 3.141592653589793238462643383279502884196e-39
 //! ```
+//!
+//! BigFloatExt has two flavors: either it is a normal number, or error.
+//! Any operation on a number and an another number can result either in a number or an error.
+//! Any operation on a number and an error results in error.
+//! 
+//! ## Precision
+//! 
+//! Basic operations like add, sub, mul, div are expected to have error only in the last digit. 
+//! More complex functions such as sin, cos, ln can have larger error.
+//! 
+//! ## Performance
+//! 
+//! The implementation is very straightforward and does not utilize sophisticated algorithms. 
+//! Although, fixed-size mantissa allowed to introduce precomputed tables to speed-up certain computations.
 //! 
 //! ## no_std
 //!

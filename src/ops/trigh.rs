@@ -1,6 +1,7 @@
 /// Hyperbolic trigonometric functions and inverse hyperbolic trigonometric functions.
 
 use crate::defs::BigFloat;
+use crate::defs::DECIMAL_SIGN_NEG;
 use crate::defs::Error;
 use crate::defs::DECIMAL_SIGN_POS;
 use crate::E;
@@ -61,7 +62,7 @@ impl BigFloat {
         let xx = x.mul(&x)?;
         let arg = x.add(&xx.add(&Self::one())?.sqrt()?)?;
         if arg.n == 0 {
-            Err(Error::ExponentOverflow) 
+            Err(Error::ExponentOverflow(DECIMAL_SIGN_NEG)) 
         } else {
             arg.ln()
         }
@@ -129,9 +130,9 @@ mod tests {
         d1.e = -37;
         epsilon.e = -71; // 1*10^(-32)
         for i in 1..100 {
-            d1.m[9] = i;
+            d1.m[8] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 32;
             let s = d1.sinh().unwrap();
             let c = s.asinh().unwrap();
             assert!(d1.sub(&c).unwrap().abs().cmp(&epsilon) <= 0);
@@ -146,11 +147,11 @@ mod tests {
         d1 = BigFloat::new();
         d1.m[7] = 123;
         d1.e = -37;
-        epsilon.e = -75; // 1*10^(-36)
+        epsilon.e = -71; // 1*10^(-32)
         for i in 0..100 {
-            d1.m[9] = 10 + i;
+            d1.m[8] = 10 + i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i<100 {2} else if i<1000 {3} else {4} + 36;
+            d1.n = if i<100 {2} else if i<1000 {3} else {4} + 32;
             let s = d1.cosh().unwrap();
             let mut c = s.acosh().unwrap();
             assert!(c.sign == DECIMAL_SIGN_POS);
@@ -175,9 +176,9 @@ mod tests {
         d1.e = -37;
         epsilon.e = -70; // 1*10^(-32)
         for i in 0..100 {
-            d1.m[9] = i;
+            d1.m[8] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 32;
             let s = d1.tanh().unwrap();
             let c = s.atanh().unwrap();
             assert!(d1.sub(&c).unwrap().abs().cmp(&epsilon) <= 0);

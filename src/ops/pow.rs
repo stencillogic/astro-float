@@ -7,6 +7,7 @@ use crate::defs::DECIMAL_BASE_LOG10;
 use crate::defs::DECIMAL_POSITIONS;
 use crate::defs::DECIMAL_BASE;
 use crate::defs::DECIMAL_SIGN_NEG;
+use crate::defs::DECIMAL_SIGN_POS;
 use crate::defs::DECIMAL_MAX_EXPONENT_POSITIONS;
 use crate::defs::ZEROED_MANTISSA;
 
@@ -30,7 +31,7 @@ impl BigFloat {
         }
 
         if d1.n + d1.e as i16 > DECIMAL_MAX_EXPONENT_POSITIONS {
-            return Err(Error::ExponentOverflow);
+            return Err(Error::ExponentOverflow(self.sign));
         }
 
         // split to fractional and integer parts 
@@ -156,7 +157,7 @@ mod tests {
         d1.m[0] = 123;
         d1.n = 3;
         d1.e = 1;
-        assert!(d2.pow(&d1).unwrap_err() == Error::ExponentOverflow);
+        assert!(d2.pow(&d1).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
 
         // argument is too small
         d1 = BigFloat::new();
@@ -214,16 +215,16 @@ mod tests {
         d2.m[6] = 671;
         d2.m[7] = 100;
         d2.m[8] = 10;
-        d2.m[9] = 9999;
-        d2.n = DECIMAL_POSITIONS as i16;
-        d2.e = -38;
+        d2.m[9] = 0;
+        d2.n = 34;
+        d2.e = -33;
         d1 = BigFloat::new();
         d1.m[0] = 2;
         d1.m[1] = 0;
         d1.m[2] = 0;
-        d1.n = 1;
-        epsilon.e = -77; // 1*10^(-38)
-        d1.e = 0;
+        d1.n = 10;
+        epsilon.e = -76; // 1*10^(-37)
+        d1.e = -8;
         for i in 1..100 {
             for j in 0..10 {
                 d2.m[2] = i;

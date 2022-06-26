@@ -60,7 +60,7 @@ impl BigFloat {
 
         // arctanh series
         ml = ml.sub(&one)?.div(&ml.add(&one)?)?;    // (x-1)/(x+1)
-        
+
         // further reduction: arctanh(x) = arctanh(s) + arctanh((x - s) / (1 - x*s))
         let (idx, mut dx) = Self::get_trig_params(&mut ml, 0);
         let atanh_s = LN_VALUES[idx];
@@ -123,14 +123,14 @@ mod tests {
         d2.m[4] = 651;
         d2.m[5] = 41;
         d2.m[6] = 671;
-        d2.m[7] = 100;
-        d2.m[8] = 10;
-        d2.m[9] = 9999;
-        d2.n = DECIMAL_POSITIONS as i16;
+        d2.m[7] = 9999;
+        d2.m[8] = 0;
+        d2.m[9] = 0;
         d2.e = -10;
-        for i in 0..100 {
+        for i in 1..100 {
             d2.m[2] = i;
-            d2.m[5] = i;
+            d2.m[7] = i;
+            d2.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 28;
             d2.e = -50 + (i%100) as i8;
             epsilon.e = d2.e - 36;  // 1*10^(1 + d2.e)
             let ret = d2.ln().unwrap();

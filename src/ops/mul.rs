@@ -79,19 +79,24 @@ impl BigFloat {
             n = 0;
         }
 
-        if e > DECIMAL_MAX_EXPONENT as i32 || e < DECIMAL_MIN_EXPONENT as i32 {
-            return Err(Error::ExponentOverflow);
-        }
-
         for i in 0..d3.m.len() {
             d3.m[i] = m3[n as usize + i];
         }
-        d3.e = e as i8;
         d3.sign = if self.sign == d2.sign || self.n == 0 {
             DECIMAL_SIGN_POS
         } else {
             DECIMAL_SIGN_NEG
         };
+
+        if e < DECIMAL_MIN_EXPONENT as i32 {
+            return Ok(d3.process_subnormal(e));
+        }
+
+        if e > DECIMAL_MAX_EXPONENT as i32 {
+            return Err(Error::ExponentOverflow(d3.sign));
+        }
+
+        d3.e = e as i8;
 
         Ok(d3)
     }
@@ -262,19 +267,22 @@ impl BigFloat {
             - d2.e as i32
             - (DECIMAL_PARTS as i32 - m + n - p) * DECIMAL_BASE_LOG10 as i32;
 
-        if e > DECIMAL_MAX_EXPONENT as i32 || e < DECIMAL_MIN_EXPONENT as i32 {
-            return Err(Error::ExponentOverflow);
-        }
-
-        d3.e = e as i8;
-
-        d3.n = DECIMAL_POSITIONS as i16 - DECIMAL_BASE_LOG10 as i16 + j as i16;
-
         d3.sign = if self.sign == d2.sign {
             DECIMAL_SIGN_POS
         } else {
             DECIMAL_SIGN_NEG
         };
+
+        if e < DECIMAL_MIN_EXPONENT as i32 {
+            return Ok(d3.process_subnormal(e));
+        }
+
+        if e > DECIMAL_MAX_EXPONENT as i32 {
+            return Err(Error::ExponentOverflow(d3.sign));
+        }
+
+        d3.e = e as i8;
+        d3.n = DECIMAL_POSITIONS as i16 - DECIMAL_BASE_LOG10 as i16 + j as i16;
 
         Ok(d3)
     }
@@ -283,6 +291,8 @@ impl BigFloat {
 
 #[cfg(test)]
 mod tests {
+
+    use crate::defs::ONE;
 
     use super::*;
 
@@ -402,7 +412,7 @@ mod tests {
         // overflow
         d2.e = 123;
         d1.e = DECIMAL_MAX_EXPONENT - d2.e;
-        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
 
         // no overflow
         d1.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/2-1;
@@ -414,10 +424,6 @@ mod tests {
         d1.e = DECIMAL_MIN_EXPONENT + 122;  // d1.e + d2.e = min_exp - 1
         assert!(d1.mul(&d2).is_ok());
 
-        // overflow with negative e
-        d1.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/2-1;
-        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow);
-
         // overflow
         d2.e = 123;
         d1.e = DECIMAL_MAX_EXPONENT - d2.e;
@@ -427,7 +433,7 @@ mod tests {
         d2.m[5] = 1;
         d1.n = 21;
         d2.n = 21;
-        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
 
         // no overflow
         d1.m[5] = 0;
@@ -446,9 +452,19 @@ mod tests {
         }
         d1.n = DECIMAL_POSITIONS as i16;
         d2.n = DECIMAL_POSITIONS as i16;
-        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
 
 
+        // overflow with negative e: 0.0
+        d1 = ONE;
+        d1.e = DECIMAL_MIN_EXPONENT;
+        d2 = ONE;
+        d2.e = DECIMAL_MIN_EXPONENT+49;
+        assert!(d1.mul(&d2).unwrap().n == 0);
+
+        // minimum positive value (subnormal)
+        d2.e = DECIMAL_MIN_EXPONENT+50;
+        assert!(d1.mul(&d2).unwrap().n == 1);
         //
         // division
         //
@@ -704,13 +720,19 @@ mod tests {
         d3 = d1.div(&d2).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
-        // overflow
+        // subnormal
         d2.e = -35;
         d1.e = DECIMAL_MIN_EXPONENT;
-        assert!(d1.div(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.div(&d2).unwrap().n == 39);
 
+        // zero
+        d2.e = -35+39;
+        d1.e = DECIMAL_MIN_EXPONENT;
+        assert!(d1.div(&d2).unwrap().n == 0);
+
+        // overflow
         d2.e = -37;
         d1.e = DECIMAL_MAX_EXPONENT;
-        assert!(d1.div(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.div(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
     }
 }

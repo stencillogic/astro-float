@@ -274,12 +274,12 @@ mod tests {
 
         d1 = BigFloat::new();
         d1.e = -39;
-        d1.m[8] = 123;
+        d1.m[7] = 123;
         epsilon.e = -69; // 1*10^(-30)
         for i in 1..9999 {
-            d1.m[9] = i;
+            d1.m[8] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 32;
             let s = d1.sin().unwrap();
             let c = d1.cos().unwrap();
             let p = s.mul(&s).unwrap().add(&c.mul(&c).unwrap()).unwrap();
@@ -289,12 +289,12 @@ mod tests {
         // asin
         d1 = BigFloat::new();
         d1.e = -39;
-        d1.m[8] = 123;
+        d1.m[7] = 123;
         epsilon.e = -75; // 1*10^(-36)
         for i in 1..1571 {  // -pi/2..pi/2
-            d1.m[9] = i;
+            d1.m[8] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 32;
             let s = d1.sin().unwrap();
             let asn = s.asin().unwrap();
             assert!(d1.sub(&asn).unwrap().abs().cmp(&epsilon) <= 0);
@@ -303,12 +303,12 @@ mod tests {
         // acos
         d1 = BigFloat::new();
         d1.e = -39;
-        d1.m[8] = 123;
-        epsilon.e = -75; // 1*10^(-36)
+        d1.m[7] = 123;
+        epsilon.e = -71; // 1*10^(-32)
         for i in 1..3142 {  // 0..pi
-            d1.m[9] = i;
+            d1.m[8] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 32;
             let c = d1.cos().unwrap();
             let acs = c.acos().unwrap();
             assert!(d1.abs().sub(&acs).unwrap().abs().cmp(&epsilon) <= 0);
@@ -323,12 +323,12 @@ mod tests {
         d1 = BigFloat::new();
         d1.e = -39;
         d1.m[0] = 5678;
-        d1.m[8] = 1234;
+        d1.m[7] = 1234;
         epsilon.e = -73; // 1*10^(-34) for arguments close to pi/2 the precision is lost
         for i in 1..9999 {
-            d1.m[9] = i;
+            d1.m[8] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 32;
             let t1 = d1.tan().unwrap();
             let t2 = d1.sin().unwrap().div(&d1.cos().unwrap()).unwrap();
             let p = t1.div(&t2).unwrap();
@@ -338,12 +338,12 @@ mod tests {
         d1 = BigFloat::new();
         d1.e = -39;
         d1.m[0] = 5678;
-        d1.m[8] = 1234;
+        d1.m[7] = 1234;
         epsilon.e = -78; // 1*10^(-39) for arguments close to pi/2 the precision is lost
         for i in 1..1571 {
-            d1.m[9] = i;
+            d1.m[8] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
+            d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 32;
             let t1 = d1.tan().unwrap();
             let atn = t1.atan().unwrap();
             assert!(atn.sub(&d1).unwrap().abs().cmp(&epsilon) <= 0);

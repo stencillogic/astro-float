@@ -13,10 +13,11 @@ pub struct BigFloat {
 }
 
 /// Possible errors.
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum Error {
-    /// Exponent value becomes greater than the upper bound or smaller than the lower bound for exponent value.
-    ExponentOverflow,   
+    /// Exponent value becomes greater than the upper bound.
+    /// Error stores sign of resulting number.
+    ExponentOverflow(i8),
 
     /// Divizor is zero.
     DivisionByZero,     
@@ -174,9 +175,16 @@ impl BigFloat {
         if f == 0f64 {
             return Ok(ret);
         }
-        if f.is_infinite() || f.is_nan() {
-            return Err(Error::ExponentOverflow);
-        } 
+        if f.is_infinite() {
+            return Err(Error::ExponentOverflow(if f.is_sign_positive() {
+                DECIMAL_SIGN_POS
+            } else {
+                DECIMAL_SIGN_NEG
+            }));
+        }
+        if f.is_nan() {
+            return Err(Error::InvalidArgument);
+        }
         if f < 0f64 {
             ret.sign = DECIMAL_SIGN_NEG;
             f = -f;
@@ -203,10 +211,14 @@ impl BigFloat {
                 break;
             }
         }
-        
+
         e -= DECIMAL_POSITIONS as i32;
-        if e < DECIMAL_MIN_EXPONENT as i32 || e > DECIMAL_MAX_EXPONENT as i32 {
-            return Err(Error::ExponentOverflow);
+        if e < DECIMAL_MIN_EXPONENT as i32 {
+            return Ok(ret.process_subnormal(e));
+        }
+
+        if e > DECIMAL_MAX_EXPONENT as i32 {
+            return Err(Error::ExponentOverflow(ret.sign));
         }
         ret.e = e as i8;
 
@@ -273,6 +285,30 @@ impl BigFloat {
         self.n as usize
     }
 
+    /// Return true if the number is zero.
+    pub fn is_zero(&self) -> bool {
+        self.n == 0
+    }
+
+    /// Return true if integer part of number is zero.
+    pub fn is_int_even(&self) -> bool {
+        let int = self.int();
+        if int.e < 0 {
+            let p = int.n + int.e as i16;
+            let mut d = int.m[p as usize / DECIMAL_BASE_LOG10];
+            let mut i = p % DECIMAL_BASE_LOG10 as i16;
+            while i > 0 {
+                d /= 10;
+                i -= 1;
+            }
+            d & 1 == 0
+        } else if int.e == 0 {
+            int.m[0] & 1 == 0
+        } else {
+            true
+        }
+    }
+
     /// Return 1 if BigFloat is positive, -1 otherwise.
     pub fn get_sign(&self) -> i8 {
         self.sign
@@ -281,6 +317,11 @@ impl BigFloat {
     /// Return exponent part.
     pub fn get_exponent(&self) -> i8 {
         self.e
+    }
+
+    /// Returns true if `self` is subnormal.
+    pub fn is_subnormal(&self) -> bool {
+        self.n < DECIMAL_POSITIONS as i16
     }
 
     /// Return raw parts of BigFloat: mantissa, number of decimal positions in mantissa, sing, and

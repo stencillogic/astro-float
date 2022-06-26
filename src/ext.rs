@@ -70,28 +70,15 @@ enum Flavor {
 
 impl BigFloatExt {
 
-    /// Return new BigFloat with value zero.
+    /// Return new BigFloatExt with value zero.
     pub fn new() -> Self {
         BigFloatExt {
             inner: Flavor::Value(BigFloat::new())
         }
     }
  
-    /// Return BigFloat with the value of 1.
-    pub fn one() -> Self {
-        BigFloatExt {
-            inner: Flavor::Value(BigFloat::one())
-        }
-    }
 
-    /// Return new BigFloat with value of 2.
-    pub fn two() -> Self {
-        BigFloatExt {
-            inner: Flavor::Value(BigFloat::two())
-        }
-    }
-
-    /// Create a BigFloat value from a sequence of `bytes`. Each byte must represent a decimal digit.
+    /// Create a BigFloatExt value from a sequence of `bytes`. Each byte must represent a decimal digit.
     /// First byte is the most significant. The length of `bytes` can be any. If the length of
     /// `bytes` is greater than required, then the remaining part is ignored.
     /// If `sign` is negative, then the resulting BigFloat will be
@@ -102,7 +89,7 @@ impl BigFloatExt {
         }
     }
 
-    /// Convert BigFloat to f64.
+    /// Convert BigFloatExt to f64.
     pub fn to_f64(&self) -> f64 {
         match self.inner {
             Flavor::Value(v) => v.to_f64(),
@@ -115,7 +102,7 @@ impl BigFloatExt {
         }
     }
 
-    /// Convert BigFloat to f32.
+    /// Convert BigFloatExt to f32.
     pub fn to_f32(&self) -> f32 {
         match self.inner {
             Flavor::Value(v) => v.to_f32(),
@@ -128,7 +115,7 @@ impl BigFloatExt {
         }
     }
 
-    /// Get BigFloat's mantissa as bytes. Each byte represents a decimal digit.
+    /// Get BigFloatExt's mantissa as bytes. Each byte represents a decimal digit.
     /// First byte is the most significant. The length of `bytes` can be any. If the length of
     /// `bytes` is smaller than required, then remaining part of mantissa will be omitted.
     ///
@@ -149,11 +136,12 @@ impl BigFloatExt {
         }
     }
 
-    /// Return 1 if BigFloat is positive, -1 otherwise.
-    /// If `self` is Inf or NaN 0 is returned.
+    /// Return 1 if BigFloatExt is positive, -1 otherwise.
+    /// If `self` is NaN 0 is returned.
     pub fn get_sign(&self) -> i8 {
         match self.inner {
             Flavor::Value(v) => v.sign,
+            Flavor::Inf(s) => s,
             _ => 0,
         }
     }
@@ -167,7 +155,7 @@ impl BigFloatExt {
         }
     }
 
-    /// Return raw parts of BigFloat: mantissa, number of decimal positions in mantissa, sing, and
+    /// Return raw parts of BigFloatExt: mantissa, number of decimal positions in mantissa, sing, and
     /// exponent.
     /// If `self` is Inf or NaN None is returned.
     pub fn to_raw_parts(&self) -> Option<([i16; DECIMAL_PARTS], i16, i8, i8)> {
@@ -177,7 +165,7 @@ impl BigFloatExt {
         }
     }
 
-    /// Construct BigFloat from raw parts.
+    /// Construct BigFloatExt from raw parts.
     pub fn from_raw_parts(mantissa: [i16; DECIMAL_PARTS], mantissa_len: i16, sign: i8, exponent: i8) -> Self {
         let val = BigFloat {
             sign,
@@ -216,7 +204,7 @@ impl BigFloatExt {
             Flavor::Value(v1) => {
                 match d2.inner {
                     Flavor::Value(v2) => {
-                        Self::result_to_ext(v1.add(&v2), v1.n == 0, v1.sign == v2.sign)
+                        Self::result_to_ext(v1.add(&v2), v1.is_zero(), v1.sign == v2.sign)
                     },
                     Flavor::Inf(s2) => {
                         BigFloatExt { inner: Flavor::Inf(s2) }
@@ -249,7 +237,7 @@ impl BigFloatExt {
             Flavor::Value(v1) => {
                 match d2.inner {
                     Flavor::Value(v2) => {
-                        Self::result_to_ext(v1.sub(&v2), v1.n == 0, v1.sign == v2.sign)
+                        Self::result_to_ext(v1.sub(&v2), v1.is_zero(), v1.sign == v2.sign)
                     },
                     Flavor::Inf(s2) => {
                         if s2 == DECIMAL_SIGN_POS {
@@ -286,10 +274,10 @@ impl BigFloatExt {
             Flavor::Value(v1) => {
                 match d2.inner {
                     Flavor::Value(v2) => {
-                        Self::result_to_ext(v1.mul(&v2), v1.n == 0, v1.sign == v2.sign)
+                        Self::result_to_ext(v1.mul(&v2), v1.is_zero(), v1.sign == v2.sign)
                     },
                     Flavor::Inf(s2) => {
-                        if v1.n == 0 { // 0*inf
+                        if v1.is_zero() { // 0*inf
                             NAN
                         } else {
                             let s = if v1.sign == s2 {
@@ -306,7 +294,7 @@ impl BigFloatExt {
             Flavor::Inf(s1) => {
                 match d2.inner {
                     Flavor::Value(v2) => {
-                        if v2.n == 0 { // inf*0
+                        if v2.is_zero() { // inf*0
                             NAN
                         } else {
                             let s = if v2.sign == s1 {
@@ -338,7 +326,7 @@ impl BigFloatExt {
             Flavor::Value(v1) => {
                 match d2.inner {
                     Flavor::Value(v2) => {
-                        Self::result_to_ext(v1.div(&v2), v1.n == 0, v1.sign == v2.sign)
+                        Self::result_to_ext(v1.div(&v2), v1.is_zero(), v1.sign == v2.sign)
                     },
                     Flavor::Inf(_) => {
                         ZERO
@@ -415,13 +403,13 @@ impl BigFloatExt {
         }
     }
 
-    /// Return BigFloat to the power of `d1`.
+    /// Return BigFloatExt to the power of `d1`.
     pub fn pow(&self, d1: &Self) -> Self {
         match self.inner {
             Flavor::Value(v1) => {
                 match d1.inner {
                     Flavor::Value(v2) => {
-                        Self::result_to_ext(v1.pow(&v2), v1.n == 0, v1.sign == v2.sign)
+                        Self::result_to_ext(v1.pow(&v2), v1.is_zero(), v1.sign == v2.sign)
                     },
                     Flavor::Inf(s2) => {
                         // v1^inf
@@ -437,13 +425,20 @@ impl BigFloatExt {
                     Flavor::NaN => NAN,
                 }
             },
-            Flavor::Inf(_) => {
+            Flavor::Inf(s1) => {
                 match d1.inner {
                     Flavor::Value(v2) => {
                         // inf ^ v2
                         let val = v2.cmp(&BigFloat::new());
                         if val > 0 {
-                            INF_POS
+                            if s1 == DECIMAL_SIGN_NEG &&
+                                v2.frac().is_zero() &&
+                                !v2.is_int_even() {
+                                    // v2 is odd without fractional part. 
+                                    INF_NEG
+                            } else {
+                                INF_POS
+                            }
                         } else if val < 0 {
                             ZERO
                         } else {
@@ -468,7 +463,7 @@ impl BigFloatExt {
     fn result_to_ext(res: Result<BigFloat, Error>, is_dividend_zero: bool, is_same_sign: bool) -> BigFloatExt {
         match res {
             Err(e) => match e {
-                Error::ExponentOverflow => INF_POS,
+                Error::ExponentOverflow(s) => if s == DECIMAL_SIGN_POS { INF_POS } else { INF_NEG },
                 Error::DivisionByZero => {
                     if is_dividend_zero {
                         NAN
@@ -484,6 +479,41 @@ impl BigFloatExt {
             Ok(v) => BigFloatExt {inner: Flavor::Value(v)},
         }
     }
+
+    /// Returns true if `self` is positive.
+    pub fn is_positive(&self) -> bool {
+        match self.inner {
+            Flavor::Value(v) => v.sign == DECIMAL_SIGN_POS,
+            Flavor::Inf(s) => s == DECIMAL_SIGN_POS,
+            Flavor::NaN => false,
+        }
+    }
+
+    /// Returns true if `self` is negative.
+    pub fn is_negative(&self) -> bool {
+        match self.inner {
+            Flavor::Value(v) => v.sign == DECIMAL_SIGN_NEG,
+            Flavor::Inf(s) => s == DECIMAL_SIGN_NEG,
+            Flavor::NaN => false,
+        }
+    }
+
+    /// Returns true if `self` is subnormal.
+    pub fn is_subnormal(&self) -> bool {
+        if let Flavor::Value(v) = self.inner {
+            return v.is_subnormal()
+        }
+        false
+    }
+
+    /// Returns true if `self` is zero.
+    pub fn is_zero(&self) -> bool {
+        match self.inner {
+            Flavor::Value(v) => v.is_zero(),
+            Flavor::Inf(_) => false,
+            Flavor::NaN => false,
+        }
+    }
 }
 
 
@@ -496,7 +526,7 @@ macro_rules! gen_wrapper1 {
         pub fn $fname($($arg: $arg_type,)*) -> $ret {
             let inner = match BigFloat::$fname($($arg,)*) {
                 Err(e) => match e {
-                    Error::ExponentOverflow => Flavor::Inf(DECIMAL_SIGN_POS),
+                    Error::ExponentOverflow(s) => Flavor::Inf(s),
                     _ => Flavor::NaN,
                 },
                 Ok(v) => Flavor::Value(v),
@@ -514,7 +544,7 @@ macro_rules! gen_wrapper2 {
         #[doc=$comment]
         pub fn $fname(&self$(,$arg: $arg_type)*) -> $ret {
             match self.inner {
-                Flavor::Value(v) => Self::result_to_ext(v.$fname($($arg,)*), v.n == 0, true),
+                Flavor::Value(v) => Self::result_to_ext(v.$fname($($arg,)*), v.is_zero(), true),
                 Flavor::Inf(s) => if s == DECIMAL_SIGN_POS $pos_inf else $neg_inf,
                 Flavor::NaN => NAN,
             }
@@ -540,8 +570,8 @@ macro_rules! gen_wrapper4 {
 }
 
 impl BigFloatExt {
-    gen_wrapper1!("Construct BigFloat from f32.", from_f32, Self, f, f32);
-    gen_wrapper1!("Construct BigFloat from f64.", from_f64, Self, f, f64);
+    gen_wrapper1!("Construct BigFloatExt from f32.", from_f32, Self, f, f32);
+    gen_wrapper1!("Construct BigFloatExt from f64.", from_f64, Self, f, f64);
     
     gen_wrapper4!("Return absolute value.", abs, Self, {Flavor::Inf(DECIMAL_SIGN_POS)}, {Flavor::Inf(DECIMAL_SIGN_POS)},);
     gen_wrapper4!("Return integer part of a number,", int, Self, {Flavor::NaN}, {Flavor::NaN},);
@@ -578,10 +608,6 @@ pub mod std_ops {
     use super::BigFloatExt;
     use super::Flavor;
 
-    //
-    // ops traits
-    //
-
     use std::ops::Add;
     use std::ops::AddAssign;
     use std::ops::Div;
@@ -591,8 +617,18 @@ pub mod std_ops {
     use std::ops::Neg;
     use std::ops::Sub;
     use std::ops::SubAssign;
+    use std::cmp::PartialEq;
+    use std::cmp::Eq;
+    use std::cmp::PartialOrd;
+    use std::cmp::Ordering;
+    use std::fmt::Display;
+    use std::fmt::Formatter;
+    use std::fmt::Error;
     
-    
+    //
+    // ops traits
+    //
+
     impl Add for BigFloatExt {
         type Output = Self;
         fn add(self, rhs: Self) -> Self::Output {
@@ -657,12 +693,6 @@ pub mod std_ops {
     // ordering traits
     //
     
-    use std::cmp::PartialEq;
-    use std::cmp::Eq;
-    use std::cmp::PartialOrd;
-    use std::cmp::Ordering;
-    
-    
     impl PartialEq for BigFloatExt {
         fn eq(&self, other: &Self) -> bool {
             let cmp_result = BigFloatExt::cmp(self, other);
@@ -702,15 +732,12 @@ pub mod std_ops {
         }
     }
 
-    use std::fmt::Display;
-    use std::fmt::Formatter;
-    use std::fmt::Error;
 
     impl Display for BigFloatExt {
         fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
             let s = match self.inner {
                 Flavor::Value(v) => {
-                    if v.n == 0 {
+                    if v.is_zero() {
                         "0".to_owned()
                     } else {
                         let mut num = if v.sign == DECIMAL_SIGN_NEG {
@@ -725,9 +752,7 @@ pub mod std_ops {
                         for byte in &bytes[1..] {
                             num.push(std::char::from_digit(*byte as u32, 10).unwrap());
                         }
-                        let mut e = v.e as i32;
-                        let x = v.n as i32 + e - 1;
-                        e -= x;
+                        let e = v.n as i32 + v.e as i32 - 1;
                         if e != 0 {
                             num.push('e');
                             if e > 0 {
@@ -751,5 +776,333 @@ pub mod std_ops {
             };
             write!(f, "{}", s)
         }
+    }
+}
+
+
+
+#[cfg(test)]
+mod tests {
+
+    use std::ops::Neg;
+
+    use super::*;
+
+    #[test]
+    fn test_ext() {
+
+        // Inf & NaN
+        let d1 = ONE;
+        assert!(!d1.is_inf());
+        assert!(!d1.is_nan());
+        assert!(!d1.is_inf_pos());
+        assert!(!d1.is_inf_neg());
+        assert!(d1.get_sign() > 0);
+
+        let d1 = ONE / BigFloatExt::new();
+        assert!(d1.is_inf());
+        assert!(!d1.is_nan());
+        assert!(d1.is_inf_pos());
+        assert!(!d1.is_inf_neg());
+        assert!(d1.get_sign() > 0);
+
+        let d1 = d1.neg();
+        assert!(d1.is_inf());
+        assert!(!d1.is_nan());
+        assert!(!d1.is_inf_pos());
+        assert!(d1.is_inf_neg());
+        assert!(d1.get_sign() < 0);
+
+        let d1 = BigFloatExt::new() / BigFloatExt::new();
+        assert!(!d1.is_inf());
+        assert!(d1.is_nan());
+        assert!(!d1.is_inf_pos());
+        assert!(!d1.is_inf_neg());
+        assert!(d1.get_sign() == 0);
+
+        // conversions
+        let d1 = ONE;
+        assert!(d1.to_f64() == 1.0);
+        assert!(d1.to_f32() == 1.0);
+        let d1 = BigFloatExt::new() / BigFloatExt::new();
+        assert!(d1.to_f64().is_nan());
+        assert!(d1.to_f32().is_nan());
+        let d1 = ONE / BigFloatExt::new();
+        assert!(d1.to_f64().is_infinite());
+        assert!(d1.to_f32().is_infinite());
+        assert!(d1.to_f64().is_sign_positive());
+        assert!(d1.to_f32().is_sign_positive());
+        let d1 = d1.neg();
+        assert!(d1.to_f64().is_sign_negative());
+        assert!(d1.to_f32().is_sign_negative());
+        assert!(d1.to_f64().is_infinite());
+        assert!(d1.to_f32().is_infinite());
+
+        let d1 = ONE;
+        let mut bytes = [1; DECIMAL_PARTS];
+        d1.get_mantissa_bytes(&mut bytes);
+        assert!(bytes != [1; DECIMAL_PARTS]);
+        assert!(d1.get_mantissa_len() != 0);
+        let mut bytes = [1; DECIMAL_PARTS];
+        let d1 = INF_POS;
+        d1.get_mantissa_bytes(&mut bytes);
+        assert!(d1.get_mantissa_len() == 0);
+        assert!(bytes == [1; DECIMAL_PARTS]);
+        let d1 = INF_NEG;
+        d1.get_mantissa_bytes(&mut bytes);
+        assert!(d1.get_mantissa_len() == 0);
+        assert!(bytes == [1; DECIMAL_PARTS]);
+        let d1 = NAN;
+        d1.get_mantissa_bytes(&mut bytes);
+        assert!(d1.get_mantissa_len() == 0);
+        assert!(bytes == [1; DECIMAL_PARTS]);
+
+        assert!(ONE.get_exponent() < 0);
+        assert!(INF_POS.get_exponent() == 0);
+        assert!(INF_NEG.get_exponent() == 0);
+        assert!(NAN.get_exponent() == 0);
+    
+        assert!(ONE.to_raw_parts().is_some());
+        assert!(INF_POS.to_raw_parts().is_none());
+        assert!(INF_NEG.to_raw_parts().is_none());
+        assert!(NAN.to_raw_parts().is_none());
+
+        assert!(ONE.add(&ONE).cmp(&TWO) == Some(0));
+        assert!(ONE.add(&INF_POS).is_inf_pos());
+        assert!(INF_POS.add(&ONE).is_inf_pos());
+        assert!(ONE.add(&INF_NEG).is_inf_neg());
+        assert!(INF_NEG.add(&ONE).is_inf_neg());
+        assert!(INF_POS.add(&INF_POS).is_inf_pos());
+        assert!(INF_POS.add(&INF_NEG).is_nan());
+        assert!(INF_NEG.add(&INF_NEG).is_inf_neg());
+        assert!(INF_NEG.add(&INF_POS).is_nan());
+
+        assert!(TWO.sub(&ONE).cmp(&ONE) == Some(0));
+        assert!(ONE.sub(&INF_POS).is_inf_neg());
+        assert!(INF_POS.sub(&ONE).is_inf_pos());
+        assert!(ONE.sub(&INF_NEG).is_inf_pos());
+        assert!(INF_NEG.sub(&ONE).is_inf_neg());
+        assert!(INF_POS.sub(&INF_POS).is_nan());
+        assert!(INF_POS.sub(&INF_NEG).is_inf_pos());
+        assert!(INF_NEG.sub(&INF_NEG).is_nan());
+        assert!(INF_NEG.sub(&INF_POS).is_inf_neg());
+
+        assert!(TWO.mul(&ONE).cmp(&TWO) == Some(0));
+        assert!(ONE.mul(&INF_POS).is_inf_pos());
+        assert!(INF_POS.mul(&ONE).is_inf_pos());
+        assert!(ONE.mul(&INF_NEG).is_inf_neg());
+        assert!(INF_NEG.mul(&ONE).is_inf_neg());
+        assert!(ONE.neg().mul(&INF_POS).is_inf_neg());
+        assert!(ONE.neg().mul(&INF_NEG).is_inf_pos());
+        assert!(INF_POS.mul(&ONE.neg()).is_inf_neg());
+        assert!(INF_NEG.mul(&ONE.neg()).is_inf_pos());
+        assert!(INF_POS.mul(&INF_POS).is_inf_pos());
+        assert!(INF_POS.mul(&INF_NEG).is_inf_neg());
+        assert!(INF_NEG.mul(&INF_NEG).is_inf_pos());
+        assert!(INF_NEG.mul(&INF_POS).is_inf_neg());
+        assert!(INF_POS.mul(&BigFloatExt::new()).is_nan());
+        assert!(INF_NEG.mul(&BigFloatExt::new()).is_nan());
+        assert!(BigFloatExt::new().mul(&INF_POS).is_nan());
+        assert!(BigFloatExt::new().mul(&INF_NEG).is_nan());
+
+        assert!(TWO.div(&TWO).cmp(&ONE) == Some(0));
+        assert!(TWO.div(&INF_POS).is_zero());
+        assert!(INF_POS.div(&TWO).is_inf_pos());
+        assert!(TWO.div(&INF_NEG).is_zero());
+        assert!(INF_NEG.div(&TWO).is_inf_neg());
+        assert!(TWO.neg().div(&INF_POS).is_zero());
+        assert!(TWO.neg().div(&INF_NEG).is_zero());
+        assert!(INF_POS.div(&TWO.neg()).is_inf_neg());
+        assert!(INF_NEG.div(&TWO.neg()).is_inf_pos());
+        assert!(INF_POS.div(&INF_POS).is_nan());
+        assert!(INF_POS.div(&INF_NEG).is_nan());
+        assert!(INF_NEG.div(&INF_NEG).is_nan());
+        assert!(INF_NEG.div(&INF_POS).is_nan());
+        assert!(INF_POS.div(&BigFloatExt::new()).is_inf_pos());
+        assert!(INF_NEG.div(&BigFloatExt::new()).is_inf_neg());
+        assert!(BigFloatExt::new().div(&INF_POS).is_zero());
+        assert!(BigFloatExt::new().div(&INF_NEG).is_zero());
+
+        for op in [BigFloatExt::add, 
+            BigFloatExt::sub, 
+            BigFloatExt::mul, 
+            BigFloatExt::div, ] {
+            assert!(op(&NAN, &ONE).is_nan());
+            assert!(op(&ONE, &NAN).is_nan());
+            assert!(op(&NAN, &INF_POS).is_nan());
+            assert!(op(&INF_POS, &NAN).is_nan());
+            assert!(op(&NAN, &INF_NEG).is_nan());
+            assert!(op(&INF_NEG, &NAN).is_nan());
+            assert!(op(&NAN, &NAN).is_nan());
+        }
+
+        assert!(ONE.cmp(&ONE).is_some());
+        assert!(ONE.cmp(&INF_POS).is_some());
+        assert!(INF_POS.cmp(&ONE).is_some());
+        assert!(INF_POS.cmp(&INF_POS).is_some());
+        assert!(ONE.cmp(&INF_NEG).is_some());
+        assert!(INF_NEG.cmp(&ONE).is_some());
+        assert!(INF_NEG.cmp(&INF_NEG).is_some());
+        assert!(ONE.cmp(&NAN).is_none());
+        assert!(NAN.cmp(&ONE).is_none());
+        assert!(INF_POS.cmp(&NAN).is_none());
+        assert!(NAN.cmp(&INF_POS).is_none());
+        assert!(INF_NEG.cmp(&NAN).is_none());
+        assert!(NAN.cmp(&INF_NEG).is_none());
+        assert!(NAN.cmp(&NAN).is_none());
+
+        assert!(ONE.is_positive());
+        assert!(!ONE.is_negative());
+
+        assert!(ONE.inv_sign().is_negative());
+        assert!(!ONE.inv_sign().is_positive());
+        assert!(!INF_POS.is_negative());
+        assert!(INF_POS.is_positive());
+        assert!(INF_NEG.is_negative());
+        assert!(!INF_NEG.is_positive());
+        assert!(!NAN.is_positive());
+        assert!(!NAN.is_negative());
+
+
+        assert!(ONE.pow(&ONE).cmp(&ONE) == Some(0));
+        assert!(BigFloatExt::new().pow(&INF_POS).is_zero());
+        assert!(BigFloatExt::new().pow(&INF_NEG).is_zero());
+        assert!(ONE.pow(&INF_POS).cmp(&ONE) == Some(0));
+        assert!(ONE.pow(&INF_NEG).cmp(&ONE) == Some(0));
+        assert!(TWO.pow(&INF_POS).is_inf_pos());
+        assert!(TWO.pow(&INF_NEG).is_inf_neg());
+        assert!(INF_POS.pow(&ONE).is_inf_pos());
+        assert!(INF_NEG.pow(&ONE).is_inf_neg());
+        assert!(INF_NEG.pow(&TWO).is_inf_pos());
+        assert!(INF_NEG.pow(&BigFloatExt::from_f64(10.2)).is_inf_pos());
+        assert!(INF_NEG.pow(&BigFloatExt::from_f64(3.0)).is_inf_neg());
+        assert!(INF_POS.pow(&ONE.neg()).is_zero());
+        assert!(INF_NEG.pow(&ONE.neg()).is_zero());
+        assert!(INF_POS.pow(&BigFloatExt::new()).cmp(&ONE) == Some(0));
+        assert!(INF_NEG.pow(&BigFloatExt::new()).cmp(&ONE) == Some(0));
+        assert!(INF_POS.pow(&INF_POS).is_inf_pos());
+        assert!(INF_NEG.pow(&INF_POS).is_inf_pos());
+        assert!(INF_POS.pow(&INF_NEG).is_zero());
+        assert!(INF_NEG.pow(&INF_NEG).is_zero());
+
+        assert!(BigFloatExt::from_f32(f32::NAN).is_nan());
+        assert!(BigFloatExt::from_f32(f32::INFINITY).is_inf_pos());
+        assert!(BigFloatExt::from_f32(f32::NEG_INFINITY).is_inf_neg());
+        assert!(!BigFloatExt::from_f32(1.0).is_nan());
+        assert!(BigFloatExt::from_f64(f64::NAN).is_nan());
+        assert!(BigFloatExt::from_f64(f64::INFINITY).is_inf_pos());
+        assert!(BigFloatExt::from_f64(f64::NEG_INFINITY).is_inf_neg());
+        assert!(!BigFloatExt::from_f64(1.0).is_nan());
+        assert!(ONE.pow(&NAN).is_nan());
+        assert!(NAN.pow(&ONE).is_nan());
+        assert!(INF_POS.pow(&NAN).is_nan());
+        assert!(NAN.pow(&INF_POS).is_nan());
+        assert!(INF_NEG.pow(&NAN).is_nan());
+        assert!(NAN.pow(&INF_NEG).is_nan());
+        assert!(NAN.pow(&NAN).is_nan());
+
+        assert!(INF_NEG.abs().is_inf_pos());
+        assert!(INF_POS.abs().is_inf_pos());
+        assert!(NAN.abs().is_nan());
+
+        assert!(INF_NEG.int().is_nan());
+        assert!(INF_POS.int().is_nan());
+        assert!(NAN.int().is_nan());
+
+        assert!(INF_NEG.frac().is_nan());
+        assert!(INF_POS.frac().is_nan());
+        assert!(NAN.frac().is_nan());
+
+        assert!(INF_NEG.ceil().is_inf_neg());
+        assert!(INF_POS.ceil().is_inf_pos());
+        assert!(NAN.ceil().is_nan());
+
+        assert!(INF_NEG.floor().is_inf_neg());
+        assert!(INF_POS.floor().is_inf_pos());
+        assert!(NAN.floor().is_nan());
+
+        assert!(INF_NEG.round(0).is_inf_neg());
+        assert!(INF_POS.round(0).is_inf_pos());
+        assert!(NAN.round(0).is_nan());
+
+        assert!(INF_NEG.sqrt().is_nan());
+        assert!(INF_POS.sqrt().is_inf_pos());
+        assert!(NAN.sqrt().is_nan());
+
+        assert!(INF_NEG.ln().is_nan());
+        assert!(INF_POS.ln().is_inf_pos());
+        assert!(NAN.ln().is_nan());
+
+        assert!(INF_NEG.sin().is_nan());
+        assert!(INF_POS.sin().is_nan());
+        assert!(NAN.sin().is_nan());
+
+        assert!(INF_NEG.cos().is_nan());
+        assert!(INF_POS.cos().is_nan());
+        assert!(NAN.cos().is_nan());
+
+        assert!(INF_NEG.tan().is_nan());
+        assert!(INF_POS.tan().is_nan());
+        assert!(NAN.tan().is_nan());
+
+        assert!(INF_NEG.asin().is_nan());
+        assert!(INF_POS.asin().is_nan());
+        assert!(NAN.asin().is_nan());
+
+        assert!(INF_NEG.acos().is_nan());
+        assert!(INF_POS.acos().is_nan());
+        assert!(NAN.acos().is_nan());
+
+        assert!(INF_NEG.atan().cmp(&HALF_PI.neg()) == Some(0));
+        assert!(INF_POS.atan().cmp(&HALF_PI) == Some(0));
+        assert!(NAN.atan().is_nan());
+
+        assert!(INF_NEG.sinh().is_inf_neg());
+        assert!(INF_POS.sinh().is_inf_pos());
+        assert!(NAN.sinh().is_nan());
+        
+        assert!(INF_NEG.cosh().is_inf_pos());
+        assert!(INF_POS.cosh().is_inf_pos());
+        assert!(NAN.cosh().is_nan());
+
+        assert!(INF_NEG.tanh().cmp(&ONE.neg()) == Some(0));
+        assert!(INF_POS.tanh().cmp(&ONE) == Some(0));
+        assert!(NAN.tanh().is_nan());
+        
+        assert!(INF_NEG.asinh().is_inf_neg());
+        assert!(INF_POS.asinh().is_inf_pos());
+        assert!(NAN.asinh().is_nan());
+        
+        assert!(INF_NEG.acosh().is_zero());
+        assert!(INF_POS.acosh().is_zero());
+        assert!(NAN.acosh().is_nan());
+        
+        assert!(INF_NEG.atanh().is_zero());
+        assert!(INF_POS.atanh().is_zero());
+        assert!(NAN.atanh().is_nan());
+
+        let d1 = ONE;
+        let d2 = BigFloatExt::new();
+        assert!(d1 + d2 == d1);
+        let mut d3 = BigFloatExt::new();
+        d3 += d1;
+        assert!(d1 == d3);
+        d3 -= d1;
+        assert!(d1 > d3);
+        d3 = TWO;
+        d3 *= TWO;
+        assert!(d3 == TWO*TWO);
+        d3 /= TWO;
+        assert!(TWO == d3);
+        assert!(ONE < d3);
+        assert!(ONE == TWO/TWO);
+
+        let d1 = BigFloatExt::from_f64(0.0123456789);
+        assert!(format!("{}", d1.round(10)) == "1.234567890000000000000000000000000000000e-2");
+        let d1 = BigFloatExt::from_f64(-123.456789);
+        assert!(format!("{}", d1.round(6)) == "-1.234567890000000000000000000000000000000e+2");
+        assert!(format!("{}", INF_POS) == "Inf");
+        assert!(format!("{}", INF_NEG) == "-Inf");
+        assert!(format!("{}", NAN) == "NaN");
     }
 }

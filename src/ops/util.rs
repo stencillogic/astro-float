@@ -1,6 +1,7 @@
 /// Utility functions.
 
 use crate::defs::BigFloat;
+use crate::defs::DECIMAL_MIN_EXPONENT;
 use crate::defs::Error;
 use crate::defs::DECIMAL_BASE_LOG10;
 use crate::defs::DECIMAL_POSITIONS;
@@ -226,9 +227,9 @@ impl BigFloat {
     }
 
     // determine parameters for computation of trig function
-    pub(super) fn get_trig_params(x: &mut BigFloatInc, add: i32) -> (usize, BigFloatInc) {
+    pub(super) fn get_trig_params(x: &mut BigFloatInc, add_one: i32) -> (usize, BigFloatInc) {
         x.maximize_mantissa();
-        let mut i = add - (x.n as i32 + x.e as i32);
+        let mut i = add_one - (x.n as i32 + x.e as i32);
         let mut idx = 0;
         let mut dx = *x;
 
@@ -244,6 +245,23 @@ impl BigFloat {
             dx.m[DECIMAL_PARTS] = x.m[DECIMAL_PARTS] % m;
         }
         (idx, dx)
+    }
+
+
+    /// If exponent is too small try to present number in subnormal form.
+    /// If not successful, then return 0.0
+    pub(crate) fn process_subnormal(&mut self, e: i32) -> Self {
+        if (DECIMAL_POSITIONS as i32) + e > DECIMAL_MIN_EXPONENT as i32 {
+            // subnormal
+            let shift = (DECIMAL_MIN_EXPONENT as i32 - e) as usize;
+            Self::shift_right(&mut self.m, shift);
+            self.n = (DECIMAL_POSITIONS - shift) as i16;
+            self.e = DECIMAL_MIN_EXPONENT;
+            *self
+        } else {
+            // zero
+            Self::new()
+        }
     }
 }
 

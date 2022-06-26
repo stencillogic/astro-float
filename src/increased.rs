@@ -147,19 +147,24 @@ impl BigFloatInc {
             n = 0;
         }
 
-        if e > DECIMAL_MAX_EXPONENT as i32 || e < DECIMAL_MIN_EXPONENT as i32 {
-            return Err(Error::ExponentOverflow);
-        }
-
         for i in 0..d3.m.len() {
             d3.m[i] = m3[n as usize + i];
         }
-        d3.e = e as i8;
         d3.sign = if self.sign == d2.sign || self.n == 0 {
             DECIMAL_SIGN_POS
         } else {
             DECIMAL_SIGN_NEG
         };
+
+        if e < DECIMAL_MIN_EXPONENT as i32 {
+            return Ok(d3.process_subnormal(e));
+        }
+
+        if e > DECIMAL_MAX_EXPONENT as i32 {
+            return Err(Error::ExponentOverflow(d3.sign));
+        }
+
+        d3.e = e as i8;
 
         Ok(d3)
     }
@@ -353,28 +358,38 @@ impl BigFloatInc {
             - d2.e as i32
             - (DECIMAL_PARTS as i32 - m + n - p) * DECIMAL_BASE_LOG10 as i32;
 
-        if e > DECIMAL_MAX_EXPONENT as i32 || e < DECIMAL_MIN_EXPONENT as i32 {
-            return Err(Error::ExponentOverflow);
-        }
-
-        d3.e = e as i8;
-
-        d3.n = DECIMAL_POSITIONS as i16 - DECIMAL_BASE_LOG10 as i16 + j as i16;
-
         d3.sign = if self.sign == d2.sign {
             DECIMAL_SIGN_POS
         } else {
             DECIMAL_SIGN_NEG
         };
+
+        if e < DECIMAL_MIN_EXPONENT as i32 {
+            return Ok(d3.process_subnormal(e));
+        }
+        
+        if e > DECIMAL_MAX_EXPONENT as i32 {
+            return Err(Error::ExponentOverflow(d3.sign));
+        }
+
+        d3.e = e as i8;
+        d3.n = DECIMAL_POSITIONS as i16 - DECIMAL_BASE_LOG10 as i16 + j as i16;
+
         Ok(d3)
     }
 
     /// Shift to the left as much as possibe.
     pub fn maximize_mantissa(&mut self) {
         if self.n < DECIMAL_POSITIONS as i16 {
-            Self::shift_left(&mut self.m, DECIMAL_POSITIONS - self.n as usize);
-            self.e -= DECIMAL_POSITIONS as i8 - self.n as i8;
-            self.n = DECIMAL_POSITIONS as i16;
+            let mut shift = DECIMAL_POSITIONS - self.n as usize;
+            if shift > (self.e as i32 - DECIMAL_MIN_EXPONENT as i32) as usize {
+                shift = (self.e - DECIMAL_MIN_EXPONENT) as usize; 
+            }
+            if shift > 0 {
+                Self::shift_left(&mut self.m, shift);
+                self.e -= shift as i8;
+                self.n += shift as i16;
+            }
         }
     }
 
@@ -392,13 +407,14 @@ impl BigFloatInc {
             for i in 1..DECIMAL_PARTS {
                 if self.m[i] < DECIMAL_BASE as i16 - 1 {
                     self.m[i] += 1;
+                    self.n = Self::num_digits(&self.m);
                     return Ok(());
                 } else {
                     self.m[i] = 0;
                 }
             }
             if self.e == DECIMAL_MAX_EXPONENT {
-                return Err(Error::ExponentOverflow);
+                return Err(Error::ExponentOverflow(self.sign));
             }
             self.e += 1;
             Self::shift_right(&mut self.m, 1);
@@ -609,7 +625,7 @@ impl BigFloatInc {
             d3.e = e as i8;
             if Self::abs_add(&n1.m, &n2.m, &mut d3.m) > 0 {
                 if e == DECIMAL_MAX_EXPONENT as i32 {
-                    return Err(Error::ExponentOverflow);
+                    return Err(Error::ExponentOverflow(d3.sign));
                 }
                 d3.e += 1;
                 Self::shift_right(&mut d3.m, 1);
@@ -767,5 +783,22 @@ impl BigFloatInc {
             d3[i] = (m % DECIMAL_BASE as i32) as i16;
         }
         d3[DECIMAL_PARTS] = (m / DECIMAL_BASE as i32) as i16;
+    }
+
+
+    /// If exponent is too small try to present number in subnormal form.
+    /// If not successful, then return 0.0
+    fn process_subnormal(&mut self, e: i32) -> Self {
+        if (DECIMAL_POSITIONS as i32) + e > DECIMAL_MIN_EXPONENT as i32 {
+            // subnormal
+            let shift = (DECIMAL_MIN_EXPONENT as i32 - e) as usize;
+            Self::shift_right(&mut self.m, shift);
+            self.n = (DECIMAL_POSITIONS - shift) as i16;
+            self.e = DECIMAL_MIN_EXPONENT;
+            *self
+        } else {
+            // zero
+            Self::new()
+        }
     }
 }

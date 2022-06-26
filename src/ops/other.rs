@@ -85,7 +85,7 @@ impl BigFloat {
                     i += 1;
                 }
                 if ret.e == DECIMAL_MAX_EXPONENT {
-                    return Err(Error::ExponentOverflow);
+                    return Err(Error::ExponentOverflow(ret.sign));
                 }
                 ret.e += 1;
                 Self::shift_right(&mut ret.m, 1);
