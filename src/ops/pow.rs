@@ -7,7 +7,6 @@ use crate::defs::DECIMAL_BASE_LOG10;
 use crate::defs::DECIMAL_POSITIONS;
 use crate::defs::DECIMAL_BASE;
 use crate::defs::DECIMAL_SIGN_NEG;
-use crate::defs::DECIMAL_SIGN_POS;
 use crate::defs::DECIMAL_MAX_EXPONENT_POSITIONS;
 use crate::defs::ZEROED_MANTISSA;
 
@@ -105,6 +104,7 @@ impl BigFloat {
 mod tests {
 
     use super::*;
+    use crate::defs::DECIMAL_SIGN_POS;
 
     #[test]
     fn test_pow() {

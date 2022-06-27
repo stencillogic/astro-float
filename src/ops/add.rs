@@ -6,8 +6,8 @@ use crate::defs::DECIMAL_PARTS;
 use crate::defs::DECIMAL_POSITIONS;
 use crate::defs::DECIMAL_BASE;
 use crate::defs::DECIMAL_SIGN_POS;
-use crate::defs::DECIMAL_SIGN_NEG;
 use crate::defs::DECIMAL_MAX_EXPONENT;
+use crate::defs::ZEROED_MANTISSA;
 
 
 impl BigFloat {
@@ -38,10 +38,8 @@ impl BigFloat {
         let free: i32;
         let mut e: i32;
         let cmp: i16;
-        let mut n1: &BigFloat;
-        let mut n2: &BigFloat;
-        let mut s1: BigFloat;
-        let mut s2: BigFloat;
+        let mut n1: BigFloat;
+        let mut n2: BigFloat;
 
         // one of the numbers is zero
         if 0 == self.n {
@@ -60,55 +58,41 @@ impl BigFloat {
 
         // assign d1 and d2 to n1 and n2 such that n1 has more significant digits than n2
         // (we want to save more digits while not sacrificing any significant digits)
-        let mut invert_sign = false;
         if self.e as i32 + (self.n as i32) < d2.e as i32 + d2.n as i32 {
-            n1 = d2;
-            n2 = self;
-            if op < 0 {
-                invert_sign = true;
-            }
+            n1 = if op < 0 {d2.inv_sign()} else {*d2};
+            n2 = *self;
         } else {
-            n1 = self;
-            n2 = d2;
+            n1 = *self;
+            n2 = if op < 0 {d2.inv_sign()} else {*d2};
         }
         shift = n1.e as i32 - n2.e as i32;
         e = n1.e as i32;
 
         // bring n1 and n2 to having common exponent
         if shift > 0 {
-            s1 = *n1;
-            s2 = *n2;
-
-            free = DECIMAL_POSITIONS as i32 - s1.n as i32;
+            free = DECIMAL_POSITIONS as i32 - n1.n as i32;
 
             if shift > free {
-                if shift - free > s2.n as i32 {
+                if shift - free > n2.n as i32 {
                     // n2 is too small
-                    d3 = *n1;
-                    if invert_sign {
-                        d3.sign = if d3.sign == DECIMAL_SIGN_POS { DECIMAL_SIGN_NEG } else { DECIMAL_SIGN_POS };
-                    }
+                    d3 = n1;
                     return Ok(d3);
                 } else {
                     if free > 0 {
-                        Self::shift_left(&mut s1.m, free as usize);
+                        Self::shift_left(&mut n1.m, free as usize);
                     }
-                    Self::shift_right(&mut s2.m, (shift - free) as usize);
+                    Self::shift_right(&mut n2.m, (shift - free) as usize);
                     e -= free;
                 }
             } else {
-                Self::shift_left(&mut s1.m, shift as usize);
+                Self::shift_left(&mut n1.m, shift as usize);
                 e -= shift;
             }
-            n1 = &s1;
-            n2 = &s2;
         } else if shift < 0 {
-            s2 = *n2;
-            Self::shift_left(&mut s2.m, (-shift) as usize);
-            n2 = &s2;
+            Self::shift_left(&mut n2.m, (-shift) as usize);
         }
 
-        if (n1.sign != n2.sign && op >= 0) || (op < 0 && n1.sign == n2.sign) {
+        if n1.sign != n2.sign {
             // subtract
             cmp = Self::abs_cmp(&n1.m, &n2.m);
             if cmp > 0 {
@@ -125,11 +109,11 @@ impl BigFloat {
                 d3.sign = DECIMAL_SIGN_POS;
                 d3.e = 0;
                 d3.n = 0;
-                d3.m.iter_mut().for_each(|x| *x = 0);
+                d3.m = ZEROED_MANTISSA;
             }
         } else {
             // add
-            d3.sign = self.sign;
+            d3.sign = n1.sign;
             d3.e = e as i8;
             if Self::abs_add(&n1.m, &n2.m, &mut d3.m) > 0 {
                 if e == DECIMAL_MAX_EXPONENT as i32 {
@@ -142,9 +126,6 @@ impl BigFloat {
             } else {
                 d3.n = Self::num_digits(&d3.m);
             }
-        }
-        if invert_sign {
-            d3.sign = if d3.sign == DECIMAL_SIGN_POS { DECIMAL_SIGN_NEG } else { DECIMAL_SIGN_POS };
         }
         Ok(d3)
     }

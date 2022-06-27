@@ -267,6 +267,7 @@ impl BigFloat {
             - d2.e as i32
             - (DECIMAL_PARTS as i32 - m + n - p) * DECIMAL_BASE_LOG10 as i32;
 
+        d3.n = DECIMAL_POSITIONS as i16 - DECIMAL_BASE_LOG10 as i16 + j as i16;
         d3.sign = if self.sign == d2.sign {
             DECIMAL_SIGN_POS
         } else {
@@ -282,7 +283,6 @@ impl BigFloat {
         }
 
         d3.e = e as i8;
-        d3.n = DECIMAL_POSITIONS as i16 - DECIMAL_BASE_LOG10 as i16 + j as i16;
 
         Ok(d3)
     }

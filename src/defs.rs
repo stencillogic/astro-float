@@ -232,7 +232,7 @@ impl BigFloat {
             f += self.m[i] as f64;
             f /= DECIMAL_BASE as f64;
         }
-        let mut e = self.n + self.e as i16;
+        let mut e = DECIMAL_POSITIONS as i32 + self.e as i32;
         while e < 0 {
             f /= 10f64;
             e += 1;
@@ -321,7 +321,8 @@ impl BigFloat {
 
     /// Returns true if `self` is subnormal.
     pub fn is_subnormal(&self) -> bool {
-        self.n < DECIMAL_POSITIONS as i16
+        self.n < DECIMAL_POSITIONS as i16 &&
+        self.e == DECIMAL_MIN_EXPONENT
     }
 
     /// Return raw parts of BigFloat: mantissa, number of decimal positions in mantissa, sing, and

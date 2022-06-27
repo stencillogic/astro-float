@@ -358,6 +358,7 @@ impl BigFloatInc {
             - d2.e as i32
             - (DECIMAL_PARTS as i32 - m + n - p) * DECIMAL_BASE_LOG10 as i32;
 
+        d3.n = DECIMAL_POSITIONS as i16 - DECIMAL_BASE_LOG10 as i16 + j as i16;
         d3.sign = if self.sign == d2.sign {
             DECIMAL_SIGN_POS
         } else {
@@ -373,7 +374,6 @@ impl BigFloatInc {
         }
 
         d3.e = e as i8;
-        d3.n = DECIMAL_POSITIONS as i16 - DECIMAL_BASE_LOG10 as i16 + j as i16;
 
         Ok(d3)
     }
@@ -793,7 +793,7 @@ impl BigFloatInc {
             // subnormal
             let shift = (DECIMAL_MIN_EXPONENT as i32 - e) as usize;
             Self::shift_right(&mut self.m, shift);
-            self.n = (DECIMAL_POSITIONS - shift) as i16;
+            self.n -= shift as i16;
             self.e = DECIMAL_MIN_EXPONENT;
             *self
         } else {

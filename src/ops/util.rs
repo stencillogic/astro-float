@@ -189,6 +189,12 @@ impl BigFloat {
 
     // integer part of d1
     pub(super) fn extract_int_part(d1: &Self) -> Self {
+        if d1.e >= 0 {
+            return *d1;
+        }
+        if d1.e as i16 + d1.n < 0 {
+            return Self::new();
+        }
         let mut int = Self::new();
         let mut i = -(d1.e as i16);
         let mut t = Self::get_div_factor(i);
@@ -255,7 +261,7 @@ impl BigFloat {
             // subnormal
             let shift = (DECIMAL_MIN_EXPONENT as i32 - e) as usize;
             Self::shift_right(&mut self.m, shift);
-            self.n = (DECIMAL_POSITIONS - shift) as i16;
+            self.n -= shift as i16;
             self.e = DECIMAL_MIN_EXPONENT;
             *self
         } else {

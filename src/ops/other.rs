@@ -20,6 +20,17 @@ impl BigFloat {
         ret
     }
 
+    /// Return absolute value. 
+    pub fn inv_sign(&self) -> BigFloat {
+        let mut ret = *self;
+        if ret.sign == DECIMAL_SIGN_NEG {
+            ret.sign = DECIMAL_SIGN_POS;
+        } else {
+            ret.sign = DECIMAL_SIGN_NEG;
+        }
+        ret
+    }
+
     /// Returns the largest integer less than or equal to a number.
     ///
     /// # Errors
@@ -114,10 +125,10 @@ impl BigFloat {
 
         let diff: i32 = self.e as i32 + self.n as i32 - d2.e as i32 - d2.n as i32;
         if diff > 0 {
-            return 1;
+            return self.sign as i16;
         }
         if diff < 0 {
-            return -1;
+            return -self.sign as i16;
         }
 
         if self.n != d2.n {

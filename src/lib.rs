@@ -70,7 +70,17 @@ mod tests {
 
     use super::*;
     use rand::random;
-    use crate::defs::DECIMAL_PARTS;
+    use crate::defs::{
+        DECIMAL_SIGN_POS, 
+        DECIMAL_SIGN_NEG, 
+        DECIMAL_MIN_EXPONENT, 
+        DECIMAL_MAX_EXPONENT, 
+        DECIMAL_POSITIONS,
+        ONE,
+        MIN,
+        MAX,
+        MIN_POSITIVE,
+    };
 
 
     #[test]
@@ -82,8 +92,6 @@ mod tests {
         //
 
         let mut d1;
-
-        assert!(DECIMAL_PARTS >= 10);
 
         // regular buf
         let bytes1: [u8; 20] = [1,2,3,4,5,6,7,8,9,10,11,112,13,14,15,16,17,18,19,20];
@@ -151,5 +159,260 @@ mod tests {
                 assert!((f - f2).abs() < 0.000001f32);
             }
         }
+    }
+
+
+    #[test]
+    fn test_num() {
+
+        let mut d1;
+        let mut d2;
+        let mut d3;
+        let mut ref_num;
+
+        // inf
+        assert!(BigFloat::from_f64(f64::INFINITY).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
+        assert!(BigFloat::from_f64(f64::NEG_INFINITY).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_NEG));
+
+        // nan
+        assert!(BigFloat::from_f64(f64::NAN).unwrap_err() == Error::InvalidArgument);
+
+        // 0.0
+        assert!(BigFloat::from_f64(0.0).unwrap().to_f64() == 0.0);
+
+        d1 = BigFloat::from_f64(1.3510326597545574e-124).unwrap();
+        d1.to_f64();
+
+        // conversions
+        for _ in 0..10000 {
+            let f: f64 = random_f64_exp(50, 25);
+            if f.is_finite() && f != 0.0 {
+                d1 = BigFloat::from_f64(f).unwrap();
+                assert!((d1.to_f64() / f - 1.0).abs() < 1000.0*f64::EPSILON);
+                if (f as f32).is_finite() && (f as f32) != 0.0 {
+                    d1 = BigFloat::from_f32(f as f32).unwrap();
+                    assert!((d1.to_f32() / f as f32 - 1.0).abs() < 1000.0*f32::EPSILON);
+                }
+            }
+        }
+
+        // 0 * 0
+        d1 = BigFloat::new();
+        d2 = BigFloat::new();
+        ref_num = BigFloat::new();
+        d3 = d1.mul(&d2).unwrap();
+        assert!(d3.cmp(&ref_num) == 0);
+
+        // 0.99 * 0
+        d1 = BigFloat::from_f64(0.99).unwrap();
+        d3 = d1.mul(&d2).unwrap();
+        assert!(d3.cmp(&ref_num) == 0);
+
+        // 0 * 12349999
+        d1 = BigFloat::new();
+        d2 = BigFloat::from_f64(12349999.0).unwrap();
+        d3 = d1.mul(&d2).unwrap();
+        assert!(d3.cmp(&ref_num) == 0);
+
+        // 1 * 1
+        d1 = BigFloat::from_f64(1.0).unwrap();
+        d2 = BigFloat::from_f64(1.0).unwrap();
+        d3 = d1.mul(&d2).unwrap();
+        assert!(d3.cmp(&d1) == 0);
+
+        // 1 * -1
+        d1 = BigFloat::from_f64(1.0).unwrap();
+        d2 = BigFloat::from_f64(1.0).unwrap().inv_sign();
+        d3 = d1.mul(&d2).unwrap();
+        assert!(d3.cmp(&d2) == 0);
+
+        // -1 * 1
+        d3 = d2.mul(&d1).unwrap();
+        assert!(d3.cmp(&d2) == 0);
+
+        // -1 * -1
+        d1 = d1.inv_sign();
+        d3 = d1.mul(&d2).unwrap();
+        ref_num = BigFloat::from_f64(1.0).unwrap();
+        assert!(d3.cmp(&ref_num) == 0);
+
+        // 0 / 0 
+        d1 = BigFloat::new();
+        d2 = BigFloat::new();
+        assert!(d1.div(&d2).unwrap_err() == Error::DivisionByZero);
+
+        // d2 / 0
+        d2 = BigFloat::from_f64(123.0).unwrap();
+        assert!(d2.div(&d1).unwrap_err() == Error::DivisionByZero);
+
+        // 0 / d2
+        d3 = d1.div(&d2).unwrap();
+        ref_num = BigFloat::new();
+        assert!(d3.cmp(&ref_num) == 0);
+
+        // 0 / -d2
+        d2 = d2.inv_sign();
+        d3 = d1.div(&d2).unwrap();
+        assert!(d3.cmp(&ref_num) == 0);
+
+
+        // add & sub & cmp
+        for _ in 0..10000 {
+            // avoid subnormal numbers
+            let f1 = random_f64_exp(50, 25);
+            let f2 = random_f64_exp(50, 25);
+            if f1.is_finite() && f2.is_finite() {
+                let f3 = f1 + f2;
+                let f4 = f1 - f2;
+                d1 = BigFloat::from_f64(f1).unwrap();
+                d2 = BigFloat::from_f64(f2).unwrap();
+                if f3 == 0.0 {
+                    assert!(d1.add(&d2).unwrap().to_f64().abs() <= 1000.0*f64::EPSILON);
+                } else {
+                    assert!((d1.add(&d2).unwrap().to_f64() / f3 - 1.0).abs() <= 1000.0*f64::EPSILON);
+                }
+                if f4 == 0.0 {
+                    assert!(d1.sub(&d2).unwrap().to_f64().abs() <= 1000.0*f64::EPSILON);
+                } else {
+                    assert!((d1.sub(&d2).unwrap().to_f64() / f4 - 1.0).abs() <= 1000.0*f64::EPSILON);
+                }
+                if f1 > f2 {
+                    assert!(d1.cmp(&d2) > 0);
+                } else if f1 < f2 {
+                    assert!(d1.cmp(&d2) < 0);
+                } else {
+                    assert!(d1.cmp(&d2) == 0);
+                }
+            }
+        }
+
+        // mul & div
+        for _ in 0..10000 {
+            // avoid subnormal numbers
+            let f1 = random_f64_exp(50, 25);
+            let f2 = random_f64_exp(50, 25);
+            if f1.is_finite() && f2.is_finite() && f2 != 0.0 {
+                let f3 = f1*f2;
+                let f4 = f1/f2;
+                d1 = BigFloat::from_f64(f1).unwrap();
+                d2 = BigFloat::from_f64(f2).unwrap();
+                assert!((d1.mul(&d2).unwrap().to_f64() / f3 - 1.0).abs() <= 1000.0*f64::EPSILON);
+                assert!((d1.div(&d2).unwrap().to_f64() / f4 - 1.0).abs() <= 1000.0*f64::EPSILON);
+            }
+        }
+
+
+        // subnormal numbers
+        d1 = MIN_POSITIVE;
+        d2 = MIN_POSITIVE;
+        ref_num = MIN_POSITIVE;
+        ref_num.m[0] = 2;
+        ref_num.n = 1;
+
+        // min_positive + min_positive = 2*min_positive
+        assert!(d1.add(&d2).unwrap().cmp(&ref_num) == 0);
+        assert!(d1.add(&d2).unwrap().cmp(&d1) > 0);
+        assert!(d1.cmp(&d1.add(&d2).unwrap()) < 0);
+
+        // min_positive - min_positive = 0
+        ref_num = BigFloat::new();
+        assert!(d1.sub(&d2).unwrap().cmp(&ref_num) == 0);
+
+        // 1 * min_positive = min_positive
+        assert!(ONE.mul(&d2).unwrap().cmp(&d2) == 0);
+
+        // min_positive / 1 = min_positive
+        assert!(d2.div(&ONE).unwrap().cmp(&d2) == 0);
+
+        // min_positive / 1 = min_positive
+        assert!(d2.div(&ONE).unwrap().cmp(&d2) == 0);
+
+        // normal -> subnormal -> normal
+        d1 = ONE;
+        d1.e = DECIMAL_MIN_EXPONENT;
+        d2 = MIN_POSITIVE;
+        assert!(!d1.is_subnormal());
+        assert!(d1.sub(&d2).unwrap().cmp(&d1) < 0);
+        assert!(d1.cmp(&d1.sub(&d2).unwrap()) > 0);
+        d1 = d1.sub(&d2).unwrap();
+        assert!(d1.is_subnormal());
+        d1 = d1.add(&d2).unwrap();
+        assert!(!d1.is_subnormal());
+
+        // overflow
+        d1 = ONE;
+        d1.e = DECIMAL_MAX_EXPONENT - (DECIMAL_POSITIONS as i8 - 1);
+        assert!(MAX.add(&d1).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
+        assert!(MIN.sub(&d1).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_NEG));
+        assert!(MAX.mul(&MAX).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
+        d1 = ONE;
+        d1.e = DECIMAL_MIN_EXPONENT;
+        assert!(MAX.div(&d1).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
+
+        // decompose and compose
+        let f1 = random_f64_exp(50, 25);
+        d1 = BigFloat::from_f64(f1).unwrap();
+        let (m,n,s,e) = d1.to_raw_parts();
+        d2 = BigFloat::from_raw_parts(m, n, s, e);
+        assert!(d1.cmp(&d2) == 0);
+
+        // sign and exponent
+        d1 = ONE;
+        assert!(d1.get_sign() > 0);
+        d1 = d1.inv_sign();
+        assert!(d1.get_sign() < 0);
+        assert!(d1.get_exponent() == -39);
+
+        // fract & int
+        let f1 = 12345.6789;
+        d1 = BigFloat::from_f64(f1).unwrap();
+        assert!((d1.frac().to_f64() - f1.fract()).abs() < 100000.0*f64::EPSILON);
+        assert!((d1.int().to_f64() - (f1 as u64) as f64).abs() < 100000.0*f64::EPSILON);
+
+        let f1 = -0.006789;
+        d1 = BigFloat::from_f64(f1).unwrap();
+        assert!(d1.frac().cmp(&d1) == 0);
+        assert!(d1.int().is_zero());
+
+        d1 = BigFloat::from_bytes(&[2,2,2,2,2,0,0,0], DECIMAL_SIGN_POS, -2);
+        assert!(d1.frac().is_zero());
+        assert!(d1.int().cmp(&d1) == 0);
+
+        assert!(MIN_POSITIVE.frac().cmp(&MIN_POSITIVE) == 0);
+        assert!(MIN_POSITIVE.int().is_zero());
+
+        d1 = BigFloat::new();
+        assert!(d1.frac().is_zero());
+        assert!(d1.int().is_zero());
+
+        // ceil & floor
+        d1 = BigFloat::from_f64(12.3).unwrap();
+        assert!(d1.floor().unwrap().to_f64() == 12.0);
+        assert!(d1.ceil().unwrap().to_f64() == 13.0);
+        d1 = BigFloat::from_f64(12.0).unwrap();
+        assert!(d1.floor().unwrap().to_f64() == 12.0);
+        assert!(d1.ceil().unwrap().to_f64() == 12.0);
+
+        d1 = BigFloat::from_f64(-12.3).unwrap();
+        assert!(d1.floor().unwrap().to_f64() == -13.0);
+        assert!(d1.ceil().unwrap().to_f64() == -12.0);
+        d1 = BigFloat::from_f64(-12.0).unwrap();
+        assert!(d1.floor().unwrap().to_f64() == -12.0);
+        assert!(d1.ceil().unwrap().to_f64() == -12.0);
+
+        // abs
+        d1 = BigFloat::from_f64(12.3).unwrap();
+        assert!(d1.abs().to_f64() == 12.3);
+        d1 = BigFloat::from_f64(-12.3).unwrap();
+        assert!(d1.abs().to_f64() == 12.3);
+    }
+
+    fn random_f64_exp(max_exp: i32, min_exp: i32) -> f64 {
+        let mut f: f64 = random();
+        f = f.powi(random::<i32>().abs() % max_exp - min_exp);
+        if random::<i8>() & 1 == 0 {
+            f = -f;
+        }
+        f
     }
 }
