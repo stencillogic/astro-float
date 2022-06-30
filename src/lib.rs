@@ -60,15 +60,14 @@ pub use crate::ext::TWO;
 pub use crate::ext::E;
 pub use crate::ext::PI;
 pub use crate::ext::HALF_PI;
-pub use crate::defs::Error;
 
 
 #[cfg(test)]
 mod tests {
 
-    use super::*;
     use rand::random;
     use crate::defs::BigFloatNum;
+    use crate::defs::Error;
     use crate::defs::{
         DECIMAL_SIGN_POS, 
         DECIMAL_SIGN_NEG, 

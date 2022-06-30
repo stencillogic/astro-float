@@ -1,6 +1,5 @@
-//! Extended BigFloat, which supports `NaN`, and `Inf` 
-//! values, and implements `std::ops` traits from the standard library.
-//! This is preferred to use with respect to the future changes in the library.
+//! BigFloat number whith support of `NaN`, and `Inf` 
+//! values, and implementation of `std::ops` traits.
 
 use crate::defs::{BigFloatNum, Error, DECIMAL_SIGN_POS, DECIMAL_PARTS, DECIMAL_SIGN_NEG, DECIMAL_POSITIONS,
     DECIMAL_MAX_EXPONENT, DECIMAL_MIN_EXPONENT};
@@ -41,7 +40,7 @@ pub const ONE: BigFloat = BigFloat { inner: Flavor::Value(crate::defs::ONE) };
 /// Value of two.
 pub const TWO: BigFloat = BigFloat { inner: Flavor::Value(crate::defs::TWO) };
 
-/// Eulers number.
+/// Euler's number.
 pub const E: BigFloat = BigFloat { inner: Flavor::Value(crate::defs::E) };
 
 /// PI number.
@@ -55,7 +54,7 @@ pub const HALF_PI: BigFloat = BigFloat { inner: Flavor::Value(BigFloatNum {
     e: -(DECIMAL_POSITIONS as i8 - 1),
 })};
 
-/// `BigFloat` with support of `NaN`, and `Inf` and operators like `+`, `-`, etc.
+/// Number representation.
 #[derive(Copy, Clone, Debug)]
 pub struct BigFloat {
     inner: Flavor,
