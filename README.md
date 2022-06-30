@@ -8,7 +8,7 @@ There are several notable implementations of numbers with increased precision fo
 
 While these libraries are great in many ways, they don't allow you to perform operations on numbers while still providing fairly high precision.
 
-There are also wrapper libraries, like [rug](https://crates.io/crates/rug)), that depend on MPFR for implementing arbitrary precision floating point numbers.
+There are also wrapper libraries, like [rug](https://crates.io/crates/rug), that depend on MPFR for implementing arbitrary precision floating point numbers.
 
 This library is written in pure Rust, provides more precision than f32, f64, and some other data types with increased precision.
 
