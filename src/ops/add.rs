@@ -1,6 +1,6 @@
 /// Addition and subtraction.
 
-use crate::defs::BigFloat;
+use crate::defs::BigFloatNum;
 use crate::defs::Error;
 use crate::defs::DECIMAL_PARTS;
 use crate::defs::DECIMAL_POSITIONS;
@@ -10,14 +10,14 @@ use crate::defs::DECIMAL_MAX_EXPONENT;
 use crate::defs::ZEROED_MANTISSA;
 
 
-impl BigFloat {
+impl BigFloatNum {
 
     /// Add d2 and return result of addition.
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - when result is too big or too small.
-    pub fn add(&self, d2: &BigFloat) -> Result<BigFloat, Error> {
+    /// ExponentOverflow - when result is too big.
+    pub fn add(&self, d2: &Self) -> Result<Self, Error> {
         self.add_sub(d2, 1)
     }
 
@@ -25,21 +25,21 @@ impl BigFloat {
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - when result is too big or too small.
-    pub fn sub(&self, d2: &BigFloat) -> Result<BigFloat, Error> {
+    /// ExponentOverflow - when result is too big.
+    pub fn sub(&self, d2: &Self) -> Result<Self, Error> {
         self.add_sub(d2, -1)
     }
 
 
     // add if op >= 0 subtract if op < 0
-    fn add_sub(&self, d2: &BigFloat, op: i8) -> Result<BigFloat, Error> {
+    fn add_sub(&self, d2: &Self, op: i8) -> Result<Self, Error> {
         let mut d3 = Self::new();
         let shift: i32;
         let free: i32;
         let mut e: i32;
         let cmp: i16;
-        let mut n1: BigFloat;
-        let mut n2: BigFloat;
+        let mut n1: BigFloatNum;
+        let mut n2: BigFloatNum;
 
         // one of the numbers is zero
         if 0 == self.n {
@@ -116,10 +116,16 @@ impl BigFloat {
             d3.sign = n1.sign;
             d3.e = e as i8;
             if Self::abs_add(&n1.m, &n2.m, &mut d3.m) > 0 {
-                if e == DECIMAL_MAX_EXPONENT as i32 {
+                if d3.e == DECIMAL_MAX_EXPONENT {
                     return Err(Error::ExponentOverflow(d3.sign));
                 }
                 d3.e += 1;
+                if Self::round_mantissa(&mut d3.m, 1) {
+                    if d3.e == DECIMAL_MAX_EXPONENT {
+                        return Err(Error::ExponentOverflow(d3.sign));
+                    }
+                    d3.e += 1;
+                }
                 Self::shift_right(&mut d3.m, 1);
                 d3.m[DECIMAL_PARTS - 1] += DECIMAL_BASE as i16 / 10;
                 d3.n = DECIMAL_POSITIONS as i16;
@@ -178,10 +184,10 @@ mod tests {
     #[test]
     fn test_add() {
 
-        let mut d1 = BigFloat::new(); 
-        let mut d2 = BigFloat::new(); 
-        let mut d3: BigFloat; 
-        let mut ref_num = BigFloat::new();
+        let mut d1 = BigFloatNum::new(); 
+        let mut d2 = BigFloatNum::new(); 
+        let mut d3: BigFloatNum; 
+        let mut ref_num = BigFloatNum::new();
 
         //
         // addition
@@ -234,9 +240,9 @@ mod tests {
         d3 = d1.add(&d2).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
-        d1 = BigFloat::new();
-        d2 = BigFloat::new();
-        ref_num = BigFloat::new();
+        d1 = BigFloatNum::new();
+        d2 = BigFloatNum::new();
+        ref_num = BigFloatNum::new();
         d1.m[1] = 9999;
         d2.m[1] = 9999;
         ref_num.m[1] = 9998;
@@ -267,8 +273,8 @@ mod tests {
         assert!(d3.cmp(&ref_num) == 0);
 
         // different exponents and precisions
-        d1 = BigFloat::new();
-        d2 = BigFloat::new();
+        d1 = BigFloatNum::new();
+        d2 = BigFloatNum::new();
 
         for i in 0..DECIMAL_PARTS
         {
@@ -377,9 +383,9 @@ mod tests {
         d3 = d1.sub(&d2).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
-        d1 = BigFloat::new();
-        d2 = BigFloat::new();
-        ref_num = BigFloat::new();
+        d1 = BigFloatNum::new();
+        d2 = BigFloatNum::new();
+        ref_num = BigFloatNum::new();
         d1.m[1] = 9998;
         d1.m[2] = 1;
         d1.n = 9;

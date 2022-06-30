@@ -5,7 +5,7 @@ pub const DECIMAL_PARTS: usize = 10;
 
 /// Number representation.
 #[derive(Copy, Clone, Debug)]
-pub struct BigFloat {
+pub struct BigFloatNum {
     pub (crate) sign: i8,                // sign
     pub (crate) e: i8,                   // exponent
     pub (crate) n: i16,                  // the number of decimal positions in the mantissa excluding leading zeroes
@@ -37,12 +37,11 @@ pub const DECIMAL_SIGN_POS: i8 = 1;         // + sign
 pub const DECIMAL_SIGN_NEG: i8 = -1;        // - sign
 pub const DECIMAL_MIN_EXPONENT: i8 = -128;  // min exponent value
 pub const DECIMAL_MAX_EXPONENT: i8 = 127;   // max exponent value
-pub const DECIMAL_MAX_EXPONENT_POSITIONS: i16 = 3;  // max decimal positions in exponent
 pub const ZEROED_MANTISSA: [i16; DECIMAL_PARTS] = [0; DECIMAL_PARTS];
 
 
 /// Zero.
-pub const ZERO: BigFloat = BigFloat {
+pub const ZERO: BigFloatNum = BigFloatNum {
     m: ZEROED_MANTISSA,
     n: 0, 
     sign: DECIMAL_SIGN_POS, 
@@ -50,7 +49,7 @@ pub const ZERO: BigFloat = BigFloat {
 };
 
 /// One.
-pub const ONE: BigFloat = BigFloat {
+pub const ONE: BigFloatNum = BigFloatNum {
     m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1000],
     n: DECIMAL_POSITIONS as i16, 
     sign: DECIMAL_SIGN_POS, 
@@ -58,7 +57,7 @@ pub const ONE: BigFloat = BigFloat {
 };
 
 /// Two.
-pub const TWO: BigFloat = BigFloat {
+pub const TWO: BigFloatNum = BigFloatNum {
     m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 2000],
     n: DECIMAL_POSITIONS as i16, 
     sign: DECIMAL_SIGN_POS, 
@@ -66,7 +65,7 @@ pub const TWO: BigFloat = BigFloat {
 };
 
 /// Eulers number.
-pub const E: BigFloat = BigFloat {
+pub const E: BigFloatNum = BigFloatNum {
     m: [7757, 6249, 3526, 7471, 6028, 2353, 9045, 2845, 2818, 2718],
     n: DECIMAL_POSITIONS as i16, 
     sign: DECIMAL_SIGN_POS, 
@@ -74,7 +73,7 @@ pub const E: BigFloat = BigFloat {
 };
 
 /// Pi number.
-pub const PI: BigFloat = BigFloat {
+pub const PI: BigFloatNum = BigFloatNum {
     m: [4197, 288, 2795, 3383, 6264, 2384, 9793, 5358, 5926, 3141],
     n: DECIMAL_POSITIONS as i16, 
     sign: DECIMAL_SIGN_POS, 
@@ -82,7 +81,7 @@ pub const PI: BigFloat = BigFloat {
 };
 
 /// Largest value possible.
-pub const MAX: BigFloat = BigFloat {
+pub const MAX: BigFloatNum = BigFloatNum {
     m: [9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999,],
     n: DECIMAL_POSITIONS as i16, 
     sign: DECIMAL_SIGN_POS, 
@@ -90,7 +89,7 @@ pub const MAX: BigFloat = BigFloat {
 };
 
 /// Smalles value possible.
-pub const MIN: BigFloat = BigFloat {
+pub const MIN: BigFloatNum = BigFloatNum {
     m: [9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999,],
     n: DECIMAL_POSITIONS as i16, 
     sign: DECIMAL_SIGN_NEG, 
@@ -98,7 +97,7 @@ pub const MIN: BigFloat = BigFloat {
 };
 
 /// Smalles positive number.
-pub const MIN_POSITIVE: BigFloat = BigFloat {
+pub const MIN_POSITIVE: BigFloatNum = BigFloatNum {
     m: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0,],
     n: 1, 
     sign: DECIMAL_SIGN_POS, 
@@ -107,11 +106,11 @@ pub const MIN_POSITIVE: BigFloat = BigFloat {
 
 
 /// Creation and number manipulation functions.
-impl BigFloat {
+impl BigFloatNum {
 
     /// Return new BigFloat with value zero.
     pub fn new() -> Self {
-        BigFloat {
+        BigFloatNum {
             sign: DECIMAL_SIGN_POS,
             e: 0,
             n: 0,
@@ -128,21 +127,12 @@ impl BigFloat {
         val
     }
 
-    /// Return new BigFloat with value two.
-    pub fn two() -> Self {
-        let mut val = Self::new();
-        val.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/5;
-        val.n = DECIMAL_POSITIONS as i16;
-        val.e = 1 - DECIMAL_POSITIONS as i8;
-        val
-    }
-
     /// Create a BigFloat value from a sequence of `bytes`. Each byte must represent a decimal digit.
     /// First byte is the most significant. The length of `bytes` can be any. If the length of
     /// `bytes` is greater than required, then the remaining part is ignored.
     /// If `sign` is negative, then the resulting BigFloat will be
     /// negative.
-    pub fn from_bytes(bytes: &[u8], sign: i8, exponent: i8) -> BigFloat {
+    pub fn from_bytes(bytes: &[u8], sign: i8, exponent: i8) -> BigFloatNum {
         let mut mantissa = ZEROED_MANTISSA;
         let mut n: usize = 0;
         let mut p: i16 = 1;
@@ -156,7 +146,7 @@ impl BigFloat {
             }
         }
 
-        BigFloat {
+        BigFloatNum {
             sign: if sign >= 0 { DECIMAL_SIGN_POS } else { DECIMAL_SIGN_NEG },
             e: exponent,
             n: d as i16,
@@ -168,10 +158,10 @@ impl BigFloat {
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - when result is too big or too small.
+    /// ExponentOverflow - when result is too big.
     pub fn from_f64(mut f: f64) -> Result<Self, Error> {
         let mut e: i32 = 0;
-        let mut ret = BigFloat::new();
+        let mut ret = BigFloatNum::new();
         if f == 0f64 {
             return Ok(ret);
         }
@@ -251,7 +241,7 @@ impl BigFloat {
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - when result is too big or too small.
+    /// ExponentOverflow - when result is too big.
     pub fn from_f32(f: f32) -> Result<Self, Error> {
         Self::from_f64(f as f64)
     }
@@ -309,35 +299,9 @@ impl BigFloat {
         }
     }
 
-    /// Return 1 if BigFloat is positive, -1 otherwise.
-    pub fn get_sign(&self) -> i8 {
-        self.sign
-    }
-
-    /// Return exponent part.
-    pub fn get_exponent(&self) -> i8 {
-        self.e
-    }
-
     /// Returns true if `self` is subnormal.
     pub fn is_subnormal(&self) -> bool {
         self.n < DECIMAL_POSITIONS as i16 &&
         self.e == DECIMAL_MIN_EXPONENT
-    }
-
-    /// Return raw parts of BigFloat: mantissa, number of decimal positions in mantissa, sing, and
-    /// exponent.
-    pub fn to_raw_parts(&self) -> ([i16; DECIMAL_PARTS], i16, i8, i8) {
-        (self.m, self.n, self.sign, self.e)
-    }
-
-    /// Construct BigFloat from raw parts.
-    pub fn from_raw_parts(mantissa: [i16; DECIMAL_PARTS], mantissa_len: i16, sign: i8, exponent: i8) -> Self {
-        BigFloat {
-            sign,
-            e: exponent,
-            n: mantissa_len,
-            m: mantissa,
-        }
     }
 }

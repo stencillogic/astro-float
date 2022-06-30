@@ -1,4 +1,4 @@
-use crate::increased::BigFloatInc;
+use crate::inc::inc::BigFloatInc;
 
 // tangent polinomial coeefficients
 pub(crate) const TAN_VALUES: [BigFloatInc; 100] = [

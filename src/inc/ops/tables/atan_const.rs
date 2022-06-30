@@ -1,4 +1,4 @@
-use crate::increased::BigFloatInc;
+use crate::inc::inc::BigFloatInc;
 
 // atan polynomial coefficients
 pub(crate) const ATAN_VALUES1: [BigFloatInc; 100] = [
@@ -106,7 +106,7 @@ pub(crate) const ATAN_VALUES1: [BigFloatInc; 100] = [
 
 
 // atan precalculated values
-pub(crate) const ATAN_VALUES2: [BigFloatInc; 10000] = [
+pub(crate) const ATAN_VALUES2: [BigFloatInc; 10001] = [
   BigFloatInc { sign: 1, e: 0, n: 0, m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
   BigFloatInc { sign: 1, e: -48, n: 44, m: [1158, 6349, 4920, 952, 5238, 6666, 8666, 6666, 6666, 9999, 9999] },
   BigFloatInc { sign: 1, e: -47, n: 44, m: [8899, 7917, 1650, 6196, 5047, 3331, 9733, 3333, 7333, 9999, 1999] },
@@ -10107,4 +10107,5 @@ pub(crate) const ATAN_VALUES2: [BigFloatInc; 10000] = [
   BigFloatInc { sign: 1, e: -44, n: 44, m: [5685, 1156, 4224, 7255, 352, 6426, 967, 1983, 895, 4814, 7852] },
   BigFloatInc { sign: 1, e: -44, n: 44, m: [7437, 2235, 8100, 82, 5126, 6995, 4295, 7816, 3396, 9815, 7852] },
   BigFloatInc { sign: 1, e: -44, n: 44, m: [7183, 1886, 8578, 2076, 5333, 2577, 7628, 3649, 897, 4816, 7853] },
+  BigFloatInc { sign: 1, e: -44, n: 44, m: [9234, 492, 5721, 1987, 8458, 5660, 961, 4483, 3397, 9816, 7853] },
 ];
