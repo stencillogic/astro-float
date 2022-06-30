@@ -1,47 +1,45 @@
 /// Addition and subtraction.
 
-use crate::defs::BigFloat;
+use crate::defs::BigFloatNum;
 use crate::defs::Error;
 use crate::defs::DECIMAL_PARTS;
 use crate::defs::DECIMAL_POSITIONS;
 use crate::defs::DECIMAL_BASE;
 use crate::defs::DECIMAL_SIGN_POS;
-use crate::defs::DECIMAL_SIGN_NEG;
 use crate::defs::DECIMAL_MAX_EXPONENT;
+use crate::defs::ZEROED_MANTISSA;
 
 
-impl BigFloat {
+impl BigFloatNum {
 
     /// Add d2 and return result of addition.
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - when result is too big or too small.
-    pub fn add(&self, d2: &BigFloat) -> Result<BigFloat, Error> {
-        return self.add_sub(d2, 1);
+    /// ExponentOverflow - when result is too big.
+    pub fn add(&self, d2: &Self) -> Result<Self, Error> {
+        self.add_sub(d2, 1)
     }
 
     /// Subtract d2 and return result of subtraction.
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - when result is too big or too small.
-    pub fn sub(&self, d2: &BigFloat) -> Result<BigFloat, Error> {
-        return self.add_sub(d2, -1);
+    /// ExponentOverflow - when result is too big.
+    pub fn sub(&self, d2: &Self) -> Result<Self, Error> {
+        self.add_sub(d2, -1)
     }
 
 
     // add if op >= 0 subtract if op < 0
-    fn add_sub(&self, d2: &BigFloat, op: i8) -> Result<BigFloat, Error> {
+    fn add_sub(&self, d2: &Self, op: i8) -> Result<Self, Error> {
         let mut d3 = Self::new();
         let shift: i32;
         let free: i32;
         let mut e: i32;
         let cmp: i16;
-        let mut n1: &BigFloat;
-        let mut n2: &BigFloat;
-        let mut s1: BigFloat;
-        let mut s2: BigFloat;
+        let mut n1: BigFloatNum;
+        let mut n2: BigFloatNum;
 
         // one of the numbers is zero
         if 0 == self.n {
@@ -60,55 +58,41 @@ impl BigFloat {
 
         // assign d1 and d2 to n1 and n2 such that n1 has more significant digits than n2
         // (we want to save more digits while not sacrificing any significant digits)
-        let mut invert_sign = false;
         if self.e as i32 + (self.n as i32) < d2.e as i32 + d2.n as i32 {
-            n1 = d2;
-            n2 = self;
-            if op < 0 {
-                invert_sign = true;
-            }
+            n1 = if op < 0 {d2.inv_sign()} else {*d2};
+            n2 = *self;
         } else {
-            n1 = self;
-            n2 = d2;
+            n1 = *self;
+            n2 = if op < 0 {d2.inv_sign()} else {*d2};
         }
         shift = n1.e as i32 - n2.e as i32;
         e = n1.e as i32;
 
         // bring n1 and n2 to having common exponent
         if shift > 0 {
-            s1 = *n1;
-            s2 = *n2;
-
-            free = DECIMAL_POSITIONS as i32 - s1.n as i32;
+            free = DECIMAL_POSITIONS as i32 - n1.n as i32;
 
             if shift > free {
-                if shift - free > s2.n as i32 {
+                if shift - free > n2.n as i32 {
                     // n2 is too small
-                    d3 = *n1;
-                    if invert_sign {
-                        d3.sign = if d3.sign == DECIMAL_SIGN_POS { DECIMAL_SIGN_NEG } else { DECIMAL_SIGN_POS };
-                    }
+                    d3 = n1;
                     return Ok(d3);
                 } else {
                     if free > 0 {
-                        Self::shift_left(&mut s1.m, free as usize);
+                        Self::shift_left(&mut n1.m, free as usize);
                     }
-                    Self::shift_right(&mut s2.m, (shift - free) as usize);
+                    Self::shift_right(&mut n2.m, (shift - free) as usize);
                     e -= free;
                 }
             } else {
-                Self::shift_left(&mut s1.m, shift as usize);
+                Self::shift_left(&mut n1.m, shift as usize);
                 e -= shift;
             }
-            n1 = &s1;
-            n2 = &s2;
         } else if shift < 0 {
-            s2 = *n2;
-            Self::shift_left(&mut s2.m, (-shift) as usize);
-            n2 = &s2;
+            Self::shift_left(&mut n2.m, (-shift) as usize);
         }
 
-        if (n1.sign != n2.sign && op >= 0) || (op < 0 && n1.sign == n2.sign) {
+        if n1.sign != n2.sign {
             // subtract
             cmp = Self::abs_cmp(&n1.m, &n2.m);
             if cmp > 0 {
@@ -125,17 +109,23 @@ impl BigFloat {
                 d3.sign = DECIMAL_SIGN_POS;
                 d3.e = 0;
                 d3.n = 0;
-                d3.m.iter_mut().for_each(|x| *x = 0);
+                d3.m = ZEROED_MANTISSA;
             }
         } else {
             // add
-            d3.sign = self.sign;
+            d3.sign = n1.sign;
             d3.e = e as i8;
             if Self::abs_add(&n1.m, &n2.m, &mut d3.m) > 0 {
-                if e == DECIMAL_MAX_EXPONENT as i32 {
-                    return Err(Error::ExponentOverflow);
+                if d3.e == DECIMAL_MAX_EXPONENT {
+                    return Err(Error::ExponentOverflow(d3.sign));
                 }
                 d3.e += 1;
+                if Self::round_mantissa(&mut d3.m, 1) {
+                    if d3.e == DECIMAL_MAX_EXPONENT {
+                        return Err(Error::ExponentOverflow(d3.sign));
+                    }
+                    d3.e += 1;
+                }
                 Self::shift_right(&mut d3.m, 1);
                 d3.m[DECIMAL_PARTS - 1] += DECIMAL_BASE as i16 / 10;
                 d3.n = DECIMAL_POSITIONS as i16;
@@ -143,10 +133,7 @@ impl BigFloat {
                 d3.n = Self::num_digits(&d3.m);
             }
         }
-        if invert_sign {
-            d3.sign = if d3.sign == DECIMAL_SIGN_POS { DECIMAL_SIGN_NEG } else { DECIMAL_SIGN_POS };
-        }
-        return Ok(d3);
+        Ok(d3)
     }
 
     fn abs_add(d1: &[i16], d2: &[i16], d3: &mut [i16]) -> u32 {
@@ -165,8 +152,7 @@ impl BigFloat {
             d3[i] = s as i16;
             i += 1;
         }
-
-        return c;
+        c
     }
 
     // subtract absolute value of d2 from d1
@@ -198,10 +184,10 @@ mod tests {
     #[test]
     fn test_add() {
 
-        let mut d1 = BigFloat::new(); 
-        let mut d2 = BigFloat::new(); 
-        let mut d3: BigFloat; 
-        let mut ref_num = BigFloat::new();
+        let mut d1 = BigFloatNum::new(); 
+        let mut d2 = BigFloatNum::new(); 
+        let mut d3: BigFloatNum; 
+        let mut ref_num = BigFloatNum::new();
 
         //
         // addition
@@ -221,11 +207,11 @@ mod tests {
         d2.e = DECIMAL_MAX_EXPONENT;
         d1.e = DECIMAL_MAX_EXPONENT;
 
-        assert!(d1.add(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.add(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
 
         d2.sign = DECIMAL_SIGN_NEG;
         d1.sign = DECIMAL_SIGN_NEG;
-        assert!(d1.add(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.add(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_NEG));
 
         d2.e = 0;
         d1.e = 0;
@@ -254,9 +240,9 @@ mod tests {
         d3 = d1.add(&d2).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
-        d1 = BigFloat::new();
-        d2 = BigFloat::new();
-        ref_num = BigFloat::new();
+        d1 = BigFloatNum::new();
+        d2 = BigFloatNum::new();
+        ref_num = BigFloatNum::new();
         d1.m[1] = 9999;
         d2.m[1] = 9999;
         ref_num.m[1] = 9998;
@@ -287,8 +273,8 @@ mod tests {
         assert!(d3.cmp(&ref_num) == 0);
 
         // different exponents and precisions
-        d1 = BigFloat::new();
-        d2 = BigFloat::new();
+        d1 = BigFloatNum::new();
+        d2 = BigFloatNum::new();
 
         for i in 0..DECIMAL_PARTS
         {
@@ -363,11 +349,11 @@ mod tests {
         d2.n = 2;
         d1.e = DECIMAL_MAX_EXPONENT;
         d2.e = DECIMAL_MAX_EXPONENT;
-        assert!(d1.sub(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.sub(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_NEG));
 
         d2.sign = DECIMAL_SIGN_NEG;
         d1.sign = DECIMAL_SIGN_POS;
-        assert!(d1.sub(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.sub(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
 
         d1.e -= 1;
         ref_num.m.iter_mut().for_each(|x| *x = 0);
@@ -397,9 +383,9 @@ mod tests {
         d3 = d1.sub(&d2).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
-        d1 = BigFloat::new();
-        d2 = BigFloat::new();
-        ref_num = BigFloat::new();
+        d1 = BigFloatNum::new();
+        d2 = BigFloatNum::new();
+        ref_num = BigFloatNum::new();
         d1.m[1] = 9998;
         d1.m[2] = 1;
         d1.n = 9;

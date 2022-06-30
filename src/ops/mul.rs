@@ -1,6 +1,6 @@
 /// Multiplication and division.
 
-use crate::defs::BigFloat;
+use crate::defs::BigFloatNum;
 use crate::defs::Error;
 use crate::defs::DECIMAL_PARTS;
 use crate::defs::DECIMAL_BASE_LOG10;
@@ -11,14 +11,14 @@ use crate::defs::DECIMAL_SIGN_NEG;
 use crate::defs::DECIMAL_MIN_EXPONENT;
 use crate::defs::DECIMAL_MAX_EXPONENT;
 
-impl BigFloat {
+impl BigFloatNum {
 
     /// Multiply by d2 and return result of multiplication.
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - when result is too big or too small.
-    pub fn mul(&self, d2: &BigFloat) -> Result<BigFloat, Error> {
+    /// ExponentOverflow - when result is too big.
+    pub fn mul(&self, d2: &Self) -> Result<Self, Error> {
         let mut d3 = Self::new();
         let mut m: i32;
         let mut k: i32;
@@ -79,32 +79,42 @@ impl BigFloat {
             n = 0;
         }
 
-        if e > DECIMAL_MAX_EXPONENT as i32 || e < DECIMAL_MIN_EXPONENT as i32 {
-            return Err(Error::ExponentOverflow);
+        if Self::round_mantissa(&mut m3, n as i16) {
+            e += 1;
         }
 
         for i in 0..d3.m.len() {
             d3.m[i] = m3[n as usize + i];
         }
-        d3.e = e as i8;
         d3.sign = if self.sign == d2.sign || self.n == 0 {
             DECIMAL_SIGN_POS
         } else {
             DECIMAL_SIGN_NEG
         };
 
-        return Ok(d3);
+        if e < DECIMAL_MIN_EXPONENT as i32 {
+            return Ok(d3.process_subnormal(e));
+        }
+
+        if e > DECIMAL_MAX_EXPONENT as i32 {
+            return Err(Error::ExponentOverflow(d3.sign));
+        }
+
+        d3.e = e as i8;
+
+        Ok(d3)
     }
 
     /// Divide by d2 and return result of division.
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - when result is too big or too small.
+    /// ExponentOverflow - when result is too big.
     /// DivisionByZero - in case of d2 equal to zero.
-    pub fn div(&self, d2: &BigFloat) -> Result<BigFloat, Error> {
+    pub fn div(&self, d2: &Self) -> Result<Self, Error> {
         // Knuth's division
         let mut d3 = Self::new();
+        let mut m3 = [0; DECIMAL_PARTS + 1];
         let mut d: i32;
         let mut c: i16;
         let mut i: i32;
@@ -133,7 +143,7 @@ impl BigFloat {
         }
         m = (self.n as i32 - 1) / DECIMAL_BASE_LOG10 as i32;
 
-        i = DECIMAL_PARTS as i32 - 1;
+        i = DECIMAL_PARTS as i32;
         p = 1;
 
         if n == 0 {
@@ -150,7 +160,7 @@ impl BigFloat {
             while i >= 0 {
                 qh = rh * DECIMAL_BASE as i32 + if j >= 0 { self.m[j as usize] as i32 } else { 0 };
                 rh = qh % d;
-                d3.m[i as usize] = (qh / d) as i16;
+                m3[i as usize] = (qh / d) as i16;
 
                 if rh == 0 && j <= 0 {
                     break;
@@ -162,7 +172,7 @@ impl BigFloat {
 
             while i > 0 {
                 i -= 1;
-                d3.m[i as usize] = 0;
+                m3[i as usize] = 0;
             }
         } else {
             // normalize: n1 = d1 * d, n2 = d2 * d
@@ -236,8 +246,8 @@ impl BigFloat {
                     assert!(c > 0);
                 }
 
-                if i < DECIMAL_PARTS as i32 - 1 || qh > 0 {
-                    d3.m[i as usize] = qh as i16;
+                if i < DECIMAL_PARTS as i32 || qh > 0 {
+                    m3[i as usize] = qh as i16;
                     i -= 1;
                 } else {
                     p -= 1;
@@ -250,6 +260,12 @@ impl BigFloat {
             }
         }
 
+        let mut rnd_e = 0;
+        if Self::round_mantissa(&mut m3, DECIMAL_BASE_LOG10 as i16) {
+            rnd_e = 1;
+        }
+        d3.m.copy_from_slice(&m3[1..DECIMAL_PARTS+1]);
+
         // exponent
         j = 0;
         d = d3.m[DECIMAL_PARTS - 1] as i32;
@@ -260,29 +276,35 @@ impl BigFloat {
 
         e = self.e as i32
             - d2.e as i32
-            - (DECIMAL_PARTS as i32 - m + n - p) * DECIMAL_BASE_LOG10 as i32;
-
-        if e > DECIMAL_MAX_EXPONENT as i32 || e < DECIMAL_MIN_EXPONENT as i32 {
-            return Err(Error::ExponentOverflow);
-        }
-
-        d3.e = e as i8;
+            - (DECIMAL_PARTS as i32 - m + n - p) * DECIMAL_BASE_LOG10 as i32
+            + rnd_e;
 
         d3.n = DECIMAL_POSITIONS as i16 - DECIMAL_BASE_LOG10 as i16 + j as i16;
-
         d3.sign = if self.sign == d2.sign {
             DECIMAL_SIGN_POS
         } else {
             DECIMAL_SIGN_NEG
         };
 
-        return Ok(d3);
+        if e < DECIMAL_MIN_EXPONENT as i32 {
+            return Ok(d3.process_subnormal(e));
+        }
+
+        if e > DECIMAL_MAX_EXPONENT as i32 {
+            return Err(Error::ExponentOverflow(d3.sign));
+        }
+
+        d3.e = e as i8;
+
+        Ok(d3)
     }
 }
 
 
 #[cfg(test)]
 mod tests {
+
+    use crate::defs::ONE;
 
     use super::*;
 
@@ -291,13 +313,13 @@ mod tests {
 
         let mut d1;
         let mut d2;
-        let mut d3: BigFloat; 
+        let mut d3: BigFloatNum; 
         let mut ref_num;
 
         // 0 * 0
-        d1 = BigFloat::new();
-        d2 = BigFloat::new();
-        ref_num = BigFloat::new();
+        d1 = BigFloatNum::new();
+        d2 = BigFloatNum::new();
+        ref_num = BigFloatNum::new();
         d3 = d1.mul(&d2).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
@@ -384,9 +406,9 @@ mod tests {
         assert!(d3.cmp(&ref_num) == 0);
 
         // exponent modificaton and overflows
-        d1 = BigFloat::new();
-        d2 = BigFloat::new();
-        ref_num = BigFloat::new();
+        d1 = BigFloatNum::new();
+        d2 = BigFloatNum::new();
+        ref_num = BigFloatNum::new();
 
         // 5000..0 * 2
         d1.m[DECIMAL_PARTS - 1] = DECIMAL_BASE as i16 / 2;
@@ -402,7 +424,7 @@ mod tests {
         // overflow
         d2.e = 123;
         d1.e = DECIMAL_MAX_EXPONENT - d2.e;
-        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
 
         // no overflow
         d1.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/2-1;
@@ -414,10 +436,6 @@ mod tests {
         d1.e = DECIMAL_MIN_EXPONENT + 122;  // d1.e + d2.e = min_exp - 1
         assert!(d1.mul(&d2).is_ok());
 
-        // overflow with negative e
-        d1.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/2-1;
-        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow);
-
         // overflow
         d2.e = 123;
         d1.e = DECIMAL_MAX_EXPONENT - d2.e;
@@ -427,7 +445,7 @@ mod tests {
         d2.m[5] = 1;
         d1.n = 21;
         d2.n = 21;
-        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
 
         // no overflow
         d1.m[5] = 0;
@@ -446,17 +464,27 @@ mod tests {
         }
         d1.n = DECIMAL_POSITIONS as i16;
         d2.n = DECIMAL_POSITIONS as i16;
-        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.mul(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
 
 
+        // overflow with negative e: 0.0
+        d1 = ONE;
+        d1.e = DECIMAL_MIN_EXPONENT;
+        d2 = ONE;
+        d2.e = DECIMAL_MIN_EXPONENT+49;
+        assert!(d1.mul(&d2).unwrap().n == 0);
+
+        // minimum positive value (subnormal)
+        d2.e = DECIMAL_MIN_EXPONENT+50;
+        assert!(d1.mul(&d2).unwrap().n == 1);
         //
         // division
         //
 
 
-        d1 = BigFloat::new();
-        d2 = BigFloat::new();
-        ref_num = BigFloat::new();
+        d1 = BigFloatNum::new();
+        d2 = BigFloatNum::new();
+        ref_num = BigFloatNum::new();
 
         // division by zero
         assert!(d1.div(&d2).unwrap_err() == Error::DivisionByZero);
@@ -480,7 +508,8 @@ mod tests {
         d2.n = 1;
         d1.m[0] = 9998;
         d1.n = 4;
-        for i in 0..DECIMAL_PARTS-1 {
+        ref_num.m[0] = 6667;
+        for i in 1..DECIMAL_PARTS-1 {
             ref_num.m[i] = 6666;
         }
         ref_num.m[DECIMAL_PARTS - 1] = 3332;
@@ -511,7 +540,8 @@ mod tests {
         d1.n = 5;
         d2.m[0] = 33;
         d2.n = 1;
-        for i in 0..DECIMAL_PARTS-1 {
+        ref_num.m[0] = 8182;
+        for i in 1..DECIMAL_PARTS-1 {
             ref_num.m[i] = 8181;
         }
         ref_num.m[DECIMAL_PARTS - 1] = 2787;
@@ -536,9 +566,7 @@ mod tests {
         // 3333 3..3 3333 / 9999
         for i in 0..DECIMAL_PARTS {
             d1.m[i] = 3333;
-            ref_num.m[i] = if i%3 == 1 { 0 } else { 
-                if i%3 == 2 { 6667 } else { 3333 }
-            };
+            ref_num.m[i] = if i%3 == 1 { 0 } else if i%3 == 2 { 6667 } else { 3333 };
         }
         d2.m[0] = 9999;
         d2.n = 4;
@@ -566,9 +594,9 @@ mod tests {
 
 
         // division by divisor with two or more digits
-        d1 = BigFloat::new();
-        d2 = BigFloat::new();
-        ref_num = BigFloat::new();
+        d1 = BigFloatNum::new();
+        d2 = BigFloatNum::new();
+        ref_num = BigFloatNum::new();
 
         // 1111 9999 9999 9999 / 3333 3333
         d1.m[3] = 1111;
@@ -673,7 +701,7 @@ mod tests {
         ref_num.m[3] = 8752;
         ref_num.m[2] = 6244;
         ref_num.m[1] = 5626;
-        ref_num.m[0] = 5006;
+        ref_num.m[0] = 5007;
         ref_num.n = 40;
         ref_num.e = -32;
         d3 = d1.div(&d2).unwrap();
@@ -700,19 +728,25 @@ mod tests {
         ref_num.m[3] = 2541;
         ref_num.m[2] = 4698;
         ref_num.m[1] = 7492;
-        ref_num.m[0] = 9453;
+        ref_num.m[0] = 9454;
         ref_num.n = 40;
         ref_num.e = -43;
         d3 = d1.div(&d2).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
-        // overflow
+        // subnormal
         d2.e = -35;
         d1.e = DECIMAL_MIN_EXPONENT;
-        assert!(d1.div(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.div(&d2).unwrap().n == 39);
 
+        // zero
+        d2.e = -35+39;
+        d1.e = DECIMAL_MIN_EXPONENT;
+        assert!(d1.div(&d2).unwrap().n == 0);
+
+        // overflow
         d2.e = -37;
         d1.e = DECIMAL_MAX_EXPONENT;
-        assert!(d1.div(&d2).unwrap_err() == Error::ExponentOverflow);
+        assert!(d1.div(&d2).unwrap_err() == Error::ExponentOverflow(DECIMAL_SIGN_POS));
     }
 }

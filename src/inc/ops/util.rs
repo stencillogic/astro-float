@@ -1,17 +1,14 @@
 /// Utility functions.
 
-use crate::defs::BigFloatNum;
-use crate::defs::DECIMAL_MAX_EXPONENT;
+use crate::inc::inc::BigFloatInc;
 use crate::defs::DECIMAL_MIN_EXPONENT;
-use crate::defs::Error;
 use crate::defs::DECIMAL_BASE_LOG10;
-use crate::defs::DECIMAL_POSITIONS;
 use crate::defs::DECIMAL_BASE;
 use crate::defs::DECIMAL_SIGN_POS;
-use crate::defs::DECIMAL_PARTS;
-use crate::inc::inc::BigFloatInc;
+use crate::inc::inc::DECIMAL_POSITIONS;
+use crate::inc::inc::DECIMAL_PARTS;
 
-impl BigFloatNum {
+impl BigFloatInc {
 
     // compare absolute values of two big floats
     // return positive if d1 > d2, negative if d1 < d2, 0 otherwise
@@ -137,35 +134,6 @@ impl BigFloatNum {
         d3[DECIMAL_PARTS] = (m / DECIMAL_BASE as i32) as i16;
     }
 
-    // Convert to BigFloatInc.
-    pub(super) fn to_big_float_inc(d1: &Self) -> BigFloatInc {
-        let mut ret = BigFloatInc::new();
-        (&mut ret.m[0..DECIMAL_PARTS]).copy_from_slice(&d1.m);
-        ret.n = d1.n;
-        ret.e = d1.e;
-        ret.sign = d1.sign;
-        ret
-    }
-
-    // Convert from BigFloatInc.
-    pub(super) fn from_big_float_inc(d1: &mut BigFloatInc) -> Result<Self, Error> {
-        let mut ret = Self::new();
-        if d1.n == 0 {
-            return Ok(ret);
-        }
-        d1.maximize_mantissa();
-        if BigFloatInc::round_mantissa(&mut d1.m, DECIMAL_BASE_LOG10 as i16) {
-            if d1.e == DECIMAL_MAX_EXPONENT {
-                return Err(Error::ExponentOverflow(d1.sign));
-            }
-        }
-        (&mut ret.m).copy_from_slice(&d1.m[1..]);
-        ret.n = if d1.n > DECIMAL_PARTS as i16 { d1.n - DECIMAL_BASE_LOG10 as i16 } else { 0 };
-        ret.e = d1.e + DECIMAL_BASE_LOG10 as i8;
-        ret.sign = d1.sign;
-        Ok(ret)
-    }
-
     // fractional part of d1 
     pub(super) fn extract_fract_part(d1: &Self) -> Self {
         let mut fractional = Self::new();
@@ -239,6 +207,29 @@ impl BigFloatNum {
         }
         t
     }
+
+    // determine parameters for computation of trig function
+    pub(super) fn get_trig_params(x: &mut BigFloatInc, add_one: i32) -> (usize, BigFloatInc) {
+        x.maximize_mantissa();
+        let mut i = add_one - (x.n as i32 + x.e as i32);
+        let mut idx = 0;
+        let mut dx = *x;
+
+        // x = s + dx
+        if i < DECIMAL_BASE_LOG10 as i32 {
+            idx = x.m[DECIMAL_PARTS-1] as usize;
+            let mut m = 1;
+            while i > 0 {
+                idx /= 10;
+                i -= 1;
+                m *= 10;
+            }
+            dx.m[DECIMAL_PARTS-1] = x.m[DECIMAL_PARTS-1] % m;
+            dx.n = Self::num_digits(&dx.m);
+        }
+        (idx, dx)
+    }
+
 
     /// If exponent is too small try to present number in subnormal form.
     /// If not successful, then return 0.0
@@ -318,5 +309,49 @@ impl BigFloatNum {
         false
     }
 
+    /// Shift to the left as much as possibe.
+    pub fn maximize_mantissa(&mut self) {
+        if self.n < DECIMAL_POSITIONS as i16 {
+            let mut shift = DECIMAL_POSITIONS - self.n as usize;
+            if shift > (self.e as i32 - DECIMAL_MIN_EXPONENT as i32) as usize {
+                shift = (self.e - DECIMAL_MIN_EXPONENT) as usize; 
+            }
+            if shift > 0 {
+                Self::shift_left(&mut self.m, shift);
+                self.e -= shift as i8;
+                self.n += shift as i16;
+            }
+        }
+    }
+
+
+    /// Return fractional part of number with positive sign.
+    pub fn get_fractional_part(&self) -> Self {
+        let mut fractional = Self::new();
+        let e = -(self.e as i16);
+        if e >= self.n {
+            fractional = *self;
+            fractional.sign = DECIMAL_SIGN_POS;
+        } else if e > 0 {
+            let mut i = 0;
+            while i + (DECIMAL_BASE_LOG10 as i16) <= e {
+                fractional.m[i as usize / DECIMAL_BASE_LOG10] = self.m[i as usize / DECIMAL_BASE_LOG10];
+                i += DECIMAL_BASE_LOG10 as i16;
+            }
+            if i < e {
+                let mut t = 1;
+                while i < e {
+                    t *= 10;
+                    i += 1;
+                }
+                fractional.m[i as usize / DECIMAL_BASE_LOG10] += self.m[i as usize / DECIMAL_BASE_LOG10 as usize] % t;
+            }
+            fractional.n = Self::num_digits(&fractional.m);
+            if fractional.n > 0 {
+                fractional.e = self.e;
+            }
+        }
+        fractional
+    }
 }
 

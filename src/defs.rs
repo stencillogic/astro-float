@@ -5,7 +5,7 @@ pub const DECIMAL_PARTS: usize = 10;
 
 /// Number representation.
 #[derive(Copy, Clone, Debug)]
-pub struct BigFloat {
+pub struct BigFloatNum {
     pub (crate) sign: i8,                // sign
     pub (crate) e: i8,                   // exponent
     pub (crate) n: i16,                  // the number of decimal positions in the mantissa excluding leading zeroes
@@ -13,10 +13,11 @@ pub struct BigFloat {
 }
 
 /// Possible errors.
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum Error {
-    /// Exponent value becomes greater than the upper bound or smaller than the lower bound for exponent value.
-    ExponentOverflow,   
+    /// Exponent value becomes greater than the upper bound.
+    /// Error stores sign of resulting number.
+    ExponentOverflow(i8),
 
     /// Divizor is zero.
     DivisionByZero,     
@@ -36,12 +37,35 @@ pub const DECIMAL_SIGN_POS: i8 = 1;         // + sign
 pub const DECIMAL_SIGN_NEG: i8 = -1;        // - sign
 pub const DECIMAL_MIN_EXPONENT: i8 = -128;  // min exponent value
 pub const DECIMAL_MAX_EXPONENT: i8 = 127;   // max exponent value
-pub const DECIMAL_MAX_EXPONENT_POSITIONS: i16 = 3;  // max decimal positions in exponent
 pub const ZEROED_MANTISSA: [i16; DECIMAL_PARTS] = [0; DECIMAL_PARTS];
 
 
+/// Zero.
+pub const ZERO: BigFloatNum = BigFloatNum {
+    m: ZEROED_MANTISSA,
+    n: 0, 
+    sign: DECIMAL_SIGN_POS, 
+    e: 0,
+};
+
+/// One.
+pub const ONE: BigFloatNum = BigFloatNum {
+    m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1000],
+    n: DECIMAL_POSITIONS as i16, 
+    sign: DECIMAL_SIGN_POS, 
+    e: 1 - (DECIMAL_POSITIONS as i8),
+};
+
+/// Two.
+pub const TWO: BigFloatNum = BigFloatNum {
+    m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 2000],
+    n: DECIMAL_POSITIONS as i16, 
+    sign: DECIMAL_SIGN_POS, 
+    e: 1 - (DECIMAL_POSITIONS as i8),
+};
+
 /// Eulers number.
-pub const E: BigFloat = BigFloat {
+pub const E: BigFloatNum = BigFloatNum {
     m: [7757, 6249, 3526, 7471, 6028, 2353, 9045, 2845, 2818, 2718],
     n: DECIMAL_POSITIONS as i16, 
     sign: DECIMAL_SIGN_POS, 
@@ -49,25 +73,49 @@ pub const E: BigFloat = BigFloat {
 };
 
 /// Pi number.
-pub const PI: BigFloat = BigFloat {
-    m: [4197, 0288, 2795, 3383, 6264, 2384, 9793, 5358, 5926, 3141],
+pub const PI: BigFloatNum = BigFloatNum {
+    m: [4197, 288, 2795, 3383, 6264, 2384, 9793, 5358, 5926, 3141],
     n: DECIMAL_POSITIONS as i16, 
     sign: DECIMAL_SIGN_POS, 
     e: 1 - (DECIMAL_POSITIONS as i8),
 };
 
+/// Largest value possible.
+pub const MAX: BigFloatNum = BigFloatNum {
+    m: [9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999,],
+    n: DECIMAL_POSITIONS as i16, 
+    sign: DECIMAL_SIGN_POS, 
+    e: DECIMAL_MAX_EXPONENT,
+};
+
+/// Smalles value possible.
+pub const MIN: BigFloatNum = BigFloatNum {
+    m: [9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999, 9999,],
+    n: DECIMAL_POSITIONS as i16, 
+    sign: DECIMAL_SIGN_NEG, 
+    e: DECIMAL_MAX_EXPONENT,
+};
+
+/// Smalles positive number.
+pub const MIN_POSITIVE: BigFloatNum = BigFloatNum {
+    m: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0,],
+    n: 1, 
+    sign: DECIMAL_SIGN_POS, 
+    e: DECIMAL_MIN_EXPONENT,
+};
+
 
 /// Creation and number manipulation functions.
-impl BigFloat {
+impl BigFloatNum {
 
     /// Return new BigFloat with value zero.
     pub fn new() -> Self {
-        return BigFloat {
+        BigFloatNum {
             sign: DECIMAL_SIGN_POS,
             e: 0,
             n: 0,
             m: ZEROED_MANTISSA,
-        };
+        }
     }
     
     /// Return BigFloat with the value of 1.
@@ -76,16 +124,7 @@ impl BigFloat {
         val.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/10;
         val.n = DECIMAL_POSITIONS as i16;
         val.e = 1 - DECIMAL_POSITIONS as i8;
-        return val;
-    }
-
-    /// Return new BigFloat with value two.
-    pub fn two() -> Self {
-        let mut val = Self::new();
-        val.m[DECIMAL_PARTS-1] = DECIMAL_BASE as i16/5;
-        val.n = DECIMAL_POSITIONS as i16;
-        val.e = 1 - DECIMAL_POSITIONS as i8;
-        return val;
+        val
     }
 
     /// Create a BigFloat value from a sequence of `bytes`. Each byte must represent a decimal digit.
@@ -93,7 +132,7 @@ impl BigFloat {
     /// `bytes` is greater than required, then the remaining part is ignored.
     /// If `sign` is negative, then the resulting BigFloat will be
     /// negative.
-    pub fn from_bytes(bytes: &[u8], sign: i8, exponent: i8) -> BigFloat {
+    pub fn from_bytes(bytes: &[u8], sign: i8, exponent: i8) -> BigFloatNum {
         let mut mantissa = ZEROED_MANTISSA;
         let mut n: usize = 0;
         let mut p: i16 = 1;
@@ -107,28 +146,35 @@ impl BigFloat {
             }
         }
 
-        return BigFloat {
+        BigFloatNum {
             sign: if sign >= 0 { DECIMAL_SIGN_POS } else { DECIMAL_SIGN_NEG },
             e: exponent,
             n: d as i16,
             m: mantissa,
-        };
+        }
     }
 
     /// Construct BigFloat from f64.
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - when result is too big or too small.
+    /// ExponentOverflow - when result is too big.
     pub fn from_f64(mut f: f64) -> Result<Self, Error> {
         let mut e: i32 = 0;
-        let mut ret = BigFloat::new();
+        let mut ret = BigFloatNum::new();
         if f == 0f64 {
             return Ok(ret);
         }
-        if f == f64::INFINITY || f == f64::NAN {
-            return Err(Error::ExponentOverflow);
-        } 
+        if f.is_infinite() {
+            return Err(Error::ExponentOverflow(if f.is_sign_positive() {
+                DECIMAL_SIGN_POS
+            } else {
+                DECIMAL_SIGN_NEG
+            }));
+        }
+        if f.is_nan() {
+            return Err(Error::InvalidArgument);
+        }
         if f < 0f64 {
             ret.sign = DECIMAL_SIGN_NEG;
             f = -f;
@@ -148,21 +194,25 @@ impl BigFloat {
         loop {
             f *= DECIMAL_BASE as f64;
             let d = f as i16;
-            f = f - d as f64;
+            f -= d as f64;
             ret.m[p] = d;
             p -= 1;
             if f == 0f64 || p == 0 {
                 break;
             }
         }
-        
+
         e -= DECIMAL_POSITIONS as i32;
-        if e < DECIMAL_MIN_EXPONENT as i32 || e > DECIMAL_MAX_EXPONENT as i32 {
-            return Err(Error::ExponentOverflow);
+        if e < DECIMAL_MIN_EXPONENT as i32 {
+            return Ok(ret.process_subnormal(e));
+        }
+
+        if e > DECIMAL_MAX_EXPONENT as i32 {
+            return Err(Error::ExponentOverflow(ret.sign));
         }
         ret.e = e as i8;
 
-        return Ok(ret);
+        Ok(ret)
     }
 
     /// Convert BigFloat to f64.
@@ -172,7 +222,7 @@ impl BigFloat {
             f += self.m[i] as f64;
             f /= DECIMAL_BASE as f64;
         }
-        let mut e = self.n + self.e as i16;
+        let mut e = DECIMAL_POSITIONS as i32 + self.e as i32;
         while e < 0 {
             f /= 10f64;
             e += 1;
@@ -184,14 +234,14 @@ impl BigFloat {
         if self.sign == DECIMAL_SIGN_NEG {
             f = -f;
         }
-        return f;
+        f
     }
 
     /// Construct BigFloat from f32. Wrapper for from_f64.
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - when result is too big or too small.
+    /// ExponentOverflow - when result is too big.
     pub fn from_f32(f: f32) -> Result<Self, Error> {
         Self::from_f64(f as f64)
     }
@@ -225,29 +275,33 @@ impl BigFloat {
         self.n as usize
     }
 
-    /// Return 1 if BigFloat is positive, -1 otherwise.
-    pub fn get_sign(&self) -> i8 {
-        self.sign
+    /// Return true if the number is zero.
+    pub fn is_zero(&self) -> bool {
+        self.n == 0
     }
 
-    /// Return exponent part.
-    pub fn get_exponent(&self) -> i8 {
-        self.e
+    /// Return true if integer part of number is zero.
+    pub fn is_int_even(&self) -> bool {
+        let int = self.int();
+        if int.e < 0 {
+            let p = int.n + int.e as i16;
+            let mut d = int.m[p as usize / DECIMAL_BASE_LOG10];
+            let mut i = p % DECIMAL_BASE_LOG10 as i16;
+            while i > 0 {
+                d /= 10;
+                i -= 1;
+            }
+            d & 1 == 0
+        } else if int.e == 0 {
+            int.m[0] & 1 == 0
+        } else {
+            true
+        }
     }
 
-    /// Return raw parts of BigFloat: mantissa, number of decimal positions in mantissa, sing, and
-    /// exponent.
-    pub fn to_raw_parts(&self) -> ([i16; DECIMAL_PARTS], i16, i8, i8) {
-        (self.m, self.n, self.sign, self.e)
-    }
-
-    /// Construct BigFloat from raw parts.
-    pub fn from_raw_parts(mantissa: [i16; DECIMAL_PARTS], mantissa_len: i16, sign: i8, exponent: i8) -> Self {
-        return BigFloat {
-            sign: sign,
-            e: exponent,
-            n: mantissa_len,
-            m: mantissa,
-        };
+    /// Returns true if `self` is subnormal.
+    pub fn is_subnormal(&self) -> bool {
+        self.n < DECIMAL_POSITIONS as i16 &&
+        self.e == DECIMAL_MIN_EXPONENT
     }
 }

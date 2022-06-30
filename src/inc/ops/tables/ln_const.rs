@@ -1,4 +1,4 @@
-use crate::increased::BigFloatInc;
+use crate::inc::inc::BigFloatInc;
 
 // sin(s)
 pub(crate) const LN_VALUES: [BigFloatInc; 8182] = [

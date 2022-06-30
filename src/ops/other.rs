@@ -1,6 +1,6 @@
 /// Other operations.
 
-use crate::defs::BigFloat;
+use crate::defs::BigFloatNum;
 use crate::defs::Error;
 use crate::defs::DECIMAL_PARTS;
 use crate::defs::DECIMAL_BASE_LOG10;
@@ -9,22 +9,33 @@ use crate::defs::DECIMAL_SIGN_POS;
 use crate::defs::DECIMAL_SIGN_NEG;
 use crate::defs::DECIMAL_MAX_EXPONENT;
 
-impl BigFloat {
+impl BigFloatNum {
 
     /// Return absolute value. 
-    pub fn abs(&self) -> BigFloat {
+    pub fn abs(&self) -> Self {
         let mut ret = *self;
         if ret.sign == DECIMAL_SIGN_NEG {
             ret.sign = DECIMAL_SIGN_POS;
         }
-        return ret;
+        ret
+    }
+
+    /// Return absolute value. 
+    pub fn inv_sign(&self) -> Self {
+        let mut ret = *self;
+        if ret.sign == DECIMAL_SIGN_NEG {
+            ret.sign = DECIMAL_SIGN_POS;
+        } else {
+            ret.sign = DECIMAL_SIGN_NEG;
+        }
+        ret
     }
 
     /// Returns the largest integer less than or equal to a number.
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - when result is too big or too small.
+    /// ExponentOverflow - when result is too big.
     pub fn floor(&self) -> Result<Self, Error> {
         self.floor_ceil(DECIMAL_SIGN_POS)
     }
@@ -33,7 +44,7 @@ impl BigFloat {
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - when result is too big or too small.
+    /// ExponentOverflow - when result is too big.
     pub fn ceil(&self) -> Result<Self, Error> {
         self.floor_ceil(DECIMAL_SIGN_NEG)
     }
@@ -43,7 +54,7 @@ impl BigFloat {
     pub fn frac(&self) -> Self {
         let mut ret = Self::extract_fract_part(self);
         ret.sign = self.sign;
-        return ret;
+        ret
     }
 
     /// Return integer part of a number,
@@ -51,10 +62,11 @@ impl BigFloat {
     pub fn int(&self) -> Self {
         let mut ret = Self::extract_int_part(self);
         ret.sign = self.sign;
-        return ret;
+        ret
     }
 
     /// Returns the rounded number with `n` decimal positions in the fractional part of the number.
+    /// Round half away from 0.
     pub fn round(&self, n: usize) -> Result<Self, Error> {
         let mut ret = *self;
         let e = (-self.e) as usize;
@@ -85,19 +97,19 @@ impl BigFloat {
                     i += 1;
                 }
                 if ret.e == DECIMAL_MAX_EXPONENT {
-                    return Err(Error::ExponentOverflow);
+                    return Err(Error::ExponentOverflow(ret.sign));
                 }
                 ret.e += 1;
                 Self::shift_right(&mut ret.m, 1);
                 ret.m[DECIMAL_PARTS - 1] += DECIMAL_BASE as i16 / 10;
             }
         }
-        return Ok(ret);
+        Ok(ret)
     }
 
     /// Compare to d2.
     /// Returns positive if self > d2, negative if self < d2, 0 otherwise.
-    pub fn cmp(&self, d2: &BigFloat) -> i16 {
+    pub fn cmp(&self, d2: &Self) -> i16 {
         if self.sign != d2.sign {
             return self.sign as i16;
         }
@@ -114,10 +126,10 @@ impl BigFloat {
 
         let diff: i32 = self.e as i32 + self.n as i32 - d2.e as i32 - d2.n as i32;
         if diff > 0 {
-            return 1;
+            return self.sign as i16;
         }
         if diff < 0 {
-            return -1;
+            return -self.sign as i16;
         }
 
         if self.n != d2.n {
@@ -186,7 +198,7 @@ impl BigFloat {
             }
             n2 -= 1;
         }
-        return 0;
+        0
     }
 
     // floor and ceil computation
@@ -207,7 +219,7 @@ impl BigFloat {
                 return int.sub(&one);
             }
         }
-        return Ok(int);
+        Ok(int)
     }
 
     // round n positions in a single digit
@@ -228,7 +240,7 @@ impl BigFloat {
         if n == DECIMAL_BASE_LOG10 {
             return (0, if DECIMAL_BASE as i16/2 <= ret {1} else {0});
         }
-        return (ret, 0)
+        (ret, 0)
     }
 }
 
@@ -242,9 +254,9 @@ mod tests {
 
     #[test]
     fn test_other() {
-        let mut d1 = BigFloat::new(); 
-        let mut d2 = BigFloat::new(); 
-        let one = BigFloat::one();
+        let mut d1 = BigFloatNum::new(); 
+        let mut d2 = BigFloatNum::new(); 
+        let one = BigFloatNum::one();
 
         //
         // cmp
@@ -294,7 +306,7 @@ mod tests {
         // abs
         //
 
-        d1 = BigFloat::new();
+        d1 = BigFloatNum::new();
         d1.sign = DECIMAL_SIGN_NEG;
         assert!(d1.abs().sign == DECIMAL_SIGN_POS);
         d1.sign = DECIMAL_SIGN_POS;
@@ -306,12 +318,12 @@ mod tests {
         //
 
         // 0
-        d1 = BigFloat::new();
+        d1 = BigFloatNum::new();
         assert!(d1.floor().unwrap().cmp(&d1) == 0);
         assert!(d1.ceil().unwrap().cmp(&d1) == 0);
 
         // positive
-        d1 = BigFloat::new();
+        d1 = BigFloatNum::new();
         d1.m[0] = 4560;
         d1.m[1] = 123;
         d1.m[2] = 6789;
@@ -324,7 +336,7 @@ mod tests {
         d1.m[9] = 1234;
         d1.n = DECIMAL_POSITIONS as i16;
         d1.e = -38;
-        d2 = BigFloat::new();
+        d2 = BigFloatNum::new();
         d2.m[9] = 1200;
         d2.n = DECIMAL_POSITIONS as i16;
         d2.e = -38;
@@ -334,7 +346,7 @@ mod tests {
         d1.e = -40;
         assert!(d1.floor().unwrap().n == 0);
         assert!(d1.ceil().unwrap().cmp(&one) == 0);
-        d1 = BigFloat::new();
+        d1 = BigFloatNum::new();
         d1.m[9] = 130;
         d1.n = DECIMAL_POSITIONS as i16-1;
         d1.e = -36;
@@ -342,13 +354,13 @@ mod tests {
         assert!(d1.floor().unwrap().cmp(&d1) == 0);
 
         // negative
-        d1 = BigFloat::new();
+        d1 = BigFloatNum::new();
         d1.m[8] = 10;
         d1.m[9] = 1234;
         d1.n = DECIMAL_POSITIONS as i16;
         d1.e = -38;
         d1.sign = DECIMAL_SIGN_NEG;
-        d2 = BigFloat::new();
+        d2 = BigFloatNum::new();
         d2.m[9] = 1300;
         d2.n = DECIMAL_POSITIONS as i16;
         d2.sign = DECIMAL_SIGN_NEG;
@@ -361,7 +373,7 @@ mod tests {
         d2.sign = DECIMAL_SIGN_NEG;
         assert!(d1.floor().unwrap().cmp(&d2) == 0);
         assert!(d1.ceil().unwrap().n == 0);
-        d1 = BigFloat::new();
+        d1 = BigFloatNum::new();
         d1.m[9] = 130;
         d1.n = DECIMAL_POSITIONS as i16-1;
         d1.e = -36;
@@ -375,7 +387,7 @@ mod tests {
         //
 
         // frac: no fractional
-        d1 = BigFloat::new();
+        d1 = BigFloatNum::new();
         d1.m[8] = 4567;
         d1.m[9] = 123;
         d1.n = DECIMAL_POSITIONS as i16-1;
@@ -387,7 +399,7 @@ mod tests {
 
         // frac: some fractional
         d1.e = -37;
-        d2 = BigFloat::new();
+        d2 = BigFloatNum::new();
         d2.m[8] = 7000;
         d2.m[9] = 3456;
         d2.e = -40;
@@ -406,7 +418,7 @@ mod tests {
 
 
         // int: no fractional
-        d1 = BigFloat::new();
+        d1 = BigFloatNum::new();
         d1.m[8] = 4567;
         d1.m[9] = 123;
         d1.n = DECIMAL_POSITIONS as i16-1;
@@ -423,7 +435,7 @@ mod tests {
         // int: some fractional
         d1.sign = DECIMAL_SIGN_POS;
         d1.e = -37;
-        d2 = BigFloat::new();
+        d2 = BigFloatNum::new();
         d2.m[9] = 1200;
         d2.e = -38;
         d2.n = 40;
@@ -440,7 +452,7 @@ mod tests {
         // round
         //
 
-        d1 = BigFloat::new();
+        d1 = BigFloatNum::new();
         d1.m[7] = 1234;
         d1.m[8] = 4527;
         d1.m[9] = 123;
@@ -471,7 +483,7 @@ mod tests {
         d2.sign = DECIMAL_SIGN_NEG;
         d1.sign = DECIMAL_SIGN_NEG;
         assert!(d1.round(0).unwrap().cmp(&d2) == 0);
-        d1 = BigFloat::new();
+        d1 = BigFloatNum::new();
         d1.m[9] = 1234;
         d1.n = 39;
         d1.e = 10;
@@ -482,7 +494,7 @@ mod tests {
         }
         d1.n = DECIMAL_POSITIONS as i16;
         d1.e = -10;
-        d2 = BigFloat::one();
+        d2 = BigFloatNum::one();
         d2.e = -9;
         assert!(d1.round(2).unwrap().cmp(&d2) == 0);
     }
