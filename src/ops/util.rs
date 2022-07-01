@@ -28,7 +28,7 @@ impl BigFloatNum {
 
 
     // shift m to the right by n digits
-    pub(super) fn shift_right(m: &mut [i16], mut n: usize) {
+    pub(crate) fn shift_right(m: &mut [i16], mut n: usize) {
         assert!(n > 0 && n <= DECIMAL_POSITIONS);
 
         let mut s: i16;
@@ -103,7 +103,7 @@ impl BigFloatNum {
     }
 
     // return number of digits taken in mantissa
-    pub(super) fn num_digits(m: &[i16]) -> i16 {
+    pub(crate) fn num_digits(m: &[i16]) -> i16 {
         let mut n: i16 = DECIMAL_POSITIONS as i16;
         let mut t: i16;
         let mut p: i16 = DECIMAL_PARTS as i16 - 1;

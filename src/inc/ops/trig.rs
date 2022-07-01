@@ -16,7 +16,7 @@ const HALF_PI: BigFloatInc = BigFloatInc {
     sign: DECIMAL_SIGN_POS, 
     e: -43,
 };
-const PI2: BigFloatInc = BigFloatInc {
+const PI: BigFloatInc = BigFloatInc {
     m: [1694, 4197, 288, 2795, 3383, 6264, 2384, 9793, 5358, 5926, 3141],
     n: 44, 
     sign: DECIMAL_SIGN_POS, 
@@ -57,11 +57,11 @@ impl BigFloatInc {
 
         // determine quadrant
         let mut quadrant = 0;
-        x = x.div(&PI2)?;
+        x = x.div(&PI)?;
         let fractional = x.get_fractional_part();
-        x = PI2.mul(&fractional)?;
+        x = PI.mul(&fractional)?;
         while x.cmp(&HALF_PI) > 0 {
-            x = PI2.sub(&x)?;
+            x = PI.sub(&x)?;
             quadrant = 1;
         }
         let (idx, mut dx) = Self::get_trig_params(&mut x, 1);
@@ -190,9 +190,9 @@ impl BigFloatInc {
 
         // determine quadrant
         let mut quadrant = q;
-        x = x.div(&PI2)?;
+        x = x.div(&PI)?;
         let fractional = x.get_fractional_part();
-        x = PI2.mul(&fractional)?;
+        x = PI.mul(&fractional)?;
         while x.cmp(&HALF_PI) > 0 {
             x = x.sub(&HALF_PI)?;
             quadrant += 1;

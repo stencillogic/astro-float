@@ -149,10 +149,11 @@ impl BigFloatNum {
         BigFloatNum {
             sign: if sign >= 0 { DECIMAL_SIGN_POS } else { DECIMAL_SIGN_NEG },
             e: exponent,
-            n: d as i16,
+            n: Self::num_digits(&mantissa),
             m: mantissa,
         }
     }
+
 
     /// Construct BigFloat from f64.
     ///
@@ -215,6 +216,15 @@ impl BigFloatNum {
         Ok(ret)
     }
 
+    /// Construct BigFloat from f32. Wrapper for from_f64.
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big.
+    pub fn from_f32(f: f32) -> Result<Self, Error> {
+        Self::from_f64(f as f64)
+    }
+
     /// Convert BigFloat to f64.
     pub fn to_f64(&self) -> f64 {
         let mut f: f64 = 0f64;
@@ -235,15 +245,6 @@ impl BigFloatNum {
             f = -f;
         }
         f
-    }
-
-    /// Construct BigFloat from f32. Wrapper for from_f64.
-    ///
-    /// # Errors
-    ///
-    /// ExponentOverflow - when result is too big.
-    pub fn from_f32(f: f32) -> Result<Self, Error> {
-        Self::from_f64(f as f64)
     }
 
     /// Convert BigFloat to f32. Wrapper for to_f64

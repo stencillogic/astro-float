@@ -88,6 +88,33 @@ impl BigFloat {
         }
     }
 
+    /// Construct BigFloat from f64 value.
+    /// The conversion is not guaranteed to be lossless, since BigFloat and f64 have different radix.
+    pub fn from_f64(f: f64) -> Self {
+        #[cfg(feature = "std")] {
+            let strepr = format!("{:e}", f);
+            Self::parse(&strepr).unwrap()
+        }
+        #[cfg(not(feature = "std"))] {
+            let inner = match BigFloatNum::from_f64(f) {
+                Err(e) => match e {
+                    Error::ExponentOverflow(s) => Flavor::Inf(s),
+                    _ => Flavor::NaN,
+                },
+                Ok(v) => Flavor::Value(v),
+            };
+            BigFloat {
+                inner
+            }
+        }
+    }
+
+    /// Construct BigFloat from f32 value.
+    /// The conversion is not guaranteed to be lossless, since BigFloat and f32 have different radix.
+    pub fn from_f32(f: f32) -> Self {
+        Self::from_f64(f as f64)
+    }
+
     /// Convert BigFloat to f64.
     pub fn to_f64(&self) -> f64 {
         match self.inner {
@@ -151,6 +178,16 @@ impl BigFloat {
         match self.inner {
             Flavor::Value(v) => v.e,
             _ => 0,
+        }
+    }
+
+
+    /// Sets exponent part of `self`.
+    /// Function has no effect on Inf and NaN values.
+    pub fn set_exponent(&mut self, e: i8) {
+        if let Flavor::Value(mut v) = self.inner { 
+            v.e = e;
+            self.inner = Flavor::Value(v);
         }
     }
 
@@ -497,7 +534,8 @@ impl BigFloat {
         }
     }
 
-    /// Returns true if `self` is subnormal.
+    /// Returns true if `self` is subnormal. 
+    /// Number is considered subnormal if not all places of mantissa are used, and exponent has minimum possible value.
     pub fn is_subnormal(&self) -> bool {
         if let Flavor::Value(v) = self.inner {
             return v.is_subnormal()
@@ -513,29 +551,64 @@ impl BigFloat {
             Flavor::NaN => false,
         }
     }
-}
 
 
-
-// wrapper function creator
-macro_rules! gen_wrapper1 {
-    // unwrap error
-    ($comment:literal, $fname:ident, $ret:ty, $($arg:ident, $arg_type:ty),*) => {
-        #[doc=$comment]
-        pub fn $fname($($arg: $arg_type,)*) -> $ret {
-            let inner = match BigFloatNum::$fname($($arg,)*) {
-                Err(e) => match e {
-                    Error::ExponentOverflow(s) => Flavor::Inf(s),
-                    _ => Flavor::NaN,
-                },
-                Ok(v) => Flavor::Value(v),
-            };
-            BigFloat {
-                inner
+    /// Parse the number from string `s`. 
+    /// Function expects `s` to be a number in scientific format with base 10, or +-Inf, or NaN.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use num_bigfloat::BigFloat;
+    /// 
+    /// let n = BigFloat::parse("0.0").unwrap();
+    /// assert!(n.to_f64() == 0.0);
+    /// let n = BigFloat::parse("1.123e-123").unwrap();
+    /// assert!((n.to_f64() - 1.123e-123).abs() < f64::EPSILON);
+    /// let n = BigFloat::parse("-Inf").unwrap();
+    /// assert!(n.to_f64() == f64::NEG_INFINITY);
+    /// let n = BigFloat::parse("NaN").unwrap();
+    /// assert!(n.to_f64().is_nan());
+    /// ```
+    #[cfg(feature = "std")]
+    pub fn parse(s: &str) -> Option<Self> {
+        let ps = crate::parser::parse(s);
+        if ps.is_valid() {
+            if ps.is_inf() {
+                if ps.sign() == DECIMAL_SIGN_POS {
+                    Some(INF_POS)
+                } else {
+                    Some(INF_NEG)
+                }
+            } else if ps.is_nan() {
+                Some(NAN)
+            } else {
+                let (m, _n, s, e) = ps.raw_parts();
+                let mut num = BigFloatNum::from_bytes(&m, s, 0);
+                if num.n == 0 {
+                    return Some(ZERO);
+                }
+                if e < DECIMAL_MIN_EXPONENT as i32 {
+                    if e > DECIMAL_MIN_EXPONENT as i32 - num.n as i32 {
+                        BigFloatNum::shift_right(&mut num.m, (DECIMAL_MIN_EXPONENT as i32 - e) as usize);
+                        num.n = (num.n as i32 - DECIMAL_MIN_EXPONENT as i32 + e) as i16;
+                        num.e = DECIMAL_MIN_EXPONENT;
+                    } else {
+                        return Some(ZERO);
+                    }
+                } else if e > DECIMAL_MAX_EXPONENT as i32 {
+                    return Some(BigFloat {inner: Flavor::Inf(s)});
+                } else {
+                    num.e = e as i8;
+                }
+                Some(BigFloat {inner: Flavor::Value(num)})
             }
+        } else {
+            None
         }
-    };
+    }
 }
+
 
 macro_rules! gen_wrapper2 {
     // unwrap error, function requires self as argument
@@ -569,8 +642,6 @@ macro_rules! gen_wrapper4 {
 }
 
 impl BigFloat {
-    gen_wrapper1!("Construct BigFloat from f32.", from_f32, Self, f, f32);
-    gen_wrapper1!("Construct BigFloat from f64.", from_f64, Self, f, f64);
     
     gen_wrapper4!("Return absolute value.", abs, Self, {Flavor::Inf(DECIMAL_SIGN_POS)}, {Flavor::Inf(DECIMAL_SIGN_POS)},);
     gen_wrapper4!("Return integer part of a number,", int, Self, {Flavor::NaN}, {Flavor::NaN},);
@@ -1107,9 +1178,9 @@ mod tests {
         assert!(ONE == TWO/TWO);
 
         let d1 = BigFloat::from_f64(0.0123456789);
-        assert!(format!("{}", d1.round(10)) == "1.234567890000000000000000000000000000000e-2");
+        assert!(format!("{}", d1) == "1.234567890000000000000000000000000000000e-2");
         let d1 = BigFloat::from_f64(-123.456789);
-        assert!(format!("{}", d1.round(6)) == "-1.234567890000000000000000000000000000000e+2");
+        assert!(format!("{}", d1) == "-1.234567890000000000000000000000000000000e+2");
         assert!(format!("{}", INF_POS) == "Inf");
         assert!(format!("{}", INF_NEG) == "-Inf");
         assert!(format!("{}", NAN) == "NaN");
