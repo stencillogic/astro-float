@@ -83,7 +83,7 @@ mod tests {
         DECIMAL_SIGN_POS, 
         DECIMAL_MIN_EXPONENT, 
         DECIMAL_MAX_EXPONENT, 
-        DECIMAL_POSITIONS,
+        DECIMAL_POSITIONS, DECIMAL_BASE, DECIMAL_PARTS, DECIMAL_SIGN_NEG,
     };
 
 
@@ -342,15 +342,52 @@ mod tests {
         assert!(d1.abs().to_f64() == 12.3);
         d1 = BigFloat::from_f64(-12.3);
         assert!(d1.abs().to_f64() == 12.3);
+
+        // sqrt
+        for _ in 0..10000 {
+            let num = random_normal_float(256, 128).abs();
+            let sq = num.sqrt();
+            let ret = sq.mul(&sq);
+            assert!(num.sub(&ret).abs().get_mantissa_len() < 2);
+        }
+
+        // pow
+        for _ in 0..10000 {
+            let a = random_normal_float(4, 40).abs();
+            let n = random_normal_float(4, 40).abs();
+            let inv = ONE.div(&n);
+            let p = a.pow(&n);
+            if  !p.is_inf() && p.get_mantissa_len() >= DECIMAL_POSITIONS - 1 {
+                let ret = p.pow(&inv);
+                assert!(a.sub(&ret).abs().get_mantissa_len() <= 2);
+            }
+        }
+
     }
 
-    fn random_f64_exp(max_exp: i32, min_exp: i32) -> f64 {
+    fn random_f64_exp(exp_range: i32, exp_shift: i32) -> f64 {
         let mut f: f64 = random();
-        f = f.powi(random::<i32>().abs() % max_exp - min_exp);
+        f = f.powi(random::<i32>().abs() % exp_range - exp_shift);
         if random::<i8>() & 1 == 0 {
             f = -f;
         }
         f
+    }
+
+    fn random_normal_float(exp_range: i32, exp_shift: i32) -> BigFloat {
+        let mut mantissa = [0i16; DECIMAL_PARTS];
+        for i in 0..DECIMAL_PARTS {
+            mantissa[i] = (random::<u16>() % DECIMAL_BASE as u16) as i16;
+        }
+        if mantissa[DECIMAL_PARTS-1] == 0 {
+            mantissa[DECIMAL_PARTS-1] = (DECIMAL_BASE-1) as i16;
+        }
+        while mantissa[DECIMAL_PARTS-1] / 1000 == 0 {
+            mantissa[DECIMAL_PARTS-1] *= 10;
+        }
+        let sign = if random::<i8>() & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
+        let exp = random::<i32>().abs() % exp_range - exp_shift;
+        BigFloat::from_raw_parts(mantissa, DECIMAL_POSITIONS as i16, sign, exp as i8)
     }
 
 }

@@ -278,7 +278,7 @@ impl BigFloatInc {
                     m[i] = 0;
                 }
                 i = i1;
-                if i < DECIMAL_PARTS {
+                if i < m.len() {
                     if m[i] / t2 + 1 < DECIMAL_BASE as i16 / t2 {
                         m[i] = (m[i] / t2 + 1) * t2;
                         return false;
@@ -289,7 +289,7 @@ impl BigFloatInc {
 
                 // process overflows
                 i += 1;
-                while i < DECIMAL_PARTS {
+                while i < m.len() {
                     if m[i] < DECIMAL_BASE as i16 - 1 {
                         m[i] += 1;
                         return false;
@@ -298,7 +298,7 @@ impl BigFloatInc {
                     }
                     i += 1;
                 }
-                m[DECIMAL_PARTS - 1] = DECIMAL_BASE as i16 / 10;
+                m[m.len() - 1] = DECIMAL_BASE as i16 / 10;
                 return true;
             } else {
                 // just remove trailing digits

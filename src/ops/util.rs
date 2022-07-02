@@ -157,10 +157,15 @@ impl BigFloatNum {
         if BigFloatInc::round_mantissa(&mut d1.m, DECIMAL_BASE_LOG10 as i16) {
             if d1.e == DECIMAL_MAX_EXPONENT {
                 return Err(Error::ExponentOverflow(d1.sign));
+            } else {
+                d1.e += 1;
             }
         }
         (&mut ret.m).copy_from_slice(&d1.m[1..]);
-        ret.n = if d1.n > DECIMAL_PARTS as i16 { d1.n - DECIMAL_BASE_LOG10 as i16 } else { 0 };
+        ret.n = Self::num_digits(&ret.m);
+        if d1.e > DECIMAL_MAX_EXPONENT - DECIMAL_BASE_LOG10 as i8 {
+            return Err(Error::ExponentOverflow(d1.sign));
+        }
         ret.e = d1.e + DECIMAL_BASE_LOG10 as i8;
         ret.sign = d1.sign;
         Ok(ret)
@@ -287,7 +292,7 @@ impl BigFloatNum {
                     m[i] = 0;
                 }
                 i = i1;
-                if i < DECIMAL_PARTS {
+                if i < m.len() {
                     if m[i] / t2 + 1 < DECIMAL_BASE as i16 / t2 {
                         m[i] = (m[i] / t2 + 1) * t2;
                         return false;
@@ -298,7 +303,7 @@ impl BigFloatNum {
 
                 // process overflows
                 i += 1;
-                while i < DECIMAL_PARTS {
+                while i < m.len() {
                     if m[i] < DECIMAL_BASE as i16 - 1 {
                         m[i] += 1;
                         return false;
@@ -307,7 +312,7 @@ impl BigFloatNum {
                     }
                     i += 1;
                 }
-                m[DECIMAL_PARTS - 1] = DECIMAL_BASE as i16 / 10;
+                m[m.len() - 1] = DECIMAL_BASE as i16 / 10;
                 return true;
             } else {
                 // just remove trailing digits

@@ -102,14 +102,21 @@ impl BigFloatInc {
     /// InvalidArgument - when |`self`| > 1.
     pub fn asin(&self) -> Result<Self, Error> {
         let one = Self::one();
-        if self.abs().cmp(&one) > 0 {
+        let cmp_to_one = self.abs().cmp(&one);
+        if cmp_to_one > 0 {
             return Err(Error::InvalidArgument);
+        } else if cmp_to_one == 0 {
+            return Ok(HALF_PI);
         }
 
-        // arcsin(x) = 2*arctan(x / ( 1 + sqrt(1 - x^2)))
+        // arcsin(x) = arctan(x / sqrt(1 - x^2))
         let x = *self;
-        let arg = x.div(&one.add(&one.sub(&x.mul(&x)?)?.sqrt()?)?)?;
-        Self::two().mul(&arg.atan()?)
+        let d = one.sub(&x.mul(&x)?)?.sqrt()?;
+        if d.n == 0 {
+            return Ok(HALF_PI);
+        }
+        let arg = x.div(&d)?;
+        arg.atan()
     }
 
     /// Returns arccosine of a number.
@@ -206,7 +213,7 @@ impl BigFloatInc {
         let (idx, dx) = Self::get_trig_params(&mut x, 1);
 
         // determine closest precomputed values of derivatives
-        let mut s = [BigFloatInc::new(), BigFloatInc::new(), BigFloatInc::new(), BigFloatInc::new(),];
+        let mut s = [Self::new(), Self::new(), Self::new(), Self::new(),];
         s[0] = SIN_VALUES1[idx];
         s[1] = SIN_VALUES2[idx];
         s[2] = s[0];
@@ -216,7 +223,7 @@ impl BigFloatInc {
 
         let mut ret = s[quadrant];
         let mut dxn = dx;
-        let one = BigFloatInc::one();
+        let one = Self::one();
         let mut fct = one;
         let mut inc = one;
         let mut der_n = (quadrant + 1) % 4;

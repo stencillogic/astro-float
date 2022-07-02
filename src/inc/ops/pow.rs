@@ -1,13 +1,14 @@
-use crate::defs::DECIMAL_SIGN_NEG;
 /// Power.
 
 use crate::inc::inc::BigFloatInc;
 use crate::inc::ops::tables::exp_const::EXP_VALUES;
+use crate::inc::ops::tables::exp_const::EXP_VALUES2;
 use crate::defs::Error;
 use crate::inc::inc::DECIMAL_PARTS;
 use crate::defs::DECIMAL_BASE_LOG10;
 use crate::defs::DECIMAL_BASE;
-use crate::inc::inc::E;
+use crate::defs::DECIMAL_SIGN_NEG;
+use crate::defs::DECIMAL_SIGN_POS;
 
 
 impl BigFloatInc {
@@ -28,40 +29,78 @@ impl BigFloatInc {
             let int = Self::extract_int_part(d1);
             self.powi(&int)
         } else {
-            // self^d1 = e^(d1*ln(self))
-            // e^(d1*ln(self)) = e^int * e^fract
-            // e^int = e.powi(int)
-            // e^fract = fract.exp()
-            let b = if self.sign == DECIMAL_SIGN_NEG {
-                self.inv_sign()
-            } else {
-                *self
-            };
-            let mut x = d1.mul(&b.ln()?)?;
-            if d1.sign == DECIMAL_SIGN_NEG {
-                x = x.inv_sign();
-            }
-            let one = BigFloatInc::one();
-            let int = Self::extract_int_part(&x);
-            let frac = Self::extract_fract_part(&x);
-            let p1 = if int.n != 0 {
-                E.powi(&int)?
-            } else {
-                one
-            };
-            let p2 = if frac.n != 0 {
-                BigFloatInc::expf(&frac)?
-            } else {
-                one
-            };
-            let mut ret = if d1.sign == DECIMAL_SIGN_NEG {
-                one.div(&p1.mul(&p2)?)
-            } else {
-                p1.mul(&p2)
-            }?;
-            ret.sign = self.sign;
-            Ok(ret)
+            self.powexp(d1)
         }
+    }
+
+    // compute power by replacing base to e.
+    fn powexp(&self, d1: &Self) -> Result<Self, Error> {
+        // self^d1 = e^(d1*ln(self))
+        // e^(d1*ln(self)) = e^int * e^fract
+        // e^int = e.powi(int)
+        // e^fract = fract.exp()
+        let b = if self.sign == DECIMAL_SIGN_NEG {
+            self.inv_sign()
+        } else {
+            *self
+        };
+        let x = d1.mul(&b.ln()?)?;
+        let one = BigFloatInc::one();
+        let int = Self::extract_int_part(&x);
+        let frac = Self::extract_fract_part(&x);
+        let p1 = if int.n != 0 {
+            Self::result_inversion(Self::expi(&int), x.sign == DECIMAL_SIGN_NEG)?
+        } else {
+            one
+        };
+        let p2 = if frac.n != 0 {
+            BigFloatInc::expf(&frac)?
+        } else {
+            one
+        };
+        let ml = Self::result_inversion(p1.mul(&p2), x.sign == DECIMAL_SIGN_NEG)?;
+        let mut ret = if x.sign == DECIMAL_SIGN_NEG {
+            one.div(&ml)?
+        } else {
+            ml
+        };
+        ret.sign = self.sign;
+        Ok(ret)
+    }
+
+    // Convert exponent overflow to zero if conv is true.
+    fn result_inversion(r: Result<Self, Error>, conv: bool) -> Result<Self, Error> {
+        match r {
+            Ok(v) => Ok(v),
+            Err(Error::ExponentOverflow(s)) => 
+                if conv {
+                    Ok(Self::new())
+                } else {
+                    Err(Error::ExponentOverflow(s))
+                },
+            Err(e) => Err(e)
+        }
+    }
+
+    // e^d1, for integer d1
+    fn expi(d1: &Self) -> Result<Self, Error> {
+        let mut int = *d1;
+        let mut ret = Self::one();
+        let mut pow_idx = 0;
+        while int.n > 0 {
+            if pow_idx > 2 {
+                return Err(Error::ExponentOverflow(DECIMAL_SIGN_POS));
+            }
+            let mut cnt = int.m[0] % 10;
+            while cnt > 0 {
+                ret = ret.mul(&EXP_VALUES2[pow_idx])?;
+                cnt -= 1;
+            }
+            pow_idx += 1;
+            Self::shift_right(&mut int.m, 1);
+            int.n -= 1;
+        }
+        Ok(ret)
     }
 
     // self^d1, for integer d1

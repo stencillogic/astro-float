@@ -160,6 +160,7 @@ impl BigFloatNum {
     /// # Errors
     ///
     /// ExponentOverflow - when result is too big.
+    #[cfg(not(feature = "std"))]
     pub fn from_f64(mut f: f64) -> Result<Self, Error> {
         let mut e: i32 = 0;
         let mut ret = BigFloatNum::new();
@@ -221,6 +222,7 @@ impl BigFloatNum {
     /// # Errors
     ///
     /// ExponentOverflow - when result is too big.
+    #[cfg(not(feature = "std"))]
     pub fn from_f32(f: f32) -> Result<Self, Error> {
         Self::from_f64(f as f64)
     }

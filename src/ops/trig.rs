@@ -84,12 +84,13 @@ mod tests {
     use crate::defs::DECIMAL_POSITIONS;
 
     #[test]
-    fn test_trig() {
+    fn test_trig_fun() {
 
         let mut d1;
         let one = BigFloatNum::one();
         let mut epsilon = BigFloatNum::one();
         epsilon.e = - epsilon.n as i8 + 1 - (DECIMAL_POSITIONS as i8);
+
 
         //
         // sin, cos, asin, acos
@@ -130,7 +131,7 @@ mod tests {
         d1.e = -39;
         d1.m[8] = 123;
         epsilon.e = -71; // 1*10^(-32)
-        for i in 1..3 {  // 0..pi
+        for i in 1..3142 {  // 0..pi
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
             d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;

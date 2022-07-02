@@ -120,12 +120,16 @@ impl BigFloatInc {
                 }
                 d3.e += 1;
                 if Self::round_mantissa(&mut d3.m, 1) {
+                    // e.g. m = 998, round 1 => m = 100, m is suppoed o be shifted right by
+                    // one digit, so no additional shift required.
                     if d3.e == DECIMAL_MAX_EXPONENT {
                         return Err(Error::ExponentOverflow(d3.sign));
                     }
                     d3.e += 1;
+                } else {
+                    // rounding did not caused additional significant digit, but addition itself did.
+                    Self::shift_right(&mut d3.m, 1);
                 }
-                Self::shift_right(&mut d3.m, 1);
                 d3.m[DECIMAL_PARTS - 1] += DECIMAL_BASE as i16 / 10;
                 d3.n = DECIMAL_POSITIONS as i16;
             } else {
