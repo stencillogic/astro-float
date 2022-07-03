@@ -14,8 +14,8 @@ impl BigFloatNum {
     /// InvalidArgument - when `self` is negative or zero.
     pub fn ln(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.ln()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.ln()?;
+        Self::from_big_float_inc(ret)
     }
 
     /// E to the power of `self`.
@@ -25,8 +25,8 @@ impl BigFloatNum {
     /// ExponentOverflow - when result is too big.
     pub fn exp(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.exp()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.exp()?;
+        Self::from_big_float_inc(ret)
     }
 }
 

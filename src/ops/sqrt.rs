@@ -13,8 +13,8 @@ impl BigFloatNum {
     /// Returns ArgumentIsNegative if `self` is less than 0.
     pub fn sqrt(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.sqrt()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.sqrt()?;
+        Self::from_big_float_inc(ret)
     }
 }
 

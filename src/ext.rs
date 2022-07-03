@@ -818,9 +818,10 @@ pub mod std_ops {
                         };
                         let mut bytes = [0; DECIMAL_POSITIONS];
                         v.get_mantissa_bytes(&mut bytes);
+                        let len = v.get_mantissa_len();
                         num.push(std::char::from_digit(bytes[0] as u32, 10).unwrap());
                         num += ".";
-                        for byte in &bytes[1..] {
+                        for byte in &bytes[1..len] {
                             num.push(std::char::from_digit(*byte as u32, 10).unwrap());
                         }
                         let e = v.n as i32 + v.e as i32 - 1;

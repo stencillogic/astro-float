@@ -13,8 +13,8 @@ impl BigFloatNum {
     /// ExponentOverflow - when result is too big.
     pub fn sinh(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.sinh()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.sinh()?;
+        Self::from_big_float_inc(ret)
     }
 
     /// Returns hyperbolic cosine of a number.
@@ -24,8 +24,8 @@ impl BigFloatNum {
     /// ExponentOverflow - when result is too big.
     pub fn cosh(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.cosh()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.cosh()?;
+        Self::from_big_float_inc(ret)
     }
 
     /// Returns hyperbolic tangent of a number.
@@ -35,8 +35,8 @@ impl BigFloatNum {
     /// ExponentOverflow - when result is too big.
     pub fn tanh(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.tanh()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.tanh()?;
+        Self::from_big_float_inc(ret)
     }
 
     /// Returns inverse hyperbolic sine of a number.
@@ -46,8 +46,8 @@ impl BigFloatNum {
     /// ExponentOverflow - when result is too big.
     pub fn asinh(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.asinh()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.asinh()?;
+        Self::from_big_float_inc(ret)
     }
 
     /// Returns inverse hyperbolic cosine of a number.
@@ -58,8 +58,8 @@ impl BigFloatNum {
     /// InvalidArgument - when `self` is less than 1.
     pub fn acosh(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.acosh()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.acosh()?;
+        Self::from_big_float_inc(ret)
     }
 
     /// Returns inverse hyperbolic tangent of a number.
@@ -70,8 +70,8 @@ impl BigFloatNum {
     /// InvalidArgument - when |`self`| >= 1.
     pub fn atanh(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.atanh()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.atanh()?;
+        Self::from_big_float_inc(ret)
     }
 }
 

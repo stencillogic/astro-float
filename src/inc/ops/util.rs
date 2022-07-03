@@ -61,7 +61,7 @@ impl BigFloatInc {
     }
 
     // shift m to the left by n digits
-    pub(super) fn shift_left(m: &mut [i16], mut n: usize) {
+    pub(crate) fn shift_left(m: &mut [i16], mut n: usize) {
         assert!(n > 0 && n <= DECIMAL_POSITIONS);
 
         let mut i: usize;

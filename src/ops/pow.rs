@@ -16,8 +16,8 @@ impl BigFloatNum {
     pub fn pow(&self, d1: &Self) -> Result<Self, Error> {
         let a = Self::to_big_float_inc(self);
         let n = Self::to_big_float_inc(d1);
-        let mut ret = a.pow(&n)?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = a.pow(&n)?;
+        Self::from_big_float_inc(ret)
     }
 }
 

@@ -77,7 +77,8 @@ mod tests {
         ONE,
         TWO,
         MIN,
-        MAX,
+        MAX, 
+        PI, HALF_PI,
     };
     use crate::defs::{
         DECIMAL_SIGN_POS, 
@@ -353,8 +354,8 @@ mod tests {
 
         // pow
         for _ in 0..10000 {
-            let a = random_normal_float(4, 40).abs();
-            let n = random_normal_float(4, 40).abs();
+            let a = random_normal_float(4, 40);
+            let n = random_normal_float(4, 40);
             let inv = ONE.div(&n);
             let p = a.pow(&n);
             if  !p.is_inf() && p.get_mantissa_len() >= DECIMAL_POSITIONS - 1 {
@@ -363,6 +364,37 @@ mod tests {
             }
         }
 
+        // ln
+        for _ in 0..10000 {
+            let num = random_normal_float(256, 127).abs();
+            if num.is_zero() {
+                assert!(num.ln().is_nan());
+            } else {
+                let l = num.ln();
+                let e = l.exp();
+                assert!(num.sub(&e).abs().get_mantissa_len() <= 4);
+            }
+        }
+
+        // sin, asin
+        for _ in 0..10000 {
+            let num = random_normal_float(90, 127);
+            let s = num.sin();
+            let a = s.asin();
+            if num.abs().cmp(&HALF_PI).unwrap() <= 0 {
+                assert!(num.sub(&a).get_mantissa_len() <= 2);
+            } else {
+                let mut sub1 = num.add(&a).abs().div(&PI).frac();
+                let mut sub2 = num.sub(&a).abs().div(&PI).frac();
+                if sub1.get_mantissa_len() > 2 {
+                    sub1 = ONE.sub(&sub1);
+                }
+                if sub2.get_mantissa_len() > 2 {
+                    sub2 = ONE.sub(&sub2);
+                }
+                assert!(sub1.get_mantissa_len() <= 2 || sub2.get_mantissa_len() <= 2);
+            }
+        }
     }
 
     fn random_f64_exp(exp_range: i32, exp_shift: i32) -> f64 {
@@ -389,5 +421,4 @@ mod tests {
         let exp = random::<i32>().abs() % exp_range - exp_shift;
         BigFloat::from_raw_parts(mantissa, DECIMAL_POSITIONS as i16, sign, exp as i8)
     }
-
 }

@@ -148,12 +148,22 @@ impl BigFloatNum {
     }
 
     // Convert from BigFloatInc.
-    pub(super) fn from_big_float_inc(d1: &mut BigFloatInc) -> Result<Self, Error> {
+    pub(super) fn from_big_float_inc(mut d1: BigFloatInc) -> Result<Self, Error> {
         let mut ret = Self::new();
         if d1.n == 0 {
             return Ok(ret);
         }
         d1.maximize_mantissa();
+        let mut additional_shift = 0;
+        if d1.n < DECIMAL_POSITIONS as i16 + DECIMAL_BASE_LOG10 as i16 {
+            // d1 is subnormal, but it's mantissa still can be shifted 
+            // because resulting number exponent will be incremented by DECIMAL_BASE_LOG10
+            additional_shift = DECIMAL_POSITIONS + DECIMAL_BASE_LOG10 - d1.n as usize;
+            if additional_shift > DECIMAL_BASE_LOG10 {
+                additional_shift = DECIMAL_BASE_LOG10;
+            }
+            BigFloatInc::shift_left(&mut d1.m, additional_shift);
+        }
         if BigFloatInc::round_mantissa(&mut d1.m, DECIMAL_BASE_LOG10 as i16) {
             if d1.e == DECIMAL_MAX_EXPONENT {
                 return Err(Error::ExponentOverflow(d1.sign));
@@ -166,7 +176,7 @@ impl BigFloatNum {
         if d1.e > DECIMAL_MAX_EXPONENT - DECIMAL_BASE_LOG10 as i8 {
             return Err(Error::ExponentOverflow(d1.sign));
         }
-        ret.e = d1.e + DECIMAL_BASE_LOG10 as i8;
+        ret.e = d1.e + DECIMAL_BASE_LOG10 as i8 - additional_shift as i8;
         ret.sign = d1.sign;
         Ok(ret)
     }

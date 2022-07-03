@@ -12,8 +12,8 @@ impl BigFloatNum {
     /// ExponentOverflow - when result is too big.
     pub fn sin(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.sin()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.sin()?;
+        Self::from_big_float_inc(ret)
     }
 
     /// Returns cosine of a number. Argument is an angle in radians.
@@ -23,8 +23,8 @@ impl BigFloatNum {
     /// ExponentOverflow - when result is too big.
     pub fn cos(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.cos()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.cos()?;
+        Self::from_big_float_inc(ret)
     }
 
     /// Returns tangent of a number. Argument is an angle in radians.
@@ -34,8 +34,8 @@ impl BigFloatNum {
     /// ExponentOverflow - when result is too big.
     pub fn tan(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.tan()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.tan()?;
+        Self::from_big_float_inc(ret)
     }
 
     /// Returns arcsine of a number. Result is an angle in radians ranging from `-pi` to `pi`.
@@ -46,8 +46,8 @@ impl BigFloatNum {
     /// InvalidArgument - when |`self`| > 1.
     pub fn asin(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.asin()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.asin()?;
+        Self::from_big_float_inc(ret)
     }
 
     /// Returns arccosine of a number.
@@ -58,8 +58,8 @@ impl BigFloatNum {
     /// InvalidArgument - when |`self`| > 1.
     pub fn acos(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.acos()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.acos()?;
+        Self::from_big_float_inc(ret)
     }
 
     /// Returns arctangent of a number. 
@@ -69,8 +69,8 @@ impl BigFloatNum {
     /// ExponentOverflow - when result is too big.
     pub fn atan(&self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
-        let mut ret = arg.atan()?;
-        Self::from_big_float_inc(&mut ret)
+        let ret = arg.atan()?;
+        Self::from_big_float_inc(ret)
     }
 }
 
