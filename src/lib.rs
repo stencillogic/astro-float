@@ -17,8 +17,8 @@
 //! use num_bigfloat::PI;
 //! 
 //! // compute pi: pi = 6*arctan(1/sqrt(3))
-//! let six: BigFloat = 6.0.into();
-//! let three: BigFloat = 3.0.into();
+//! let six: BigFloat = 6.0.into(); // note: conversion from f64,f32 are not loss-less.
+//! let three: BigFloat = BigFloat::parse("3.0").unwrap();
 //! let pi = six * (ONE / three.sqrt()).atan();
 //! let epsilon = 1.0e-38.into();
 //! 
@@ -86,7 +86,7 @@ mod tests {
         DECIMAL_SIGN_POS, 
         DECIMAL_MIN_EXPONENT, 
         DECIMAL_MAX_EXPONENT, 
-        DECIMAL_POSITIONS, DECIMAL_BASE, DECIMAL_PARTS, DECIMAL_SIGN_NEG,
+        DECIMAL_POSITIONS, DECIMAL_BASE, DECIMAL_PARTS, DECIMAL_SIGN_NEG, BigFloatNum,
     };
 
 
@@ -333,6 +333,19 @@ mod tests {
             assert!(num.sub(&ret).abs().get_mantissa_len() < 2);
         }
 
+        // sqrt of max
+        let n = MAX.sqrt();
+        assert!(n.cmp(&ZERO).unwrap() > 0 && MAX.cmp(&n).unwrap() > 0);
+        let n = n.mul(&n);
+        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+
+        // sqrt of min positive
+        let n = MIN_POSITIVE.sqrt();
+        assert!(n.cmp(&ZERO).unwrap() > 0 && MIN_POSITIVE.cmp(&n).unwrap() < 0);
+        let n = n.mul(&n);
+        assert!(n.is_zero() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+
+
         // pow
         for _ in 0..10000 {
             let a = random_normal_float(4, 40);
@@ -357,6 +370,23 @@ mod tests {
             }
         }
 
+        // crossing x axis at x = 1
+        let n = ONE.ln();
+        assert!(n.is_zero() || ZERO.sub(&n).get_mantissa_len() < 2);
+
+        // ln of max
+        let n = MAX.ln();
+        assert!(n.cmp(&ZERO).unwrap() > 0 && MAX.cmp(&n).unwrap() > 0);
+        let n = n.exp();
+        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+
+        // ln of min positive
+        let n = MIN_POSITIVE.ln();
+        assert!(n.cmp(&ZERO).unwrap() < 0 && MIN_POSITIVE.cmp(&n.abs()).unwrap() < 0);
+        let n = n.exp();
+        assert!(n.is_inf_neg() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+
+
         // sin, asin
         for _ in 0..10000 {
             let num = random_normal_float(90, 127);
@@ -376,6 +406,38 @@ mod tests {
                 assert!(sub1.get_mantissa_len() <= 2 || sub2.get_mantissa_len() < 4);
             }
         }
+
+        // x axis crossing points: 0, PI, 2*PI
+        let n = ZERO.sin();
+        assert!(n.is_zero() || ZERO.sub(&n).get_mantissa_len() < 2);
+
+        let n = PI.sin();
+        assert!(n.is_zero() || ZERO.sub(&n).get_exponent() < -(DECIMAL_POSITIONS as i8) - 38);
+
+        let n = PI.add(&PI).sin();
+        assert!(n.is_zero() || ZERO.sub(&n).get_exponent() < -(DECIMAL_POSITIONS as i8) - 38);
+
+        // sin near 0
+        let n = MIN_POSITIVE.sin();
+        assert!(MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+        let n = MIN_POSITIVE.inv_sign().sin();
+        assert!(MIN_POSITIVE.inv_sign().sub(&n).get_mantissa_len() < 2);
+
+        // sin extremums PI/2, 3*PI/2
+        let eps = BigFloat::parse("1.0e-39").unwrap();
+        let exp_err = -(DECIMAL_POSITIONS as i8) - 38;
+        test_extremum(BigFloat::sin, &HALF_PI, &ONE, 3, 2, 2, &eps, exp_err);
+        test_extremum(BigFloat::sin, &HALF_PI.add(&PI), &ONE.inv_sign(), 3, 2, 2, &eps, exp_err);
+
+        // asin extremums: 1, -1
+        test_extremum(BigFloat::asin, &ONE, &HALF_PI, 2, 2, 22, &eps, exp_err);
+        test_extremum(BigFloat::asin, &ONE.inv_sign(), &HALF_PI.inv_sign(), 1, 2, 22, &eps, exp_err);
+
+        // asin near 0
+        let n = MIN_POSITIVE.asin();
+        assert!(MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+        let n = MIN_POSITIVE.inv_sign().asin();
+        assert!(MIN_POSITIVE.inv_sign().sub(&n).get_mantissa_len() < 2);
 
         // cos, acos
         for _ in 0..10000 {
@@ -397,6 +459,23 @@ mod tests {
             }
         }
 
+        // x axis crossing points: PI/2, 3*PI/2
+        let n = HALF_PI.cos();
+        assert!(n.is_zero() || ZERO.sub(&n).get_exponent() < -(DECIMAL_POSITIONS as i8) - 38);
+
+        let n = HALF_PI.add(&PI).cos();
+        assert!(n.is_zero() || ZERO.sub(&n).get_exponent() < -(DECIMAL_POSITIONS as i8) - 38);
+
+        // cos extremums: 0, PI
+        let eps = BigFloat::parse("1.0e-39").unwrap();
+        test_extremum(BigFloat::cos, &ZERO, &ONE, 3, 2, 2, &eps, exp_err);
+        test_extremum(BigFloat::cos, &PI, &ONE.inv_sign(), 3, 2, 2, &eps, exp_err);
+
+        // acos extremums: 1, -1
+        let exp_err = -(DECIMAL_POSITIONS as i8) - 18;
+        test_extremum(BigFloat::acos, &ONE, &ZERO, 2, 2, 22, &eps, exp_err);
+        test_extremum(BigFloat::acos, &ONE.inv_sign(), &PI, 1, 2, 22, &eps, exp_err);
+
         // tan, atan
         for _ in 0..10000 {
             let num = random_normal_float(3, 40);
@@ -417,6 +496,32 @@ mod tests {
             }
         }
 
+        // near pi/2, -pi/2
+        let n = HALF_PI.tan();
+        assert!(n.get_mantissa_len() as i8 + n.get_exponent() > 39);
+        let n = HALF_PI.sub(&eps).tan();
+        assert!(n.get_mantissa_len() as i8 + n.get_exponent() > 39 && n.is_positive());
+        let n = HALF_PI.inv_sign().tan();
+        assert!(n.get_mantissa_len() as i8 + n.get_exponent() > 39);
+        let n = HALF_PI.sub(&eps).inv_sign().tan();
+        assert!(n.get_mantissa_len() as i8 + n.get_exponent() > 39 && n.is_negative());
+
+        // atan for large negative and large positive.
+        let n = MAX.atan();
+        assert!(HALF_PI.sub(&n).get_mantissa_len() < 2);
+        let n = MIN.atan();
+        assert!(HALF_PI.inv_sign().sub(&n).get_mantissa_len() < 2);
+
+        let mut n = MAX;
+        n.set_exponent(n.get_exponent() - (DECIMAL_POSITIONS as i8));
+        let n = n.atan();
+        assert!(HALF_PI.sub(&n).get_mantissa_len() < 2);
+
+        let mut n = MIN;
+        n.set_exponent(n.get_exponent() - (DECIMAL_POSITIONS as i8));
+        let n = n.atan();
+        assert!(HALF_PI.inv_sign().sub(&n).get_mantissa_len() < 2);
+
         // sinh, asinh
         for _ in 0..10000 {
             let num = random_normal_float(90, 127);
@@ -424,7 +529,7 @@ mod tests {
             let a = s.asinh();
             assert!(num.sub(&a).get_mantissa_len() < 4);
         }
-        
+
         // cosh, acosh
         for _ in 0..10000 {
             let num = random_normal_float(90, 127);
@@ -432,6 +537,11 @@ mod tests {
             let a = s.asinh();
             assert!(num.sub(&a).get_mantissa_len() < 4);
         }
+
+        // cosh extremums at 0
+        let exp_err = -(DECIMAL_POSITIONS as i8) - 38;
+        let eps = BigFloat::parse("1.0e-19").unwrap();
+        test_extremum(BigFloat::cosh, &ZERO, &ONE, 3, 2, 2, &eps, exp_err);
 
         // tanh, atanh
         for _ in 0..10000 {
@@ -465,5 +575,34 @@ mod tests {
         let sign = if random::<i8>() & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
         let exp = random::<i32>().abs() % exp_range - exp_shift;
         BigFloat::from_raw_parts(mantissa, DECIMAL_POSITIONS as i16, sign, exp as i8)
+    }
+
+    // test function extremum
+    // sides: 3 - both, 2 - left, 1 - right, 0 - none (just exact value).
+    // x - input value, y - expected value.
+    // err - number of digits in mantissa allowed for error at point near extremum.
+    // exact_err - number of digits in mantissa allowed for error at extremum.
+    // exp_err - compare exponent of difference to exp_err
+    fn test_extremum(f: fn (&BigFloat) -> BigFloat, x: &BigFloat, y: &BigFloat, sides: u8, 
+                    exact_err: usize, err: usize, eps: &BigFloat, exp_err: i8) {
+        let n = f(x);
+        assert_close(&n, y, exact_err, exp_err);
+
+        if sides & 1 != 0 {
+            let x1 = x.add(eps);
+            let n = f(&x1);
+            assert_close(&n, y, err, exp_err);
+        }
+
+        if sides & 2 != 0 {
+            let x1 = x.sub(eps);
+            let n = f(&x1);
+            assert_close(&n, y, err, exp_err);
+        }
+    }
+
+    // assert n is close to y
+    fn assert_close(n: &BigFloat, y: &BigFloat, err: usize, exp_err: i8) {
+        assert!(n.cmp(y).unwrap() == 0 || n.sub(y).get_mantissa_len() < err || n.sub(y).get_exponent() < exp_err);
     }
 }

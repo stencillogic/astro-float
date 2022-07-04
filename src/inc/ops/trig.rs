@@ -22,6 +22,12 @@ const PI: BigFloatInc = BigFloatInc {
     sign: DECIMAL_SIGN_POS, 
     e: -43,
 };
+const PI2: BigFloatInc = BigFloatInc {
+    m: [3388, 8394, 576, 5590, 6766, 2528, 4769, 9586, 717, 1853, 6283],
+    n: 44, 
+    sign: DECIMAL_SIGN_POS, 
+    e: -43,
+};
 
 impl BigFloatInc {
 
@@ -106,7 +112,7 @@ impl BigFloatInc {
         if cmp_to_one > 0 {
             return Err(Error::InvalidArgument);
         } else if cmp_to_one == 0 {
-            return Ok(HALF_PI);
+            return Ok(if self.sign == DECIMAL_SIGN_NEG { HALF_PI.inv_sign() } else { HALF_PI });
         }
 
         // arcsin(x) = arctan(x / sqrt(1 - x^2))
@@ -135,6 +141,10 @@ impl BigFloatInc {
     ///
     /// ExponentOverflow - when result is too big.
     pub fn atan(&self) -> Result<Self, Error> {
+        if self.n == 0 {
+            return Ok(Self::new());
+        }
+
         let one = BigFloatInc::one();
         let mut x = *self;
         x.sign = DECIMAL_SIGN_POS;
@@ -144,13 +154,16 @@ impl BigFloatInc {
         let x_one_cmp = x.abs().cmp(&one);
         if x_one_cmp > 0 {
             x = one.div(&x)?;
+            if x.n == 0 {
+                return Ok(if self.sign == DECIMAL_SIGN_NEG { 
+                    HALF_PI.inv_sign() 
+                } else { 
+                    HALF_PI 
+                });
+            }
             inverse_arg = true;
         } else if x_one_cmp == 0 {
             return Ok(ATAN_VALUES2[10000]);
-        }
-
-        if x.n == 0 {
-            return Ok(Self::new());
         }
 
         // further reduction: arctan(x) = arctan(s) + arctan((x - s) / (1 + x*s))
@@ -197,18 +210,15 @@ impl BigFloatInc {
 
         // determine quadrant
         let mut quadrant = q;
-        x = x.div(&PI)?;
+        x = x.div(&PI2)?;
         let fractional = x.get_fractional_part();
-        x = PI.mul(&fractional)?;
+        x = PI2.mul(&fractional)?;
         while x.cmp(&HALF_PI) > 0 {
             x = x.sub(&HALF_PI)?;
             quadrant += 1;
         }
         if quadrant >= 4 {
             quadrant -= 4;
-        }
-        if x.sign == DECIMAL_SIGN_NEG {
-            quadrant = 3 - quadrant;
         }
         let (idx, dx) = Self::get_trig_params(&mut x, 1);
 
@@ -247,11 +257,16 @@ impl BigFloatInc {
                 der_n = 0;
             }
         }
+        ret.sign = if quadrant > 1 {
+            DECIMAL_SIGN_NEG
+        } else {
+            DECIMAL_SIGN_POS
+        };
         if q == 0 {
-            ret.sign = self.sign;
+            ret.sign *= self.sign;
         }
         if ret.abs().cmp(&one) > 0 {
-            ret = one;
+            ret = if ret.sign == DECIMAL_SIGN_NEG { one.inv_sign() } else { one };
         }
         Ok(ret)
     }

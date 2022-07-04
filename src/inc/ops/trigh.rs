@@ -67,7 +67,7 @@ impl BigFloatInc {
     /// ExponentOverflow - when result is too big.
     pub fn cosh(&self) -> Result<Self, Error> {
         if self.e as i16 + self.n <= -1 {
-            // sinh(x) = 1 + x^2/2! + x^4/4! + ...
+            // cosh(x) = 1 + x^2/2! + x^4/4! + ...
             let one = Self::one();
             let two = Self::two();
             let mut ret = one;
