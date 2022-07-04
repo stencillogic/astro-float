@@ -78,7 +78,9 @@ mod tests {
         TWO,
         MIN,
         MAX, 
-        PI, HALF_PI,
+        PI, 
+        HALF_PI, 
+        ZERO,
     };
     use crate::defs::{
         DECIMAL_SIGN_POS, 
@@ -142,10 +144,10 @@ mod tests {
             let f: f64 = random_f64_exp(50, 25);
             if f.is_finite() && f != 0.0 {
                 d1 = BigFloat::from_f64(f);
-                assert!((d1.to_f64() / f - 1.0).abs() < 10.0*f64::EPSILON);
+                assert!((d1.to_f64() / f - 1.0).abs() < 100.0*f64::EPSILON);
                 if (f as f32).is_finite() && (f as f32) != 0.0 {
                     d1 = BigFloat::from_f32(f as f32);
-                    assert!((d1.to_f32() / f as f32 - 1.0).abs() < 10.0*f32::EPSILON);
+                    assert!((d1.to_f32() / f as f32 - 1.0).abs() < 100.0*f32::EPSILON);
                 }
             }
         }
@@ -213,45 +215,24 @@ mod tests {
         // add & sub & cmp
         for _ in 0..10000 {
             // avoid subnormal numbers
-            let f1 = random_f64_exp(50, 25);
-            let f2 = random_f64_exp(50, 25);
-            if f1.is_finite() && f2.is_finite() {
-                let f3 = f1 + f2;
-                let f4 = f1 - f2;
-                d1 = BigFloat::from_f64(f1);
-                d2 = BigFloat::from_f64(f2);
-                if f3 == 0.0 {
-                    assert!(d1.add(&d2).to_f64().abs() <= 10000.0*f64::EPSILON);
-                } else {
-                    assert!((d1.add(&d2).to_f64() / f3 - 1.0).abs() <= 10000.0*f64::EPSILON);
-                }
-                if f4 == 0.0 {
-                    assert!(d1.sub(&d2).to_f64().abs() <= 10000.0*f64::EPSILON);
-                } else {
-                    assert!((d1.sub(&d2).to_f64() / f4 - 1.0).abs() <= 10000.0*f64::EPSILON);
-                }
-                if f1 > f2 {
-                    assert!(d1.cmp(&d2).unwrap() > 0);
-                } else if f1 < f2 {
-                    assert!(d1.cmp(&d2).unwrap() < 0);
-                } else {
-                    assert!(d1.cmp(&d2).unwrap() == 0);
-                }
+            d1 = random_normal_float(4, 30);
+            d2 = random_normal_float(4, 34);
+            let n1 = d1.add(&d2);
+            if n1.sub(&d1).get_mantissa_len() > 5 {
+                let n2 = n1.sub(&d2);
+                assert!(n2.sub(&d1).get_mantissa_len() < 4);
             }
         }
 
         // mul & div
         for _ in 0..10000 {
             // avoid subnormal numbers
-            let f1 = random_f64_exp(50, 25);
-            let f2 = random_f64_exp(50, 25);
-            if f1.is_finite() && f2.is_finite() && f2 != 0.0 {
-                let f3 = f1*f2;
-                let f4 = f1/f2;
-                d1 = BigFloat::from_f64(f1);
-                d2 = BigFloat::from_f64(f2);
-                assert!((d1.mul(&d2).to_f64() / f3 - 1.0).abs() <= 10000.0*f64::EPSILON);
-                assert!((d1.div(&d2).to_f64() / f4 - 1.0).abs() <= 10000.0*f64::EPSILON);
+            d1 = random_normal_float(40, 40);
+            d2 = random_normal_float(40, 40);
+            if d2.cmp(&ZERO).unwrap() != 0 {
+                let n1 = d1.div(&d2);
+                let n2 = n1.mul(&d2);
+                assert!(n2.sub(&d1).abs().get_mantissa_len() <= 4);
             }
         }
 
@@ -360,7 +341,7 @@ mod tests {
             let p = a.pow(&n);
             if  !p.is_inf() && p.get_mantissa_len() >= DECIMAL_POSITIONS - 1 {
                 let ret = p.pow(&inv);
-                assert!(a.sub(&ret).abs().get_mantissa_len() <= 2);
+                assert!(a.sub(&ret).abs().get_mantissa_len() < 3);
             }
         }
 
@@ -372,7 +353,7 @@ mod tests {
             } else {
                 let l = num.ln();
                 let e = l.exp();
-                assert!(num.sub(&e).abs().get_mantissa_len() <= 4);
+                assert!(num.sub(&e).abs().get_mantissa_len() < 5);
             }
         }
 
@@ -382,7 +363,7 @@ mod tests {
             let s = num.sin();
             let a = s.asin();
             if num.abs().cmp(&HALF_PI).unwrap() <= 0 {
-                assert!(num.sub(&a).get_mantissa_len() <= 2);
+                assert!(num.sub(&a).get_mantissa_len() < 4);
             } else {
                 let mut sub1 = num.add(&a).abs().div(&PI).frac();
                 let mut sub2 = num.sub(&a).abs().div(&PI).frac();
@@ -392,8 +373,72 @@ mod tests {
                 if sub2.get_mantissa_len() > 2 {
                     sub2 = ONE.sub(&sub2);
                 }
-                assert!(sub1.get_mantissa_len() <= 2 || sub2.get_mantissa_len() <= 2);
+                assert!(sub1.get_mantissa_len() <= 2 || sub2.get_mantissa_len() < 4);
             }
+        }
+
+        // cos, acos
+        for _ in 0..10000 {
+            let num = random_normal_float(3, 40);
+            let c = num.cos();
+            let a = c.acos();
+            if num.abs().cmp(&PI).unwrap() <= 0 {
+                assert!(num.abs().sub(&a).get_mantissa_len() < 5);
+            } else {
+                let mut sub1 = num.add(&a).abs().div(&PI).frac();
+                let mut sub2 = num.sub(&a).abs().div(&PI).frac();
+                if sub1.get_mantissa_len() > 2 {
+                    sub1 = ONE.sub(&sub1);
+                }
+                if sub2.get_mantissa_len() > 2 {
+                    sub2 = ONE.sub(&sub2);
+                }
+                assert!(sub1.get_mantissa_len() < 5 || sub2.get_mantissa_len() < 5);
+            }
+        }
+
+        // tan, atan
+        for _ in 0..10000 {
+            let num = random_normal_float(3, 40);
+            let t = num.tan();
+            let a = t.atan();
+            if num.abs().cmp(&HALF_PI).unwrap() <= 0 {
+                assert!(num.sub(&a).get_mantissa_len() < 3);
+            } else {
+                let mut sub1 = num.add(&a).abs().div(&PI).frac();
+                let mut sub2 = num.sub(&a).abs().div(&PI).frac();
+                if sub1.get_mantissa_len() > 2 {
+                    sub1 = ONE.sub(&sub1);
+                }
+                if sub2.get_mantissa_len() > 2 {
+                    sub2 = ONE.sub(&sub2);
+                }
+                assert!(sub1.get_mantissa_len() < 3 || sub2.get_mantissa_len() < 3);
+            }
+        }
+
+        // sinh, asinh
+        for _ in 0..10000 {
+            let num = random_normal_float(90, 127);
+            let s = num.sinh();
+            let a = s.asinh();
+            assert!(num.sub(&a).get_mantissa_len() < 4);
+        }
+        
+        // cosh, acosh
+        for _ in 0..10000 {
+            let num = random_normal_float(90, 127);
+            let s = num.sinh();
+            let a = s.asinh();
+            assert!(num.sub(&a).get_mantissa_len() < 4);
+        }
+
+        // tanh, atanh
+        for _ in 0..10000 {
+            let num = random_normal_float(88, 127);
+            let s = num.tanh();
+            let a = s.atanh();
+            assert!(num.sub(&a).get_mantissa_len() < 6);
         }
     }
 

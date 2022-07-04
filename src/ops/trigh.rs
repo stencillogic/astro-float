@@ -123,7 +123,7 @@ mod tests {
         for i in 0..100 {
             d1.m[8] = 10 + i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-            d1.n = if i<100 {2} else if i<1000 {3} else {4} + 32;
+            d1.n = BigFloatNum::num_digits(&d1.m);
             let s = d1.cosh().unwrap();
             let mut c = s.acosh().unwrap();
             assert!(c.sign == DECIMAL_SIGN_POS);

@@ -1,6 +1,7 @@
 use crate::inc::inc::BigFloatInc;
 
-pub(crate) const SQRT_VALUES: [BigFloatInc; 1089] = [
+pub(crate) const SQRT_VALUES: [BigFloatInc; 1090] = [
+  BigFloatInc { sign: 1, e: -42, n: 44, m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1000] },
   BigFloatInc { sign: 1, e: -41, n: 43, m: [9672, 7856, 6980, 4209, 8872, 8016, 5048, 7309, 5623, 4213, 141] },
   BigFloatInc { sign: 1, e: -42, n: 44, m: [8053, 6942, 7236, 5058, 6341, 2744, 2935, 8877, 756, 508, 1732] },
   BigFloatInc { sign: 1, e: -40, n: 42, m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20] },

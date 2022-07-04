@@ -224,6 +224,7 @@ impl BigFloatInc {
         let mut ret = s[quadrant];
         let mut dxn = dx;
         let one = Self::one();
+        // TODO: precompute factorials as polynomial coeffs.
         let mut fct = one;
         let mut inc = one;
         let mut der_n = (quadrant + 1) % 4;
