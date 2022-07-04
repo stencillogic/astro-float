@@ -31,7 +31,7 @@
 //! ## Performance
 //! 
 //! The fixed-size mantissa allowed the introduction of precomputed tables to speed up most calculations.
-//! With regard to anything else, the implementation is straightforward and does not utilize sophisticated algorithms.
+//! With regard to anything else, the implementation is straightforward.
 //! 
 //! ## no_std
 //!
