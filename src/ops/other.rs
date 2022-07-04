@@ -1,13 +1,14 @@
 /// Other operations.
 
 use crate::defs::BigFloatNum;
+use crate::defs::DECIMAL_POSITIONS;
 use crate::defs::Error;
-use crate::defs::DECIMAL_PARTS;
 use crate::defs::DECIMAL_BASE_LOG10;
 use crate::defs::DECIMAL_BASE;
 use crate::defs::DECIMAL_SIGN_POS;
 use crate::defs::DECIMAL_SIGN_NEG;
 use crate::defs::DECIMAL_MAX_EXPONENT;
+use crate::defs::ZEROED_MANTISSA;
 
 impl BigFloatNum {
 
@@ -66,42 +67,24 @@ impl BigFloatNum {
     }
 
     /// Returns the rounded number with `n` decimal positions in the fractional part of the number.
-    /// Round half away from 0.
+    /// Rounds half away from 0.
     pub fn round(&self, n: usize) -> Result<Self, Error> {
         let mut ret = *self;
         let e = (-self.e) as usize;
         if self.e < 0 && e > n {
-            let mut i = 0;
-            let mut n = e - n;
-            let mut c = 0;
-            while n > 0 {
-                let s = if n > DECIMAL_BASE_LOG10 {
-                    DECIMAL_BASE_LOG10
-                } else {
-                    n
-                };
-                n -= s;
-                let (p1, p2) = Self::round_digit(ret.m[i] + c, s);
-                ret.m[i] = p1;
-                c = p2;
-                i += 1;
-            }
-            if c > 0 {
-                while i < DECIMAL_PARTS {
-                    if ret.m[i] < DECIMAL_BASE as i16 - 1 {
-                        ret.m[i] += 1;
-                        return Ok(ret);
-                    } else {
-                        ret.m[i] = 0;
+            let m = e - n;
+            if m > DECIMAL_POSITIONS {
+                return Ok(Self::new());
+            } else {
+                if Self::round_mantissa(&mut ret.m, m as i16) {
+                    if ret.e == DECIMAL_MAX_EXPONENT {
+                        return Err(Error::ExponentOverflow(ret.sign));
                     }
-                    i += 1;
+                    ret.e += 1;
                 }
-                if ret.e == DECIMAL_MAX_EXPONENT {
-                    return Err(Error::ExponentOverflow(ret.sign));
+                if ret.m == ZEROED_MANTISSA {
+                    return Ok(Self::new());
                 }
-                ret.e += 1;
-                Self::shift_right(&mut ret.m, 1);
-                ret.m[DECIMAL_PARTS - 1] += DECIMAL_BASE as i16 / 10;
             }
         }
         Ok(ret)
@@ -136,7 +119,7 @@ impl BigFloatNum {
             return Self::abs_cmp_with_shift(&self.m, self.n, &d2.m, d2.n) * self.sign as i16;
         }
 
-        return Self::abs_cmp(&self.m, &d2.m) * self.sign as i16;
+        Self::abs_cmp(&self.m, &d2.m) * self.sign as i16
     }
 
     // compare absolute values of two floats with shifts n1, n2
@@ -221,27 +204,6 @@ impl BigFloatNum {
         }
         Ok(int)
     }
-
-    // round n positions in a single digit
-    fn round_digit(d: i16, n: usize) -> (i16, i16) {
-        if d == DECIMAL_BASE as i16 {
-            return (0, 1);
-        }
-        let mut t = 1;
-        let mut c = 0;
-        for _ in 0..n {
-            c = if (d / t % 10) + c >= 5 { 1 } else { 0 };
-            t *= 10;
-        }
-        let ret = (d / t + c) * t;
-        if ret == DECIMAL_BASE as i16 {
-            return (0, 1);
-        }
-        if n == DECIMAL_BASE_LOG10 {
-            return (0, if DECIMAL_BASE as i16/2 <= ret {1} else {0});
-        }
-        (ret, 0)
-    }
 }
 
 
@@ -251,6 +213,7 @@ mod tests {
 
     use super::*;
     use crate::defs::DECIMAL_POSITIONS;
+    use crate::defs::DECIMAL_PARTS;
 
     #[test]
     fn test_other() {
@@ -476,7 +439,7 @@ mod tests {
         d2.m[8] = 5000;
         assert!(d1.round(2).unwrap().cmp(&d2) == 0);
         d2.m[8] = 0;
-        d2.m[9] = 124;
+        d2.m[9] = 123;
         assert!(d1.round(1).unwrap().cmp(&d2) == 0);
         d2.m[9] = 120;
         assert!(d1.round(0).unwrap().cmp(&d2) == 0);
@@ -488,6 +451,16 @@ mod tests {
         d1.n = 39;
         d1.e = 10;
         assert!(d1.round(2).unwrap().cmp(&d1) == 0);
+        d1 = BigFloatNum::new();
+        d1.m[9] = 123;
+        d1.e = -42;
+        d1.n = 39;
+        d2 = d1;
+        d2.m[9] = 100;
+        assert!(d1.round(4).unwrap().cmp(&d2) == 0);
+        d2 = BigFloatNum::new();
+        assert!(d1.round(3).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(2).unwrap().cmp(&d2) == 0);
 
         for i in 0..DECIMAL_PARTS {
             d1.m[i] = DECIMAL_BASE as i16 - 1;
