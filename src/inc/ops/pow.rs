@@ -20,14 +20,20 @@ impl BigFloatInc {
     ///
     /// ExponentOverflow - when result is too big.
     ///
-    /// ArgumentIsNegative - when `d1` has fractional part and `self` is negative.
+    /// InvalidArgument - when `d1` and `self` both equal to zero.
     pub fn pow(&self, d1: &Self) -> Result<Self, Error> {
         if self.n == 0 {
-            return Ok(*self);
+            if d1.sign == DECIMAL_SIGN_NEG {
+                return Err(Error::ExponentOverflow(DECIMAL_SIGN_POS));
+            } else if d1.n == 0 {
+                return Err(Error::InvalidArgument);
+            } else {
+                return Ok(*self);
+            }
         }
         if Self::extract_fract_part(d1).n == 0 {
             let int = Self::extract_int_part(d1);
-            self.powi(&int)
+            Self::result_inversion(self.powi(&int), d1.sign == DECIMAL_SIGN_NEG, self.sign)
         } else {
             self.powexp(d1)
         }
@@ -39,17 +45,13 @@ impl BigFloatInc {
         // e^(d1*ln(self)) = e^int * e^fract
         // e^int = e.powi(int)
         // e^fract = fract.exp()
-        let b = if self.sign == DECIMAL_SIGN_NEG {
-            self.inv_sign()
-        } else {
-            *self
-        };
+        let b = self.abs();
         let x = d1.mul(&b.ln()?)?;
         let one = BigFloatInc::one();
         let int = Self::extract_int_part(&x);
         let frac = Self::extract_fract_part(&x);
         let p1 = if int.n != 0 {
-            Self::result_inversion(Self::expi(&int), x.sign == DECIMAL_SIGN_NEG)?
+            Self::result_inversion(Self::expi(&int), x.sign == DECIMAL_SIGN_NEG, self.sign)?
         } else {
             one
         };
@@ -58,7 +60,7 @@ impl BigFloatInc {
         } else {
             one
         };
-        let ml = Self::result_inversion(p1.mul(&p2), x.sign == DECIMAL_SIGN_NEG)?;
+        let ml = Self::result_inversion(p1.mul(&p2), x.sign == DECIMAL_SIGN_NEG, self.sign)?;
         let mut ret = if x.sign == DECIMAL_SIGN_NEG {
             one.div(&ml)?
         } else {
@@ -69,16 +71,17 @@ impl BigFloatInc {
     }
 
     // Convert exponent overflow to zero if conv is true.
-    fn result_inversion(r: Result<Self, Error>, conv: bool) -> Result<Self, Error> {
+    fn result_inversion(r: Result<Self, Error>, conv: bool, base_sign: i8) -> Result<Self, Error> {
         match r {
             Ok(v) => Ok(v),
-            Err(Error::ExponentOverflow(s)) => 
+            Err(Error::ExponentOverflow(_)) => 
                 if conv {
                     Ok(Self::new())
                 } else {
-                    Err(Error::ExponentOverflow(s))
+                    Err(Error::ExponentOverflow(base_sign))
                 },
-            Err(e) => Err(e)
+            Err(Error::DivisionByZero) => Err(Error::ExponentOverflow(base_sign)),
+            Err(e) => Err(e),
         }
     }
 
@@ -111,9 +114,17 @@ impl BigFloatInc {
         while int.n > 0 {
             if int.m[0] & 1 != 0 {
                 ret = ret.mul(&ml)?;
+                if ret.n == 0 {
+                    break;
+                }
             }
-            ml = ml.mul(&ml)?;
             Self::divide_by_two_int(&mut int);
+            if int.n > 0 {
+                ml = ml.mul(&ml)?;
+            }
+        }
+        if d1.sign == DECIMAL_SIGN_NEG {
+            ret = Self::one().div(&ret)?
         }
         Ok(ret)
     }

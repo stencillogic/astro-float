@@ -366,6 +366,94 @@ mod tests {
             }
         }
 
+        // one^any = one
+        assert!(ONE.pow(&MIN_POSITIVE).cmp(&ONE).unwrap() == 0);
+        assert!(ONE.pow(&MIN_POSITIVE.inv_sign()).cmp(&ONE).unwrap() == 0);
+        assert!(ONE.pow(&MAX).cmp(&ONE).unwrap() == 0);
+        assert!(ONE.pow(&MIN).cmp(&ONE).unwrap() == 0);
+        assert!(ONE.pow(&TWO).cmp(&ONE).unwrap() == 0);
+        assert!(ONE.pow(&ONE.div(&TWO)).cmp(&ONE).unwrap() == 0);
+        assert!(ONE.pow(&ZERO).cmp(&ONE).unwrap() == 0);
+
+        // (> 1)^n
+        assert!(TWO.pow(&MIN_POSITIVE).cmp(&ONE).unwrap() == 0);
+        assert!(TWO.pow(&MIN_POSITIVE.inv_sign()).cmp(&ONE).unwrap() == 0);
+        assert!(TWO.pow(&MAX).is_inf_pos());
+        assert!(TWO.pow(&MIN).is_zero());
+        assert!(TWO.pow(&ONE).cmp(&TWO).unwrap() == 0);
+        assert!(TWO.pow(&ZERO).cmp(&ONE).unwrap() == 0);
+
+        // (< 1)^n
+        let n = ONE.div(&TWO);
+        assert!(n.pow(&MIN_POSITIVE).cmp(&ONE).unwrap() == 0);
+        assert!(n.pow(&MIN_POSITIVE.inv_sign()).cmp(&ONE).unwrap() == 0);
+        assert!(n.pow(&MAX).is_zero());
+        assert!(n.pow(&MIN).is_inf_pos());
+        assert!(n.pow(&ONE).cmp(&n).unwrap() == 0);
+        assert!(n.pow(&ZERO).cmp(&ONE).unwrap() == 0);
+
+        // 0^n
+        assert!(ZERO.pow(&MIN_POSITIVE).is_zero());
+        assert!(ZERO.pow(&MIN_POSITIVE.inv_sign()).is_inf_pos());
+        assert!(ZERO.pow(&MAX).is_zero());
+        assert!(ZERO.pow(&MIN).is_inf_pos());
+        assert!(ZERO.pow(&ONE).is_zero());
+        assert!(ZERO.pow(&ZERO).is_nan());
+
+        // -(> 1)^n
+        let n = TWO.inv_sign();
+        assert!(n.pow(&MIN_POSITIVE).cmp(&ONE.inv_sign()).unwrap() == 0);
+        assert!(n.pow(&MIN_POSITIVE.inv_sign()).cmp(&ONE.inv_sign()).unwrap() == 0);
+        assert!(n.pow(&MAX).is_inf_neg());
+        assert!(n.pow(&MIN).is_zero());
+        assert!(n.pow(&ONE).cmp(&TWO.inv_sign()).unwrap() == 0);
+        assert!(n.pow(&TWO).is_positive());
+        assert!(n.pow(&ZERO).cmp(&ONE).unwrap() == 0);
+
+        // -(< 1)^n
+        let n = ONE.div(&TWO).inv_sign();
+        assert!(n.pow(&MIN_POSITIVE).cmp(&ONE.inv_sign()).unwrap() == 0);
+        assert!(n.pow(&MIN_POSITIVE.inv_sign()).cmp(&ONE.inv_sign()).unwrap() == 0);
+        assert!(n.pow(&MAX).is_zero());
+        assert!(n.pow(&MIN).is_inf_neg());
+        assert!(n.pow(&ONE).cmp(&n).unwrap() == 0);
+        assert!(n.pow(&TWO).is_positive());
+        assert!(n.pow(&ZERO).cmp(&ONE).unwrap() == 0);
+
+        // MAX^n
+        assert!(MAX.pow(&MIN_POSITIVE).cmp(&ONE).unwrap() == 0);
+        assert!(MAX.pow(&MIN_POSITIVE.inv_sign()).cmp(&ONE).unwrap() == 0);
+        assert!(MAX.pow(&MAX).is_inf_pos());
+        assert!(MAX.pow(&MIN).is_zero());
+        assert!(MAX.pow(&ONE).cmp(&MAX).unwrap() == 0);
+        assert!(MAX.pow(&ZERO).cmp(&ONE).unwrap() == 0);
+
+        // MIN^n
+        assert!(MIN.pow(&MIN_POSITIVE).cmp(&ONE.inv_sign()).unwrap() == 0);
+        assert!(MIN.pow(&MIN_POSITIVE.inv_sign()).cmp(&ONE.inv_sign()).unwrap() == 0);
+        assert!(MIN.pow(&MAX).is_inf_neg());
+        assert!(MIN.pow(&MIN).is_zero());
+        assert!(MIN.pow(&ONE).cmp(&MIN).unwrap() == 0);
+        assert!(MIN.pow(&ZERO).cmp(&ONE).unwrap() == 0);
+
+        // MIN_POSITIVE^n
+        assert!(MIN_POSITIVE.pow(&MIN_POSITIVE).cmp(&ONE).unwrap() == 0);
+        assert!(MIN_POSITIVE.pow(&MIN_POSITIVE.inv_sign()).cmp(&ONE).unwrap() == 0);
+        assert!(MIN_POSITIVE.pow(&MAX).is_zero());
+        assert!(MIN_POSITIVE.pow(&MIN).is_inf_pos());
+        assert!(MIN_POSITIVE.pow(&ONE).cmp(&MIN_POSITIVE).unwrap() == 0);
+        assert!(MIN_POSITIVE.pow(&ZERO).cmp(&ONE).unwrap() == 0);
+
+        // (-MIN_POSITIVE)^n
+        let n = MIN_POSITIVE.inv_sign();
+        assert!(n.pow(&MIN_POSITIVE).cmp(&ONE.inv_sign()).unwrap() == 0);
+        assert!(n.pow(&MIN_POSITIVE.inv_sign()).cmp(&ONE.inv_sign()).unwrap() == 0);
+        assert!(n.pow(&MAX).is_zero());
+        assert!(n.pow(&MIN).is_inf_neg());
+        assert!(n.pow(&ONE).cmp(&n).unwrap() == 0);
+        assert!(n.pow(&TWO).is_positive());
+        assert!(n.pow(&ZERO).cmp(&ONE).unwrap() == 0);
+
         // ln
         for _ in 0..10000 {
             let num = random_normal_float(256, 127).abs();

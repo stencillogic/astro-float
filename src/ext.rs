@@ -1007,13 +1007,13 @@ mod tests {
             assert!(op(&NAN, &NAN).is_nan());
         }
 
-        assert!(ONE.cmp(&ONE).is_some());
-        assert!(ONE.cmp(&INF_POS).is_some());
-        assert!(INF_POS.cmp(&ONE).is_some());
-        assert!(INF_POS.cmp(&INF_POS).is_some());
-        assert!(ONE.cmp(&INF_NEG).is_some());
-        assert!(INF_NEG.cmp(&ONE).is_some());
-        assert!(INF_NEG.cmp(&INF_NEG).is_some());
+        assert!(ONE.cmp(&ONE).unwrap() == 0);
+        assert!(ONE.cmp(&INF_POS).unwrap() < 0);
+        assert!(INF_POS.cmp(&ONE).unwrap() > 0);
+        assert!(INF_POS.cmp(&INF_POS).unwrap() == 0);
+        assert!(ONE.cmp(&INF_NEG).unwrap() > 0);
+        assert!(INF_NEG.cmp(&ONE).unwrap() < 0);
+        assert!(INF_NEG.cmp(&INF_NEG).unwrap() == 0);
         assert!(ONE.cmp(&NAN).is_none());
         assert!(NAN.cmp(&ONE).is_none());
         assert!(INF_POS.cmp(&NAN).is_none());
