@@ -507,7 +507,7 @@ mod tests {
                 if sub2.get_mantissa_len() > 2 {
                     sub2 = ONE.sub(&sub2);
                 }
-                assert!(sub1.get_mantissa_len() <= 2 || sub2.get_mantissa_len() < 4);
+                assert!(sub1.get_mantissa_len() < 4 || sub2.get_mantissa_len() < 4);
             }
         }
 
