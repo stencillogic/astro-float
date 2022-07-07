@@ -160,25 +160,25 @@ mod tests {
         assert!(d3.cmp(&ref_num) == Some(0));
 
         // 0.99 * 0
-        d1 = BigFloat::from_f64(0.99);
+        d1 = BigFloat::parse("0.99").unwrap();
         d3 = d1.mul(&d2);
         assert!(d3.cmp(&ref_num) == Some(0));
 
         // 0 * 12349999
         d1 = BigFloat::new();
-        d2 = BigFloat::from_f64(12349999.0);
+        d2 = BigFloat::parse("12349999.0").unwrap();
         d3 = d1.mul(&d2);
         assert!(d3.cmp(&ref_num) == Some(0));
 
         // 1 * 1
-        d1 = BigFloat::from_f64(1.0);
-        d2 = BigFloat::from_f64(1.0);
+        d1 = BigFloat::parse("1.0").unwrap();
+        d2 = BigFloat::parse("1.0").unwrap();
         d3 = d1.mul(&d2);
         assert!(d3.cmp(&d1) == Some(0));
 
         // 1 * -1
-        d1 = BigFloat::from_f64(1.0);
-        d2 = BigFloat::from_f64(1.0).inv_sign();
+        d1 = BigFloat::parse("1.0").unwrap();
+        d2 = BigFloat::parse("1.0").unwrap().inv_sign();
         d3 = d1.mul(&d2);
         assert!(d3.cmp(&d2) == Some(0));
 
@@ -189,7 +189,7 @@ mod tests {
         // -1 * -1
         d1 = d1.inv_sign();
         d3 = d1.mul(&d2);
-        ref_num = BigFloat::from_f64(1.0);
+        ref_num = BigFloat::parse("1.0").unwrap();
         assert!(d3.cmp(&ref_num) == Some(0));
 
         // 0 / 0 
@@ -198,7 +198,7 @@ mod tests {
         assert!(d1.div(&d2).is_nan());
 
         // d2 / 0
-        d2 = BigFloat::from_f64(123.0);
+        d2 = BigFloat::parse("123.0").unwrap();
         assert!(d2.div(&d1).is_inf_pos());
 
         // 0 / d2
@@ -212,7 +212,7 @@ mod tests {
         assert!(d3.cmp(&ref_num) == Some(0));
 
 
-        // add & sub & cmp
+        // add & sub
         for _ in 0..10000 {
             // avoid subnormal numbers
             d1 = random_normal_float(4, 30);
