@@ -524,15 +524,31 @@ mod tests {
 
         // sinh, asinh
         for _ in 0..10000 {
-            let num = random_normal_float(90, 127);
+            let num = random_normal_float(91, 127);
             let s = num.sinh();
             let a = s.asinh();
             assert!(num.sub(&a).get_mantissa_len() < 4);
         }
 
+        // sinh of MAX
+        let n = MAX.sinh();
+        assert!(n.is_inf_pos());
+        let n = MAX.inv_sign().sinh();
+        assert!(n.is_inf_neg());
+
+        // asinh of MAX
+        let n = MAX.asinh();
+        assert!(n.cmp(&MAX).unwrap() < 0);
+        let n = n.sinh();
+        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+        let n = MAX.inv_sign().asinh();
+        assert!(n.cmp(&MAX.inv_sign()).unwrap() > 0);
+        let n = n.sinh();
+        assert!(n.is_inf_neg() || MAX.inv_sign().sub(&n).get_mantissa_len() < 2);
+
         // cosh, acosh
         for _ in 0..10000 {
-            let num = random_normal_float(90, 127);
+            let num = random_normal_float(91, 127);
             let s = num.sinh();
             let a = s.asinh();
             assert!(num.sub(&a).get_mantissa_len() < 4);
@@ -543,6 +559,23 @@ mod tests {
         let eps = BigFloat::parse("1.0e-19").unwrap();
         test_extremum(BigFloat::cosh, &ZERO, &ONE, 3, 2, 2, &eps, exp_err);
 
+        // cosh of MAX
+        let n = MAX.cosh();
+        assert!(n.is_inf_pos());
+        let n = MAX.inv_sign().cosh();
+        assert!(n.is_inf_pos());
+
+        // acosh of MAX
+        let n = MAX.acosh();
+        assert!(n.cmp(&MAX).unwrap() < 0);
+        let n = n.cosh();
+        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+
+        // acosh extrema: 1
+        let exp_err = -(DECIMAL_POSITIONS as i8) - 18;
+        let eps = BigFloat::parse("1.0e-39").unwrap();
+        test_extremum(BigFloat::acosh, &ONE, &ZERO, 1, 2, 2, &eps, exp_err);
+
         // tanh, atanh
         for _ in 0..10000 {
             let num = random_normal_float(88, 127);
@@ -550,6 +583,24 @@ mod tests {
             let a = s.atanh();
             assert!(num.sub(&a).get_mantissa_len() < 6);
         }
+
+        // tanh of MAX
+        let n = MAX.tanh();
+        assert!(n.cmp(&ONE).unwrap() == 0);
+        let n = MIN.tanh();
+        assert!(n.cmp(&ONE.inv_sign()).unwrap() == 0);
+
+        // atanh of 1, -1
+        let n = ONE.atanh();
+        assert!(n.is_inf_pos());
+        let n = ONE.inv_sign().atanh();
+        assert!(n.is_inf_neg());
+
+        // atanh of MAX
+        let n = MAX.atanh();
+        assert!(n.sub(&ZERO).get_mantissa_len() < 2);
+        let n = MIN.atanh();
+        assert!(n.sub(&ZERO).get_mantissa_len() < 2);
     }
 
     fn random_f64_exp(exp_range: i32, exp_shift: i32) -> f64 {

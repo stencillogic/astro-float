@@ -15,6 +15,13 @@ const ONE_HALF: BigFloatInc = BigFloatInc {
     e: -(DECIMAL_POSITIONS as i8),
 };
 
+const LN_OF_2: BigFloatInc = BigFloatInc {
+    m: [13, 755, 6568, 5817, 1214, 7232, 941, 9453, 559, 4718, 6931],
+    n: DECIMAL_POSITIONS as i16, 
+    sign: DECIMAL_SIGN_POS, 
+    e: -(DECIMAL_POSITIONS as i8),
+};
+
 impl BigFloatInc {
 
     /// Returns hyperbolic sine of a number.
@@ -52,7 +59,11 @@ impl BigFloatInc {
                 self.inv_sign().exp()
             } else {
                 self.exp()
-            }?;
+            }.map_err(|e| if let Error::ExponentOverflow(_) = e {
+                Error::ExponentOverflow(self.sign)
+            } else {
+                e
+            })?;
             let e_x2 = Self::one().div(&e_x1)?;
             let mut ret = e_x1.sub(&e_x2)?.mul(&ONE_HALF)?;
             ret.sign = self.sign;
@@ -123,6 +134,14 @@ impl BigFloatInc {
                 ret = val;
             }
             Ok(ret)
+        } else if self.n + self.e as i16 > 2 {
+            // int part of x has at least 3 digits
+            // this is not the best estimate for optimisation, but it is simple
+            Ok(if self.sign == DECIMAL_SIGN_NEG {
+                Self::one().inv_sign()
+            } else {
+                Self::one()
+            })
         } else {
             // (e^x - e^-x) / (e^x + e^-x)
             let e_x1 = if self.sign == DECIMAL_SIGN_NEG {
@@ -158,6 +177,12 @@ impl BigFloatInc {
                 ret = val;
             }
             Ok(ret)
+        } else if (self.e as i16 + self.n - 1)*2 >= DECIMAL_POSITIONS as i16 {
+            // sign(x)*(ln(|x|) + ln(2))
+            let x = self.abs();
+            let mut ret = x.ln()?.add(&LN_OF_2)?;
+            ret.sign = self.sign;
+            Ok(ret)
         } else {
             // sign(x)*ln(|x| + sqrt(x^2 + 1))
             let x = self.abs();
@@ -182,23 +207,27 @@ impl BigFloatInc {
     /// ExponentOverflow - when result is too big.
     /// InvalidArgument - when `self` is less than 1.
     pub fn acosh(&self) -> Result<Self, Error> {
-        // ln(x + sqrt(x^2 - 1))
         let x = *self;
         let one = Self::one();
         if x.cmp(&one) < 0 {
             return Err(Error::InvalidArgument);
         }
-        let xx = x.mul(&x)?;
-        let arg = x.add(&xx.sub(&one)?.sqrt()?)?;
-        arg.ln()
+        if (x.e as i16 + x.n - 1)*2 >= DECIMAL_POSITIONS as i16 {
+            // ln(x) + ln(2)
+            x.ln()?.add(&LN_OF_2)
+        } else {
+            // ln(x + sqrt(x^2 - 1))
+            let xx = x.mul(&x)?;
+            let arg = x.add(&xx.sub(&one)?.sqrt()?)?;
+            arg.ln()
+        }
     }
 
     /// Returns inverse hyperbolic tangent of a number.
     ///
     /// # Errors
     ///
-    /// ExponentOverflow - when result is too big.
-    /// InvalidArgument - when |`self`| >= 1.
+    /// InvalidArgument - when |`self`| > 1.
     pub fn atanh(&self) -> Result<Self, Error> {
         if self.e as i16 + self.n <= -5 {
             // atanh(x) = x + x^3/3 + x^5/5 + ...
@@ -222,11 +251,15 @@ impl BigFloatInc {
             // 0.5 * ln( (1+x) / (1-x) )
             let x = *self;
             let one = Self::one();
-            if x.abs().cmp(&one) >= 0 {
-                return Err(Error::InvalidArgument);
+            let cmp_result = x.abs().cmp(&one);
+            if cmp_result > 0 {
+                Err(Error::InvalidArgument)
+            } else if cmp_result == 0 {
+                Err(Error::ExponentOverflow(x.sign))
+            } else {
+                let arg = one.add(&x)?.div(&one.sub(&x)?)?;
+                ONE_HALF.mul(&arg.ln()?)
             }
-            let arg = one.add(&x)?.div(&one.sub(&x)?)?;
-            ONE_HALF.mul(&arg.ln()?)
         }
     }
 }
