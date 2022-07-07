@@ -571,10 +571,14 @@ mod tests {
         let n = n.cosh();
         assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
 
-        // acosh extrema: 1
+        // acosh extrema at 1
         let exp_err = -(DECIMAL_POSITIONS as i8) - 18;
         let eps = BigFloat::parse("1.0e-39").unwrap();
         test_extremum(BigFloat::acosh, &ONE, &ZERO, 1, 2, 2, &eps, exp_err);
+
+        // acosh resulting to NAN
+        let n = ZERO.acosh();
+        assert!(n.is_nan());
 
         // tanh, atanh
         for _ in 0..10000 {
@@ -601,6 +605,12 @@ mod tests {
         assert!(n.sub(&ZERO).get_mantissa_len() < 2);
         let n = MIN.atanh();
         assert!(n.sub(&ZERO).get_mantissa_len() < 2);
+
+        // atanh resulting to NAN
+        let n = TWO.atanh();
+        assert!(n.is_nan());
+        let n = TWO.inv_sign().atanh();
+        assert!(n.is_nan());
     }
 
     fn random_f64_exp(exp_range: i32, exp_shift: i32) -> f64 {
