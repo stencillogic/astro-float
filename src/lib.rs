@@ -339,11 +339,19 @@ mod tests {
         let n = n.mul(&n);
         assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
 
+        // sqrt of zero
+        let n = ZERO.sqrt();
+        assert!(n.cmp(&ZERO).unwrap() == 0);
+
         // sqrt of min positive
         let n = MIN_POSITIVE.sqrt();
         assert!(n.cmp(&ZERO).unwrap() > 0 && MIN_POSITIVE.cmp(&n).unwrap() < 0);
         let n = n.mul(&n);
         assert!(n.is_zero() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+
+        // sqrt of negative
+        let n = MIN_POSITIVE.inv_sign().sqrt();
+        assert!(n.is_nan());
 
 
         // pow
@@ -385,6 +393,14 @@ mod tests {
         assert!(n.cmp(&ZERO).unwrap() < 0 && MIN_POSITIVE.cmp(&n.abs()).unwrap() < 0);
         let n = n.exp();
         assert!(n.is_inf_neg() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+
+        // sqrt of negative
+        let n = MIN_POSITIVE.inv_sign().ln();
+        assert!(n.is_nan());
+
+        // sqrt of zero
+        let n = ZERO.inv_sign().ln();
+        assert!(n.is_nan());
 
 
         // sin, asin
@@ -439,6 +455,12 @@ mod tests {
         let n = MIN_POSITIVE.inv_sign().asin();
         assert!(MIN_POSITIVE.inv_sign().sub(&n).get_mantissa_len() < 2);
 
+        // asin resulting to NAN
+        let n = TWO.asin();
+        assert!(n.is_nan());
+        let n = TWO.inv_sign().asin();
+        assert!(n.is_nan());
+
         // cos, acos
         for _ in 0..10000 {
             let num = random_normal_float(3, 40);
@@ -475,6 +497,12 @@ mod tests {
         let exp_err = -(DECIMAL_POSITIONS as i8) - 18;
         test_extremum(BigFloat::acos, &ONE, &ZERO, 2, 2, 22, &eps, exp_err);
         test_extremum(BigFloat::acos, &ONE.inv_sign(), &PI, 1, 2, 22, &eps, exp_err);
+
+        // acos resulting to NAN
+        let n = TWO.acos();
+        assert!(n.is_nan());
+        let n = TWO.inv_sign().acos();
+        assert!(n.is_nan());
 
         // tan, atan
         for _ in 0..10000 {
@@ -533,7 +561,7 @@ mod tests {
         // sinh of MAX
         let n = MAX.sinh();
         assert!(n.is_inf_pos());
-        let n = MAX.inv_sign().sinh();
+        let n = MIN.sinh();
         assert!(n.is_inf_neg());
 
         // asinh of MAX
@@ -541,10 +569,10 @@ mod tests {
         assert!(n.cmp(&MAX).unwrap() < 0);
         let n = n.sinh();
         assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
-        let n = MAX.inv_sign().asinh();
-        assert!(n.cmp(&MAX.inv_sign()).unwrap() > 0);
+        let n = MIN.asinh();
+        assert!(n.cmp(&MIN).unwrap() > 0);
         let n = n.sinh();
-        assert!(n.is_inf_neg() || MAX.inv_sign().sub(&n).get_mantissa_len() < 2);
+        assert!(n.is_inf_neg() || MIN.sub(&n).get_mantissa_len() < 2);
 
         // cosh, acosh
         for _ in 0..10000 {
@@ -562,7 +590,7 @@ mod tests {
         // cosh of MAX
         let n = MAX.cosh();
         assert!(n.is_inf_pos());
-        let n = MAX.inv_sign().cosh();
+        let n = MIN.cosh();
         assert!(n.is_inf_pos());
 
         // acosh of MAX

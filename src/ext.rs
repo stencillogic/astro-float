@@ -657,7 +657,7 @@ impl BigFloat {
     gen_wrapper2!("Returns sine of a number. Argument is an angle in radians.", sin, Self, {NAN}, {NAN},);
     gen_wrapper2!("Returns cosine of a number. Argument is an angle in radians.", cos, Self, {NAN}, {NAN},);
     gen_wrapper2!("Returns tangent of a number. Argument is an angle in radians.", tan, Self, {NAN}, {NAN},);
-    gen_wrapper2!("Returns arcsine of a number. Result is an angle in radians ranging from `-pi` to `pi`.", asin, Self, {NAN}, {NAN},);
+    gen_wrapper2!("Returns arcsine of a number. Result is an angle in radians ranging from `-pi/2` to `pi/2`.", asin, Self, {NAN}, {NAN},);
     gen_wrapper2!("Returns arccosine of a number.", acos, Self, {NAN}, {NAN},);
     gen_wrapper2!("Returns arctangent of a number. ", atan, Self, {HALF_PI}, {HALF_PI.inv_sign()},);
     
