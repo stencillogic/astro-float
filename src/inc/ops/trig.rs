@@ -57,7 +57,7 @@ impl BigFloatInc {
     pub fn tan(&self) -> Result<Self, Error> {
         // tan(x) = tan(s + dx) = tan(s) + tan(dx) / (1 - tan(s)*tan(dx));
         // tan(s) = sin(s)/cos(s)
-        // tan(dx) = x + 1/3*x^3 + 2/15*x^5 + ... (tailor series)
+        // tan(dx) = x + 1/3*x^3 + 2/15*x^5 + ... (Taylor series)
         // do calculation only for angles [0, pi/2)
         let mut x = *self;
 
@@ -75,7 +75,7 @@ impl BigFloatInc {
         // sin(s) / cos(s) = sin(s) / sin(s + pi/2)
         let tan_s = SIN_VALUES1[idx].div(&SIN_VALUES2[idx])?;
 
-        // tailor series
+        // Taylor series
         let mut tan_dx = dx;
         let dxq = dx.mul(&dx)?;
         let mut i = 0;
@@ -172,7 +172,7 @@ impl BigFloatInc {
         let s = x.sub(&dx)?;
         dx = dx.div(&one.add(&x.mul(&s)?)?)?;
 
-        // taylor series
+        // Taylor series
         let mut ret = dx;
         let dxx = dx.mul(&dx)?;
         for i in 0..ATAN_VALUES1.len() {
