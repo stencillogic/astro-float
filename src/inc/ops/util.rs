@@ -100,7 +100,7 @@ impl BigFloatInc {
     }
 
     // return number of digits taken in mantissa
-    pub(super) fn num_digits(m: &[i16]) -> i16 {
+    pub(crate) fn num_digits(m: &[i16]) -> i16 {
         let mut n: i16 = DECIMAL_POSITIONS as i16;
         let mut t: i16;
         let mut p: i16 = DECIMAL_PARTS as i16 - 1;

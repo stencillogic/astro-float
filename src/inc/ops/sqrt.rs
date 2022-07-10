@@ -31,10 +31,13 @@ impl BigFloatInc {
             return Ok(*self);
         }
 
+        // calc sqrt of integer number with same mantissa
         let mut int_num = *self;
         int_num.e = 0;
         let mut sq = Self::sqrt_int(&int_num)?;
 
+        // make exponent even by dividing or multiplying number by sqrt(10), 
+        // then sqrt of even exponent is simply e/2
         if self.e & 1 != 0 {
             if self.e < 0 {
                 sq = sq.div(&SQRT_OF_10)?;

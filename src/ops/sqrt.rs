@@ -103,14 +103,14 @@ mod tests {
         d1.m[9] = 0;
         d1.n = 32;
         d1.e = -36;
-        epsilon.e = - epsilon.n as i8 + 1 - (DECIMAL_POSITIONS as i8);
+        epsilon.e = - epsilon.n as i8 + 2 - (DECIMAL_POSITIONS as i8);
         for i in 1..8000 {
             d1.m[8] = 10+i;
             d1.m[9] = i;
             d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
             ret = d1.sqrt().unwrap();
             ret = ret.mul(&ret).unwrap();
-            assert!(ret.sub(&ret).unwrap().abs().cmp(&epsilon) <= 0);
+            assert!(ret.div(&d1).unwrap().sub(&BigFloatNum::one()).unwrap().abs().cmp(&epsilon) <= 0);
         }
     }
 }
