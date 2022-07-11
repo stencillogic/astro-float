@@ -496,6 +496,49 @@ impl BigFloat {
         }
     }
 
+    /// Returns logarithm of base `b` of a number.
+    pub fn log(&self, b: &Self) -> Self {
+        match self.inner {
+            Flavor::Value(v1) => {
+                match b.inner {
+                    Flavor::Value(v2) => {
+                        Self::result_to_ext(v1.log(&v2), false, true)
+                    },
+                    Flavor::Inf(s2) => {
+                        // v1.log(inf)
+                        if s2 == DECIMAL_SIGN_POS {
+                            ZERO
+                        } else {
+                            NAN
+                        }
+                    },
+                    Flavor::NaN => NAN,
+                }
+            },
+            Flavor::Inf(s1) => {
+                if s1 == DECIMAL_SIGN_NEG {
+                    // -inf.log(any)
+                    NAN
+                } else {
+                    match b.inner {
+                        Flavor::Value(v2) => {
+                            // +inf.log(v2)
+                            let val = v2.cmp(&BigFloatNum::one());
+                            if val < 0 {
+                                INF_NEG
+                            } else {
+                                INF_POS
+                            }
+                        },
+                        Flavor::Inf(_) => NAN, // +inf.log(inf)
+                        Flavor::NaN => NAN,
+                    }
+                }
+            },
+            Flavor::NaN => NAN,
+        }
+    }
+
     fn result_to_ext(res: Result<BigFloatNum, Error>, is_dividend_zero: bool, is_same_sign: bool) -> BigFloat {
         match res {
             Err(e) => match e {
@@ -1057,6 +1100,25 @@ mod tests {
         assert!(INF_POS.pow(&INF_NEG).is_zero());
         assert!(INF_NEG.pow(&INF_NEG).is_zero());
 
+        let half = ONE.div(&TWO);
+        assert!(TWO.log(&TWO).cmp(&ONE) == Some(0));
+        assert!(TWO.log(&INF_POS).is_zero());
+        assert!(TWO.log(&INF_NEG).is_nan());
+        assert!(INF_POS.log(&TWO).is_inf_pos());
+        assert!(INF_NEG.log(&TWO).is_nan());
+        assert!(half.log(&half).cmp(&ONE) == Some(0));
+        assert!(half.log(&INF_POS).is_zero());
+        assert!(half.log(&INF_NEG).is_nan());
+        assert!(INF_POS.log(&half).is_inf_neg());
+        assert!(INF_NEG.log(&half).is_nan());
+        assert!(INF_POS.log(&INF_POS).is_nan());
+        assert!(INF_POS.log(&INF_NEG).is_nan());
+        assert!(INF_NEG.log(&INF_POS).is_nan());
+        assert!(INF_NEG.log(&INF_NEG).is_nan());
+        assert!(TWO.log(&ONE).is_inf_pos());
+        assert!(half.log(&ONE).is_inf_pos());
+        assert!(ONE.log(&ONE).is_nan());
+
         assert!(BigFloat::from_f32(f32::NAN).is_nan());
         assert!(BigFloat::from_f32(f32::INFINITY).is_inf_pos());
         assert!(BigFloat::from_f32(f32::NEG_INFINITY).is_inf_neg());
@@ -1065,6 +1127,7 @@ mod tests {
         assert!(BigFloat::from_f64(f64::INFINITY).is_inf_pos());
         assert!(BigFloat::from_f64(f64::NEG_INFINITY).is_inf_neg());
         assert!(!BigFloat::from_f64(1.0).is_nan());
+
         assert!(ONE.pow(&NAN).is_nan());
         assert!(NAN.pow(&ONE).is_nan());
         assert!(INF_POS.pow(&NAN).is_nan());
@@ -1072,6 +1135,14 @@ mod tests {
         assert!(INF_NEG.pow(&NAN).is_nan());
         assert!(NAN.pow(&INF_NEG).is_nan());
         assert!(NAN.pow(&NAN).is_nan());
+
+        assert!(TWO.log(&NAN).is_nan());
+        assert!(NAN.log(&TWO).is_nan());
+        assert!(INF_POS.log(&NAN).is_nan());
+        assert!(NAN.log(&INF_POS).is_nan());
+        assert!(INF_NEG.log(&NAN).is_nan());
+        assert!(NAN.log(&INF_NEG).is_nan());
+        assert!(NAN.log(&NAN).is_nan());
 
         assert!(INF_NEG.abs().is_inf_pos());
         assert!(INF_POS.abs().is_inf_pos());

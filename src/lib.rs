@@ -519,13 +519,72 @@ mod tests {
         let n = n.exp();
         assert!(n.is_inf_neg() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
 
-        // sqrt of negative
+        // ln of negative
         let n = MIN_POSITIVE.inv_sign().ln();
         assert!(n.is_nan());
 
-        // sqrt of zero
+        // ln of zero
         let n = ZERO.inv_sign().ln();
         assert!(n.is_nan());
+
+        // log
+        for _ in 0..10000 {
+            let base = random_normal_float(256, 127).abs();
+            let num = random_normal_float(256, 127).abs();
+            if num.is_zero() || base.is_zero() {
+                assert!(num.log(&base).is_nan());
+            } else {
+                let l = num.log(&base);
+                let e = base.pow(&l);
+                assert!(num.sub(&e).abs().get_mantissa_len() < 5);
+            }
+        }
+
+        // log crossing x axis at x = 1
+        let base1 = BigFloat::parse("5.4321").unwrap();
+        let base2 = BigFloat::parse("0.4321").unwrap();
+        let n = ONE.log(&base1);
+        assert!(n.is_zero() || ZERO.sub(&n).get_mantissa_len() < 2);
+        let n = ONE.log(&base2);
+        assert!(n.is_zero() || ZERO.sub(&n).get_mantissa_len() < 2);
+
+        // log of max
+        let n = MAX.log(&base1);
+        assert!(n.cmp(&ZERO).unwrap() > 0 && MAX.cmp(&n).unwrap() > 0);
+        let n = base1.pow(&n);
+        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+        let n = MAX.log(&base2);
+        assert!(n.cmp(&ZERO).unwrap() < 0 && MAX.cmp(&n.inv_sign()).unwrap() > 0);
+        let n = base2.pow(&n);
+        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+
+        // log of min positive
+        let n = MIN_POSITIVE.log(&base1);
+        assert!(n.cmp(&ZERO).unwrap() < 0 && MIN_POSITIVE.cmp(&n.abs()).unwrap() < 0);
+        let n = base1.pow(&n);
+        assert!(n.is_inf_neg() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+        let n = MIN_POSITIVE.log(&base2);
+        assert!(n.cmp(&ZERO).unwrap() > 0 && MIN_POSITIVE.cmp(&n.abs()).unwrap() < 0);
+        let n = base2.pow(&n);
+        assert!(n.is_inf_neg() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+
+        // log of negative
+        let n = MIN_POSITIVE.inv_sign().log(&base1);
+        assert!(n.is_nan());
+        let n = MIN_POSITIVE.inv_sign().log(&base2);
+        assert!(n.is_nan());
+
+        // negative base
+        assert!(TWO.log(&base1.inv_sign()).is_nan());
+
+        // log of zero
+        let n = ZERO.inv_sign().log(&base1);
+        assert!(n.is_nan());
+        let n = ZERO.inv_sign().log(&base2);
+        assert!(n.is_nan());
+
+        // zero base
+        assert!(TWO.log(&ZERO).is_nan());
 
 
         // sin, asin

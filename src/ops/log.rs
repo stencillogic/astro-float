@@ -36,6 +36,8 @@ impl BigFloatNum {
     /// ExponentOverflow - when result is too big.
     ///
     /// InvalidArgument - when `self` or `b` is negative or zero.
+    ///
+    /// DivisionByZero - when `b` is equal to 1.
     pub fn log(&self, b: &Self) -> Result<Self, Error> {
         let arg = Self::to_big_float_inc(self);
         let base = Self::to_big_float_inc(b);

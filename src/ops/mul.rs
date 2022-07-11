@@ -112,6 +112,7 @@ impl BigFloatNum {
     ///
     /// ExponentOverflow - when result is too big.
     /// DivisionByZero - in case of d2 equal to zero.
+    /// InvalidArgument - in case both d1 and self are zeroes.
     pub fn div(&self, d2: &Self) -> Result<Self, Error> {
         // Knuth's division
         let mut d3 = Self::new();
@@ -135,7 +136,11 @@ impl BigFloatNum {
         let mut n1j: usize;
 
         if d2.n == 0 {
-            return Err(Error::DivisionByZero);
+            if self.n == 0 {
+                return Err(Error::InvalidArgument);
+            } else {
+                return Err(Error::DivisionByZero);
+            }
         }
         n = (d2.n as i32 - 1) / DECIMAL_BASE_LOG10 as i32;
 
@@ -487,12 +492,15 @@ mod tests {
         d2 = BigFloatNum::new();
         ref_num = BigFloatNum::new();
 
-        // division by zero
-        assert!(d1.div(&d2).unwrap_err() == Error::DivisionByZero);
+        // 0 / 0
+        assert!(d1.div(&d2).unwrap_err() == Error::InvalidArgument);
 
-        // 0 / d2
+        // d2 / 0
         d2.m[0] = 1;
         d2.n = 1;
+        assert!(d2.div(&d1).unwrap_err() == Error::DivisionByZero);
+
+        // 0 / d2
         d3 = d1.div(&d2).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
