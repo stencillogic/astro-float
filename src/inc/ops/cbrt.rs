@@ -27,7 +27,6 @@ const CBRT_OF_10: BigFloatInc = BigFloatInc {
     n: 44, 
     sign: DECIMAL_SIGN_POS, 
     e: -43,
-
 };
 
 const CBRT_OF_100: BigFloatInc = BigFloatInc {
@@ -35,7 +34,6 @@ const CBRT_OF_100: BigFloatInc = BigFloatInc {
     n: 44,
     sign: DECIMAL_SIGN_POS, 
     e: -43,
-    
 };
 
 impl BigFloatInc {

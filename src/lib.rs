@@ -354,6 +354,37 @@ mod tests {
         assert!(n.is_nan());
 
 
+        // cbrt
+        for _ in 0..10000 {
+            let num = random_normal_float(256, 128).abs();
+            let sq = num.cbrt();
+            let ret = sq.mul(&sq).mul(&sq);
+            assert!(num.sub(&ret).abs().get_mantissa_len() < 2);
+        }
+
+        // cbrt of max
+        let n = MAX.cbrt();
+        assert!(n.cmp(&ZERO).unwrap() > 0 && MAX.cmp(&n).unwrap() > 0);
+        let n = n.mul(&n).mul(&n);
+        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+
+        // cbrt of zero
+        let n = ZERO.cbrt();
+        assert!(n.cmp(&ZERO).unwrap() == 0);
+
+        // cbrt of min positive
+        let n = MIN_POSITIVE.cbrt();
+        assert!(n.cmp(&ZERO).unwrap() > 0 && MIN_POSITIVE.cmp(&n).unwrap() < 0);
+        let n = n.mul(&n).mul(&n);
+        assert!(n.is_zero() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+
+        // cbrt of negative
+        let n = MIN_POSITIVE.inv_sign().cbrt();
+        assert!(n.cmp(&ZERO).unwrap() < 0 && MIN_POSITIVE.inv_sign().cmp(&n).unwrap() > 0);
+        let n = n.mul(&n).mul(&n);
+        assert!(n.is_zero() || MIN_POSITIVE.inv_sign().sub(&n).get_mantissa_len() < 2);
+
+
         // pow
         for _ in 0..10000 {
             let a = random_normal_float(4, 40);
