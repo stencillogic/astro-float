@@ -97,4 +97,17 @@ impl BigFloatInc {
     pub fn exp(&self) -> Result<Self, Error> {
         E.pow(self)
     }
+
+    /// Returns logarithm of base `b` of a number.
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big.
+    ///
+    /// InvalidArgument - when `self` or `b` is negative or zero.
+    ///
+    /// DivisionByZero - when `b` is equal to 1.
+    pub fn log(&self, b: &Self) -> Result<Self, Error> {
+        self.ln()?.div(&b.ln()?)
+    }
 }
