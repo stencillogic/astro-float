@@ -378,7 +378,13 @@ mod tests {
         let n = n.mul(&n).mul(&n);
         assert!(n.is_zero() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
 
-        // cbrt of negative
+        // cbrt of negative MAX
+        let n = MAX.inv_sign().cbrt();
+        assert!(n.cmp(&ZERO).unwrap() < 0 && MAX.inv_sign().cmp(&n).unwrap() < 0);
+        let n = n.mul(&n).mul(&n);
+        assert!(n.is_inf_neg() || MAX.inv_sign().sub(&n).get_mantissa_len() < 2);
+
+        // cbrt of negative MIN_POSITIVE
         let n = MIN_POSITIVE.inv_sign().cbrt();
         assert!(n.cmp(&ZERO).unwrap() < 0 && MIN_POSITIVE.inv_sign().cmp(&n).unwrap() > 0);
         let n = n.mul(&n).mul(&n);
