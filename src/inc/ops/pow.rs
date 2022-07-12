@@ -32,7 +32,8 @@ impl BigFloatInc {
             }
         }
         if Self::extract_fract_part(d1).n == 0 {
-            let int = Self::extract_int_part(d1);
+            let mut int = Self::extract_int_part(d1);
+            int.sign = d1.sign;
             Self::result_inversion(self.powi(&int), d1.sign == DECIMAL_SIGN_NEG, self.sign)
         } else {
             self.powexp(d1)

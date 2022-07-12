@@ -492,40 +492,58 @@ mod tests {
         assert!(n.pow(&ZERO).cmp(&ONE).unwrap() == 0);
 
         // ln
+        let ten = BigFloat::parse("10").unwrap();
         for _ in 0..10000 {
             let num = random_normal_float(256, 127).abs();
             if num.is_zero() {
                 assert!(num.ln().is_nan());
+                assert!(num.log2().is_nan());
+                assert!(num.log10().is_nan());
             } else {
                 let l = num.ln();
                 let e = l.exp();
                 assert!(num.sub(&e).abs().get_mantissa_len() < 5);
+
+                let l = num.log2();
+                let e = TWO.pow(&l);
+                assert!(num.sub(&e).abs().get_mantissa_len() < 5);
+
+                let l = num.log10();
+                let e = ten.pow(&l);
+                assert!(num.sub(&e).abs().get_mantissa_len() < 5);
             }
         }
 
-        // crossing x axis at x = 1
-        let n = ONE.ln();
-        assert!(n.is_zero() || ZERO.sub(&n).get_mantissa_len() < 2);
+        let ops = [BigFloat::ln, BigFloat::log2, BigFloat::log10,];
+        let bases = [crate::E, TWO, ten];
+        for i in 0..ops.len() {
+            let op = ops[i];
+            let base = bases[i];
 
-        // ln of max
-        let n = MAX.ln();
-        assert!(n.cmp(&ZERO).unwrap() > 0 && MAX.cmp(&n).unwrap() > 0);
-        let n = n.exp();
-        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+            // crossing x axis at x = 1
+            let n = op(&ONE);
+            assert!(n.is_zero() || ZERO.sub(&n).get_mantissa_len() < 2);
 
-        // ln of min positive
-        let n = MIN_POSITIVE.ln();
-        assert!(n.cmp(&ZERO).unwrap() < 0 && MIN_POSITIVE.cmp(&n.abs()).unwrap() < 0);
-        let n = n.exp();
-        assert!(n.is_inf_neg() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+            // ln of max
+            let n = op(&MAX);
+            assert!(n.cmp(&ZERO).unwrap() > 0 && MAX.cmp(&n).unwrap() > 0);
+            let n = base.pow(&n);
+            assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 4);
 
-        // ln of negative
-        let n = MIN_POSITIVE.inv_sign().ln();
-        assert!(n.is_nan());
+            // ln of min positive
+            let n = op(&MIN_POSITIVE);
+            assert!(n.cmp(&ZERO).unwrap() < 0 && MIN_POSITIVE.cmp(&n.abs()).unwrap() < 0);
+            let n = base.pow(&n);
+            assert!(n.is_inf_neg() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 4);
 
-        // ln of zero
-        let n = ZERO.inv_sign().ln();
-        assert!(n.is_nan());
+            // ln of negative
+            let n = op(&MIN_POSITIVE.inv_sign());
+            assert!(n.is_nan());
+
+            // ln of zero
+            let n = op(&ZERO.inv_sign());
+            assert!(n.is_nan());
+        }
 
         // log
         for _ in 0..10000 {

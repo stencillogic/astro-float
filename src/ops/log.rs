@@ -1,6 +1,9 @@
 /// Logarithms.
 
 use crate::defs::BigFloatNum;
+use crate::defs::DECIMAL_BASE;
+use crate::defs::DECIMAL_PARTS;
+use crate::defs::DECIMAL_POSITIONS;
 use crate::defs::Error;
 
 impl BigFloatNum {
@@ -43,6 +46,37 @@ impl BigFloatNum {
         let base = Self::to_big_float_inc(b);
         let ret = arg.log(&base)?;
         Self::from_big_float_inc(ret)
+    }
+
+
+    /// Returns logarithm of base 2 of a number.
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big.
+    ///
+    /// InvalidArgument - when `self` or `b` is negative or zero.
+    pub fn log2(&self) -> Result<Self, Error> {
+        let mut two = Self::new();
+        two.m[DECIMAL_PARTS - 1] = DECIMAL_BASE as i16/5;
+        two.n = DECIMAL_POSITIONS as i16;
+        two.e = 1 - DECIMAL_POSITIONS as i8;
+        self.log(&two)
+    }
+
+    /// Returns logarithm of base 10 of a number.
+    ///
+    /// # Errors
+    ///
+    /// ExponentOverflow - when result is too big.
+    ///
+    /// InvalidArgument - when `self` or `b` is negative or zero.
+    pub fn log10(&self) -> Result<Self, Error> {
+        let mut ten = Self::new();
+        ten.m[DECIMAL_PARTS - 1] = DECIMAL_BASE as i16/10;
+        ten.n = DECIMAL_POSITIONS as i16;
+        ten.e = 2 - DECIMAL_POSITIONS as i8;
+        self.log(&ten)
     }
 }
 
@@ -128,5 +162,15 @@ mod tests {
             d1 = half.pow(&ret).unwrap();
             assert!(d2.sub(&d1).unwrap().n <= 3);
         }
+
+        // log2
+        epsilon.e = - epsilon.n as i8 + 1 - (DECIMAL_POSITIONS as i8);
+        assert!(four.log2().unwrap().sub(&two).unwrap().abs().cmp(&epsilon) <= 0);
+
+        // log10
+        d1 = BigFloatNum::new();
+        d1.m[0] = 100;
+        d1.n = 3;
+        assert!(d1.log10().unwrap().sub(&two).unwrap().abs().cmp(&epsilon) <= 0);
     }
 }

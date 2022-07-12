@@ -696,6 +696,8 @@ impl BigFloat {
     gen_wrapper2!("Return square root of a number.", sqrt, Self, {INF_POS}, {NAN},);
     gen_wrapper2!("Return cube root of a number.", cbrt, Self, {INF_POS}, {INF_NEG},);
     gen_wrapper2!("Returns natural logarithm of a number.", ln, Self, {INF_POS}, {NAN},);
+    gen_wrapper2!("Returns logarithm base 2 of a number.", log2, Self, {INF_POS}, {NAN},);
+    gen_wrapper2!("Returns logarithm base 10 of a number.", log10, Self, {INF_POS}, {NAN},);
     gen_wrapper2!("Returns `e` to the power of `self`.", exp, Self, {INF_POS}, {INF_NEG},);
     
     gen_wrapper2!("Returns sine of a number. Argument is an angle in radians.", sin, Self, {NAN}, {NAN},);
@@ -1176,9 +1178,13 @@ mod tests {
         assert!(INF_POS.cbrt().is_inf_pos());
         assert!(NAN.cbrt().is_nan());
 
-        assert!(INF_NEG.ln().is_nan());
-        assert!(INF_POS.ln().is_inf_pos());
-        assert!(NAN.ln().is_nan());
+        for op in [BigFloat::ln, 
+            BigFloat::log2, 
+            BigFloat::log10,] {
+            assert!(op(&INF_NEG).is_nan());
+            assert!(op(&INF_POS).is_inf_pos());
+            assert!(op(&NAN).is_nan());
+        }
 
         assert!(INF_NEG.exp().is_inf_neg());
         assert!(INF_POS.exp().is_inf_pos());
