@@ -80,7 +80,8 @@ mod tests {
         MAX, 
         PI, 
         HALF_PI, 
-        ZERO,
+        ZERO, 
+        NAN,
     };
     use crate::defs::{
         DECIMAL_SIGN_POS, 
@@ -841,6 +842,145 @@ mod tests {
         assert!(n.is_nan());
         let n = TWO.inv_sign().atanh();
         assert!(n.is_nan());
+
+        // min, max
+        for _ in 0..1000 {
+            let num1 = random_normal_float(256, 127);
+            let num2 = random_normal_float(256, 127);
+            let n1 = num1.max(&num2);
+            let n2 = num1.min(&num2);
+            if num1.cmp(&num2).unwrap() > 0 {
+                assert!(n1.cmp(&num1).unwrap() == 0);
+                assert!(n2.cmp(&num2).unwrap() == 0);
+            } else {
+                assert!(n1.cmp(&num2).unwrap() == 0);
+                assert!(n2.cmp(&num1).unwrap() == 0);
+            }
+        }
+
+        assert!(ONE.max(&INF_POS).cmp(&INF_POS).unwrap() == 0);
+        assert!(INF_POS.max(&ONE).cmp(&INF_POS).unwrap() == 0);
+        assert!(ONE.max(&INF_NEG).cmp(&ONE).unwrap() == 0);
+        assert!(INF_NEG.max(&ONE).cmp(&ONE).unwrap() == 0);
+        assert!(INF_POS.max(&INF_NEG).cmp(&INF_POS).unwrap() == 0);
+        assert!(INF_NEG.max(&INF_POS).cmp(&INF_POS).unwrap() == 0);
+        assert!(NAN.max(&ONE).is_nan());
+        assert!(NAN.max(&NAN).is_nan());
+        assert!(ONE.max(&NAN).is_nan());
+        assert!(INF_POS.max(&NAN).is_nan());
+        assert!(INF_NEG.max(&NAN).is_nan());
+        assert!(NAN.max(&INF_POS).is_nan());
+        assert!(NAN.max(&INF_NEG).is_nan());
+
+        assert!(ONE.min(&INF_POS).cmp(&ONE).unwrap() == 0);
+        assert!(INF_POS.min(&ONE).cmp(&ONE).unwrap() == 0);
+        assert!(ONE.min(&INF_NEG).cmp(&INF_NEG).unwrap() == 0);
+        assert!(INF_NEG.min(&ONE).cmp(&INF_NEG).unwrap() == 0);
+        assert!(INF_POS.min(&INF_NEG).cmp(&INF_NEG).unwrap() == 0);
+        assert!(INF_NEG.min(&INF_POS).cmp(&INF_NEG).unwrap() == 0);
+        assert!(NAN.min(&ONE).is_nan());
+        assert!(NAN.min(&NAN).is_nan());
+        assert!(ONE.min(&NAN).is_nan());
+        assert!(INF_POS.min(&NAN).is_nan());
+        assert!(INF_NEG.min(&NAN).is_nan());
+        assert!(NAN.min(&INF_POS).is_nan());
+        assert!(NAN.min(&INF_NEG).is_nan());
+
+        // clamp
+        for _ in 0..1000 {
+            let num1 = random_normal_float(256, 127);
+            let num2 = random_normal_float(256, 127);
+            let num3 = random_normal_float(256, 127);
+            let upper = num1.max(&num2);
+            let lower = num1.min(&num2);
+            let n = num3.clamp(&lower, &upper);
+            assert!(n.cmp(&upper).unwrap() <= 0);
+            assert!(n.cmp(&lower).unwrap() >= 0);
+        }
+
+        assert!(TWO.clamp(&ONE, &ONE).cmp(&ONE).unwrap() == 0);
+        assert!(INF_POS.clamp(&ONE, &TWO).cmp(&TWO).unwrap() == 0);
+        assert!(INF_NEG.clamp(&ONE, &TWO).cmp(&ONE).unwrap() == 0);
+
+        assert!(ONE.clamp(&INF_NEG, &INF_POS).cmp(&ONE).unwrap() == 0);
+        assert!(INF_POS.clamp(&INF_NEG, &INF_POS).cmp(&INF_POS).unwrap() == 0);
+        assert!(INF_NEG.clamp(&INF_NEG, &INF_POS).cmp(&INF_NEG).unwrap() == 0);
+
+        assert!(ONE.clamp(&TWO, &INF_POS).cmp(&TWO).unwrap() == 0);
+        assert!(INF_POS.clamp(&TWO, &INF_POS).cmp(&INF_POS).unwrap() == 0);
+        assert!(INF_NEG.clamp(&TWO, &INF_POS).cmp(&TWO).unwrap() == 0);
+
+        assert!(TWO.clamp(&INF_NEG, &ONE).cmp(&ONE).unwrap() == 0);
+        assert!(INF_POS.clamp(&INF_NEG, &ONE).cmp(&ONE).unwrap() == 0);
+        assert!(INF_NEG.clamp(&INF_NEG, &ONE).cmp(&INF_NEG).unwrap() == 0);
+
+        assert!(ZERO.clamp(&INF_POS, &INF_NEG).is_nan());
+        assert!(ZERO.clamp(&TWO, &ONE).is_nan());
+        assert!(ZERO.clamp(&INF_POS, &ONE).is_nan());
+        assert!(ZERO.clamp(&TWO, &INF_NEG).is_nan());
+
+        for i in 1..0b111 {
+            let n1 = if i & 1 == 0 { NAN } else { ONE };
+            let n2 = if i & 0b10 == 0 { NAN } else { ONE };
+            let n3 = if i & 0b100 == 0 { NAN } else { ONE };
+            assert!(n1.clamp(&n2, &n3).is_nan());
+        }
+
+        // signum
+        assert!(TWO.signum().cmp(&ONE).unwrap() == 0);
+        assert!(ZERO.signum().cmp(&ONE).unwrap() == 0);
+        assert!(TWO.inv_sign().signum().cmp(&ONE.inv_sign()).unwrap() == 0);
+        assert!(NAN.signum().is_nan());
+        assert!(INF_POS.signum().cmp(&ONE).unwrap() == 0);
+        assert!(INF_NEG.signum().cmp(&ONE.inv_sign()).unwrap() == 0);
+
+        // euclidean div
+        for _ in 0..10000 {
+            let num1 = random_normal_float(256, 127);
+            let num2 = random_normal_float(256, 127);
+            let (n, r) = num1.div_euclid(&num2);
+            if !n.is_nan() && !n.is_inf() && !r.is_nan() && !r.is_inf() {
+                assert!(num2.mul(&n).add(&r).sub(&num1).get_mantissa_len() < 2);
+            }
+        }
+
+        let c = INF_POS.div_euclid(&TWO);
+        assert!(c.0.is_nan() && c.1.is_nan());
+        let c = INF_NEG.div_euclid(&TWO);
+        assert!(c.0.is_nan() && c.1.is_nan());
+        let c = INF_POS.div_euclid(&TWO.inv_sign());
+        assert!(c.0.is_nan() && c.1.is_nan());
+        let c = INF_NEG.div_euclid(&TWO.inv_sign());
+        assert!(c.0.is_nan() && c.1.is_nan());
+        let c = TWO.div_euclid(&INF_POS);
+        assert!(c.0.is_zero() && c.1.is_nan());
+        let c = TWO.div_euclid(&INF_NEG);
+        assert!(c.0.is_zero() && c.1.is_nan());
+        let c = TWO.inv_sign().div_euclid(&INF_POS);
+        assert!(c.0.is_zero() && c.1.is_nan());
+        let c = TWO.inv_sign().div_euclid(&INF_NEG);
+        assert!(c.0.is_zero() && c.1.is_nan());
+        let c = INF_POS.div_euclid(&INF_POS);
+        assert!(c.0.is_nan() && c.1.is_nan());
+        let c = INF_POS.div_euclid(&INF_NEG);
+        assert!(c.0.is_nan() && c.1.is_nan());
+        let c = INF_NEG.div_euclid(&INF_POS);
+        assert!(c.0.is_nan() && c.1.is_nan());
+        let c = INF_NEG.div_euclid(&INF_NEG);
+        assert!(c.0.is_nan() && c.1.is_nan());
+
+        let c = NAN.div_euclid(&ONE);
+        assert!(c.0.is_nan() && c.1.is_nan());
+        let c = NAN.div_euclid(&INF_POS);
+        assert!(c.0.is_nan() && c.1.is_nan());
+        let c = NAN.div_euclid(&INF_NEG);
+        assert!(c.0.is_nan() && c.1.is_nan());
+        let c = ONE.div_euclid(&NAN);
+        assert!(c.0.is_nan() && c.1.is_nan());
+        let c = INF_POS.div_euclid(&NAN);
+        assert!(c.0.is_nan() && c.1.is_nan());
+        let c = INF_NEG.div_euclid(&NAN);
+        assert!(c.0.is_nan() && c.1.is_nan());
     }
 
     fn random_f64_exp(exp_range: i32, exp_shift: i32) -> f64 {

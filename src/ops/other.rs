@@ -62,7 +62,9 @@ impl BigFloatNum {
     /// i.e. having self=12.345 it will return 12.0.
     pub fn int(&self) -> Self {
         let mut ret = Self::extract_int_part(self);
-        ret.sign = self.sign;
+        if ret.n != 0 {
+            ret.sign = self.sign;
+        }
         ret
     }
 

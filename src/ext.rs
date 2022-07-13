@@ -595,6 +595,73 @@ impl BigFloat {
         }
     }
 
+    /// Restrict value of `self` to an interval determined by values of `min` and `max`.
+    /// Returns `max` if `self` is greater than `max`, `min` if `self` is less than `min`, and `self` otherwise.
+    /// If any of the arguments is `NAN` or `min` is greater than `max`, the function returns `NAN`.
+    pub fn clamp(&self, min: &Self, max: &Self) -> Self {
+        if self.is_nan() || min.is_nan() || max.is_nan() || max.cmp(min).unwrap() < 0 {
+            NAN
+        } else if self.cmp(min).unwrap() < 0 {
+            *min
+        } else if self.cmp(max).unwrap() > 0 {
+            *max
+        } else {
+            *self
+        }
+    }
+
+    /// Returns value of `d1` if `d1` is greater than `self`, or the value of `self` otherwise.
+    /// If any of the arguments is `NAN`, the function returns `NAN`.
+    pub fn max(&self, d1: &Self) -> Self {
+        if self.is_nan() || d1.is_nan() {
+            NAN
+        } else if self.cmp(d1).unwrap() < 0 {
+            *d1
+        } else {
+            *self
+        }
+    }
+
+    /// Returns value of `d1` if `d1` is less than `self`, or the value of `self` otherwise.
+    /// If any of the arguments is `NAN`, the function returns `NAN`.
+    pub fn min(&self, d1: &Self) -> Self {
+        if self.is_nan() || d1.is_nan() {
+            NAN
+        } else if self.cmp(d1).unwrap() > 0 {
+            *d1
+        } else {
+            *self
+        }
+    }
+
+    /// Returns BigFloat with value `-1` if `self` is negative, `+1` if `self` is positive or zero.
+    /// Returns `NAN` If self is `NAN`.
+    pub fn signum(&self) -> Self {
+        if self.is_nan() {
+            NAN
+        } else if self.is_negative() {
+            ONE.inv_sign()
+        } else {
+            ONE
+        }
+    }
+
+    /// Euclidean division.
+    /// It returns `(b, r)` such that `self` = `b`*`q` + `r`, where
+    /// `b` is an integer part of result of division of `self` by `q`, and `r` is a remainder.
+    /// If any of the arguments is NAN, the result is `(NAN, NAN)`.
+    pub fn div_euclid(&self, q: &Self) -> (Self, Self) {
+        let d = self.div(q);
+        let mut b = d.int();
+        let f = d.frac();
+        if self.is_negative() && b.is_negative() && !f.is_zero() {
+            b = b.sub(&ONE);
+        }
+        let r = self.sub(&b.mul(q));
+
+        (b, r)
+    }
+
 
     /// Parse the number from string `s`. 
     /// Function expects `s` to be a number in scientific format with base 10, or +-Inf, or NaN.
