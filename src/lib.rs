@@ -933,54 +933,6 @@ mod tests {
         assert!(NAN.signum().is_nan());
         assert!(INF_POS.signum().cmp(&ONE).unwrap() == 0);
         assert!(INF_NEG.signum().cmp(&ONE.inv_sign()).unwrap() == 0);
-
-        // euclidean div
-        for _ in 0..10000 {
-            let num1 = random_normal_float(256, 127);
-            let num2 = random_normal_float(256, 127);
-            let (n, r) = num1.div_euclid(&num2);
-            if !n.is_nan() && !n.is_inf() && !r.is_nan() && !r.is_inf() {
-                assert!(num2.mul(&n).add(&r).sub(&num1).get_mantissa_len() < 2);
-            }
-        }
-
-        let c = INF_POS.div_euclid(&TWO);
-        assert!(c.0.is_nan() && c.1.is_nan());
-        let c = INF_NEG.div_euclid(&TWO);
-        assert!(c.0.is_nan() && c.1.is_nan());
-        let c = INF_POS.div_euclid(&TWO.inv_sign());
-        assert!(c.0.is_nan() && c.1.is_nan());
-        let c = INF_NEG.div_euclid(&TWO.inv_sign());
-        assert!(c.0.is_nan() && c.1.is_nan());
-        let c = TWO.div_euclid(&INF_POS);
-        assert!(c.0.is_zero() && c.1.is_nan());
-        let c = TWO.div_euclid(&INF_NEG);
-        assert!(c.0.is_zero() && c.1.is_nan());
-        let c = TWO.inv_sign().div_euclid(&INF_POS);
-        assert!(c.0.is_zero() && c.1.is_nan());
-        let c = TWO.inv_sign().div_euclid(&INF_NEG);
-        assert!(c.0.is_zero() && c.1.is_nan());
-        let c = INF_POS.div_euclid(&INF_POS);
-        assert!(c.0.is_nan() && c.1.is_nan());
-        let c = INF_POS.div_euclid(&INF_NEG);
-        assert!(c.0.is_nan() && c.1.is_nan());
-        let c = INF_NEG.div_euclid(&INF_POS);
-        assert!(c.0.is_nan() && c.1.is_nan());
-        let c = INF_NEG.div_euclid(&INF_NEG);
-        assert!(c.0.is_nan() && c.1.is_nan());
-
-        let c = NAN.div_euclid(&ONE);
-        assert!(c.0.is_nan() && c.1.is_nan());
-        let c = NAN.div_euclid(&INF_POS);
-        assert!(c.0.is_nan() && c.1.is_nan());
-        let c = NAN.div_euclid(&INF_NEG);
-        assert!(c.0.is_nan() && c.1.is_nan());
-        let c = ONE.div_euclid(&NAN);
-        assert!(c.0.is_nan() && c.1.is_nan());
-        let c = INF_POS.div_euclid(&NAN);
-        assert!(c.0.is_nan() && c.1.is_nan());
-        let c = INF_NEG.div_euclid(&NAN);
-        assert!(c.0.is_nan() && c.1.is_nan());
     }
 
     fn random_f64_exp(exp_range: i32, exp_shift: i32) -> f64 {

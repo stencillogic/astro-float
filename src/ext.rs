@@ -646,22 +646,6 @@ impl BigFloat {
         }
     }
 
-    /// Euclidean division.
-    /// It returns `(b, r)` such that `self` = `b`*`q` + `r`, where
-    /// `b` is an integer part of result of division of `self` by `q`, and `r` is a remainder.
-    /// If any of the arguments is NAN, the result is `(NAN, NAN)`.
-    pub fn div_euclid(&self, q: &Self) -> (Self, Self) {
-        let d = self.div(q);
-        let mut b = d.int();
-        let f = d.frac();
-        if self.is_negative() && b.is_negative() && !f.is_zero() {
-            b = b.sub(&ONE);
-        }
-        let r = self.sub(&b.mul(q));
-
-        (b, r)
-    }
-
 
     /// Parse the number from string `s`. 
     /// Function expects `s` to be a number in scientific format with base 10, or +-Inf, or NaN.
@@ -786,12 +770,17 @@ impl BigFloat {
 #[cfg(feature = "std")]
 pub mod std_ops {
 
+    use crate::ONE;
+    use crate::ZERO;
     use crate::defs::DECIMAL_POSITIONS;
     use crate::defs::DECIMAL_SIGN_NEG;
-
-    use super::BigFloat;
+    use crate::NAN;
+    use crate::BigFloat;
+    
     use super::Flavor;
 
+    use std::iter::Product;
+    use std::iter::Sum;
     use std::ops::Add;
     use std::ops::AddAssign;
     use std::ops::Div;
@@ -807,7 +796,7 @@ pub mod std_ops {
     use std::cmp::Ordering;
     use std::fmt::Display;
     use std::fmt::Formatter;
-    use std::fmt::Error;
+    use std::str::FromStr;
     
     //
     // ops traits
@@ -825,8 +814,7 @@ pub mod std_ops {
             *self = BigFloat::add(self, &rhs)
         }
     }
-    
-    
+
     impl Div for BigFloat {
         type Output = Self;
         fn div(self, rhs: Self) -> Self::Output {
@@ -852,14 +840,14 @@ pub mod std_ops {
             *self = BigFloat::mul(self, &rhs)
         }
     }
-    
+
     impl Neg for BigFloat {
         type Output = Self;
         fn neg(self) -> Self::Output {
             self.inv_sign()
         }
     }
-    
+
     impl Sub for BigFloat {
         type Output = Self;
         fn sub(self, rhs: Self) -> Self::Output {
@@ -869,6 +857,58 @@ pub mod std_ops {
     
     impl SubAssign for BigFloat {
         fn sub_assign(&mut self, rhs: Self) {
+            *self = BigFloat::sub(self, &rhs)
+        }
+    }
+
+    impl Add<&BigFloat> for BigFloat {
+        type Output = Self;
+        fn add(self, rhs: &BigFloat) -> Self::Output {
+            BigFloat::add(&self, rhs)
+        }
+    }
+    
+    impl AddAssign<&BigFloat> for BigFloat {
+        fn add_assign(&mut self, rhs: &BigFloat) {
+            *self = BigFloat::add(self, &rhs)
+        }
+    }
+    
+    impl Div<&BigFloat> for BigFloat {
+        type Output = Self;
+        fn div(self, rhs: &BigFloat) -> Self::Output {
+            BigFloat::div(&self, &rhs)
+        }
+    }
+    
+    impl DivAssign<&BigFloat> for BigFloat {
+        fn div_assign(&mut self, rhs: &BigFloat) {
+            *self = BigFloat::div(self, &rhs)
+        }
+    }
+    
+    impl Mul<&BigFloat> for BigFloat {
+        type Output = Self;
+        fn mul(self, rhs: &BigFloat) -> Self::Output {
+            BigFloat::mul(&self, &rhs)
+        }
+    }
+    
+    impl MulAssign<&BigFloat> for BigFloat {
+        fn mul_assign(&mut self, rhs: &BigFloat) {
+            *self = BigFloat::mul(self, &rhs)
+        }
+    }
+
+    impl Sub<&BigFloat> for BigFloat {
+        type Output = Self;
+        fn sub(self, rhs: &BigFloat) -> Self::Output {
+            BigFloat::sub(&self, &rhs)
+        }
+    }
+    
+    impl SubAssign<&BigFloat> for BigFloat {
+        fn sub_assign(&mut self, rhs: &BigFloat) {
             *self = BigFloat::sub(self, &rhs)
         }
     }
@@ -916,9 +956,8 @@ pub mod std_ops {
         }
     }
 
-
     impl Display for BigFloat {
-        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
             let s = match self.inner {
                 Flavor::Value(v) => {
                     if v.is_zero() {
@@ -962,15 +1001,128 @@ pub mod std_ops {
             write!(f, "{}", s)
         }
     }
+
+    impl Default for BigFloat {
+        fn default() -> BigFloat {
+            BigFloat::new()
+        }
+    }
+
+    impl FromStr for BigFloat {
+        type Err = BigFloat;
+
+        /// Returns parsed number or NAN in case of error.
+        fn from_str(src: &str) -> Result<BigFloat, Self::Err> {
+            BigFloat::parse(src).ok_or(NAN)
+        }
+    }
+
+    impl Product for BigFloat {
+        fn product<I: Iterator<Item = BigFloat>>(iter: I) -> Self {
+            let mut acc = ONE;
+            for v in iter {
+                acc *= v;
+            }
+            acc
+        }
+    }
+
+    impl Sum for BigFloat {
+        fn sum<I: Iterator<Item = BigFloat>>(iter: I) -> Self {
+            let mut acc = ZERO;
+            for v in iter {
+                acc += v;
+            }
+            acc
+        }
+    }
+
+
+    impl<'a> Product<&'a BigFloat> for BigFloat {
+        fn product<I: Iterator<Item = &'a BigFloat>>(iter: I) -> Self {
+            let mut acc = ONE;
+            for v in iter {
+                acc *= v;
+            }
+            acc
+        }
+    }
+
+    impl<'a> Sum<&'a BigFloat> for BigFloat {
+        fn sum<I: Iterator<Item = &'a BigFloat>>(iter: I) -> Self {
+            let mut acc = ZERO;
+            for v in iter {
+                acc += v;
+            }
+            acc
+        }
+    }
 }
 
+macro_rules! impl_int_conv {
+    ($s:ty, $u:ty, $from_s:ident, $from_u:ident, $from_int:ident) => {
+        impl BigFloat {
+
+            /// Construct BigFloat from integer value.
+            pub fn $from_s(i: $s) -> Self {
+                let sign = if i < 0 {
+                    DECIMAL_SIGN_NEG
+                } else {
+                    DECIMAL_SIGN_POS
+                };
+                Self::$from_int(i.abs() as $u, sign)
+            }
+        
+            /// Construct BigFloat from integer value.
+            pub fn $from_u(i: $u) -> Self {
+                Self::$from_int(i, DECIMAL_SIGN_POS)
+            }
+        
+            fn $from_int(mut v: $u, sign: i8) -> Self {
+                let mut d = [0u8; DECIMAL_POSITIONS];
+                let mut p = DECIMAL_POSITIONS;
+                while v > 0 {
+                    p -= 1;
+                    d[p] = (v % 10) as u8;
+                    v /= 10;
+                }
+                if p < DECIMAL_POSITIONS {
+                    Self::from_bytes(&d[p..], sign, 0)
+                } else {
+                    Self::new()
+                }
+            }
+        }
+
+        #[cfg(feature = "std")]
+        impl From<$s> for BigFloat {
+            fn from(i: $s) -> Self {
+                BigFloat::$from_s(i)
+            }
+        }
+
+        #[cfg(feature = "std")]
+        impl From<$u> for BigFloat {
+            fn from(i: $u) -> Self {
+                BigFloat::$from_u(i)
+            }
+        }
+    };
+}
+
+impl_int_conv!(i8, u8, from_i8, from_u8, from_int_u8);
+impl_int_conv!(i16, u16, from_i16, from_u16, from_int_u16);
+impl_int_conv!(i32, u32, from_i32, from_u32, from_int_u32);
+impl_int_conv!(i64, u64, from_i64, from_u64, from_int_u64);
+impl_int_conv!(i128, u128, from_i128, from_u128, from_int_u128);
 
 
 #[cfg(test)]
 mod tests {
 
-
-    use super::*;
+    use crate::defs::DECIMAL_PARTS;
+    use crate::*;
+    use std::str::FromStr;
 
     #[test]
     fn test_ext() {
@@ -1304,6 +1456,17 @@ mod tests {
         assert!(INF_NEG.atanh().is_zero());
         assert!(INF_POS.atanh().is_zero());
         assert!(NAN.atanh().is_nan());
+
+        assert!(BigFloat::from_i8(-123) == BigFloat::parse("-1.23e+2").unwrap());
+        assert!(BigFloat::from_u8(123) == BigFloat::parse("1.23e+2").unwrap());
+        assert!(BigFloat::from_i16(-12312) == BigFloat::parse("-1.2312e+4").unwrap());
+        assert!(BigFloat::from_u16(12312) == BigFloat::parse("1.2312e+4").unwrap());
+        assert!(BigFloat::from_i32(-123456789) == BigFloat::parse("-1.23456789e+8").unwrap());
+        assert!(BigFloat::from_u32(123456789) == BigFloat::parse("1.23456789e+8").unwrap());
+        assert!(BigFloat::from_i64(-1234567890123456789) == BigFloat::parse("-1.234567890123456789e+18").unwrap());
+        assert!(BigFloat::from_u64(1234567890123456789) == BigFloat::parse("1.234567890123456789e+18").unwrap());
+        assert!(BigFloat::from_i128(-123456789012345678901234567890123456789) == BigFloat::parse("-1.23456789012345678901234567890123456789e+38").unwrap());
+        assert!(BigFloat::from_u128(123456789012345678901234567890123456789) == BigFloat::parse("1.23456789012345678901234567890123456789e+38").unwrap());
     }
 
 
@@ -1313,6 +1476,7 @@ mod tests {
 
         let d1 = ONE;
         let d2 = BigFloat::new();
+        assert!(d1 - d2 == d1);
         assert!(d1 + d2 == d1);
         let mut d3 = BigFloat::new();
         d3 += d1;
@@ -1327,12 +1491,37 @@ mod tests {
         assert!(ONE < d3);
         assert!(ONE == TWO/TWO);
 
+        let d1 = ONE;
+        let d2 = BigFloat::new();
+        assert!(d1 - &d2 == d1);
+        assert!(d1 + &d2 == d1);
+        let mut d3 = BigFloat::new();
+        d3 += &d1;
+        assert!(d1 == d3);
+        d3 -= &d1;
+        assert!(d1 > d3);
+        d3 = TWO;
+        d3 *= &TWO;
+        assert!(d3 == TWO*&TWO);
+        d3 /= &TWO;
+        assert!(TWO == d3);
+        assert!(ONE < d3);
+        assert!(ONE == TWO/&TWO);
+
         let d1 = BigFloat::from_f64(0.0123456789);
         assert!(format!("{}", d1) == "1.234567890000000000000000000000000000000e-2");
+        assert!(BigFloat::from_str(&format!("{}", d1)).unwrap() == d1);
         let d1 = BigFloat::from_f64(-123.456789);
         assert!(format!("{}", d1) == "-1.234567890000000000000000000000000000000e+2");
+        assert!(BigFloat::from_str(&format!("{}", d1)).unwrap() == d1);
         assert!(format!("{}", INF_POS) == "Inf");
         assert!(format!("{}", INF_NEG) == "-Inf");
         assert!(format!("{}", NAN) == "NaN");
+
+        assert!(BigFloat::from_str("abc").unwrap_err().is_nan());
+
+        let arr = [TWO, ONE, TWO];
+        assert!(arr.into_iter().product::<BigFloat>() == TWO * TWO);
+        assert!(arr.into_iter().sum::<BigFloat>() == TWO + ONE + TWO);
     }
 }

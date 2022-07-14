@@ -332,6 +332,5 @@ impl BigFloatNum {
         }
         false
     }
-
 }
 
