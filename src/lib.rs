@@ -38,8 +38,8 @@
 //! use num_bigfloat::PI;
 //! 
 //! // compute pi: pi = 6*arctan(1/sqrt(3))
-//! let six: BigFloat = BigFloat::from_f64(6.0);
-//! let three: BigFloat = BigFloat::from_f64(3.0);
+//! let six: BigFloat = BigFloat::from_u8(6);
+//! let three: BigFloat = BigFloat::from_u8(3);
 //! let pi = six.mul(&ONE.div(&three.sqrt()).atan());
 //! let epsilon = BigFloat::from_f64(1.0e-38);
 //! 
