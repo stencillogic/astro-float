@@ -12,8 +12,6 @@ There are also wrapper libraries, like [rug](https://crates.io/crates/rug), that
 
 This library is written in pure Rust, provides more precision than f32, f64, and some other data types with increased precision.
 
-This library is minimalistic and is not as elaborate as MPFR.
-
 ## Number characteristics
 
 Number has fixed-size mantissa and exponent.

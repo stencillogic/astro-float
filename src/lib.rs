@@ -46,11 +46,6 @@
 //! assert!(pi.sub(&PI).abs().cmp(&epsilon).unwrap() < 0);
 //! ```
 //! 
-//! ## Performance
-//! 
-//! The fixed-size mantissa allowed the introduction of precomputed tables to speed up most calculations.
-//! With regard to anything else, the implementation is straightforward.
-//! 
 //! ## no_std
 //!
 //! Library can be used without the standard Rust library. This can be achieved by turning off `std` feature.
