@@ -1122,6 +1122,8 @@ mod tests {
 
     use crate::defs::DECIMAL_PARTS;
     use crate::*;
+
+    #[cfg(feature = "std")]
     use std::str::FromStr;
 
     #[test]
@@ -1456,17 +1458,6 @@ mod tests {
         assert!(INF_NEG.atanh().is_zero());
         assert!(INF_POS.atanh().is_zero());
         assert!(NAN.atanh().is_nan());
-
-        assert!(BigFloat::from_i8(-123) == BigFloat::parse("-1.23e+2").unwrap());
-        assert!(BigFloat::from_u8(123) == BigFloat::parse("1.23e+2").unwrap());
-        assert!(BigFloat::from_i16(-12312) == BigFloat::parse("-1.2312e+4").unwrap());
-        assert!(BigFloat::from_u16(12312) == BigFloat::parse("1.2312e+4").unwrap());
-        assert!(BigFloat::from_i32(-123456789) == BigFloat::parse("-1.23456789e+8").unwrap());
-        assert!(BigFloat::from_u32(123456789) == BigFloat::parse("1.23456789e+8").unwrap());
-        assert!(BigFloat::from_i64(-1234567890123456789) == BigFloat::parse("-1.234567890123456789e+18").unwrap());
-        assert!(BigFloat::from_u64(1234567890123456789) == BigFloat::parse("1.234567890123456789e+18").unwrap());
-        assert!(BigFloat::from_i128(-123456789012345678901234567890123456789) == BigFloat::parse("-1.23456789012345678901234567890123456789e+38").unwrap());
-        assert!(BigFloat::from_u128(123456789012345678901234567890123456789) == BigFloat::parse("1.23456789012345678901234567890123456789e+38").unwrap());
     }
 
 
@@ -1523,5 +1514,16 @@ mod tests {
         let arr = [TWO, ONE, TWO];
         assert!(arr.into_iter().product::<BigFloat>() == TWO * TWO);
         assert!(arr.into_iter().sum::<BigFloat>() == TWO + ONE + TWO);
+
+        assert!(BigFloat::from_i8(-123) == BigFloat::parse("-1.23e+2").unwrap());
+        assert!(BigFloat::from_u8(123) == BigFloat::parse("1.23e+2").unwrap());
+        assert!(BigFloat::from_i16(-12312) == BigFloat::parse("-1.2312e+4").unwrap());
+        assert!(BigFloat::from_u16(12312) == BigFloat::parse("1.2312e+4").unwrap());
+        assert!(BigFloat::from_i32(-123456789) == BigFloat::parse("-1.23456789e+8").unwrap());
+        assert!(BigFloat::from_u32(123456789) == BigFloat::parse("1.23456789e+8").unwrap());
+        assert!(BigFloat::from_i64(-1234567890123456789) == BigFloat::parse("-1.234567890123456789e+18").unwrap());
+        assert!(BigFloat::from_u64(1234567890123456789) == BigFloat::parse("1.234567890123456789e+18").unwrap());
+        assert!(BigFloat::from_i128(-123456789012345678901234567890123456789) == BigFloat::parse("-1.23456789012345678901234567890123456789e+38").unwrap());
+        assert!(BigFloat::from_u128(123456789012345678901234567890123456789) == BigFloat::parse("1.23456789012345678901234567890123456789e+38").unwrap());
     }
 }

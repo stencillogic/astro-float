@@ -11,12 +11,13 @@
 //! 
 //! ## Examples
 //! 
-//! ```
+//! ``` 
 //! use num_bigfloat::BigFloat;
 //! use num_bigfloat::ONE;
 //! use num_bigfloat::PI;
 //! 
 //! // compute pi: pi = 6*arctan(1/sqrt(3))
+//! # #[cfg(feature = "std")] {
 //! let six: BigFloat = 6.0.into(); // note: conversion from f64,f32 are not loss-less.
 //! let three: BigFloat = BigFloat::parse("3.0").unwrap();
 //! let pi = six * (ONE / three.sqrt()).atan();
@@ -25,7 +26,24 @@
 //! assert!((pi - PI).abs() < epsilon);
 //! 
 //! println!("{}", pi);
+//! # }
 //! // output: 3.141592653589793238462643383279502884196e-39
+//! ```
+//! 
+//! `no_std` example:
+//! 
+//! ``` 
+//! use num_bigfloat::BigFloat;
+//! use num_bigfloat::ONE;
+//! use num_bigfloat::PI;
+//! 
+//! // compute pi: pi = 6*arctan(1/sqrt(3))
+//! let six: BigFloat = BigFloat::from_f64(6.0);
+//! let three: BigFloat = BigFloat::from_f64(3.0);
+//! let pi = six.mul(&ONE.div(&three.sqrt()).atan());
+//! let epsilon = BigFloat::from_f64(1.0e-38);
+//! 
+//! assert!(pi.sub(&PI).abs().cmp(&epsilon).unwrap() < 0);
 //! ```
 //! 
 //! ## Performance
@@ -161,25 +179,25 @@ mod tests {
         assert!(d3.cmp(&ref_num) == Some(0));
 
         // 0.99 * 0
-        d1 = BigFloat::parse("0.99").unwrap();
+        d1 = BigFloat::from_f64(0.99);
         d3 = d1.mul(&d2);
         assert!(d3.cmp(&ref_num) == Some(0));
 
         // 0 * 12349999
         d1 = BigFloat::new();
-        d2 = BigFloat::parse("12349999.0").unwrap();
+        d2 = BigFloat::from_u32(12349999);
         d3 = d1.mul(&d2);
         assert!(d3.cmp(&ref_num) == Some(0));
 
         // 1 * 1
-        d1 = BigFloat::parse("1.0").unwrap();
-        d2 = BigFloat::parse("1.0").unwrap();
+        d1 = BigFloat::from_u8(1);
+        d2 = BigFloat::from_u8(1);
         d3 = d1.mul(&d2);
         assert!(d3.cmp(&d1) == Some(0));
 
         // 1 * -1
-        d1 = BigFloat::parse("1.0").unwrap();
-        d2 = BigFloat::parse("1.0").unwrap().inv_sign();
+        d1 = BigFloat::from_u8(1);
+        d2 = BigFloat::from_u8(1).inv_sign();
         d3 = d1.mul(&d2);
         assert!(d3.cmp(&d2) == Some(0));
 
@@ -190,7 +208,7 @@ mod tests {
         // -1 * -1
         d1 = d1.inv_sign();
         d3 = d1.mul(&d2);
-        ref_num = BigFloat::parse("1.0").unwrap();
+        ref_num = BigFloat::from_u8(1);
         assert!(d3.cmp(&ref_num) == Some(0));
 
         // 0 / 0 
@@ -199,7 +217,7 @@ mod tests {
         assert!(d1.div(&d2).is_nan());
 
         // d2 / 0
-        d2 = BigFloat::parse("123.0").unwrap();
+        d2 = BigFloat::from_u8(123);
         assert!(d2.div(&d1).is_inf_pos());
 
         // 0 / d2
@@ -493,7 +511,7 @@ mod tests {
         assert!(n.pow(&ZERO).cmp(&ONE).unwrap() == 0);
 
         // ln
-        let ten = BigFloat::parse("10").unwrap();
+        let ten = BigFloat::from_u8(10);
         for _ in 0..10000 {
             let num = random_normal_float(256, 127).abs();
             if num.is_zero() {
@@ -560,8 +578,8 @@ mod tests {
         }
 
         // log crossing x axis at x = 1
-        let base1 = BigFloat::parse("5.4321").unwrap();
-        let base2 = BigFloat::parse("0.4321").unwrap();
+        let base1 = BigFloat::from_f64(5.4321);
+        let base2 = BigFloat::from_f64(0.4321);
         let n = ONE.log(&base1);
         assert!(n.is_zero() || ZERO.sub(&n).get_mantissa_len() < 2);
         let n = ONE.log(&base2);
@@ -643,7 +661,7 @@ mod tests {
         assert!(MIN_POSITIVE.inv_sign().sub(&n).get_mantissa_len() < 2);
 
         // sin extremums PI/2, 3*PI/2
-        let eps = BigFloat::parse("1.0e-39").unwrap();
+        let eps = BigFloat::from_f64(1.0e-39);
         let exp_err = -(DECIMAL_POSITIONS as i8) - 38;
         test_extremum(BigFloat::sin, &HALF_PI, &ONE, 3, 2, 2, &eps, exp_err);
         test_extremum(BigFloat::sin, &HALF_PI.add(&PI), &ONE.inv_sign(), 3, 2, 2, &eps, exp_err);
@@ -692,7 +710,7 @@ mod tests {
         assert!(n.is_zero() || ZERO.sub(&n).get_exponent() < -(DECIMAL_POSITIONS as i8) - 38);
 
         // cos extremums: 0, PI
-        let eps = BigFloat::parse("1.0e-39").unwrap();
+        let eps = BigFloat::from_f64(1.0e-39);
         test_extremum(BigFloat::cos, &ZERO, &ONE, 3, 2, 2, &eps, exp_err);
         test_extremum(BigFloat::cos, &PI, &ONE.inv_sign(), 3, 2, 2, &eps, exp_err);
 
@@ -787,7 +805,7 @@ mod tests {
 
         // cosh extremums at 0
         let exp_err = -(DECIMAL_POSITIONS as i8) - 38;
-        let eps = BigFloat::parse("1.0e-19").unwrap();
+        let eps = BigFloat::from_f64(1.0e-19);
         test_extremum(BigFloat::cosh, &ZERO, &ONE, 3, 2, 2, &eps, exp_err);
 
         // cosh of MAX
@@ -804,7 +822,7 @@ mod tests {
 
         // acosh extrema at 1
         let exp_err = -(DECIMAL_POSITIONS as i8) - 18;
-        let eps = BigFloat::parse("1.0e-39").unwrap();
+        let eps = BigFloat::from_f64(1.0e-39);
         test_extremum(BigFloat::acosh, &ONE, &ZERO, 1, 2, 2, &eps, exp_err);
 
         // acosh resulting to NAN
