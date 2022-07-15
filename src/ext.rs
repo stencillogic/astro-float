@@ -848,6 +848,13 @@ pub mod std_ops {
         }
     }
 
+    impl Neg for &BigFloat {
+        type Output = BigFloat;
+        fn neg(self) -> Self::Output {
+            (*self).inv_sign()
+        }
+    }
+
     impl Sub for BigFloat {
         type Output = Self;
         fn sub(self, rhs: Self) -> Self::Output {
@@ -1482,6 +1489,9 @@ mod tests {
         assert!(ONE < d3);
         assert!(ONE == TWO/TWO);
 
+        let d1 = -TWO;
+        assert!(d1.is_negative());
+
         let d1 = ONE;
         let d2 = BigFloat::new();
         assert!(d1 - &d2 == d1);
@@ -1498,6 +1508,9 @@ mod tests {
         assert!(TWO == d3);
         assert!(ONE < d3);
         assert!(ONE == TWO/&TWO);
+
+        let d1 = -&TWO;
+        assert!(d1.is_negative());
 
         let d1 = BigFloat::from_f64(0.0123456789);
         assert!(format!("{}", d1) == "1.234567890000000000000000000000000000000e-2");
