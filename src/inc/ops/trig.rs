@@ -100,7 +100,7 @@ impl BigFloatInc {
         Ok(ret)
     }
 
-    /// Returns arcsine of a number. Result is an angle in radians ranging from `-pi` to `pi`.
+    /// Returns arcsine of a number. Result is an angle in radians ranging from `-pi/2` to `pi/2`.
     ///
     /// # Errors
     ///
@@ -108,24 +108,19 @@ impl BigFloatInc {
     /// InvalidArgument - when |`self`| > 1.
     pub fn asin(&self) -> Result<Self, Error> {
         let one = Self::one();
-        let cmp_to_one = self.abs().cmp(&one);
-        if cmp_to_one > 0 {
-            return Err(Error::InvalidArgument);
-        } else if cmp_to_one == 0 {
-            return Ok(if self.sign == DECIMAL_SIGN_NEG { HALF_PI.inv_sign() } else { HALF_PI });
-        }
 
         // arcsin(x) = arctan(x / sqrt(1 - x^2))
         let x = *self;
         let d = one.sub(&x.mul(&x)?)?.sqrt()?;
         if d.n == 0 {
-            return Ok(HALF_PI);
+            Ok(if x.sign == DECIMAL_SIGN_NEG { HALF_PI.inv_sign() } else { HALF_PI })
+        } else {
+            let arg = x.div(&d)?;
+            arg.atan()
         }
-        let arg = x.div(&d)?;
-        arg.atan()
     }
 
-    /// Returns arccosine of a number.
+    /// Returns arccosine of a number. Result is an angle in radians ranging from `0` to `pi`.
     ///
     /// # Errors
     ///
@@ -135,7 +130,7 @@ impl BigFloatInc {
         HALF_PI.sub(&self.asin()?)
     }
 
-    /// Returns arctangent of a number. 
+    /// Returns arctangent of a number. Result is an angle in radians ranging from `-pi/2` to `pi/2`.
     ///
     /// # Errors
     ///

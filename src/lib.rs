@@ -250,7 +250,6 @@ mod tests {
             }
         }
 
-
         // subnormal numbers
         d1 = MIN_POSITIVE;
         d2 = MIN_POSITIVE;
@@ -624,15 +623,16 @@ mod tests {
             let num = random_normal_float(90, 127);
             let s = num.sin();
             let a = s.asin();
+            assert!(HALF_PI.cmp(&a).unwrap() >= 0 && HALF_PI.inv_sign().cmp(&a).unwrap() <= 0);
             if num.abs().cmp(&HALF_PI).unwrap() <= 0 {
                 assert!(num.sub(&a).get_mantissa_len() < 4);
             } else {
                 let mut sub1 = num.add(&a).abs().div(&PI).frac();
                 let mut sub2 = num.sub(&a).abs().div(&PI).frac();
-                if sub1.get_mantissa_len() > 2 {
+                if sub1.get_mantissa_len() > 4 {
                     sub1 = ONE.sub(&sub1);
                 }
-                if sub2.get_mantissa_len() > 2 {
+                if sub2.get_mantissa_len() > 4 {
                     sub2 = ONE.sub(&sub2);
                 }
                 assert!(sub1.get_mantissa_len() < 4 || sub2.get_mantissa_len() < 4);
@@ -682,16 +682,20 @@ mod tests {
             let num = random_normal_float(3, 40);
             let c = num.cos();
             let a = c.acos();
+            assert!(PI.cmp(&a).unwrap() >= 0 && ZERO.inv_sign().cmp(&a).unwrap() <= 0);
             if num.abs().cmp(&PI).unwrap() <= 0 {
                 assert!(num.abs().sub(&a).get_mantissa_len() < 5);
             } else {
                 let mut sub1 = num.add(&a).abs().div(&PI).frac();
                 let mut sub2 = num.sub(&a).abs().div(&PI).frac();
-                if sub1.get_mantissa_len() > 2 {
+                if sub1.get_mantissa_len() > 5 {
                     sub1 = ONE.sub(&sub1);
                 }
-                if sub2.get_mantissa_len() > 2 {
+                if sub2.get_mantissa_len() > 5 {
                     sub2 = ONE.sub(&sub2);
+                }
+                if sub1.get_mantissa_len() >= 5 && sub2.get_mantissa_len() >= 5 {
+                    println!("{} {} {} {} {}", num, c, a, sub1, sub2);
                 }
                 assert!(sub1.get_mantissa_len() < 5 || sub2.get_mantissa_len() < 5);
             }
@@ -725,6 +729,7 @@ mod tests {
             let num = random_normal_float(3, 40);
             let t = num.tan();
             let a = t.atan();
+            assert!(HALF_PI.cmp(&a).unwrap() >= 0 && HALF_PI.inv_sign().cmp(&a).unwrap() <= 0);
             if num.abs().cmp(&HALF_PI).unwrap() <= 0 {
                 assert!(num.sub(&a).get_mantissa_len() < 3);
             } else {
@@ -946,6 +951,94 @@ mod tests {
         assert!(NAN.signum().is_nan());
         assert!(INF_POS.signum().cmp(&ONE).unwrap() == 0);
         assert!(INF_NEG.signum().cmp(&ONE.inv_sign()).unwrap() == 0);
+
+
+        d1 = random_normal_float(4, 30);
+        d2 = random_normal_float(4, 34);
+        let n1 = d1.add(&d2);
+        let n1 = n1.sub(&d2);
+        let n2 = n1.add(&d2);
+        let n2 = n2.sub(&d2);
+        assert!(n1.cmp(&n2).unwrap() == 0);
+
+        d1 = random_normal_float(40, 40);
+        d2 = random_normal_float(40, 40);
+        let n1 = d1.mul(&d2);
+        let n1 = n1.div(&d2);
+        let n2 = n1.mul(&d2);
+        let n2 = n2.div(&d2);
+        assert!(n1.cmp(&n2).unwrap() == 0);
+
+        d1 = random_normal_float(256, 128).abs();
+        let n1 = d1.sqrt();
+        let n1 = n1.mul(&n1);
+        let n2 = n1.sqrt();
+        let n2 = n2.mul(&n2);
+        assert!(n1.cmp(&n2).unwrap() == 0);
+
+        d1 = random_normal_float(256, 128).abs();
+        let n1 = d1.cbrt();
+        let n1 = n1.mul(&n1).mul(&n1);
+        let n2 = n1.cbrt();
+        let n2 = n2.mul(&n2).mul(&n2);
+        assert!(n1.cmp(&n2).unwrap() == 0);
+
+        d1 = random_normal_float(256, 127).abs();
+        let n1 = d1.ln();
+        let n1 = n1.exp();
+        let n2 = n1.ln();
+        let n2 = n2.exp();
+        assert!(n1.cmp(&n2).unwrap() == 0);
+
+        d1 = random_normal_float(256, 127).abs();
+        let d2 = random_normal_float(256, 127).abs();
+        let n1 = d1.log(&d2);
+        let n1 = d2.pow(&n1);
+        let n2 = n1.log(&d2);
+        let n2 = d2.pow(&n2);
+        assert!(n1.cmp(&n2).unwrap() == 0);
+
+        d1 = random_normal_float(90, 127).abs();
+        let n1 = d1.sin();
+        let n1 = n1.asin();
+        let n2 = n1.sin();
+        let n2 = n2.asin();
+        assert!(n1.cmp(&n2).unwrap() == 0);
+
+        d1 = random_normal_float(3, 40).abs();
+        let n1 = d1.cos();
+        let n1 = n1.acos();
+        let n2 = n1.cos();
+        let n2 = n2.acos();
+        assert!(n1.cmp(&n2).unwrap() == 0);
+
+        d1 = random_normal_float(3, 40).abs();
+        let n1 = d1.tan();
+        let n1 = n1.atan();
+        let n2 = n1.tan();
+        let n2 = n2.atan();
+        assert!(n1.cmp(&n2).unwrap() == 0);
+
+        d1 = random_normal_float(91, 127);
+        let n1 = d1.sinh();
+        let n1 = n1.asinh();
+        let n2 = n1.sinh();
+        let n2 = n2.asinh();
+        assert!(n1.cmp(&n2).unwrap() == 0);
+
+        d1 = random_normal_float(91, 127);
+        let n1 = d1.cosh();
+        let n1 = n1.acosh();
+        let n2 = n1.cosh();
+        let n2 = n2.acosh();
+        assert!(n1.cmp(&n2).unwrap() == 0);
+
+        d1 = random_normal_float(88, 127);
+        let n1 = d1.tanh();
+        let n1 = n1.atanh();
+        let n2 = n1.tanh();
+        let n2 = n2.atanh();
+        assert!(n1.cmp(&n2).unwrap() == 0);
     }
 
     fn random_f64_exp(exp_range: i32, exp_shift: i32) -> f64 {

@@ -755,8 +755,8 @@ impl BigFloat {
     gen_wrapper2!("Returns cosine of `self`. The function takes an angle in radians as an argument.", cos, Self, {NAN}, {NAN},);
     gen_wrapper2!("Returns tangent of `self`. The function takes an angle in radians as an argument.", tan, Self, {NAN}, {NAN},);
     gen_wrapper2!("Returns arcsine of `self`. Result is an angle in radians ranging from -pi/2 to pi/2.", asin, Self, {NAN}, {NAN},);
-    gen_wrapper2!("Returns arccosine of `self`.", acos, Self, {NAN}, {NAN},);
-    gen_wrapper2!("Returns arctangent of `self`. ", atan, Self, {HALF_PI}, {HALF_PI.inv_sign()},);
+    gen_wrapper2!("Returns arccosine of `self`. Result is an angle in radians ranging from 0 to pi.", acos, Self, {NAN}, {NAN},);
+    gen_wrapper2!("Returns arctangent of `self`. Result is an angle in radians ranging from -pi/2 to pi/2.", atan, Self, {HALF_PI}, {HALF_PI.inv_sign()},);
 
     gen_wrapper2!("Returns hyperbolic sine of `self`.", sinh, Self, {INF_POS}, {INF_NEG},);
     gen_wrapper2!("Returns hyperbolic cosine of `self`.", cosh, Self, {INF_POS}, {INF_POS},);
