@@ -2,7 +2,6 @@
 
 use crate::defs::BigFloatNum;
 use crate::defs::DECIMAL_MAX_EXPONENT;
-use crate::defs::DECIMAL_MIN_EXPONENT;
 use crate::defs::Error;
 use crate::defs::DECIMAL_BASE_LOG10;
 use crate::defs::DECIMAL_POSITIONS;
@@ -127,16 +126,6 @@ impl BigFloatNum {
         n
     }
 
-    // multiply d1 by digit d and put result to d3 with overflow
-    pub(super) fn mul_by_digit(d1: &[i16], d: i32, d3: &mut [i16]) {
-        let mut m: i32 = 0;
-        for i in 0..DECIMAL_PARTS {
-            m = d1[i] as i32 * d + m / DECIMAL_BASE as i32;
-            d3[i] = (m % DECIMAL_BASE as i32) as i16;
-        }
-        d3[DECIMAL_PARTS] = (m / DECIMAL_BASE as i32) as i16;
-    }
-
     // Convert to BigFloatInc.
     pub(super) fn to_big_float_inc(d1: &Self) -> BigFloatInc {
         let mut ret = BigFloatInc::new();
@@ -253,22 +242,6 @@ impl BigFloatNum {
             x -= 1;
         }
         t
-    }
-
-    /// If exponent is too small try to present number in subnormal form.
-    /// If not successful, then return 0.0
-    pub(crate) fn process_subnormal(&mut self, e: i32) -> Self {
-        if (DECIMAL_POSITIONS as i32) + e > DECIMAL_MIN_EXPONENT as i32 {
-            // subnormal
-            let shift = (DECIMAL_MIN_EXPONENT as i32 - e) as usize;
-            Self::shift_right(&mut self.m, shift);
-            self.n -= shift as i16;
-            self.e = DECIMAL_MIN_EXPONENT;
-            *self
-        } else {
-            // zero
-            Self::new()
-        }
     }
 
 
