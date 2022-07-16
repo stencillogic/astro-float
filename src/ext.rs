@@ -2,7 +2,7 @@
 //! values, and implementation of `std::ops` traits.
 
 use crate::defs::{BigFloatNum, Error, DECIMAL_SIGN_POS, DECIMAL_PARTS, DECIMAL_SIGN_NEG, DECIMAL_POSITIONS,
-    DECIMAL_MAX_EXPONENT, DECIMAL_MIN_EXPONENT};
+    DECIMAL_MAX_EXPONENT, DECIMAL_MIN_EXPONENT, RoundingMode};
 
 /// Maximum value possible.
 pub const MAX: BigFloat = BigFloat {inner: Flavor::Value(crate::defs::MAX)};
@@ -742,7 +742,7 @@ impl BigFloat {
     gen_wrapper4!("Returns fractional part of `self`.", frac, Self, {Flavor::NaN}, {Flavor::NaN},);
     gen_wrapper2!("Returns the smallest integer greater than or equal to `self`.", ceil, Self, {INF_POS}, {INF_NEG},);
     gen_wrapper2!("Returns the largest integer less than or equal to `self`.", floor, Self, {INF_POS}, {INF_NEG},);
-    gen_wrapper2!("Returns the rounded number with `n` decimal positions in the fractional part of the number.", round, Self, {INF_POS}, {INF_NEG}, n, usize);
+    gen_wrapper2!("Returns the rounded number with `n` decimal positions in the fractional part of the number using rounding mode `rm`.", round, Self, {INF_POS}, {INF_NEG}, n, usize, rm, RoundingMode);
 
     gen_wrapper2!("Returns square root of `self`.", sqrt, Self, {INF_POS}, {NAN},);
     gen_wrapper2!("Returns cube root of `self`.", cbrt, Self, {INF_POS}, {INF_NEG},);
@@ -1127,7 +1127,7 @@ impl_int_conv!(i128, u128, from_i128, from_u128, from_int_u128);
 #[cfg(test)]
 mod tests {
 
-    use crate::defs::DECIMAL_PARTS;
+    use crate::defs::{DECIMAL_PARTS, RoundingMode};
     use crate::*;
 
     #[cfg(feature = "std")]
@@ -1394,9 +1394,12 @@ mod tests {
         assert!(INF_POS.floor().is_inf_pos());
         assert!(NAN.floor().is_nan());
 
-        assert!(INF_NEG.round(0).is_inf_neg());
-        assert!(INF_POS.round(0).is_inf_pos());
-        assert!(NAN.round(0).is_nan());
+        for rm in [RoundingMode::Up, RoundingMode::Down, RoundingMode::ToZero, 
+                RoundingMode::FromZero, RoundingMode::ToEven, RoundingMode::ToOdd] {
+            assert!(INF_NEG.round(0, rm).is_inf_neg());
+            assert!(INF_POS.round(0, rm).is_inf_pos());
+            assert!(NAN.round(0, rm).is_nan());
+        }
 
         assert!(INF_NEG.sqrt().is_nan());
         assert!(INF_POS.sqrt().is_inf_pos());

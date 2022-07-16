@@ -60,6 +60,7 @@ mod ext;
 #[cfg(feature = "std")]
 mod parser;
 
+pub use crate::defs::RoundingMode;
 pub use crate::ext::BigFloat;
 pub use crate::ext::MAX;
 pub use crate::ext::MAX_EXP;

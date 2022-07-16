@@ -8,6 +8,7 @@ use crate::defs::DECIMAL_POSITIONS;
 use crate::defs::DECIMAL_BASE;
 use crate::defs::DECIMAL_SIGN_POS;
 use crate::defs::DECIMAL_PARTS;
+use crate::defs::RoundingMode;
 use crate::inc::inc::BigFloatInc;
 
 impl BigFloatNum {
@@ -246,7 +247,7 @@ impl BigFloatNum {
 
 
     // Round n positons to even, return true if exponent is to be incremented.
-    pub(crate) fn round_mantissa(m: &mut [i16], n: i16) -> bool {
+    pub(crate) fn round_mantissa(m: &mut [i16], n: i16, rm: RoundingMode, is_positive: bool) -> bool {
 
         if n > 0 && n <= DECIMAL_POSITIONS as i16 {
             let n = n-1;
@@ -264,10 +265,39 @@ impl BigFloatNum {
             let t = Self::get_div_factor(n);
             let t2 = Self::get_div_factor(np1);
             let num = m[i] / t % 10;
-            if num >= 5 {
-                // add 1
-                c = true;
-            }
+
+            let num2 = if i1 < m.len() {
+                m[i1] / t2 % 10
+            } else {
+                0
+            };
+
+            match rm {
+                RoundingMode::Up => if num >= 5 && is_positive || num > 5 && !is_positive {
+                    // add 1
+                    c = true;
+                },
+                RoundingMode::Down => if num > 5 && is_positive || num >= 5 && !is_positive {
+                    // add 1
+                    c = true;
+                },
+                RoundingMode::FromZero => if num >= 5 {
+                    // add 1
+                    c = true;
+                },
+                RoundingMode::ToZero => if num > 5 {
+                    // add 1
+                    c = true;
+                },
+                RoundingMode::ToEven => if num >= 5 && num2 & 1 != 0 {
+                    // add 1
+                    c = true;
+                },
+                RoundingMode::ToOdd => if num >= 5 && num2 & 1 == 0 {
+                    // add 1
+                    c = true;
+                },
+            };
 
             if c {
                 // add 1 at (n+1)'th position

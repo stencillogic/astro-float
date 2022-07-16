@@ -30,6 +30,29 @@ pub enum Error {
 }
 
 
+/// Possible errors.
+#[derive(Eq, PartialEq, Debug, Copy, Clone)]
+pub enum RoundingMode {
+    /// Round half toward positive infinity.
+    Up,
+
+    /// Round half toward negative infinity.
+    Down,
+
+    /// Round half toward zero.
+    ToZero,
+
+    /// Round half away from zero.
+    FromZero,
+
+    /// Round half to even.
+    ToEven,
+
+    /// Round half to odd.
+    ToOdd,
+}
+
+
 pub const DECIMAL_BASE_LOG10: usize = 4;    // number decimal positions in a digit = log10(DECIMAL_BASE)
 pub const DECIMAL_POSITIONS: usize = DECIMAL_PARTS * DECIMAL_BASE_LOG10;
 pub const DECIMAL_BASE: usize = 10000;      // 9999 is the maximum of a digit

@@ -8,6 +8,7 @@ use crate::defs::DECIMAL_BASE;
 use crate::defs::DECIMAL_SIGN_POS;
 use crate::defs::DECIMAL_SIGN_NEG;
 use crate::defs::DECIMAL_MAX_EXPONENT;
+use crate::defs::RoundingMode;
 use crate::defs::ZEROED_MANTISSA;
 
 impl BigFloatNum {
@@ -68,9 +69,8 @@ impl BigFloatNum {
         ret
     }
 
-    /// Returns the rounded number with `n` decimal positions in the fractional part of the number.
-    /// Rounds half away from 0.
-    pub fn round(&self, n: usize) -> Result<Self, Error> {
+    /// Returns the rounded number with `n` decimal positions in the fractional part of the number using rounding mode `rm`.
+    pub fn round(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         let mut ret = *self;
         let e = (-self.e) as usize;
         if self.e < 0 && e > n {
@@ -78,7 +78,7 @@ impl BigFloatNum {
             if m > DECIMAL_POSITIONS {
                 return Ok(Self::new());
             } else {
-                if Self::round_mantissa(&mut ret.m, m as i16) {
+                if Self::round_mantissa(&mut ret.m, m as i16, rm, self.sign == DECIMAL_SIGN_POS) {
                     if ret.e == DECIMAL_MAX_EXPONENT {
                         return Err(Error::ExponentOverflow(ret.sign));
                     }
@@ -417,6 +417,7 @@ mod tests {
         // round
         //
 
+        // from zero
         d1 = BigFloatNum::new();
         d1.m[7] = 1234;
         d1.m[8] = 4527;
@@ -424,45 +425,45 @@ mod tests {
         d1.e = -37;
         d1.n = 39;
         d2 = d1;
-        assert!(d1.round(123).unwrap().cmp(&d2) == 0);
-        assert!(d1.round(9).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(123, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(9, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
         d2.m[7] = 1230;
-        assert!(d1.round(8).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(8, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
         d2.m[7] = 1200;
-        assert!(d1.round(7).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(7, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
         d2.m[7] = 1000;
-        assert!(d1.round(6).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(6, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
         d2.m[7] = 0;
-        assert!(d1.round(5).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(5, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
         d2.m[8] = 4530;
-        assert!(d1.round(4).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(4, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
         d2.m[8] = 4500;
-        assert!(d1.round(3).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(3, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
         d2.m[8] = 5000;
-        assert!(d1.round(2).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(2, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
         d2.m[8] = 0;
         d2.m[9] = 123;
-        assert!(d1.round(1).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(1, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
         d2.m[9] = 120;
-        assert!(d1.round(0).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(0, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
         d2.sign = DECIMAL_SIGN_NEG;
         d1.sign = DECIMAL_SIGN_NEG;
-        assert!(d1.round(0).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(0, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
         d1 = BigFloatNum::new();
         d1.m[9] = 1234;
         d1.n = 39;
         d1.e = 10;
-        assert!(d1.round(2).unwrap().cmp(&d1) == 0);
+        assert!(d1.round(2, RoundingMode::FromZero).unwrap().cmp(&d1) == 0);
         d1 = BigFloatNum::new();
         d1.m[9] = 123;
         d1.e = -42;
         d1.n = 39;
         d2 = d1;
         d2.m[9] = 100;
-        assert!(d1.round(4).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(4, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
         d2 = BigFloatNum::new();
-        assert!(d1.round(3).unwrap().cmp(&d2) == 0);
-        assert!(d1.round(2).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(3, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(2, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
 
         for i in 0..DECIMAL_PARTS {
             d1.m[i] = DECIMAL_BASE as i16 - 1;
@@ -471,6 +472,136 @@ mod tests {
         d1.e = -10;
         d2 = BigFloatNum::one();
         d2.e = -9;
-        assert!(d1.round(2).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(2, RoundingMode::FromZero).unwrap().cmp(&d2) == 0);
+
+        // toward zero
+        d1 = BigFloatNum::new();
+        d1.m[8] = 4526;
+        d1.m[9] = 123;
+        d1.e = -37;
+        d1.n = 39;
+        d2 = d1;
+        d2.m[8] = 4530;
+        assert!(d1.round(4, RoundingMode::ToZero).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 4000;
+        assert!(d1.round(2, RoundingMode::ToZero).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 0;
+        assert!(d1.round(1, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[9] = 120;
+        assert!(d1.round(0, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d1.sign = DECIMAL_SIGN_NEG;
+        d2 = d1;
+        d2.m[8] = 4530;
+        assert!(d1.round(4, RoundingMode::ToZero).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 4000;
+        assert!(d1.round(2, RoundingMode::ToZero).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 0;
+        assert!(d1.round(1, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[9] = 120;
+        assert!(d1.round(0, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+
+        // toward +inf
+        d1 = BigFloatNum::new();
+        d1.m[8] = 4526;
+        d1.m[9] = 123;
+        d1.e = -37;
+        d1.n = 39;
+        d2 = d1;
+        d2.m[8] = 4530;
+        assert!(d1.round(4, RoundingMode::Up).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 5000;
+        assert!(d1.round(2, RoundingMode::Up).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 0;
+        assert!(d1.round(1, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[9] = 120;
+        assert!(d1.round(0, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d1.sign = DECIMAL_SIGN_NEG;
+        d2 = d1;
+        d2.m[8] = 4530;
+        assert!(d1.round(4, RoundingMode::Up).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 4000;
+        assert!(d1.round(2, RoundingMode::Up).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 0;
+        assert!(d1.round(1, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[9] = 120;
+        assert!(d1.round(0, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+
+        // toward -inf
+        d1 = BigFloatNum::new();
+        d1.m[8] = 4526;
+        d1.m[9] = 123;
+        d1.e = -37;
+        d1.n = 39;
+        d2 = d1;
+        d2.m[8] = 4530;
+        assert!(d1.round(4, RoundingMode::Down).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 4000;
+        assert!(d1.round(2, RoundingMode::Down).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 0;
+        assert!(d1.round(1, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[9] = 120;
+        assert!(d1.round(0, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d1.sign = DECIMAL_SIGN_NEG;
+        d2 = d1;
+        d2.m[8] = 4530;
+        assert!(d1.round(4, RoundingMode::Down).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 5000;
+        assert!(d1.round(2, RoundingMode::Down).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 0;
+        assert!(d1.round(1, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[9] = 120;
+        assert!(d1.round(0, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+
+        // to even
+        d1 = BigFloatNum::new();
+        d1.m[8] = 4535;
+        d1.m[9] = 123;
+        d1.e = -37;
+        d1.n = 39;
+        d2 = d1;
+        d2.m[8] = 4540;
+        assert!(d1.round(4, RoundingMode::ToEven).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 4000;
+        assert!(d1.round(2, RoundingMode::ToEven).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 0;
+        assert!(d1.round(1, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[9] = 120;
+        assert!(d1.round(0, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d1.sign = DECIMAL_SIGN_NEG;
+        d2 = d1;
+        d2.m[8] = 4540;
+        assert!(d1.round(4, RoundingMode::ToEven).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 4000;
+        assert!(d1.round(2, RoundingMode::ToEven).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 0;
+        assert!(d1.round(1, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[9] = 120;
+        assert!(d1.round(0, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+
+        // to odd
+        d1 = BigFloatNum::new();
+        d1.m[8] = 4535;
+        d1.m[9] = 123;
+        d1.e = -37;
+        d1.n = 39;
+        d2 = d1;
+        d2.m[8] = 4530;
+        assert!(d1.round(4, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 5000;
+        assert!(d1.round(2, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 0;
+        assert!(d1.round(1, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[9] = 120;
+        assert!(d1.round(0, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d1.sign = DECIMAL_SIGN_NEG;
+        d2 = d1;
+        d2.m[8] = 4530;
+        assert!(d1.round(4, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 5000;
+        assert!(d1.round(2, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[8] = 0;
+        assert!(d1.round(1, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        d2.m[9] = 120;
+        assert!(d1.round(0, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
     }
 }
