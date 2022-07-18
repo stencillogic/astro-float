@@ -1,4 +1,4 @@
-/// Logarithms.
+//! Logarithms.
 
 use crate::inc::inc::BigFloatInc;
 use crate::defs::Error;

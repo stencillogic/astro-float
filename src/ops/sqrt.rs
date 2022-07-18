@@ -1,4 +1,4 @@
-/// Square root.
+//! Square root.
 
 use crate::defs::BigFloatNum;
 use crate::defs::Error;
@@ -103,7 +103,7 @@ mod tests {
         d1.m[9] = 0;
         d1.n = 32;
         d1.e = -36;
-        epsilon.e = - epsilon.n as i8 + 2 - (DECIMAL_POSITIONS as i8);
+        epsilon.e = - epsilon.n as i8 + 3 - (DECIMAL_POSITIONS as i8);
         for i in 1..8000 {
             d1.m[8] = 10+i;
             d1.m[9] = i;

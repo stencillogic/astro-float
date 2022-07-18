@@ -1,4 +1,4 @@
-/// Power.
+//! Power.
 
 use crate::defs::BigFloatNum;
 use crate::defs::Error;

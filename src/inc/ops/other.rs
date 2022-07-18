@@ -1,4 +1,4 @@
-/// Other operations.
+//! Other operations.
 
 use crate::inc::inc::BigFloatInc;
 use crate::defs::DECIMAL_BASE_LOG10;

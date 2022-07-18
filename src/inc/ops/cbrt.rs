@@ -1,4 +1,4 @@
-/// Cube root.
+//! Cube root.
 
 use crate::inc::inc::BigFloatInc;
 use crate::defs::Error;

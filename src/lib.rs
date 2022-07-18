@@ -45,7 +45,12 @@
 //! 
 //! assert!(pi.sub(&PI).abs().cmp(&epsilon).unwrap() < 0);
 //! ```
-//! 
+//!
+//! ## Precision
+//!
+//! The use of additional digits of the manitissa in calculations allows minimizing the error and rounding the results correctly (i.e. as if the result was a rounded infinitely precise number).
+//! The precision of the results may be lost under certain conditions, such as when the argument is a subnormal number, or when the function is periodic, such as sine or cosine, when the argument is much larger than pi.
+//!
 //! ## no_std
 //!
 //! Library can be used without the standard Rust library. This can be achieved by turning off `std` feature.
@@ -226,7 +231,6 @@ mod tests {
         d3 = d1.div(&d2);
         assert!(d3.cmp(&ref_num) == Some(0));
 
-
         // add & sub
         for _ in 0..10000 {
             // avoid subnormal numbers
@@ -235,7 +239,7 @@ mod tests {
             let n1 = d1.add(&d2);
             if n1.sub(&d1).get_mantissa_len() > 5 {
                 let n2 = n1.sub(&d2);
-                assert!(n2.sub(&d1).get_mantissa_len() < 4);
+                assert_small(&n2.sub(&d1), 4, &d1);
             }
         }
 
@@ -247,7 +251,7 @@ mod tests {
             if d2.cmp(&ZERO).unwrap() != 0 {
                 let n1 = d1.div(&d2);
                 let n2 = n1.mul(&d2);
-                assert!(n2.sub(&d1).abs().get_mantissa_len() <= 4);
+                assert_small(&n2.sub(&d1), 4, &d1);
             }
         }
 
@@ -344,14 +348,14 @@ mod tests {
             let num = random_normal_float(256, 128).abs();
             let sq = num.sqrt();
             let ret = sq.mul(&sq);
-            assert!(num.sub(&ret).abs().get_mantissa_len() < 2);
+            assert_small(&num.sub(&ret), 2, &num);
         }
 
         // sqrt of max
         let n = MAX.sqrt();
         assert!(n.cmp(&ZERO).unwrap() > 0 && MAX.cmp(&n).unwrap() > 0);
         let n = n.mul(&n);
-        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_inf_pos(), &MAX.sub(&n), 2, &MAX);
 
         // sqrt of zero
         let n = ZERO.sqrt();
@@ -361,7 +365,7 @@ mod tests {
         let n = MIN_POSITIVE.sqrt();
         assert!(n.cmp(&ZERO).unwrap() > 0 && MIN_POSITIVE.cmp(&n).unwrap() < 0);
         let n = n.mul(&n);
-        assert!(n.is_zero() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_zero(), &MIN_POSITIVE.sub(&n), 2, &MIN_POSITIVE);
 
         // sqrt of negative
         let n = MIN_POSITIVE.inv_sign().sqrt();
@@ -369,18 +373,18 @@ mod tests {
 
 
         // cbrt
-        for _ in 0..10000 {
-            let num = random_normal_float(256, 128).abs();
+        for _ in 0..100000 {
+            let num = random_normal_float(256, 128);
             let sq = num.cbrt();
             let ret = sq.mul(&sq).mul(&sq);
-            assert!(num.sub(&ret).abs().get_mantissa_len() < 2);
+            assert_small(&num.sub(&ret), 3, &num);
         }
 
         // cbrt of max
         let n = MAX.cbrt();
         assert!(n.cmp(&ZERO).unwrap() > 0 && MAX.cmp(&n).unwrap() > 0);
         let n = n.mul(&n).mul(&n);
-        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_inf_pos(), &MAX.sub(&n), 2, &MAX);
 
         // cbrt of zero
         let n = ZERO.cbrt();
@@ -390,19 +394,19 @@ mod tests {
         let n = MIN_POSITIVE.cbrt();
         assert!(n.cmp(&ZERO).unwrap() > 0 && MIN_POSITIVE.cmp(&n).unwrap() < 0);
         let n = n.mul(&n).mul(&n);
-        assert!(n.is_zero() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_zero(), &MIN_POSITIVE.sub(&n), 2, &MIN_POSITIVE);
 
         // cbrt of negative MAX
         let n = MAX.inv_sign().cbrt();
         assert!(n.cmp(&ZERO).unwrap() < 0 && MAX.inv_sign().cmp(&n).unwrap() < 0);
         let n = n.mul(&n).mul(&n);
-        assert!(n.is_inf_neg() || MAX.inv_sign().sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_inf_neg(), &MAX.inv_sign().sub(&n), 2, &MAX.inv_sign());
 
         // cbrt of negative MIN_POSITIVE
         let n = MIN_POSITIVE.inv_sign().cbrt();
         assert!(n.cmp(&ZERO).unwrap() < 0 && MIN_POSITIVE.inv_sign().cmp(&n).unwrap() > 0);
         let n = n.mul(&n).mul(&n);
-        assert!(n.is_zero() || MIN_POSITIVE.inv_sign().sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_zero(), &MIN_POSITIVE.inv_sign().sub(&n), 2, &MIN_POSITIVE.inv_sign());
 
 
         // pow
@@ -413,7 +417,7 @@ mod tests {
             let p = a.pow(&n);
             if  !p.is_inf() && p.get_mantissa_len() >= DECIMAL_POSITIONS - 1 {
                 let ret = p.pow(&inv);
-                assert!(a.sub(&ret).abs().get_mantissa_len() < 3);
+                assert_small(&a.sub(&ret), 3, &a);
             }
         }
 
@@ -516,15 +520,15 @@ mod tests {
             } else {
                 let l = num.ln();
                 let e = l.exp();
-                assert!(num.sub(&e).abs().get_mantissa_len() < 5);
+                assert_small(&num.sub(&e), 5, &num);
 
                 let l = num.log2();
                 let e = TWO.pow(&l);
-                assert!(num.sub(&e).abs().get_mantissa_len() < 5);
+                assert_small(&num.sub(&e), 5, &num);
 
                 let l = num.log10();
                 let e = ten.pow(&l);
-                assert!(num.sub(&e).abs().get_mantissa_len() < 5);
+                assert_small(&num.sub(&e), 5, &num);
             }
         }
 
@@ -536,19 +540,19 @@ mod tests {
 
             // crossing x axis at x = 1
             let n = op(&ONE);
-            assert!(n.is_zero() || ZERO.sub(&n).get_mantissa_len() < 2);
+            assert_small_if_not(n.is_zero(), &ZERO.sub(&n), 2, &n);
 
             // ln of max
             let n = op(&MAX);
             assert!(n.cmp(&ZERO).unwrap() > 0 && MAX.cmp(&n).unwrap() > 0);
             let n = base.pow(&n);
-            assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 4);
+            assert_small_if_not(n.is_inf_pos(), &MAX.sub(&n), 4, &MAX);
 
             // ln of min positive
             let n = op(&MIN_POSITIVE);
             assert!(n.cmp(&ZERO).unwrap() < 0 && MIN_POSITIVE.cmp(&n.abs()).unwrap() < 0);
             let n = base.pow(&n);
-            assert!(n.is_inf_neg() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 4);
+            assert_small_if_not(n.is_inf_neg(), &MIN_POSITIVE.sub(&n), 4, &n);
 
             // ln of negative
             let n = op(&MIN_POSITIVE.inv_sign());
@@ -568,7 +572,7 @@ mod tests {
             } else {
                 let l = num.log(&base);
                 let e = base.pow(&l);
-                assert!(num.sub(&e).abs().get_mantissa_len() < 5);
+                assert_small(&num.sub(&e), 5, &num);
             }
         }
 
@@ -576,29 +580,29 @@ mod tests {
         let base1 = BigFloat::from_f64(5.4321);
         let base2 = BigFloat::from_f64(0.4321);
         let n = ONE.log(&base1);
-        assert!(n.is_zero() || ZERO.sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_zero(), &ZERO.sub(&n), 2, &n);
         let n = ONE.log(&base2);
-        assert!(n.is_zero() || ZERO.sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_zero(), &ZERO.sub(&n), 2, &n);
 
         // log of max
         let n = MAX.log(&base1);
         assert!(n.cmp(&ZERO).unwrap() > 0 && MAX.cmp(&n).unwrap() > 0);
         let n = base1.pow(&n);
-        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_inf_pos(), &MAX.sub(&n), 4, &MAX);
         let n = MAX.log(&base2);
         assert!(n.cmp(&ZERO).unwrap() < 0 && MAX.cmp(&n.inv_sign()).unwrap() > 0);
         let n = base2.pow(&n);
-        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_inf_pos(), &MAX.sub(&n), 2, &MAX);
 
         // log of min positive
         let n = MIN_POSITIVE.log(&base1);
         assert!(n.cmp(&ZERO).unwrap() < 0 && MIN_POSITIVE.cmp(&n.abs()).unwrap() < 0);
         let n = base1.pow(&n);
-        assert!(n.is_inf_neg() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_inf_neg(), &MIN_POSITIVE.sub(&n), 2, &n);
         let n = MIN_POSITIVE.log(&base2);
         assert!(n.cmp(&ZERO).unwrap() > 0 && MIN_POSITIVE.cmp(&n.abs()).unwrap() < 0);
         let n = base2.pow(&n);
-        assert!(n.is_inf_neg() || MIN_POSITIVE.sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_inf_neg(), &MIN_POSITIVE.sub(&n), 2, &n);
 
         // log of negative
         let n = MIN_POSITIVE.inv_sign().log(&base1);
@@ -626,7 +630,7 @@ mod tests {
             let a = s.asin();
             assert!(HALF_PI.cmp(&a).unwrap() >= 0 && HALF_PI.inv_sign().cmp(&a).unwrap() <= 0);
             if num.abs().cmp(&HALF_PI).unwrap() <= 0 {
-                assert!(num.sub(&a).get_mantissa_len() < 4);
+                assert_small(&num.sub(&a), 4, &num);
             } else {
                 let mut sub1 = num.add(&a).abs().div(&PI).frac();
                 let mut sub2 = num.sub(&a).abs().div(&PI).frac();
@@ -636,7 +640,7 @@ mod tests {
                 if sub2.get_mantissa_len() > 4 {
                     sub2 = ONE.sub(&sub2);
                 }
-                assert!(sub1.get_mantissa_len() < 4 || sub2.get_mantissa_len() < 4);
+                assert_small_any(&sub1, &sub2, 4, &num);
             }
         }
 
@@ -658,7 +662,7 @@ mod tests {
 
         // sin extremums PI/2, 3*PI/2
         let eps = BigFloat::from_f64(1.0e-39);
-        let exp_err = -(DECIMAL_POSITIONS as i8) - 38;
+        let exp_err = -(DECIMAL_POSITIONS as i8) - 18;
         test_extremum(BigFloat::sin, &HALF_PI, &ONE, 3, 2, 2, &eps, exp_err);
         test_extremum(BigFloat::sin, &HALF_PI.add(&PI), &ONE.inv_sign(), 3, 2, 2, &eps, exp_err);
 
@@ -685,7 +689,7 @@ mod tests {
             let a = c.acos();
             assert!(PI.cmp(&a).unwrap() >= 0 && ZERO.inv_sign().cmp(&a).unwrap() <= 0);
             if num.abs().cmp(&PI).unwrap() <= 0 {
-                assert!(num.abs().sub(&a).get_mantissa_len() < 5);
+                assert_small(&num.abs().sub(&a), 5, &num);
             } else {
                 let mut sub1 = num.add(&a).abs().div(&PI).frac();
                 let mut sub2 = num.sub(&a).abs().div(&PI).frac();
@@ -695,10 +699,7 @@ mod tests {
                 if sub2.get_mantissa_len() > 5 {
                     sub2 = ONE.sub(&sub2);
                 }
-                if sub1.get_mantissa_len() >= 5 && sub2.get_mantissa_len() >= 5 {
-                    println!("{} {} {} {} {}", num, c, a, sub1, sub2);
-                }
-                assert!(sub1.get_mantissa_len() < 5 || sub2.get_mantissa_len() < 5);
+                assert_small_any(&sub1, &sub2, 5, &num);
             }
         }
 
@@ -732,17 +733,17 @@ mod tests {
             let a = t.atan();
             assert!(HALF_PI.cmp(&a).unwrap() >= 0 && HALF_PI.inv_sign().cmp(&a).unwrap() <= 0);
             if num.abs().cmp(&HALF_PI).unwrap() <= 0 {
-                assert!(num.sub(&a).get_mantissa_len() < 3);
+                assert_small(&num.sub(&a), 3, &num);
             } else {
                 let mut sub1 = num.add(&a).abs().div(&PI).frac();
                 let mut sub2 = num.sub(&a).abs().div(&PI).frac();
-                if sub1.get_mantissa_len() > 2 {
+                if sub1.get_mantissa_len() > 3 {
                     sub1 = ONE.sub(&sub1);
                 }
-                if sub2.get_mantissa_len() > 2 {
+                if sub2.get_mantissa_len() > 3 {
                     sub2 = ONE.sub(&sub2);
                 }
-                assert!(sub1.get_mantissa_len() < 3 || sub2.get_mantissa_len() < 3);
+                assert_small_any(&sub1, &sub2, 3, &num);
             }
         }
 
@@ -758,26 +759,28 @@ mod tests {
 
         // atan for large negative and large positive.
         let n = MAX.atan();
-        assert!(HALF_PI.sub(&n).get_mantissa_len() < 2);
+        assert_small(&HALF_PI.sub(&n), 2, &HALF_PI);
         let n = MIN.atan();
-        assert!(HALF_PI.inv_sign().sub(&n).get_mantissa_len() < 2);
+        assert_small(&HALF_PI.inv_sign().sub(&n), 2, &HALF_PI.inv_sign());
 
         let mut n = MAX;
         n.set_exponent(n.get_exponent() - (DECIMAL_POSITIONS as i8));
         let n = n.atan();
-        assert!(HALF_PI.sub(&n).get_mantissa_len() < 2);
+        assert_small(&HALF_PI.sub(&n), 2, &HALF_PI);
 
         let mut n = MIN;
         n.set_exponent(n.get_exponent() - (DECIMAL_POSITIONS as i8));
         let n = n.atan();
-        assert!(HALF_PI.inv_sign().sub(&n).get_mantissa_len() < 2);
+        assert_small(&HALF_PI.inv_sign().sub(&n), 2, &HALF_PI.inv_sign());
 
         // sinh, asinh
         for _ in 0..10000 {
             let num = random_normal_float(91, 127);
             let s = num.sinh();
             let a = s.asinh();
-            assert!(num.sub(&a).get_mantissa_len() < 4);
+            if !a.is_inf() && !s.is_inf() {
+                assert_small(&num.sub(&a), 4, &num);
+            }
         }
 
         // sinh of MAX
@@ -790,22 +793,24 @@ mod tests {
         let n = MAX.asinh();
         assert!(n.cmp(&MAX).unwrap() < 0);
         let n = n.sinh();
-        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_inf_pos(), &MAX.sub(&n), 4, &MAX);
         let n = MIN.asinh();
         assert!(n.cmp(&MIN).unwrap() > 0);
         let n = n.sinh();
-        assert!(n.is_inf_neg() || MIN.sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_inf_neg(), &MIN.sub(&n), 4, &MIN);
 
         // cosh, acosh
         for _ in 0..10000 {
-            let num = random_normal_float(91, 127);
-            let s = num.sinh();
-            let a = s.asinh();
-            assert!(num.sub(&a).get_mantissa_len() < 4);
+            let num = random_normal_float(4, 40);
+            let s = num.cosh();
+            let a = s.acosh();
+            if !a.is_inf() && !s.is_inf() {
+                assert_small(&num.abs().sub(&a), 4, &num);
+            }
         }
 
         // cosh extremums at 0
-        let exp_err = -(DECIMAL_POSITIONS as i8) - 38;
+        let exp_err = -(DECIMAL_POSITIONS as i8) - 37;
         let eps = BigFloat::from_f64(1.0e-19);
         test_extremum(BigFloat::cosh, &ZERO, &ONE, 3, 2, 2, &eps, exp_err);
 
@@ -819,7 +824,7 @@ mod tests {
         let n = MAX.acosh();
         assert!(n.cmp(&MAX).unwrap() < 0);
         let n = n.cosh();
-        assert!(n.is_inf_pos() || MAX.sub(&n).get_mantissa_len() < 2);
+        assert_small_if_not(n.is_inf_pos(), &MAX.sub(&n), 4, &MAX);
 
         // acosh extrema at 1
         let exp_err = -(DECIMAL_POSITIONS as i8) - 18;
@@ -835,7 +840,7 @@ mod tests {
             let num = random_normal_float(88, 127);
             let s = num.tanh();
             let a = s.atanh();
-            assert!(num.sub(&a).get_mantissa_len() < 6);
+            assert_small(&num.sub(&a), 6, &num);
         }
 
         // tanh of MAX
@@ -952,94 +957,77 @@ mod tests {
         assert!(NAN.signum().is_nan());
         assert!(INF_POS.signum().cmp(&ONE).unwrap() == 0);
         assert!(INF_NEG.signum().cmp(&ONE.inv_sign()).unwrap() == 0);
+    }
+    
+    #[test]
+    fn test_stable() {
+        let mut d1: BigFloat;
+        let mut d2: BigFloat;
+        
+        for _ in 0..1000 {
+            d1 = random_normal_float(4, 30);
+            d2 = random_normal_float(4, 34);
+            check_stable1(BigFloat::add, BigFloat::sub, &d1, &d2);
+        }
 
+        for _ in 0..1000 {
+            d1 = random_normal_float(40, 40);
+            d2 = random_normal_float(40, 40);
+            check_stable1(BigFloat::mul, BigFloat::div, &d1, &d2);
+        }
 
-        d1 = random_normal_float(4, 30);
-        d2 = random_normal_float(4, 34);
-        let n1 = d1.add(&d2);
-        let n1 = n1.sub(&d2);
-        let n2 = n1.add(&d2);
-        let n2 = n2.sub(&d2);
-        assert!(n1.cmp(&n2).unwrap() == 0);
-
-        d1 = random_normal_float(40, 40);
-        d2 = random_normal_float(40, 40);
-        let n1 = d1.mul(&d2);
-        let n1 = n1.div(&d2);
-        let n2 = n1.mul(&d2);
-        let n2 = n2.div(&d2);
-        assert!(n1.cmp(&n2).unwrap() == 0);
-
-        d1 = random_normal_float(256, 128).abs();
-        let n1 = d1.sqrt();
-        let n1 = n1.mul(&n1);
-        let n2 = n1.sqrt();
-        let n2 = n2.mul(&n2);
-        assert!(n1.cmp(&n2).unwrap() == 0);
-
-        d1 = random_normal_float(256, 128).abs();
-        let n1 = d1.cbrt();
-        let n1 = n1.mul(&n1).mul(&n1);
-        let n2 = n1.cbrt();
-        let n2 = n2.mul(&n2).mul(&n2);
-        assert!(n1.cmp(&n2).unwrap() == 0);
-
-        d1 = random_normal_float(256, 127).abs();
-        let n1 = d1.ln();
-        let n1 = n1.exp();
-        let n2 = n1.ln();
-        let n2 = n2.exp();
-        assert!(n1.cmp(&n2).unwrap() == 0);
-
-        d1 = random_normal_float(256, 127).abs();
-        let d2 = random_normal_float(256, 127).abs();
-        let n1 = d1.log(&d2);
-        let n1 = d2.pow(&n1);
-        let n2 = n1.log(&d2);
-        let n2 = d2.pow(&n2);
-        assert!(n1.cmp(&n2).unwrap() == 0);
-
-        d1 = random_normal_float(90, 127).abs();
-        let n1 = d1.sin();
-        let n1 = n1.asin();
-        let n2 = n1.sin();
-        let n2 = n2.asin();
-        assert!(n1.cmp(&n2).unwrap() == 0);
-
-        d1 = random_normal_float(3, 40).abs();
-        let n1 = d1.cos();
-        let n1 = n1.acos();
-        let n2 = n1.cos();
-        let n2 = n2.acos();
-        assert!(n1.cmp(&n2).unwrap() == 0);
-
-        d1 = random_normal_float(3, 40).abs();
-        let n1 = d1.tan();
-        let n1 = n1.atan();
-        let n2 = n1.tan();
-        let n2 = n2.atan();
-        assert!(n1.cmp(&n2).unwrap() == 0);
-
-        d1 = random_normal_float(91, 127);
-        let n1 = d1.sinh();
-        let n1 = n1.asinh();
-        let n2 = n1.sinh();
-        let n2 = n2.asinh();
-        assert!(n1.cmp(&n2).unwrap() == 0);
-
-        d1 = random_normal_float(91, 127);
-        let n1 = d1.cosh();
-        let n1 = n1.acosh();
-        let n2 = n1.cosh();
-        let n2 = n2.acosh();
-        assert!(n1.cmp(&n2).unwrap() == 0);
-
-        d1 = random_normal_float(88, 127);
-        let n1 = d1.tanh();
-        let n1 = n1.atanh();
-        let n2 = n1.tanh();
-        let n2 = n2.atanh();
-        assert!(n1.cmp(&n2).unwrap() == 0);
+        for _ in 0..1000 {
+            d1 = random_normal_float(256, 128).abs();
+            check_stable2(BigFloat::sqrt, |x| {x.mul(x)}, &d1);
+        }
+    
+        for _ in 0..1000 {
+            d1 = random_normal_float(256, 128).abs();
+            check_stable2(BigFloat::cbrt, |x| {x.mul(x).mul(x)}, &d1);
+        }
+    
+        for _ in 0..1000 {
+            d1 = random_normal_float(256, 127).abs();
+            check_stable2(BigFloat::ln, BigFloat::exp, &d1);
+        }
+    
+        for _ in 0..1000 {
+            d1 = random_normal_float(256, 127).abs();
+            let d2 = random_normal_float(256, 127).abs();
+            if !d1.is_zero() && !d1.is_zero() {
+                check_stable1(BigFloat::log, |p1, p2| {BigFloat::pow(p2, p1)}, &d1, &d2);
+            }
+        }
+    
+        for _ in 0..1000 {
+            d1 = random_normal_float(90, 127).abs();
+            check_stable2(BigFloat::sin, BigFloat::asin, &d1);
+        }
+    
+        for _ in 0..1000 {
+            d1 = random_normal_float(3, 40).abs();
+            check_stable2(BigFloat::cos, BigFloat::acos, &d1);
+        }
+    
+        for _ in 0..1000 {
+            d1 = random_normal_float(3, 40).abs();
+            check_stable2(BigFloat::tan, BigFloat::atan, &d1);
+        }
+    
+        for _ in 0..1000 {
+            d1 = random_normal_float(91, 127);
+            check_stable2(BigFloat::sinh, BigFloat::asinh, &d1);
+        }
+    
+        for _ in 0..1000 {
+            d1 = random_normal_float(91, 127);
+            check_stable2(BigFloat::cosh, BigFloat::acosh, &d1);
+        }
+    
+        for _ in 0..1000 {
+            d1 = random_normal_float(88, 127);
+            check_stable2(BigFloat::tanh, BigFloat::atanh, &d1);
+        }
     }
 
     fn random_f64_exp(exp_range: i32, exp_shift: i32) -> f64 {
@@ -1063,7 +1051,7 @@ mod tests {
             mantissa[DECIMAL_PARTS-1] *= 10;
         }
         let sign = if random::<i8>() & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
-        let exp = random::<i32>().abs() % exp_range - exp_shift;
+        let exp = (if exp_range != 0 {random::<i32>().abs() % exp_range} else {0}) - exp_shift;
         BigFloat::from_raw_parts(mantissa, DECIMAL_POSITIONS as i16, sign, exp as i8)
     }
 
@@ -1095,4 +1083,75 @@ mod tests {
     fn assert_close(n: &BigFloat, y: &BigFloat, err: usize, exp_err: i8) {
         assert!(n.cmp(y).unwrap() == 0 || n.sub(y).get_mantissa_len() < err || n.sub(y).get_exponent() < exp_err);
     }
+
+    // assert v is as large as ndigits digits of scale_num's mantissa, i.e. make sure v << scale_num
+    fn assert_small(v: &BigFloat, ndigits: i32, scale_num: &BigFloat) {
+        let eps = get_assert_small_eps(ndigits, scale_num);
+        assert!(v.abs().cmp(&eps).unwrap() < 0);
+    }
+
+    // assert_small if not other condition true
+    fn assert_small_if_not(cond: bool, v: &BigFloat, ndigits: i32, scale_num: &BigFloat) {
+        if !cond {
+            assert_small(v, ndigits, scale_num);
+        }
+    }
+
+    // assert_small either for v1 or for v2
+    fn assert_small_any(v1: &BigFloat, v2: &BigFloat, ndigits: i32, scale_num: &BigFloat) {
+        let eps = get_assert_small_eps(ndigits, scale_num);
+        assert!(v1.abs().cmp(&eps).unwrap() < 0 || v2.abs().cmp(&eps).unwrap() < 0);
+    }
+
+    // prepare epsilon value
+    fn get_assert_small_eps(ndigits: i32, scale_num: &BigFloat) -> BigFloat {
+        let mut eps = ONE;
+        let e = ndigits - eps.get_mantissa_len() as i32 - (DECIMAL_POSITIONS as i32) + scale_num.get_exponent() as i32 + scale_num.get_mantissa_len() as i32;
+        if e < DECIMAL_MIN_EXPONENT as i32 {
+            eps = MIN_POSITIVE;
+            if e + DECIMAL_POSITIONS as i32 > DECIMAL_MIN_EXPONENT as i32 {
+                eps.set_exponent((e + DECIMAL_POSITIONS as i32) as i8);
+            }
+        } else if e > DECIMAL_MAX_EXPONENT as i32 {
+            eps = MAX;
+        } else {
+            eps.set_exponent(e as i8);
+        }
+        eps
+    }
+
+    // make sure consecutive application of f and inverse f do not diverge
+    fn check_stable1(f: fn (&BigFloat, &BigFloat) -> BigFloat, 
+                    finv: fn (&BigFloat, &BigFloat) -> BigFloat, 
+                    d1: &BigFloat, 
+                    d2: &BigFloat) {
+        let mut n1 = *d1;
+        let mut n2;
+        for _ in 0..10 {
+            let p = f(&n1, d2);
+            n2 = finv(&p, d2);
+            n1 = n2;
+        }
+        n2 = f(&n1, d2);
+        n2 = finv(&n2, d2);
+        assert!((n1.is_nan() && n2.is_nan()) || n1.cmp(&n2).unwrap() == 0);              
+    }
+
+
+    // make sure consecutive application of f and inverse f do not diverge
+    fn check_stable2(f: fn (&BigFloat) -> BigFloat, 
+                    finv: fn (&BigFloat) -> BigFloat, 
+                    d1: &BigFloat) {
+        let mut n1 = *d1;
+        let mut n2;
+        for _ in 0..10 {
+            let p = f(&n1);
+            n2 = finv(&p);
+            n1 = n2;
+        }
+        n2 = f(&n1);
+        n2 = finv(&n2);
+        assert!((n1.is_nan() && n2.is_nan()) || n1.cmp(&n2).unwrap() == 0);            
+    }
+    
 }

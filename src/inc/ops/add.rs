@@ -1,5 +1,6 @@
-/// Addition and subtraction.
+//! Addition and subtraction.
 
+use crate::RoundingMode;
 use crate::inc::inc::BigFloatInc;
 use crate::defs::Error;
 use crate::inc::inc::DECIMAL_PARTS;
@@ -119,7 +120,7 @@ impl BigFloatInc {
                     return Err(Error::ExponentOverflow(d3.sign));
                 }
                 d3.e += 1;
-                if Self::round_mantissa(&mut d3.m, 1) {
+                if Self::round_mantissa(&mut d3.m, 1, RoundingMode::ToEven, true) {
                     // e.g. m = 998, round 1 => m = 100, m is suppoed o be shifted right by
                     // one digit, so no additional shift required.
                     if d3.e == DECIMAL_MAX_EXPONENT {

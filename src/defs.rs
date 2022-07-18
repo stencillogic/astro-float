@@ -1,4 +1,4 @@
-///!  Definitions.
+//!  Definitions.
 
 /// Number of "digits" in BigFloat number.
 pub const DECIMAL_PARTS: usize = 10;

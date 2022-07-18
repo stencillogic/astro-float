@@ -1,4 +1,4 @@
-/// Hyperbolic trigonometric functions and inverse hyperbolic trigonometric functions.
+//! Hyperbolic trigonometric functions and inverse hyperbolic trigonometric functions.
 
 use crate::inc::inc::BigFloatInc;
 use crate::inc::inc::DECIMAL_POSITIONS;

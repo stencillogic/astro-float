@@ -1,5 +1,6 @@
-/// Multiplication and division.
+//! Multiplication and division.
 
+use crate::RoundingMode;
 use crate::inc::inc::BigFloatInc;
 use crate::defs::Error;
 use crate::inc::inc::DECIMAL_PARTS;
@@ -80,7 +81,7 @@ impl BigFloatInc {
         }
 
         // round n digits in the beginning before copying [n..n + DECIMAL_PARTS] to d3
-        if Self::round_mantissa(&mut m3[0..n as usize + DECIMAL_PARTS], n as i16 * DECIMAL_BASE_LOG10 as i16) {
+        if Self::round_mantissa(&mut m3[0..n as usize + DECIMAL_PARTS], n as i16 * DECIMAL_BASE_LOG10 as i16, RoundingMode::ToEven, true) {
             e += 1;
         }
 
@@ -267,7 +268,7 @@ impl BigFloatInc {
         }
 
         let mut rnd_e = 0;
-        if Self::round_mantissa(&mut m3[0..DECIMAL_PARTS+1], DECIMAL_BASE_LOG10 as i16) {
+        if Self::round_mantissa(&mut m3[0..DECIMAL_PARTS+1], DECIMAL_BASE_LOG10 as i16, RoundingMode::ToEven, true) {
             rnd_e = 1;
         }
         d3.m.copy_from_slice(&m3[1..DECIMAL_PARTS+1]);

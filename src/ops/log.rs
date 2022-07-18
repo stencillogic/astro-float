@@ -1,4 +1,4 @@
-/// Logarithms.
+//! Logarithms.
 
 use crate::defs::BigFloatNum;
 use crate::defs::DECIMAL_BASE;
@@ -143,24 +143,25 @@ mod tests {
         d2.m[8] = 0;
         d2.m[9] = 0;
         d2.e = -10;
-        for i in 264..1000 {
+        for i in 1..1000 {
             d2.m[2] = i;
-            d2.m[7] = i;
-            d2.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 28;
+            d2.m[9] = i;
+            d2.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
             d2.e = -50 + (i%100) as i8;
+            epsilon.e = - epsilon.n as i8 + 4 - (DECIMAL_POSITIONS as i8) + d2.e + d2.n as i8;
             let ret = d2.ln().unwrap();
             d1 = ret.exp().unwrap();
-            assert!(d2.sub(&d1).unwrap().n <= 3);
+            assert!(d2.sub(&d1).unwrap().abs().cmp(&epsilon) < 0);
 
             // base > 1
             let ret = d2.log(&two).unwrap();
             d1 = two.pow(&ret).unwrap();
-            assert!(d2.sub(&d1).unwrap().n <= 3);
+            assert!(d2.sub(&d1).unwrap().abs().cmp(&epsilon) < 0);
 
             // base < 1
             let ret = d2.log(&half).unwrap();
             d1 = half.pow(&ret).unwrap();
-            assert!(d2.sub(&d1).unwrap().n <= 3);
+            assert!(d2.sub(&d1).unwrap().abs().cmp(&epsilon) < 0);
         }
 
         // log2

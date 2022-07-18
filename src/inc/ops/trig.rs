@@ -1,4 +1,4 @@
-/// Trigonometric functions and inverse trigonometric functions.
+//! Trigonometric functions and inverse trigonometric functions.
 
 use crate::inc::inc::BigFloatInc;
 use crate::defs::Error;
@@ -165,7 +165,9 @@ impl BigFloatInc {
         let (idx, mut dx) = Self::get_trig_params(&mut x, 0);
         let atan_s = ATAN_VALUES2[idx];
         let s = x.sub(&dx)?;
-        dx = dx.div(&one.add(&x.mul(&s)?)?)?;
+        if s.n != 0 {
+            dx = dx.div(&one.add(&x.mul(&s)?)?)?;
+        }
 
         // Taylor series
         let mut ret = dx;

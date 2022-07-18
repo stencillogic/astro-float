@@ -1,4 +1,4 @@
-/// Cube root.
+//! Cube root.
 
 use crate::defs::BigFloatNum;
 use crate::defs::Error;
@@ -94,7 +94,7 @@ mod tests {
         let d2 = d1;
         let ret = d1.cbrt().unwrap();
         let ret = ret.mul(&ret).unwrap().mul(&ret).unwrap();
-        assert!(ret.div(&d2).unwrap().sub(&one).unwrap().abs().cmp(&epsilon) <= 0);
+        assert!(ret.sub(&d2).unwrap().abs().get_mantissa_len() < 2);
 
         // range of numbers
         let mut ret;

@@ -1,4 +1,4 @@
-/// Power.
+//! Power.
 
 use crate::inc::inc::BigFloatInc;
 use crate::inc::ops::tables::exp_const::EXP_VALUES;

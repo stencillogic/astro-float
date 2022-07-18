@@ -1,4 +1,4 @@
-/// Square root.
+//! Square root.
 
 use crate::inc::inc::BigFloatInc;
 use crate::defs::Error;
@@ -58,7 +58,7 @@ impl BigFloatInc {
             i -= 1;
         }
         let j = d1.m[i] / 100;
-        let mut n = if i>0 || j > 0 {SQRT_VALUES[i*99 + j as usize]} else {*d1};
+        let mut n = if i > 0 || j > 0 {SQRT_VALUES[i*99 + j as usize]} else {*d1};
 
         // Newton's method
         let two = Self::two();
@@ -67,7 +67,7 @@ impl BigFloatInc {
             let nsq = n.mul(&n)?;
             let nd = n.mul(&two)?;
             let n2 = d1.add(&nsq)?.div(&nd)?;
-            let err2 = n.sub(&n2)?;
+            let err2 = n.sub(&n2)?.abs();
             if err2.cmp(&err) >= 0 {
                 break;
             }
@@ -76,5 +76,4 @@ impl BigFloatInc {
         }
         Ok(n)
     }
-
 }

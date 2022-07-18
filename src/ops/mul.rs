@@ -1,4 +1,4 @@
-/// Multiplication and division.
+//! Multiplication and division.
 
 use crate::defs::BigFloatNum;
 use crate::defs::Error;
@@ -412,7 +412,7 @@ mod tests {
         for i in 0..DECIMAL_PARTS - 1 {
             ref_num.m[i] = if i % 2 == 0 { 9998 } else { 4999 };
         }
-        ref_num.m[0] = 9999;
+        ref_num.m[0] = 9998;
         ref_num.m[DECIMAL_PARTS - 1] = 9999;
         ref_num.n = 40;
         ref_num.e = -40;

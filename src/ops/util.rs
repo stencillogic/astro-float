@@ -1,4 +1,4 @@
-/// Utility functions.
+//! Utility functions.
 
 use crate::defs::BigFloatNum;
 use crate::defs::DECIMAL_MAX_EXPONENT;
@@ -63,45 +63,6 @@ impl BigFloatNum {
         }
     }
 
-    // shift m to the left by n digits
-    pub(super) fn shift_left(m: &mut [i16], mut n: usize) {
-        assert!(n > 0 && n <= DECIMAL_POSITIONS);
-
-        let mut i: usize;
-        let mut s: i16;
-        let mut t: i16;
-        let mut x: i32 = (n % DECIMAL_BASE_LOG10) as i32;
-        n /= DECIMAL_BASE_LOG10;
-        if x == 0 {
-            if n > 0 {
-                i = DECIMAL_PARTS - 1;
-                while i >= n {
-                    m[i] = m[i - n];
-                    i -= 1;
-                }
-            }
-        } else {
-            s = 10;
-            t = DECIMAL_BASE as i16 / 10;
-            x -= 1;
-            while x > 0 {
-                s *= 10;
-                t /= 10;
-                x -= 1;
-            }
-
-            i = DECIMAL_PARTS - 1;
-            while i > n {
-                m[i] = (m[i - n] % t) * s + m[i - n - 1] / t;
-                i -= 1;
-            }
-            m[i] = (m[i - n] % t) * s;
-        }
-        for k in 0..n {
-            m[k] = 0;
-        }
-    }
-
     // return number of digits taken in mantissa
     pub(crate) fn num_digits(m: &[i16]) -> i16 {
         let mut n: i16 = DECIMAL_POSITIONS as i16;
@@ -154,7 +115,7 @@ impl BigFloatNum {
             }
             BigFloatInc::shift_left(&mut d1.m, additional_shift);
         }
-        if BigFloatInc::round_mantissa(&mut d1.m, DECIMAL_BASE_LOG10 as i16) {
+        if BigFloatInc::round_mantissa(&mut d1.m, DECIMAL_BASE_LOG10 as i16, RoundingMode::ToEven, true) {
             if d1.e == DECIMAL_MAX_EXPONENT {
                 return Err(Error::ExponentOverflow(d1.sign));
             } else {
@@ -289,11 +250,11 @@ impl BigFloatNum {
                     // add 1
                     c = true;
                 },
-                RoundingMode::ToEven => if num >= 5 && num2 & 1 != 0 {
+                RoundingMode::ToEven => if num > 5 || (num == 5 && num2 & 1 != 0) {
                     // add 1
                     c = true;
                 },
-                RoundingMode::ToOdd => if num >= 5 && num2 & 1 == 0 {
+                RoundingMode::ToOdd => if num > 5 || (num == 5 && num2 & 1 == 0) {
                     // add 1
                     c = true;
                 },

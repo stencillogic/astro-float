@@ -1,4 +1,4 @@
-/// Other operations.
+//! Other operations.
 
 use crate::defs::BigFloatNum;
 use crate::defs::DECIMAL_POSITIONS;
@@ -18,17 +18,6 @@ impl BigFloatNum {
         let mut ret = *self;
         if ret.sign == DECIMAL_SIGN_NEG {
             ret.sign = DECIMAL_SIGN_POS;
-        }
-        ret
-    }
-
-    /// Return absolute value. 
-    pub fn inv_sign(&self) -> Self {
-        let mut ret = *self;
-        if ret.sign == DECIMAL_SIGN_NEG {
-            ret.sign = DECIMAL_SIGN_POS;
-        } else {
-            ret.sign = DECIMAL_SIGN_NEG;
         }
         ret
     }
@@ -564,9 +553,9 @@ mod tests {
         d2.m[8] = 4000;
         assert!(d1.round(2, RoundingMode::ToEven).unwrap().cmp(&d2) == 0);
         d2.m[8] = 0;
-        assert!(d1.round(1, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(1, RoundingMode::ToEven).unwrap().cmp(&d2) == 0);
         d2.m[9] = 120;
-        assert!(d1.round(0, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(0, RoundingMode::ToEven).unwrap().cmp(&d2) == 0);
         d1.sign = DECIMAL_SIGN_NEG;
         d2 = d1;
         d2.m[8] = 4540;
@@ -574,9 +563,9 @@ mod tests {
         d2.m[8] = 4000;
         assert!(d1.round(2, RoundingMode::ToEven).unwrap().cmp(&d2) == 0);
         d2.m[8] = 0;
-        assert!(d1.round(1, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(1, RoundingMode::ToEven).unwrap().cmp(&d2) == 0);
         d2.m[9] = 120;
-        assert!(d1.round(0, RoundingMode::ToOdd).unwrap().cmp(&d2) == 0);
+        assert!(d1.round(0, RoundingMode::ToEven).unwrap().cmp(&d2) == 0);
 
         // to odd
         d1 = BigFloatNum::new();

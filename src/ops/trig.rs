@@ -1,4 +1,4 @@
-/// Trigonometric functions and inverse trigonometric functions.
+//! Trigonometric functions and inverse trigonometric functions.
 
 use crate::defs::BigFloatNum;
 use crate::defs::Error;
@@ -101,6 +101,7 @@ mod tests {
         d1.m[0] = 123;
         d1.m[3] = 123;
         d1.m[7] = 123;
+        epsilon.e = - epsilon.n as i8 + 2 - (DECIMAL_POSITIONS as i8);
         for i in 1..1572 {
             d1.m[8] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
@@ -108,7 +109,7 @@ mod tests {
             let s = d1.sin().unwrap();
             let c = d1.cos().unwrap();
             let p = s.mul(&s).unwrap().add(&c.mul(&c).unwrap()).unwrap();
-            assert!(p.sub(&one).unwrap().abs().n <= 1);
+            assert!(p.sub(&one).unwrap().abs().cmp(&epsilon) < 0);
         }
 
         // asin
@@ -117,20 +118,21 @@ mod tests {
         d1.m[0] = 123;
         d1.m[3] = 123;
         d1.m[7] = 123;
+        epsilon.e = - epsilon.n as i8 + 4 - (DECIMAL_POSITIONS as i8);
         for i in 1..1571 {  // -pi/2..pi/2
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
             d1.n = if i < 10 {1} else if i<100 {2} else if i<1000 {3} else {4} + 36;
             let s = d1.sin().unwrap();
             let asn = s.asin().unwrap();
-            assert!(d1.sub(&asn).unwrap().abs().n <= 2);
+            assert!(d1.sub(&asn).unwrap().abs().cmp(&epsilon) < 0);
         }
 
         // acos
         d1 = BigFloatNum::new();
         d1.e = -39;
         d1.m[8] = 123;
-        epsilon.e = -71; // 1*10^(-32)
+        epsilon.e = - epsilon.n as i8 + 4 - (DECIMAL_POSITIONS as i8);
         for i in 1..3142 {  // 0..pi
             d1.m[9] = i;
             d1.sign = if i & 1 == 0 {DECIMAL_SIGN_POS} else {DECIMAL_SIGN_NEG};
