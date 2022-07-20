@@ -209,11 +209,15 @@ impl BigFloatNum {
 
     // Round n positons to even, return true if exponent is to be incremented.
     pub(crate) fn round_mantissa(m: &mut [i16], n: i16, rm: RoundingMode, is_positive: bool) -> bool {
-
+        
         if n > 0 && n <= DECIMAL_POSITIONS as i16 {
             let n = n-1;
+            let mut rem_zero = true;
             // anything before n'th digit becomes 0
             for i in 0..n as usize / DECIMAL_BASE_LOG10 {
+                if m[i] != 0 {
+                    rem_zero = false;
+                }
                 m[i] = 0;
             }
 
@@ -226,6 +230,9 @@ impl BigFloatNum {
             let t = Self::get_div_factor(n);
             let t2 = Self::get_div_factor(np1);
             let num = m[i] / t % 10;
+            if m[i] % t != 0 {
+                rem_zero = false;
+            }
 
             let num2 = if i1 < m.len() {
                 m[i1] / t2 % 10
@@ -233,28 +240,32 @@ impl BigFloatNum {
                 0
             };
 
+            let eq5 = num == 5 && rem_zero;
+            let gt5 = num > 5 || (num == 5 && !rem_zero);
+            let gte5 = gt5 || eq5;
+
             match rm {
-                RoundingMode::Up => if num >= 5 && is_positive || num > 5 && !is_positive {
+                RoundingMode::Up => if gte5 && is_positive || gt5 && !is_positive {
                     // add 1
                     c = true;
                 },
-                RoundingMode::Down => if num > 5 && is_positive || num >= 5 && !is_positive {
+                RoundingMode::Down => if gt5 && is_positive || gte5 && !is_positive {
                     // add 1
                     c = true;
                 },
-                RoundingMode::FromZero => if num >= 5 {
+                RoundingMode::FromZero => if gte5 {
                     // add 1
                     c = true;
                 },
-                RoundingMode::ToZero => if num > 5 {
+                RoundingMode::ToZero => if gt5 {
                     // add 1
                     c = true;
                 },
-                RoundingMode::ToEven => if num > 5 || (num == 5 && num2 & 1 != 0) {
+                RoundingMode::ToEven => if gt5 || (eq5 && num2 & 1 != 0) {
                     // add 1
                     c = true;
                 },
-                RoundingMode::ToOdd => if num > 5 || (num == 5 && num2 & 1 == 0) {
+                RoundingMode::ToOdd => if gt5 || (eq5 && num2 & 1 == 0) {
                     // add 1
                     c = true;
                 },

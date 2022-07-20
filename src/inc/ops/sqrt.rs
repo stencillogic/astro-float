@@ -31,7 +31,7 @@ impl BigFloatInc {
             return Ok(*self);
         }
 
-        // calc sqrt of integer number with same mantissa
+        // calc sqrt of integer number with the same mantissa
         let mut int_num = *self;
         int_num.e = 0;
         let mut sq = Self::sqrt_int(&int_num)?;
@@ -67,7 +67,7 @@ impl BigFloatInc {
             let nsq = n.mul(&n)?;
             let nd = n.mul(&two)?;
             let n2 = d1.add(&nsq)?.div(&nd)?;
-            let err2 = n.sub(&n2)?.abs();
+            let err2 = n.sub(&n2)?;
             if err2.cmp(&err) >= 0 {
                 break;
             }
