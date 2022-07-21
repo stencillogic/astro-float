@@ -81,8 +81,14 @@ impl BigFloatInc {
                     if free > 0 {
                         Self::shift_left(&mut n1.m, free as usize);
                     }
-                    Self::round_mantissa(&mut n2.m, (shift - free) as i16, RoundingMode::ToEven, true);
-                    Self::shift_right(&mut n2.m, (shift - free) as usize);
+                    let actual_shift = if Self::round_mantissa(&mut n2.m, (shift - free) as i16, RoundingMode::ToEven, true) {
+                        (shift - free) as usize - 1
+                    } else {
+                        (shift - free) as usize
+                    };
+                    if actual_shift > 0 {
+                        Self::shift_right(&mut n2.m, actual_shift);
+                    }
                     e -= free;
                 }
             } else {
