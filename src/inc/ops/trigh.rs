@@ -229,7 +229,7 @@ impl BigFloatInc {
     ///
     /// InvalidArgument - when |`self`| > 1.
     pub fn atanh(&self) -> Result<Self, Error> {
-        if self.e as i16 + self.n <= -5 {
+        if self.e as i16 + self.n <= -1 {
             // atanh(x) = x + x^3/3 + x^5/5 + ...
             let two = Self::two();
             let mut ret = *self;
