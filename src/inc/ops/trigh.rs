@@ -7,6 +7,7 @@ use crate::defs::Error;
 use crate::defs::DECIMAL_SIGN_POS;
 use crate::inc::ops::tables::tanh_const::TANH_VALUES;
 use crate::inc::ops::tables::asinh_const::ASINH_VALUES;
+use crate::inc::ops::tables::fact_const::INVFACT_VALUES;
 
 const ONE_HALF: BigFloatInc = BigFloatInc {
     m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5000],
@@ -32,20 +33,12 @@ impl BigFloatInc {
     pub fn sinh(&self) -> Result<Self, Error> {
         if self.e as i16 + self.n <= -1 {
             // sinh(x) = x + x^3/3! + x^5/5! + ...
-            let one = Self::one();
             let mut ret = *self;
             let dxx = self.mul(self)?;
             let mut dx = ret;
-            // TODO: precompute factorials as polynomial coeffs.
-            let mut fct = one;
-            let mut inc = one;
-            loop {
+            for i in 1..INVFACT_VALUES.len()/2 {
                 dx = dx.mul(&dxx)?;
-                inc = inc.add(&one)?;
-                fct = fct.mul(&inc)?;
-                inc = inc.add(&one)?;
-                fct = fct.mul(&inc)?;
-                let p = dx.div(&fct)?;
+                let p = dx.mul(&INVFACT_VALUES[i*2])?;
                 let val = ret.add(&p)?;
                 if val.cmp(&ret) == 0 {
                     break;
@@ -80,25 +73,17 @@ impl BigFloatInc {
         if self.e as i16 + self.n <= -1 {
             // cosh(x) = 1 + x^2/2! + x^4/4! + ...
             let one = Self::one();
-            let two = Self::two();
             let mut ret = one;
             let dxx = self.mul(self)?;
             let mut dx = dxx;
-            // TODO: precompute factorials as polynomial coeffs.
-            let mut fct = two;
-            let mut inc = fct;
-            loop {
-                let p = dx.div(&fct)?;
+            for i in 0..INVFACT_VALUES.len()/2-1 {
+                let p = dx.mul(&INVFACT_VALUES[i*2 + 1])?;
                 let val = ret.add(&p)?;
                 if val.cmp(&ret) == 0 {
                     break;
                 }
                 ret = val;
                 dx = dx.mul(&dxx)?;
-                inc = inc.add(&one)?;
-                fct = fct.mul(&inc)?;
-                inc = inc.add(&one)?;
-                fct = fct.mul(&inc)?;
             }
             Ok(ret)
         } else {
@@ -119,7 +104,7 @@ impl BigFloatInc {
     ///
     /// ExponentOverflow - when result is too big.
     pub fn tanh(&self) -> Result<Self, Error> {
-        if self.e as i16 + self.n < -2 {
+        if self.e as i16 + self.n < -1 {
             // tanh series
             let mut ret = *self;
             let dxx = self.mul(self)?;
@@ -229,7 +214,7 @@ impl BigFloatInc {
     ///
     /// InvalidArgument - when |`self`| > 1.
     pub fn atanh(&self) -> Result<Self, Error> {
-        if self.e as i16 + self.n <= -1 {
+        if self.e as i16 + self.n < -1 {
             // atanh(x) = x + x^3/3 + x^5/5 + ...
             let two = Self::two();
             let mut ret = *self;

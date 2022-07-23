@@ -8,7 +8,10 @@ use crate::inc::ops::tables::atan_const::ATAN_VALUES1;
 use crate::inc::ops::tables::atan_const::ATAN_VALUES2;
 use crate::inc::ops::tables::sin_const::SIN_VALUES1;
 use crate::inc::ops::tables::sin_const::SIN_VALUES2;
+use crate::inc::ops::tables::asin_const::ASIN_VALUES;
 use crate::inc::ops::tables::tan_const::TAN_VALUES;
+use crate::inc::ops::tables::fact_const::INVFACT_VALUES;
+
 
 const HALF_PI: BigFloatInc = BigFloatInc {
     m: [5846, 2098, 5144, 6397, 1691, 3132, 6192, 4896, 2679, 7963, 1570],
@@ -27,6 +30,12 @@ const PI2: BigFloatInc = BigFloatInc {
     n: 44, 
     sign: DECIMAL_SIGN_POS, 
     e: -43,
+};
+const SQRT_2: BigFloatInc = BigFloatInc { 
+    sign: 1, 
+    e: -43, 
+    n: 44, 
+    m: [6719, 8569, 9807, 2096, 8724, 168, 488, 3095, 6237, 2135, 1414] 
 };
 
 impl BigFloatInc {
@@ -108,15 +117,34 @@ impl BigFloatInc {
     /// InvalidArgument - when |`self`| > 1.
     pub fn asin(&self) -> Result<Self, Error> {
         let one = Self::one();
-
-        // arcsin(x) = arctan(x / sqrt(1 - x^2))
-        let x = *self;
-        let d = one.sub(&x.mul(&x)?)?.sqrt()?;
-        if d.n == 0 {
-            Ok(if x.sign == DECIMAL_SIGN_NEG { HALF_PI.inv_sign() } else { HALF_PI })
+        let mut dx = one.sub(&self.abs())?;
+        if dx.e as i16 + dx.n <= -5 {
+            // Taylor series for arsine(1-x) when x is close to 1
+            let mut ret = HALF_PI.sub(&dx.sqrt()?.mul(&SQRT_2)?)?;
+            let dxx = dx.mul(&dx)?;
+            let mut i = 0;
+            while i < ASIN_VALUES.len() {
+                dx = dx.mul(&dxx)?;
+                let p = dx.sqrt()?.mul(&ASIN_VALUES[i])?;
+                let val = ret.add(&p)?;
+                if val.cmp(&ret) == 0 {
+                    break;
+                }
+                ret = val;
+                i += 1;
+            }
+            ret.sign = self.sign;
+            Ok(ret)
         } else {
-            let arg = x.div(&d)?;
-            arg.atan()
+            // arcsin(x) = arctan(x / sqrt(1 - x^2))
+            let x = *self;
+            let d = one.sub(&x.mul(&x)?)?.sqrt()?;
+            if d.n == 0 {
+                Ok(if x.sign == DECIMAL_SIGN_NEG { HALF_PI.inv_sign() } else { HALF_PI })
+            } else {
+                let arg = x.div(&d)?;
+                arg.atan()
+            }
         }
     }
 
@@ -231,12 +259,9 @@ impl BigFloatInc {
         let mut ret = s[quadrant];
         let mut dxn = dx;
         let one = Self::one();
-        // TODO: precompute factorials as polynomial coeffs.
-        let mut fct = one;
-        let mut inc = one;
         let mut der_n = (quadrant + 1) % 4;
-        loop {
-            let p = dxn.div(&fct)?;
+        for i in 0..INVFACT_VALUES.len() {
+            let p = dxn.mul(&INVFACT_VALUES[i])?;
             let der = s[der_n];
             if der.n != 0 {
                 let add = der.mul(&p)?;
@@ -247,8 +272,6 @@ impl BigFloatInc {
                 ret = val;
             }
             dxn = dxn.mul(&dx)?;
-            inc = inc.add(&one)?;
-            fct = fct.mul(&inc)?;
             der_n += 1;
             if der_n > 3 {
                 der_n = 0;

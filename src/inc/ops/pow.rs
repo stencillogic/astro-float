@@ -3,6 +3,7 @@
 use crate::inc::inc::BigFloatInc;
 use crate::inc::ops::tables::exp_const::EXP_VALUES;
 use crate::inc::ops::tables::exp_const::EXP_VALUES2;
+use crate::inc::ops::tables::fact_const::INVFACT_VALUES;
 use crate::defs::Error;
 use crate::inc::inc::DECIMAL_PARTS;
 use crate::defs::DECIMAL_BASE_LOG10;
@@ -159,13 +160,9 @@ impl BigFloatInc {
         }
         let mut ret = one.add(&p2)?;
         let mut ml = p2;
-        let mut n = one;
-        let mut d = n;
-        loop {
+        for i in 1..INVFACT_VALUES.len() {
             ml = ml.mul(&p2)?;
-            n = n.add(&one)?;
-            d = d.mul(&n)?;
-            let val = ret.add(&ml.div(&d)?)?;
+            let val = ret.add(&ml.mul(&INVFACT_VALUES[i])?)?;
             if val.cmp(&ret) == 0 {
                 break;
             }

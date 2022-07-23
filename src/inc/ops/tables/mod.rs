@@ -6,4 +6,6 @@ pub mod cbrt_const;
 pub mod sqrt_const;
 pub mod exp_const;
 pub mod tanh_const;
+pub mod asin_const;
 pub mod asinh_const;
+pub mod fact_const;

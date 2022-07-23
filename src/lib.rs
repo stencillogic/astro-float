@@ -45,12 +45,7 @@
 //! 
 //! assert!(pi.sub(&PI).abs().cmp(&epsilon).unwrap() < 0);
 //! ```
-//!
-//! ## Precision
-//!
-//! The use of additional digits of the manitissa in calculations allows minimizing the error and rounding the results correctly (i.e. as if the result was a rounded infinitely precise number).
-//! The precision of the results may be lost under certain conditions, such as when the argument is a subnormal number, or when the function is periodic, such as sine or cosine, when the argument is much larger than pi.
-//!
+//! 
 //! ## no_std
 //!
 //! Library can be used without the standard Rust library. This can be achieved by turning off `std` feature.
@@ -109,9 +104,8 @@ mod tests {
         DECIMAL_POSITIONS, DECIMAL_BASE, DECIMAL_PARTS, DECIMAL_SIGN_NEG,
     };
 
-
     #[test]
-    fn test_bigfloat() {
+    fn test_lib_basic() {
 
         let mut d1;
         let mut d2;
@@ -230,6 +224,13 @@ mod tests {
         d2 = d2.inv_sign();
         d3 = d1.div(&d2);
         assert!(d3.cmp(&ref_num) == Some(0));
+    }
+
+    #[test]
+    fn test_lib_add_sub() {
+        let mut d1;
+        let mut d2;
+        let mut ref_num;
 
         // add & sub
         for _ in 0..10000 {
@@ -297,6 +298,11 @@ mod tests {
         d1 = ONE;
         d1.set_exponent(DECIMAL_MIN_EXPONENT);
         assert!(MAX.div(&d1).is_inf_pos());
+    }
+
+    #[test]
+    fn test_lib_fract_int_abs() {
+        let mut d1;
 
         // fract & int
         let f1 = 12345.6789;
@@ -340,7 +346,10 @@ mod tests {
         assert!(d1.abs().to_f64() == 12.3);
         d1 = BigFloat::from_f64(-12.3);
         assert!(d1.abs().to_f64() == 12.3);
+    }
 
+    #[test]
+    fn test_lib_sqrt() {
         // sqrt
         for _ in 0..10000 {
             let num = random_normal_float(256, 128).abs();
@@ -368,8 +377,10 @@ mod tests {
         // sqrt of negative
         let n = MIN_POSITIVE.inv_sign().sqrt();
         assert!(n.is_nan());
+    }
 
-
+    #[test]
+    fn test_lib_cbrt() {
         // cbrt
         for _ in 0..10000 {
             let num = random_normal_float(256, 128);
@@ -405,8 +416,10 @@ mod tests {
         assert!(n.cmp(&ZERO).unwrap() < 0 && MIN_POSITIVE.inv_sign().cmp(&n).unwrap() > 0);
         let n = n.mul(&n).mul(&n);
         assert_small_if_not(n.is_zero(), &MIN_POSITIVE.inv_sign().sub(&n), 2, &MIN_POSITIVE.inv_sign());
+    }
 
-
+    #[test]
+    fn test_lib_pow() {
         // pow
         for _ in 0..10000 {
             let a = random_normal_float(4, 40);
@@ -506,7 +519,10 @@ mod tests {
         assert!(n.pow(&ONE).cmp(&n).unwrap() == 0);
         assert!(n.pow(&TWO).is_positive());
         assert!(n.pow(&ZERO).cmp(&ONE).unwrap() == 0);
+    }
 
+    #[test]
+    fn test_lib_ln_log2_log10() {
         // ln
         let ten = BigFloat::from_u8(10);
         for _ in 0..10000 {
@@ -560,7 +576,10 @@ mod tests {
             let n = op(&ZERO.inv_sign());
             assert!(n.is_nan());
         }
+    }
 
+    #[test]
+    fn test_lib_log() {
         // log
         for _ in 0..10000 {
             let base = random_normal_float(256, 127).abs();
@@ -619,26 +638,33 @@ mod tests {
 
         // zero base
         assert!(TWO.log(&ZERO).is_nan());
+    }
 
-        
+    #[test]
+    fn test_lib_sin_asin() {
+        let eps = BigFloat::from_f64(1.0e-8);
         // sin, asin
         for _ in 0..10000 {
-            let num = random_normal_float(90, 127);
+            let num = random_normal_float(3, 40);
             let s = num.sin();
             let a = s.asin();
             assert!(HALF_PI.cmp(&a).unwrap() >= 0 && HALF_PI.inv_sign().cmp(&a).unwrap() <= 0);
-            if num.abs().cmp(&HALF_PI).unwrap() <= 0 {
-                assert_small(&num.sub(&a), 5, &num);
-            } else {
-                let mut sub1 = num.add(&a).abs().div(&PI).frac();
-                let mut sub2 = num.sub(&a).abs().div(&PI).frac();
-                if sub1.get_mantissa_len() > 5 {
-                    sub1 = ONE.sub(&sub1);
+            if ONE.sub(&s.abs()).cmp(&eps).unwrap() >= 0 {   // avoid values of sin close to 1;
+                                                                    // although computation of sin and asin is precise 
+                                                                    // this test does not work for them.
+                if num.abs().cmp(&HALF_PI).unwrap() <= 0 {
+                    assert_small(&num.sub(&a), 4, &num);
+                } else {
+                    let mut sub1 = num.add(&a).abs().div(&PI).frac();
+                    let mut sub2 = num.sub(&a).abs().div(&PI).frac();
+                    if sub1.get_mantissa_len() > 3 {
+                        sub1 = ONE.sub(&sub1);
+                    }
+                    if sub2.get_mantissa_len() > 3 {
+                        sub2 = ONE.sub(&sub2);
+                    }
+                    assert_small_any(&sub1, &sub2, 3, &num);
                 }
-                if sub2.get_mantissa_len() > 5 {
-                    sub2 = ONE.sub(&sub2);
-                }
-                assert_small_any(&sub1, &sub2, 5, &num);
             }
         }
 
@@ -665,8 +691,8 @@ mod tests {
         test_extremum(BigFloat::sin, &HALF_PI.add(&PI), &ONE.inv_sign(), 3, 2, 2, &eps, exp_err);
 
         // asin extremums: 1, -1
-        test_extremum(BigFloat::asin, &ONE, &HALF_PI, 2, 2, 22, &eps, exp_err);
-        test_extremum(BigFloat::asin, &ONE.inv_sign(), &HALF_PI.inv_sign(), 1, 2, 22, &eps, exp_err);
+        test_extremum(BigFloat::asin, &ONE, &HALF_PI, 2, 2, 2, &eps, exp_err);
+        test_extremum(BigFloat::asin, &ONE.inv_sign(), &HALF_PI.inv_sign(), 1, 2, 2, &eps, exp_err);
 
         // asin near 0
         let n = MIN_POSITIVE.asin();
@@ -679,25 +705,32 @@ mod tests {
         assert!(n.is_nan());
         let n = TWO.inv_sign().asin();
         assert!(n.is_nan());
+    }
 
-        // cos, acos
+    #[test]
+    fn test_lib_cos_acos() {
+        let eps = BigFloat::from_f64(1.0e-8);
         for _ in 0..10000 {
             let num = random_normal_float(3, 40);
             let c = num.cos();
             let a = c.acos();
             assert!(PI.cmp(&a).unwrap() >= 0 && ZERO.inv_sign().cmp(&a).unwrap() <= 0);
-            if num.abs().cmp(&PI).unwrap() <= 0 {
-                assert_small(&num.abs().sub(&a), 5, &num);
-            } else {
-                let mut sub1 = num.add(&a).abs().div(&PI).frac();
-                let mut sub2 = num.sub(&a).abs().div(&PI).frac();
-                if sub1.get_mantissa_len() > 5 {
-                    sub1 = ONE.sub(&sub1);
+            if ONE.sub(&c.abs()).cmp(&eps).unwrap() >= 0 {   // avoid values of cos close to 1;
+                                                                    // although computation of cos and acos is precise 
+                                                                    // this test does not work for them.
+                if num.abs().cmp(&PI).unwrap() <= 0 {
+                    assert_small(&num.abs().sub(&a), 4, &num);
+                } else {
+                    let mut sub1 = num.add(&a).abs().div(&PI).frac();
+                    let mut sub2 = num.sub(&a).abs().div(&PI).frac();
+                    if sub1.get_mantissa_len() > 3 {
+                        sub1 = ONE.sub(&sub1);
+                    }
+                    if sub2.get_mantissa_len() > 3 {
+                        sub2 = ONE.sub(&sub2);
+                    }
+                    assert_small_any(&sub1, &sub2, 3, &num);
                 }
-                if sub2.get_mantissa_len() > 5 {
-                    sub2 = ONE.sub(&sub2);
-                }
-                assert_small_any(&sub1, &sub2, 5, &num);
             }
         }
 
@@ -710,20 +743,23 @@ mod tests {
 
         // cos extremums: 0, PI
         let eps = BigFloat::from_f64(1.0e-39);
+        let exp_err = -(DECIMAL_POSITIONS as i8) - 18;
         test_extremum(BigFloat::cos, &ZERO, &ONE, 3, 2, 2, &eps, exp_err);
         test_extremum(BigFloat::cos, &PI, &ONE.inv_sign(), 3, 2, 2, &eps, exp_err);
 
         // acos extremums: 1, -1
-        let exp_err = -(DECIMAL_POSITIONS as i8) - 18;
-        test_extremum(BigFloat::acos, &ONE, &ZERO, 2, 2, 22, &eps, exp_err);
-        test_extremum(BigFloat::acos, &ONE.inv_sign(), &PI, 1, 2, 22, &eps, exp_err);
+        test_extremum(BigFloat::acos, &ONE, &ZERO, 2, 2, 2, &eps, exp_err);
+        test_extremum(BigFloat::acos, &ONE.inv_sign(), &PI, 1, 2, 2, &eps, exp_err);
 
         // acos resulting to NAN
         let n = TWO.acos();
         assert!(n.is_nan());
         let n = TWO.inv_sign().acos();
         assert!(n.is_nan());
+    }
 
+    #[test]
+    fn test_lib_tan_atan() {
         // tan, atan
         for _ in 0..10000 {
             let num = random_normal_float(3, 40);
@@ -746,6 +782,7 @@ mod tests {
         }
 
         // near pi/2, -pi/2
+        let eps = BigFloat::from_f64(1.0e-39);
         let n = HALF_PI.tan();
         assert!(n.get_mantissa_len() as i8 + n.get_exponent() > 39);
         let n = HALF_PI.sub(&eps).tan();
@@ -770,7 +807,10 @@ mod tests {
         n.set_exponent(n.get_exponent() - (DECIMAL_POSITIONS as i8));
         let n = n.atan();
         assert_small(&HALF_PI.inv_sign().sub(&n), 2, &HALF_PI.inv_sign());
+    }
 
+    #[test]
+    fn test_lib_sinh_asinh() {
         // sinh, asinh
         for _ in 0..10000 {
             let num = random_normal_float(91, 127);
@@ -791,12 +831,15 @@ mod tests {
         let n = MAX.asinh();
         assert!(n.cmp(&MAX).unwrap() < 0);
         let n = n.sinh();
-        assert_small_if_not(n.is_inf_pos(), &MAX.sub(&n), 4, &MAX);
+        assert_small_if_not(n.is_inf_pos(), &MAX.sub(&n), 2, &MAX);
         let n = MIN.asinh();
         assert!(n.cmp(&MIN).unwrap() > 0);
         let n = n.sinh();
-        assert_small_if_not(n.is_inf_neg(), &MIN.sub(&n), 4, &MIN);
+        assert_small_if_not(n.is_inf_neg(), &MIN.sub(&n), 2, &MIN);
+    }
 
+    #[test]
+    fn test_lib_cosh_acosh() {
         // cosh, acosh
         for _ in 0..10000 {
             let num = random_normal_float(4, 40);
@@ -832,7 +875,10 @@ mod tests {
         // acosh resulting to NAN
         let n = ZERO.acosh();
         assert!(n.is_nan());
+    }
 
+    #[test]
+    fn test_lib_tanh_atanh() {
         // tanh, atanh
         for _ in 0..10000 {
             let num = random_normal_float(88, 127);
@@ -864,7 +910,10 @@ mod tests {
         assert!(n.is_nan());
         let n = TWO.inv_sign().atanh();
         assert!(n.is_nan());
+    }
 
+    #[test]
+    fn test_lib_util() {
         // min, max
         for _ in 0..1000 {
             let num1 = random_normal_float(256, 127);
@@ -956,75 +1005,76 @@ mod tests {
         assert!(INF_POS.signum().cmp(&ONE).unwrap() == 0);
         assert!(INF_NEG.signum().cmp(&ONE.inv_sign()).unwrap() == 0);
     }
-    
+
     #[test]
-    fn test_stable() {
+    fn test_lib_stable() {
         let mut d1: BigFloat;
         let mut d2: BigFloat;
-        
-        for _ in 0..1000 {
+        let niter = 10000;
+
+        for _ in 0..niter {
             d1 = random_normal_float(4, 30);
             d2 = random_normal_float(4, 34);
-            check_stable1(BigFloat::add, BigFloat::sub, &d1, &d2);
+            check_stable1(BigFloat::add, BigFloat::sub, &d1, &d2, 1, "check stable for add/sub");
         }
-
-        for _ in 0..1000 {
+        
+        for _ in 0..niter {
             d1 = random_normal_float(40, 40);
             d2 = random_normal_float(40, 40);
-            check_stable1(BigFloat::mul, BigFloat::div, &d1, &d2);
+            check_stable1(BigFloat::mul, BigFloat::div, &d1, &d2, 1, "check stable for mul/div");
         }
-
-        for _ in 0..1000 {
-            d1 = random_normal_float(256, 128).abs();
-            check_stable2(BigFloat::sqrt, |x| {x.mul(x)}, &d1);
+        
+        for _ in 0..niter {
+            d1 = random_normal_float(255, 127).abs();
+            check_stable2(BigFloat::sqrt, |x| {x.mul(x)}, &d1, 5, "check stable for sqrt");
         }
-    
-        for _ in 0..1000 {
-            d1 = random_normal_float(256, 128).abs();
-            check_stable2(BigFloat::cbrt, |x| {x.mul(x).mul(x)}, &d1);
+        
+        for _ in 0..niter {
+            d1 = random_normal_float(255, 127).abs();
+            check_stable2(BigFloat::cbrt, |x| {x.mul(x).mul(x)}, &d1, 5, "check stable for cbrt");
         }
-    
-        for _ in 0..1000 {
-            d1 = random_normal_float(256, 127).abs();
-            check_stable2(BigFloat::ln, BigFloat::exp, &d1);
+        
+        for _ in 0..niter {
+            d1 = random_normal_float(255, 127).abs();
+            check_stable2(BigFloat::ln, BigFloat::exp, &d1, 5, "check stable for ln/exp");
         }
-    
-        for _ in 0..1000 {
-            d1 = random_normal_float(256, 127).abs();
-            let d2 = random_normal_float(256, 127).abs();
+        
+        for _ in 0..niter {
+            d1 = random_normal_float(255, 127).abs();
+            let d2 = random_normal_float(255, 127).abs();
             if !d1.is_zero() && !d1.is_zero() {
-                check_stable1(BigFloat::log, |p1, p2| {BigFloat::pow(p2, p1)}, &d1, &d2);
+                check_stable1(BigFloat::log, |p1, p2| {BigFloat::pow(p2, p1)}, &d1, &d2, 1, "check stable for log/pow");
             }
         }
-    
-        for _ in 0..1000 {
+        
+        for _ in 0..niter {
             d1 = random_normal_float(90, 127).abs();
-            check_stable2(BigFloat::sin, BigFloat::asin, &d1);
+            check_stable2(BigFloat::sin, BigFloat::asin, &d1, 10, "check stable for sin/asin");
         }
-    
-        for _ in 0..1000 {
+        
+        for _ in 0..niter {
+            d1 = random_normal_float(90, 127).abs();
+            check_stable2(BigFloat::cos, BigFloat::acos, &d1, 10, "check stable for cos/acos");
+        }
+        
+        for _ in 0..niter {
             d1 = random_normal_float(3, 40).abs();
-            check_stable2(BigFloat::cos, BigFloat::acos, &d1);
+            check_stable2(BigFloat::tan, BigFloat::atan, &d1, 10, "check stable for tan/atan");
         }
-    
-        for _ in 0..1000 {
-            d1 = random_normal_float(3, 40).abs();
-            check_stable2(BigFloat::tan, BigFloat::atan, &d1);
-        }
-    
-        for _ in 0..1000 {
+        
+        for _ in 0..niter {
             d1 = random_normal_float(91, 127);
-            check_stable2(BigFloat::sinh, BigFloat::asinh, &d1);
+            check_stable2(BigFloat::sinh, BigFloat::asinh, &d1, 5, "check stable for sinh/asinh");
         }
-    
-        for _ in 0..1000 {
+        
+        for _ in 0..niter {
             d1 = random_normal_float(91, 127);
-            check_stable2(BigFloat::cosh, BigFloat::acosh, &d1);
+            check_stable2(BigFloat::cosh, BigFloat::acosh, &d1, 5, "check stable for cosh/acosh");
         }
-    
-        for _ in 0..1000 {
+        
+        for _ in 0..niter {
             d1 = random_normal_float(88, 127);
-            check_stable2(BigFloat::tanh, BigFloat::atanh, &d1);
+            check_stable2(BigFloat::tanh, BigFloat::atanh, &d1, 5, "check stable for tanh/atanh");
         }
     }
 
@@ -1122,34 +1172,48 @@ mod tests {
     fn check_stable1(f: fn (&BigFloat, &BigFloat) -> BigFloat, 
                     finv: fn (&BigFloat, &BigFloat) -> BigFloat, 
                     d1: &BigFloat, 
-                    d2: &BigFloat) {
+                    d2: &BigFloat,
+                    niter: usize,
+                    #[allow(unused_variables)] msg: &str) {
         let mut n1 = *d1;
         let mut n2;
-        for _ in 0..10 {
+        for _ in 0..niter {
             let p = f(&n1, d2);
             n2 = finv(&p, d2);
             n1 = n2;
         }
         n2 = f(&n1, d2);
         n2 = finv(&n2, d2);
-        assert!((n1.is_nan() && n2.is_nan()) || n1.cmp(&n2).unwrap() == 0);              
+        let assertion = (n1.is_nan() && n2.is_nan()) || n1.cmp(&n2).unwrap() == 0;
+        #[cfg(feature="std")]
+        if !assertion {
+            println!("{}", msg);
+        }
+        assert!(assertion); 
     }
 
 
     // make sure consecutive application of f and inverse f do not diverge
     fn check_stable2(f: fn (&BigFloat) -> BigFloat, 
                     finv: fn (&BigFloat) -> BigFloat, 
-                    d1: &BigFloat) {
+                    d1: &BigFloat,
+                    niter: usize,
+                    #[allow(unused_variables)] msg: &str) {
         let mut n1 = *d1;
         let mut n2;
-        for _ in 0..10 {
+        for _ in 0..niter {
             let p = f(&n1);
             n2 = finv(&p);
             n1 = n2;
         }
         n2 = f(&n1);
         n2 = finv(&n2);
-        assert!((n1.is_nan() && n2.is_nan()) || n1.cmp(&n2).unwrap() == 0);            
+        let assertion = (n1.is_nan() && n2.is_nan()) || n1.cmp(&n2).unwrap() == 0;
+        #[cfg(feature="std")]
+        if !assertion {
+            println!("{}", msg);
+        }
+        assert!(assertion);
     }
     
 }

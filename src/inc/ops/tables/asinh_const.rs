@@ -1,6 +1,6 @@
 use crate::inc::inc::BigFloatInc;
 
-// hyperbolic arcsine polinomial coeefficients
+// hyperbolic arcsine polynomial coefficients
 pub(crate) const ASINH_VALUES: [BigFloatInc; 50] = [
   BigFloatInc { sign: -1, e: -44, n: 44, m: [6667, 6666, 6666, 6666, 6666, 6666, 6666, 6666, 6666, 6666, 1666] },
   BigFloatInc { sign: 1, e: -45, n: 44, m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7500] },

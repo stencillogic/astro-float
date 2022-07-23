@@ -87,8 +87,8 @@ impl BigFloat {
     /// 
     /// ```
     /// # use num_bigfloat::BigFloat;
-    /// let n1 = BigFloat::from_bytes(&[1,2,3,4,5,0,0,0], 1, -5);
-    /// let n2 = BigFloat::parse("123.45").unwrap();
+    /// let n1 = BigFloat::from_bytes(&[1,2,3,4,2,0,0,0], 1, -3);
+    /// let n2 = BigFloat::from_u32(12342);
     /// assert!(n1.cmp(&n2) == Some(0));
     /// ```
     pub fn from_bytes(bytes: &[u8], sign: i8, exponent: i8) -> Self {
@@ -161,11 +161,11 @@ impl BigFloat {
     /// 
     /// ```
     /// # use num_bigfloat::BigFloat;
-    /// let n = BigFloat::parse("123.45").unwrap();
+    /// let n = BigFloat::from_f64(123.42);
     /// let mut m = [0; 40];
     /// n.get_mantissa_bytes(&mut m);
-    /// // compare m[0..10] to [1,2,3,4,5,0,0,0,0,0]
-    /// assert!(m[0..10].iter().zip([1,2,3,4,5,0,0,0,0,0].iter()).filter(|x| { x.0 != x.1 }).count() == 0);
+    /// // compare m[0..10] to [1,2,3,4,2,0,0,0,0,0]
+    /// assert!(m[0..10].iter().zip([1,2,3,4,2,0,0,0,0,0].iter()).filter(|x| { x.0 != x.1 }).count() == 0);
     /// ```
     pub fn get_mantissa_bytes(&self, bytes: &mut [u8]) {
         if let Flavor::Value(v) = self.inner {
