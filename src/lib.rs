@@ -5,6 +5,7 @@
 //!
 //! | Name                          | Value  |
 //! |:------------------------------|-------:|
+//! | Base                          |     10 |
 //! | Decimal positions in mantissa |     40 |
 //! | Exponent minimum value        |   -128 |
 //! | Exponent maximum value        |    127 |

@@ -46,7 +46,7 @@ pub const E: BigFloat = BigFloat { inner: Flavor::Value(crate::defs::E) };
 /// PI number.
 pub const PI: BigFloat = BigFloat { inner: Flavor::Value(crate::defs::PI) };
 
-/// PI/2
+/// PI/2.
 pub const HALF_PI: BigFloat = BigFloat { inner: Flavor::Value(BigFloatNum {
     m: [2099, 5144, 6397, 1691, 3132, 6192, 4896, 2679, 7963, 1570],
     n: DECIMAL_POSITIONS as i16, 
@@ -69,7 +69,7 @@ enum Flavor {
 
 impl BigFloat {
 
-    /// Return new BigFloat with value zero.
+    /// Returns a new BigFloat with the value of zero.
     pub fn new() -> Self {
         BigFloat {
             inner: Flavor::Value(BigFloatNum::new())
@@ -77,11 +77,10 @@ impl BigFloat {
     }
  
 
-    /// Create a BigFloat value from a sequence of `bytes`. Each byte must represent a decimal digit.
-    /// First byte is the most significant. The length of `bytes` can be any. If the length of
-    /// `bytes` is greater than required, then the remaining part is ignored.
-    /// If `sign` is negative, then the resulting BigFloat will be
-    /// negative.
+    /// Creates a BigFloat value from a sequence of `bytes`. Each byte must represent a decimal digit.
+    /// First byte is the most significant. `bytes` can be of any length. 
+    /// If `bytes` is longer than required, then the remaining bytes are ignored.
+    /// If the "sign" is negative, then the resulting BigFloat will be negative.
     /// 
     /// ## Examples
     /// 
@@ -97,8 +96,8 @@ impl BigFloat {
         }
     }
 
-    /// Construct BigFloat from f64 value.
-    /// The conversion is not guaranteed to be lossless, since BigFloat and f64 have different radix.
+    /// Creates a BigFloat from f64.
+    /// The conversion is not guaranteed to be lossless since BigFloat and f64 have different bases.
     pub fn from_f64(f: f64) -> Self {
         #[cfg(feature = "std")] {
             let strepr = format!("{:e}", f);
@@ -118,13 +117,13 @@ impl BigFloat {
         }
     }
 
-    /// Construct BigFloat from f32 value.
-    /// The conversion is not guaranteed to be lossless, since BigFloat and f32 have different radix.
+    /// Creates a BigFloat from f32.
+    /// The conversion is not guaranteed to be lossless since BigFloat and f64 have different bases.
     pub fn from_f32(f: f32) -> Self {
         Self::from_f64(f as f64)
     }
 
-    /// Convert BigFloat to f64.
+    /// Converts BigFloat to f64.
     pub fn to_f64(&self) -> f64 {
         match self.inner {
             Flavor::Value(v) => v.to_f64(),
@@ -137,7 +136,7 @@ impl BigFloat {
         }
     }
 
-    /// Convert BigFloat to f32.
+    /// Converts BigFloat to f32.
     pub fn to_f32(&self) -> f32 {
         match self.inner {
             Flavor::Value(v) => v.to_f32(),
@@ -150,11 +149,12 @@ impl BigFloat {
         }
     }
 
-    /// Get BigFloat's mantissa as bytes. Each byte represents a decimal digit.
-    /// First byte is the most significant. The length of `bytes` can be any. If the length of
-    /// `bytes` is smaller than required, then remaining part of mantissa will be omitted.
+    /// Returns the mantissa of the BigFloat in `bytes`. Each byte represents a decimal digit.
+    /// The first byte is the most significant. `bytes` can be of any length. 
+    /// If the length of `bytes` is less than the number of decimal positions filled in the mantissa, 
+    /// then the rest of the mantissa will be omitted.
     ///
-    /// The length of mantissa can be determined using `get_mantissa_len`.
+    /// The length of the mantissa can be determined using `get_mantissa_len`.
     /// If `self` is Inf or NaN, nothing is returned.
     /// 
     /// ## Examples
@@ -173,7 +173,7 @@ impl BigFloat {
         }
     }
 
-    /// Return the number of decimal positions filled in the mantissa.
+    /// Returns the number of decimal places filled in the mantissa.
     /// If `self` is Inf or NaN, 0 is returned.
     pub fn get_mantissa_len(&self) -> usize {
         match self.inner {
@@ -182,7 +182,7 @@ impl BigFloat {
         }
     }
 
-    /// Return 1 if BigFloat is positive, -1 otherwise.
+    /// Returns 1 if BigFloat is positive, -1 otherwise.
     /// If `self` is NaN, 0 is returned.
     pub fn get_sign(&self) -> i8 {
         match self.inner {
@@ -192,7 +192,7 @@ impl BigFloat {
         }
     }
 
-    /// Return exponent part.
+    /// Returns the exponent part of the number.
     /// If `self` is Inf or NaN, 0 is returned.
     pub fn get_exponent(&self) -> i8 {
         match self.inner {
@@ -202,8 +202,8 @@ impl BigFloat {
     }
 
 
-    /// Sets exponent part of `self`.
-    /// Function has no effect on Inf and NaN values.
+    /// Sets the exponent part of the number.
+    /// The function has no effect on Inf and NaN values.
     pub fn set_exponent(&mut self, e: i8) {
         if let Flavor::Value(mut v) = self.inner { 
             v.e = e;
@@ -211,8 +211,8 @@ impl BigFloat {
         }
     }
 
-    /// Return raw parts of BigFloat: mantissa, number of decimal positions in mantissa, sing, and
-    /// exponent.
+    /// Returns the raw parts of the number: the mantissa, the number of decimal places in the mantissa, 
+    /// the sign, and the exponent.
     /// If `self` is Inf or NaN, None is returned.
     pub fn to_raw_parts(&self) -> Option<([i16; DECIMAL_PARTS], i16, i8, i8)> {
         match self.inner {
@@ -221,7 +221,7 @@ impl BigFloat {
         }
     }
 
-    /// Construct BigFloat from raw parts.
+    /// Creates a BigFloat from the raw parts. `to_raw_parts` can be used to get the raw parts of a number.
     pub fn from_raw_parts(mantissa: [i16; DECIMAL_PARTS], mantissa_len: i16, sign: i8, exponent: i8) -> Self {
         let val = BigFloatNum {
             sign,
@@ -234,17 +234,17 @@ impl BigFloat {
         }
     }
 
-    /// Return true if `self` is positive infinity.
+    /// Returns true if `self` is positive infinity.
     pub fn is_inf_pos(&self) -> bool {
         matches!(self.inner, Flavor::Inf(DECIMAL_SIGN_POS))
     }
 
-    /// Return true if `self` is negative infinity.
+    /// Returns true if `self` is negative infinity.
     pub fn is_inf_neg(&self) -> bool {
         matches!(self.inner, Flavor::Inf(DECIMAL_SIGN_NEG))
     }
 
-    /// Return true if `self` is infinite.
+    /// Returns true if `self` is infinite.
     pub fn is_inf(&self) -> bool {
         self.is_inf_pos() || self.is_inf_neg()
     }
@@ -254,7 +254,7 @@ impl BigFloat {
         matches!(self.inner, Flavor::NaN)
     }
 
-    /// Add `d2` to `self` and return result of addition.
+    /// Adds `d2` to `self` and returns the result of the addition.
     pub fn add(&self, d2: &Self) -> Self {
         match self.inner {
             Flavor::Value(v1) => {
@@ -287,7 +287,7 @@ impl BigFloat {
         }
     }
 
-    /// Subtract `d2` from `self` and return result of subtraction.
+    /// Subtracts `d2` from `self` and return the result of the subtraction.
     pub fn sub(&self, d2: &Self) -> Self {
         match self.inner {
             Flavor::Value(v1) => {
@@ -324,7 +324,7 @@ impl BigFloat {
         }
     }
 
-    /// Multiply `self` by `d2` and return result of multiplication.
+    /// Multiplies `self` by `d2` and returns the result of the multiplication.
     pub fn mul(&self, d2: &Self) -> Self {
         match self.inner {
             Flavor::Value(v1) => {
@@ -376,7 +376,7 @@ impl BigFloat {
         }
     }
 
-    /// Divide `self` by `d2` and return result of division.
+    /// Divides `self` by `d2` and returns the result of the division.
     pub fn div(&self, d2: &Self) -> Self {
         match self.inner {
             Flavor::Value(v1) => {
@@ -409,7 +409,7 @@ impl BigFloat {
         }
     }
 
-    /// Compare `self` to `d2`.
+    /// Compares `self` to `d2`.
     /// Returns positive if `self` > `d2`, negative if `self` < `d2`, zero if `self` == `d2`, None if `self` or `d2` is NaN.
     pub fn cmp(&self, d2: &BigFloat) -> Option<i16> {
         match self.inner {
@@ -443,7 +443,7 @@ impl BigFloat {
         }
     }
 
-    /// Changes sign of a number to opposite.
+    /// Reverses the sign of a number.
     pub fn inv_sign(&self) -> BigFloat {
         match self.inner {
             Flavor::Value(mut v1) => {
@@ -516,7 +516,7 @@ impl BigFloat {
         }
     }
 
-    /// Returns logarithm of base `b` of a number.
+    /// Returns the logarithm base `b` of a number.
     pub fn log(&self, b: &Self) -> Self {
         match self.inner {
             Flavor::Value(v1) => {
@@ -579,7 +579,8 @@ impl BigFloat {
         }
     }
 
-    /// Returns true if `self` is positive.
+    /// Returns true if `self` is positive. 
+    /// The function returns false if `self` is NaN. 
     pub fn is_positive(&self) -> bool {
         match self.inner {
             Flavor::Value(v) => v.sign == DECIMAL_SIGN_POS,
@@ -589,6 +590,7 @@ impl BigFloat {
     }
 
     /// Returns true if `self` is negative.
+    /// The function returns false if `self` is NaN. 
     pub fn is_negative(&self) -> bool {
         match self.inner {
             Flavor::Value(v) => v.sign == DECIMAL_SIGN_NEG,
@@ -598,7 +600,7 @@ impl BigFloat {
     }
 
     /// Returns true if `self` is subnormal.
-    /// Number is considered subnormal iff not all places of mantissa are used, and exponent has minimum possible value.
+    /// A number is considered subnormal if not all digits of the mantissa are used, and the exponent has the minimum possible value.
     pub fn is_subnormal(&self) -> bool {
         if let Flavor::Value(v) = self.inner {
             return v.is_subnormal()
@@ -615,9 +617,9 @@ impl BigFloat {
         }
     }
 
-    /// Restrict value of `self` to an interval determined by values of `min` and `max`.
-    /// Returns `max` if `self` is greater than `max`, `min` if `self` is less than `min`, and `self` otherwise.
-    /// If any of the arguments is NaN or `min` is greater than `max`, the function returns NaN.
+    /// Restricts the value of `self` to an interval determined by the values of `min` and `max`.
+    /// The function returns `max` if `self` is greater than `max`, `min` if `self` is less than `min`, and `self` otherwise.
+    /// If either argument is NaN or `min` is greater than `max`, the function returns NaN.
     pub fn clamp(&self, min: &Self, max: &Self) -> Self {
         if self.is_nan() || min.is_nan() || max.is_nan() || max.cmp(min).unwrap() < 0 {
             NAN
@@ -630,8 +632,8 @@ impl BigFloat {
         }
     }
 
-    /// Returns value of `d1` if `d1` is greater than `self`, or the value of `self` otherwise.
-    /// If any of the arguments is NaN, the function returns NaN.
+    /// Returns the value of `d1` if `d1` is greater than `self`, or the value of `self` otherwise.
+    /// If either argument is NaN, the function returns NaN.
     pub fn max(&self, d1: &Self) -> Self {
         if self.is_nan() || d1.is_nan() {
             NAN
@@ -643,7 +645,7 @@ impl BigFloat {
     }
 
     /// Returns value of `d1` if `d1` is less than `self`, or the value of `self` otherwise.
-    /// If any of the arguments is NaN, the function returns NaN.
+    /// If either argument is NaN, the function returns NaN.
     pub fn min(&self, d1: &Self) -> Self {
         if self.is_nan() || d1.is_nan() {
             NAN
@@ -654,8 +656,8 @@ impl BigFloat {
         }
     }
 
-    /// Returns BigFloat with value -1 if `self` is negative, 1 if `self` is positive or zero.
-    /// Returns NaN If `self` is NaN.
+    /// Returns a BigFloat with the value -1 if `self` is negative, 1 if `self` is positive, zero otherwise.
+    /// The function returns NaN If `self` is NaN.
     pub fn signum(&self) -> Self {
         if self.is_nan() {
             NAN
@@ -667,8 +669,8 @@ impl BigFloat {
     }
 
 
-    /// Parse the number from string `s`. 
-    /// Function expects `s` to be a number in scientific format with base 10, or +-Inf, or NaN.
+    /// Parses a number from the string `s`.
+    /// The function expects `s` to be a number in scientific format in base 10, or +-Inf, or NaN.
     /// 
     /// # Examples
     /// 
@@ -757,33 +759,33 @@ macro_rules! gen_wrapper4 {
 
 impl BigFloat {
 
-    gen_wrapper4!("Returns absolute value of `self`.", abs, Self, {Flavor::Inf(DECIMAL_SIGN_POS)}, {Flavor::Inf(DECIMAL_SIGN_POS)},);
-    gen_wrapper4!("Returns integer part of `self`.", int, Self, {Flavor::NaN}, {Flavor::NaN},);
-    gen_wrapper4!("Returns fractional part of `self`.", frac, Self, {Flavor::NaN}, {Flavor::NaN},);
+    gen_wrapper4!("Returns the absolute value of `self`.", abs, Self, {Flavor::Inf(DECIMAL_SIGN_POS)}, {Flavor::Inf(DECIMAL_SIGN_POS)},);
+    gen_wrapper4!("Returns the integer part of `self`.", int, Self, {Flavor::NaN}, {Flavor::NaN},);
+    gen_wrapper4!("Returns the fractional part of `self`.", frac, Self, {Flavor::NaN}, {Flavor::NaN},);
     gen_wrapper2!("Returns the smallest integer greater than or equal to `self`.", ceil, Self, {INF_POS}, {INF_NEG},);
     gen_wrapper2!("Returns the largest integer less than or equal to `self`.", floor, Self, {INF_POS}, {INF_NEG},);
-    gen_wrapper2!("Returns the rounded number with `n` decimal positions in the fractional part of the number using rounding mode `rm`.", round, Self, {INF_POS}, {INF_NEG}, n, usize, rm, RoundingMode);
+    gen_wrapper2!("Returns a rounded number with `n` decimal positions in the fractional part of the number using the rounding mode `rm`.", round, Self, {INF_POS}, {INF_NEG}, n, usize, rm, RoundingMode);
 
-    gen_wrapper2!("Returns square root of `self`.", sqrt, Self, {INF_POS}, {NAN},);
-    gen_wrapper2!("Returns cube root of `self`.", cbrt, Self, {INF_POS}, {INF_NEG},);
-    gen_wrapper2!("Returns natural logarithm of `self`.", ln, Self, {INF_POS}, {NAN},);
-    gen_wrapper2!("Returns logarithm base 2 of `self`.", log2, Self, {INF_POS}, {NAN},);
-    gen_wrapper2!("Returns logarithm base 10 of `self`.", log10, Self, {INF_POS}, {NAN},);
+    gen_wrapper2!("Returns the square root of `self`.", sqrt, Self, {INF_POS}, {NAN},);
+    gen_wrapper2!("Returns the cube root of `self`.", cbrt, Self, {INF_POS}, {INF_NEG},);
+    gen_wrapper2!("Returns the natural logarithm of `self`.", ln, Self, {INF_POS}, {NAN},);
+    gen_wrapper2!("Returns the logarithm base 2 of `self`.", log2, Self, {INF_POS}, {NAN},);
+    gen_wrapper2!("Returns the logarithm base 10 of `self`.", log10, Self, {INF_POS}, {NAN},);
     gen_wrapper2!("Returns `e` to the power of `self`.", exp, Self, {INF_POS}, {INF_NEG},);
 
-    gen_wrapper2!("Returns sine of `self`. The function takes an angle in radians as an argument.", sin, Self, {NAN}, {NAN},);
-    gen_wrapper2!("Returns cosine of `self`. The function takes an angle in radians as an argument.", cos, Self, {NAN}, {NAN},);
-    gen_wrapper2!("Returns tangent of `self`. The function takes an angle in radians as an argument.", tan, Self, {NAN}, {NAN},);
-    gen_wrapper2!("Returns arcsine of `self`. Result is an angle in radians ranging from -pi/2 to pi/2.", asin, Self, {NAN}, {NAN},);
-    gen_wrapper2!("Returns arccosine of `self`. Result is an angle in radians ranging from 0 to pi.", acos, Self, {NAN}, {NAN},);
-    gen_wrapper2!("Returns arctangent of `self`. Result is an angle in radians ranging from -pi/2 to pi/2.", atan, Self, {HALF_PI}, {HALF_PI.inv_sign()},);
+    gen_wrapper2!("Returns the sine of `self`. The function takes an angle in radians as an argument.", sin, Self, {NAN}, {NAN},);
+    gen_wrapper2!("Returns the cosine of `self`. The function takes an angle in radians as an argument.", cos, Self, {NAN}, {NAN},);
+    gen_wrapper2!("Returns the tangent of `self`. The function takes an angle in radians as an argument.", tan, Self, {NAN}, {NAN},);
+    gen_wrapper2!("Returns the arcsine of `self`. The result is an angle in radians ranging from -pi/2 to pi/2.", asin, Self, {NAN}, {NAN},);
+    gen_wrapper2!("Returns the arccosine of `self`. The result is an angle in radians ranging from 0 to pi.", acos, Self, {NAN}, {NAN},);
+    gen_wrapper2!("Returns the arctangent of `self`. The result is an angle in radians ranging from -pi/2 to pi/2.", atan, Self, {HALF_PI}, {HALF_PI.inv_sign()},);
 
-    gen_wrapper2!("Returns hyperbolic sine of `self`.", sinh, Self, {INF_POS}, {INF_NEG},);
-    gen_wrapper2!("Returns hyperbolic cosine of `self`.", cosh, Self, {INF_POS}, {INF_POS},);
-    gen_wrapper2!("Returns hyperbolic tangent of `self`.", tanh, Self, {ONE}, {ONE.inv_sign()},);
-    gen_wrapper2!("Returns inverse hyperbolic sine of `self`.", asinh, Self, {INF_POS}, {INF_NEG},);
-    gen_wrapper2!("Returns inverse hyperbolic cosine of `self`.", acosh, Self, {ZERO}, {ZERO},);
-    gen_wrapper2!("Returns inverse hyperbolic tangent of `self`.", atanh, Self, {ZERO}, {ZERO},);
+    gen_wrapper2!("Returns the hyperbolic sine of `self`.", sinh, Self, {INF_POS}, {INF_NEG},);
+    gen_wrapper2!("Returns the hyperbolic cosine of `self`.", cosh, Self, {INF_POS}, {INF_POS},);
+    gen_wrapper2!("Returns the hyperbolic tangent of `self`.", tanh, Self, {ONE}, {ONE.inv_sign()},);
+    gen_wrapper2!("Returns the inverse hyperbolic sine of `self`.", asinh, Self, {INF_POS}, {INF_NEG},);
+    gen_wrapper2!("Returns the inverse hyperbolic cosine of `self`.", acosh, Self, {ZERO}, {ZERO},);
+    gen_wrapper2!("Returns the inverse hyperbolic tangent of `self`.", atanh, Self, {ZERO}, {ZERO},);
 }
 
 /// Standard library features
