@@ -27,3 +27,9 @@ Number has fixed-size mantissa and exponent.
 ## no_std
 
 Library can be used without the standard Rust library. This can be achieved by turning off `std` feature.
+
+
+## Performance
+
+Currently `num-bigfloat` does not outperform more older and mature libraries, but work is underway to make it faster.
+Here you can find comparison with `rug`/`MPFR`: [bigfloat-bench](https://github.com/stencillogic/bigfloat-bench).
