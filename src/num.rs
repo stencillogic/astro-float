@@ -476,6 +476,26 @@ impl Mantissa {
             }
         }
     }
+
+    /// Decompose to raw parts.
+    fn to_raw_parts(&self) -> ([Digit; NUM_DIGITS], usize) {
+        (self.m, self.n)
+    }
+
+    /// Construct from raw parts.
+    fn from_raw_parts(m: [Digit; NUM_DIGITS], n: usize) -> Self {
+        Mantissa {m, n}
+    }
+
+    /// Returns true if all digits are equal to 0.
+    fn is_all_zero(&self) -> bool {
+        self.m == ZEROED_MANTISSA
+    }
+
+    /// Decrement length by l.
+    fn dec_len(&mut self, l: usize) {
+        self.n -= l;
+    }
 }
 
 
@@ -597,7 +617,7 @@ impl BigFloatNumber {
             ret.e -= 1;
         } else {
             ret.m.shift_right(1);
-            ret.m.n -= 1;
+            ret.m.dec_len(1);
         }
         ret
     }
@@ -824,12 +844,13 @@ impl BigFloatNumber {
 
     /// Decompose to raw parts.
     pub fn to_raw_parts(&self) -> ([Digit; NUM_DIGITS], usize, Sign, Exponent) {
-        (self.m.m, self.m.n, self.s, self.e)
+        let (m, n) = self.m.to_raw_parts();
+        (m, n, self.s, self.e)
     }
 
     /// Construct from raw parts.
     pub fn from_raw_parts(m: [Digit; NUM_DIGITS], n: usize, s: Sign, e: Exponent) -> Self {
-        BigFloatNumber { e, s, m: Mantissa { m, n } }
+        BigFloatNumber { e, s, m: Mantissa::from_raw_parts(m, n) }
     }
 
     /// Returns sign of a number.
@@ -886,7 +907,7 @@ impl BigFloatNumber {
             if (self.e as usize) < NUM_BIT_LEN {
                 // remove integer part of mantissa & normalize at the same time
                 Mantissa::shift_left(&mut ret.m.m, self.e as usize);
-                if ret.m.m == ZEROED_MANTISSA {
+                if ret.m.is_all_zero() {
                     return Self::new();
                 }
                 ret.e = 0;
