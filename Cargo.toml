@@ -13,6 +13,10 @@ repository = "https://github.com/stencillogic/num-bigfloat"
 [dev-dependencies]
 rand = "0.8.5"
 
+[dependencies]
+rand = { version = "0.8.5", optional = true }
+
 [features]
-default = ["std"]
+default = ["std", "random"]
 std = []
+random = ["dep:rand"]
