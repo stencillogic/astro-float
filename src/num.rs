@@ -116,8 +116,8 @@ impl BigFloatNumber {
 
         let s = if self.s == d2.s { Sign::Pos } else {Sign::Neg};
 
-        let (e1, m1_normalized) = self.normalized()?;
-        let (e2, m2_normalized) = d2.normalized()?;
+        let (e1, m1_normalized) = self.normalized(false)?;
+        let (e2, m2_normalized) = d2.normalized(false)?;
 
         let (e_shift, mut m3) = m1_normalized.mul(&m2_normalized, rm, s == Sign::Pos)?;
 
@@ -160,8 +160,8 @@ impl BigFloatNumber {
 
         let s = if self.s == d2.s { Sign::Pos } else { Sign::Neg };
 
-        let (e1, m1_normalized) = self.normalized()?;
-        let (e2, m2_normalized) = d2.normalized()?;
+        let (e1, m1_normalized) = self.normalized(false)?;
+        let (e2, m2_normalized) = d2.normalized(false)?;
 
         let (e_shift, mut m3) = m1_normalized.div(&m2_normalized, rm, s == Sign::Pos)?;
 
@@ -187,16 +187,21 @@ impl BigFloatNumber {
     }
 
     /// Return normilized mantissa and exponent with corresponding shift.
-    fn normalized(&self) -> Result<(isize, Mantissa), Error> {
+    fn normalized(&self, guard: bool) -> Result<(isize, Mantissa), Error> {
         Ok(if self.m.is_subnormal() {
-            let (shift, mantissa) = self.m.normilize()?;
+            let (shift, mantissa) = self.m.normilize(guard)?;
             assert!(shift < (isize::MAX/2 + EXPONENT_MIN as isize) as usize);
             if (self.e as isize) - shift as isize <= isize::MIN/2 {
                 return Err(Error::ExponentOverflow(self.s));
             }
             (self.e as isize - shift as isize, mantissa)
         } else {
-            (self.e as isize, self.m.clone()?)
+            let mantissa = if guard {
+                self.m.clone_guard()
+            } else {
+                self.m.clone()
+            }?;
+            (self.e as isize, mantissa)
         })
     }
 
@@ -228,8 +233,8 @@ impl BigFloatNumber {
             return self.clone();
         }
 
-        let (e1, mut m1) = self.normalized()?;
-        let (e2, mut m2) = d2.normalized()?;
+        let (e1, mut m1) = self.normalized(true)?;
+        let (e2, mut m2) = d2.normalized(true)?;
 
         // shift manitissa of the smaller number.
         let mut e = if e1 >= e2 {
@@ -245,10 +250,10 @@ impl BigFloatNumber {
             let cmp = m1.abs_cmp(&m2);
             let (shift, mut m3) = if cmp > 0 {
                 d3.s = self.s;
-                m1.abs_sub(&m2)?
+                m1.abs_sub(&m2, rm, d3.s == Sign::Pos)?
             } else if cmp < 0 {
                 d3.s = if op >= 0 { d2.s } else { d2.s.invert() };
-                m2.abs_sub(&m1)?
+                m2.abs_sub(&m1, rm, d3.s == Sign::Pos)?
             } else {
                 return Self::new(self.m.max_bit_len());
             };
@@ -724,7 +729,7 @@ mod tests {
             d2 = BigFloatNumber::random_normal(160, -80, 80).unwrap();
             let d3 = d1.sub(&d2, RoundingMode::ToEven).unwrap();
             let d4 = d3.add(&d2, RoundingMode::ToEven).unwrap();
-            eps.set_exponent(d1.get_exponent().max(d2.get_exponent()) - 157);
+            eps.set_exponent(d1.get_exponent().max(d2.get_exponent()) - 158);
             assert!(d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
         }
 

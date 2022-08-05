@@ -216,7 +216,7 @@ impl Mantissa {
     }
 
     /// Subtracts m2 from self.
-    pub fn abs_sub(&self, m2: &Self) -> Result<(usize, Self), Error> {
+    pub fn abs_sub(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(usize, Self), Error> {
         let mut c: DoubleDigit = 0;
         let mut i: usize = 0;
         let l = self.len().max(m2.len());
@@ -243,7 +243,9 @@ impl Mantissa {
         }
         assert!(c == 0);
         let shift = Self::maximize(&mut m3.m);
-        m3.n = self.max_bit_len();
+        assert!(!m3.round_mantissa(DIGIT_BIT_SIZE, rm, is_positive));
+        m3.trunc_to((l-1)*DIGIT_BIT_SIZE);
+        m3.n = m3.max_bit_len();
         Ok((shift, m3))
     }
 
@@ -255,7 +257,7 @@ impl Mantissa {
         let mut m3 = Mantissa::new(l*DIGIT_BIT_SIZE)?;
         while i < l {
             let mut s = c;
-            if i < self.len() { 
+            if i < self.len() {
                 s += self.m[i] as DoubleDigit 
             }
             if i < m2.len() { 
@@ -271,11 +273,14 @@ impl Mantissa {
             i += 1;
         }
         if c > 0 {
-            assert!(!m3.round_mantissa(1, rm, is_positive));  // it is not possible that rounding overflows, and c > 0 at the same time.
+            assert!(!m3.round_mantissa(1 + DIGIT_BIT_SIZE, rm, is_positive));  // it is not possible that rounding overflows, and c > 0 at the same time.
             m3.shift_right(1);
             let l = m3.m.len();
             m3.m[l - 1] |= DIGIT_SIGNIFICANT_BIT;
+        } else if m3.round_mantissa(DIGIT_BIT_SIZE, rm, is_positive) {
+            c = 1;
         }
+        m3.trunc_to((l-1)*DIGIT_BIT_SIZE);
         m3.n = m3.max_bit_len();
         Ok((c > 0, m3))
     }
@@ -463,146 +468,6 @@ impl Mantissa {
         Ok((e_shift, m3))
     }
 
-    // /// Divide mantissa by mantissa, return the result and exponent ajustment.
-    // pub fn div(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(usize, Self), Error> {
-    //     // Knuth's division
-    //     let l1 = self.m.len().max(m2.m.len());
-    //     let l2 = m2.m.len();
-    //     let mut m3 = Self::new((l1+2)*DIGIT_BIT_SIZE)?;
-    //     let mut c: DoubleDigit;
-    //     let mut qh: DoubleDigit;
-    //     let mut k: DoubleDigit;
-    //     let mut rh: DoubleDigit;
-    //     let mut buf1 = Self::reserve_new(2*l1  + 3, 0)?;
-    //     let mut buf2 = Self::reserve_new(l2 + 1, 0)?;
-    //     let n = l2 - 1;
-    //     let m = l1 - 1;
-    //     let buf1_shift = 2+l1;
-    //     let mut i = m3.len() - 1;
-    //     let mut e_shift = 1;
-
-    //     if n == 0 {
-    //         // division by single digit
-    //         let d = m2.m[0] as DoubleDigit;
-    //         rh = 0;
-    //         let mut j = m as isize;
-    //         if (self.m[j as usize] as DoubleDigit) < d {
-    //             rh = self.m[j as usize] as DoubleDigit;
-    //             j -= 1;
-    //             e_shift = 0;
-    //         }
-
-    //         loop {
-    //             qh = rh * DIGIT_BASE as DoubleDigit + if j >= 0 {
-    //                 self.m[j as usize] as DoubleDigit
-    //             } else {
-    //                 0
-    //             };
-    //             rh = qh % d;
-    //             m3.m[i] = (qh / d) as Digit;
-
-    //             if i == 0 || (j == 0 && rh == 0) {
-    //                 break;
-    //             }
-
-    //             j -= 1;
-    //             i -= 1;
-    //         }
-
-    //         while i > 0 {
-    //             i -= 1;
-    //             m3.m[i] = 0;
-    //         }
-    //     } else {
-    //         // normalize: n1 = d1 * d, n2 = d2 * d
-    //         let d = DIGIT_BASE / (m2.m[n] as DoubleDigit + 1); // factor d: d * m2[most significant] is close to DIGIT_MAX
-
-    //         if d == 1 {
-    //             buf1[buf1_shift..self.len() + buf1_shift].clone_from_slice(&self.m[..]);
-    //             buf2[0..m2.len()].clone_from_slice(&m2.m[..]);
-    //         } else {
-    //             Self::mul_by_digit(&self.m, d, &mut buf1[buf1_shift..]);
-    //             Self::mul_by_digit(&m2.m, d, &mut buf2[..]);
-    //         }
-
-    //         let v1 = buf2[n] as DoubleDigit;
-    //         let v2 = buf2[n - 1] as DoubleDigit;
-
-    //         let mut j = m + buf1_shift - n;
-    //         loop {
-    //             qh = buf1[j + n + 1] as DoubleDigit * DIGIT_BASE + buf1[j + n] as DoubleDigit;
-    //             rh = qh % v1;
-    //             qh /= v1;
-
-    //             if qh >= DIGIT_BASE || (qh * v2 > DIGIT_BASE * rh + buf1[j + n - 1] as DoubleDigit) {
-    //                 qh -= 1;
-    //                 rh += v1;
-    //                 if rh < DIGIT_BASE &&
-    //                     (qh >= DIGIT_BASE || (qh * v2 > DIGIT_BASE * rh + buf1[j + n - 1] as DoubleDigit)) {
-    //                         qh -= 1;
-    //                 }
-    //             }
-
-    //             // buf1_j = buf1_j - buf2 * qh
-    //             c = 0;
-    //             k = 0;
-    //             for l in 0..n + 2 {
-    //                 k = buf2[l] as DoubleDigit * qh + k / DIGIT_BASE;
-    //                 let val = k % DIGIT_BASE + c;
-    //                 if (buf1[j + l] as DoubleDigit) < val {
-    //                     buf1[j + l] += (DIGIT_BASE - val) as Digit;
-    //                     c = 1;
-    //                 } else {
-    //                     buf1[j + l] -= val as Digit;
-    //                     c = 0;
-    //                 }
-    //             }
-
-    //             if c > 0 {
-    //                 // compensate: add buf2 once
-    //                 qh -= 1;
-    //                 c = 0;
-    //                 for l in 0..n + 2 {
-    //                     let mut val = buf1[j + l] as DoubleDigit;
-    //                     val += buf2[l] as DoubleDigit + c;
-    //                     if val >= DIGIT_BASE {
-    //                         val -= DIGIT_BASE;
-    //                         c = 1;
-    //                     } else {
-    //                         c = 0;
-    //                     }
-    //                     buf1[j + l] = val as Digit;
-    //                 }
-    //                 assert!(c > 0);
-    //             }
-
-    //             if i < m || qh > 0 {
-    //                 m3.m[i] = qh as Digit;
-    //                 if i == 0 {
-    //                     break;
-    //                 } else {
-    //                     i -= 1;
-    //                 }
-    //             } else {
-    //                 e_shift = 0;
-    //             }
-
-    //             if j == 0 {
-    //                 break;
-    //             } else {
-    //                 j -= 1;
-    //             }
-    //         }
-    //     }
-    //     let _ = Self::maximize(&mut m3.m);
-    //     if m3.round_mantissa(2*DIGIT_BIT_SIZE, rm, is_positive) {
-    //         e_shift += 1;
-    //     }
-    //     m3.trunc_to(l1*DIGIT_BIT_SIZE);
-    //     m3.n = m3.max_bit_len();
-    //     Ok((e_shift, m3))
-    // }
-
     // Multiply d1 by digit d and put result to d3 with overflow.
     fn mul_by_digit(d1: &[Digit], d: DoubleDigit, d3: &mut [Digit]) {
         let mut m: DoubleDigit = 0;
@@ -646,9 +511,13 @@ impl Mantissa {
     }
 
     /// Shift to the left and return shift value.
-    pub fn normilize(&self) -> Result<(usize, Self), Error> {
+    pub fn normilize(&self, guard: bool) -> Result<(usize, Self), Error> {
         let shift = self.max_bit_len() - self.n;
-        let mut m = self.clone()?;
+        let mut m = if guard {
+            self.clone_guard()
+        } else {
+            self.clone()
+        }?;
         if shift > 0 {
             Self::shift_left_m(&mut m.m, shift);
             m.n = self.max_bit_len();
@@ -841,11 +710,23 @@ impl Mantissa {
 
     /// Clones the mantissa.
     pub fn clone(&self) -> Result<Self, Error> {
-        let mut m = Self::reserve_new(Self::bit_len_to_digit_len(self.max_bit_len()), 0)?;
+        let mut m = Self::reserve_new(self.m.len(), 0)?;
         (&mut m).copy_from_slice(&self.m);
         Ok(Mantissa {
             m,
             n: self.n,
+        })
+    }
+
+    /// Clones the mantissa, and adds the guard digit.
+    pub fn clone_guard(&self) -> Result<Self, Error> {
+        let sz = self.m.len() + 1;
+        let mut m = Self::reserve_new(sz, 0)?;
+        (&mut m[1..]).copy_from_slice(&self.m);
+        let n = self.n + DIGIT_BIT_SIZE;
+        Ok(Mantissa {
+            m,
+            n,
         })
     }
 
