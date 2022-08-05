@@ -4,7 +4,6 @@ use crate::defs::Exponent;
 use crate::defs::Sign;
 use crate::defs::Digit;
 use crate::defs::Error;
-use crate::defs::DoubleExponent;
 use crate::defs::EXPONENT_MAX;
 use crate::defs::EXPONENT_MIN;
 use crate::defs::RoundingMode;
@@ -23,8 +22,18 @@ pub struct BigFloatNumber {
 /// Low-level operations on a number.
 impl BigFloatNumber {
 
+    // Check the precision so it does not cause arithmetic overflows anywhere.
+    fn p_assertion(p: usize) -> Result<(), Error> {
+        if p >= (isize::MAX/2 + EXPONENT_MIN as isize) as usize {
+            Err(Error::InvalidArgument)
+        } else {
+            Ok(())
+        }
+    }
+
     /// Returns new number with value of 0.
     pub fn new(p: usize) -> Result<Self, Error>  {
+        Self::p_assertion(p)?;
         Ok(BigFloatNumber {
             m: Mantissa::new(p)?,
             e: 0,
@@ -34,6 +43,7 @@ impl BigFloatNumber {
 
     /// Returns maximum value.
     pub fn max(p: usize) -> Result<Self, Error> {
+        Self::p_assertion(p)?;
         Ok(BigFloatNumber {
             m: Mantissa::oned_mantissa(p)?,
             e: EXPONENT_MAX,
@@ -43,6 +53,7 @@ impl BigFloatNumber {
 
     /// Returns minimum value.
     pub fn min(p: usize) -> Result<Self, Error> {
+        Self::p_assertion(p)?;
         Ok(BigFloatNumber {
             m: Mantissa::oned_mantissa(p)?,
             e: EXPONENT_MAX,
@@ -52,6 +63,7 @@ impl BigFloatNumber {
 
     /// Returns minimum positive subnormal value.
     pub fn min_positive(p: usize) -> Result<Self, Error> {
+        Self::p_assertion(p)?;
         Ok(BigFloatNumber {
             m: Mantissa::min(p)?,
             e: EXPONENT_MIN,
@@ -61,6 +73,7 @@ impl BigFloatNumber {
 
     /// Returns new number with value of 1.
     pub fn one(p: usize) -> Result<Self, Error> {
+        Self::p_assertion(p)?;
         Ok(BigFloatNumber {
             m: Mantissa::one(p)?,
             e: 1,
@@ -70,6 +83,7 @@ impl BigFloatNumber {
 
     /// Returns new number with value of 10.
     pub fn ten(p: usize) -> Result<Self, Error> {
+        Self::p_assertion(p)?;
         Ok(BigFloatNumber {
             m: Mantissa::ten(p)?,
             e: 4,
@@ -78,8 +92,8 @@ impl BigFloatNumber {
     }
 
     /// Summation operation.
-    pub fn add(&self, d2: &Self) -> Result<Self, Error> {
-        self.add_sub(d2, 1)
+    pub fn add(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
+        self.add_sub(d2, 1, rm)
     }
 
     /// Negation operation.
@@ -90,29 +104,31 @@ impl BigFloatNumber {
     }
 
     /// Subtraction operation.
-    pub fn sub(&self, d2: &Self) -> Result<Self, Error> {
-        self.add_sub(d2, -1)
+    pub fn sub(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
+        self.add_sub(d2, -1, rm)
     }
 
     /// Multiplication operation.
-    pub fn mul(&self, d2: &Self) -> Result<Self, Error> {
+    pub fn mul(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
         if self.m.is_zero() || d2.m.is_zero() {
             return Self::new(self.m.max_bit_len())
         }
 
+        let s = if self.s == d2.s { Sign::Pos } else {Sign::Neg};
+
         let (e1, m1_normalized) = self.normalized()?;
         let (e2, m2_normalized) = d2.normalized()?;
 
-        let (e_shift, mut m3) = m1_normalized.mul(&m2_normalized)?;
+        let (e_shift, mut m3) = m1_normalized.mul(&m2_normalized, rm, s == Sign::Pos)?;
 
-        let s = if self.s == d2.s { Sign::Pos } else {Sign::Neg};
-        let mut e = e1 + e2 - e_shift as DoubleExponent;
-        if e > EXPONENT_MAX as DoubleExponent {
+        assert!(e1 <= isize::MAX/2 && e1 > isize::MIN/2 && e2 <= isize::MAX/2 && e2 > isize::MIN/2 && e_shift <= 2);
+
+        let mut e = e1 + e2 - e_shift as isize;
+        if e > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(s));
         }
-
-        if e < EXPONENT_MIN as DoubleExponent {
-            if !Self::process_subnormal(&mut m3, &mut e) {
+        if e < EXPONENT_MIN as isize {
+            if !Self::process_subnormal(&mut m3, &mut e, rm, s == Sign::Pos) {
                 return Self::new(self.m.max_bit_len());
             }
         }
@@ -127,12 +143,12 @@ impl BigFloatNumber {
     }
 
     /// Return reciprocal.
-    pub fn recip(&self) -> Result<Self, Error> {
-        Self::one(self.m.max_bit_len())?.div(self)
+    pub fn recip(&self, rm: RoundingMode) -> Result<Self, Error> {
+        Self::one(self.m.max_bit_len())?.div(self, rm)
     }
 
     /// division operation.
-    pub fn div(&self, d2: &Self) -> Result<Self, Error> {
+    pub fn div(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
 
         if d2.m.is_zero() {
             return Err(Error::DivisionByZero);
@@ -142,26 +158,21 @@ impl BigFloatNumber {
             return Self::new(self.m.max_bit_len()); // self / d2 = 0
         }
 
+        let s = if self.s == d2.s { Sign::Pos } else { Sign::Neg };
+
         let (e1, m1_normalized) = self.normalized()?;
         let (e2, m2_normalized) = d2.normalized()?;
 
-        let mut m3 = m1_normalized.div(&m2_normalized)?;
+        let (e_shift, mut m3) = m1_normalized.div(&m2_normalized, rm, s == Sign::Pos)?;
 
-        let cmp = m1_normalized.abs_cmp(&m2_normalized);
-        let shift= if cmp >= 0 {
-            1
-        } else {
-            0
-        };
+        assert!(e1 < isize::MAX/2 && e1 > isize::MIN/2 && e2 < isize::MAX/2 && e2 > isize::MIN/2 && e_shift <= 2);
 
-        let s = if self.s == d2.s { Sign::Pos } else {Sign::Neg};
-        let mut e = e1 - e2 + shift as DoubleExponent;
-
-        if e > EXPONENT_MAX as DoubleExponent {
+        let mut e = e1 - e2 + e_shift as isize;
+        if e > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(s));
         }
-        if e < EXPONENT_MIN as DoubleExponent {
-            if !Self::process_subnormal(&mut m3, &mut e) {
+        if e < EXPONENT_MIN as isize {
+            if !Self::process_subnormal(&mut m3, &mut e, rm, s == Sign::Pos) {
                 return Self::new(self.m.max_bit_len());
             }
         }
@@ -175,34 +186,35 @@ impl BigFloatNumber {
         Ok(ret)
     }
 
-    /// Fast division by 2.
-    pub fn div_by_2(&self) -> Result<Self, Error> {
-        let mut ret = self.clone()?;
-        if self.m.is_zero() {
-            return Ok(ret);
-        }
-        if ret.e > EXPONENT_MIN {
-            ret.e -= 1;
-        } else {
-            ret.m.shift_right(1);
-            ret.m.dec_len(1);
-        }
-        Ok(ret)
-    }
-
     /// Return normilized mantissa and exponent with corresponding shift.
-    fn normalized(&self) -> Result<(DoubleExponent, Mantissa), Error> {
+    fn normalized(&self) -> Result<(isize, Mantissa), Error> {
         Ok(if self.m.is_subnormal() {
             let (shift, mantissa) = self.m.normilize()?;
-            (self.e as DoubleExponent - shift as DoubleExponent, mantissa)
+            assert!(shift < (isize::MAX/2 + EXPONENT_MIN as isize) as usize);
+            if (self.e as isize) - shift as isize <= isize::MIN/2 {
+                return Err(Error::ExponentOverflow(self.s));
+            }
+            (self.e as isize - shift as isize, mantissa)
         } else {
-            (self.e as DoubleExponent, self.m.clone()?)
+            (self.e as isize, self.m.clone()?)
         })
     }
 
+    // round the mantissa before right shift and then do the shift
+    fn shift_with_round(m1: &mut Mantissa, shift: usize, rm: RoundingMode, is_positive: bool) {
+        let actual_shift = if m1.round_mantissa(shift, rm, is_positive) {
+            shift - 1
+        } else {
+            shift
+        };
+        if actual_shift > 0 {
+            m1.shift_right(actual_shift);
+        }
+    }
+
     /// Combined add and sub operations.
-    fn add_sub(&self, d2: &Self, op: i8) -> Result<Self, Error> {
-        let mut d3 = Self::new(self.m.max_bit_len())?;
+    fn add_sub(&self, d2: &Self, op: i8, rm: RoundingMode) -> Result<Self, Error> {
+        let mut d3 = Self::new(1)?;
 
         // one of the numbers is zero
         if self.m.is_zero() {
@@ -221,10 +233,10 @@ impl BigFloatNumber {
 
         // shift manitissa of the smaller number.
         let mut e = if e1 >= e2 {
-            m2.shift_right((e1 - e2) as usize);
+            Self::shift_with_round(&mut m2,(e1 - e2) as usize, rm, d2.is_positive());
             e1
         } else {
-            m1.shift_right((e2 - e1) as usize);
+            Self::shift_with_round(&mut m1,(e2 - e1) as usize, rm, self.is_positive());
             e2
         };
 
@@ -240,9 +252,12 @@ impl BigFloatNumber {
             } else {
                 return Self::new(self.m.max_bit_len());
             };
-            e -= shift as DoubleExponent;
-            if e < EXPONENT_MIN as DoubleExponent {
-                if !Self::process_subnormal(&mut m3, &mut e) {
+
+            assert!(shift as isize <= isize::MAX/2 && e >= isize::MIN/2);
+            e -= shift as isize;
+
+            if e < EXPONENT_MIN as isize {
+                if !Self::process_subnormal(&mut m3, &mut e, rm, d2.is_positive()) {
                     return Self::new(self.m.max_bit_len());
                 }
             }
@@ -251,15 +266,15 @@ impl BigFloatNumber {
         } else {
             // add
             d3.s = self.s;
-            let (c, mut m3) = m1.abs_add(&m2)?;
+            let (c, mut m3) = m1.abs_add(&m2, rm, d3.is_positive())?;
             if c {
-                if e == EXPONENT_MAX as DoubleExponent {
+                if e == EXPONENT_MAX as isize {
                     return Err(Error::ExponentOverflow(self.s));
                 }
                 e += 1;
             }
-            if e < EXPONENT_MIN as DoubleExponent {
-                if !Self::process_subnormal(&mut m3, &mut e) {
+            if e < EXPONENT_MIN as isize {
+                if !Self::process_subnormal(&mut m3, &mut e, rm, d2.is_positive()) {
                     return Self::new(self.m.max_bit_len());
                 }
             }
@@ -271,13 +286,19 @@ impl BigFloatNumber {
 
     /// If exponent is too small try to present number in subnormal form.
     /// If sucessful return true.
-    fn process_subnormal(m3: &mut Mantissa, e: &mut DoubleExponent) -> bool {
-        if (m3.max_bit_len() as DoubleExponent) + *e > EXPONENT_MIN as DoubleExponent {
+    fn process_subnormal(m3: &mut Mantissa, e: &mut isize, rm: RoundingMode, is_positive: bool) -> bool {
+        assert!(*e < 0);
+        if (m3.max_bit_len() as isize) + *e > EXPONENT_MIN as isize {
             // subnormal
-            let shift = EXPONENT_MIN as DoubleExponent - *e;
-            m3.shift_right(shift as usize);
-            m3.dec_len(shift as usize);
-            *e = EXPONENT_MIN as DoubleExponent;
+            let mut shift = (EXPONENT_MIN as isize - *e) as usize;
+            if m3.round_mantissa(shift, rm, is_positive) {
+                shift -= 1;
+            }
+            if shift > 0 {
+                m3.shift_right(shift);
+                m3.dec_len(shift);
+            }
+            *e = EXPONENT_MIN as isize;
             true
         } else {
             false
@@ -301,7 +322,7 @@ impl BigFloatNumber {
             }
         }
 
-        let e: DoubleExponent = self.e as DoubleExponent - d2.e as DoubleExponent;
+        let e: isize = self.e as isize - d2.e as isize;
         if e > 0 {
             return 1*self.s as i32;
         }
@@ -321,6 +342,7 @@ impl BigFloatNumber {
 
     /// Construct from f64.
     pub fn from_f64(p: usize, mut f: f64) -> Result<Self, Error> {
+        Self::p_assertion(p)?;
         let mut ret = BigFloatNumber::new(p)?;
         if f == 0.0f64 {
             return Ok(ret);
@@ -350,7 +372,7 @@ impl BigFloatNumber {
         let (shift, m) = Mantissa::from_u64(p, mantissa)?;
 
         ret.m = m;
-        ret.e = exponent - 0b1111111111 - shift;
+        ret.e = exponent - 0b1111111111 - shift as Exponent;
 
         Ok(ret)
     }
@@ -361,7 +383,7 @@ impl BigFloatNumber {
             return 0.0;
         }
         let mantissa = self.m.to_u64();
-        let mut e: DoubleExponent = self.e as DoubleExponent + 0b1111111111;
+        let mut e: isize = self.e as isize + 0b1111111111;
         let mut ret = 0;
         if e >= 0b11111111111 {
             match self.s {
@@ -418,6 +440,9 @@ impl BigFloatNumber {
 
     /// Construct from raw parts.
     pub fn from_raw_parts(m: &[Digit], n: usize, s: Sign, e: Exponent) -> Result<Self, Error> {
+        if m.len()*DIGIT_BIT_SIZE >= isize::MAX as usize/2 || n > m.len()*DIGIT_BIT_SIZE {
+            return Err(Error::InvalidArgument);
+        }
         Ok(BigFloatNumber { e, s, m: Mantissa::from_raw_parts(m, n)? })
     }
 
@@ -452,7 +477,7 @@ impl BigFloatNumber {
         if self.is_negative() {
             if !self.fract()?.m.is_zero() {
                 let one = Self::one(self.m.max_bit_len())?;
-                return int.sub(&one);
+                return int.sub(&one, RoundingMode::ToZero);
             }
         }
         Ok(int)
@@ -464,7 +489,7 @@ impl BigFloatNumber {
         if self.is_positive() {
             if !self.fract()?.m.is_zero() {
                 let one = Self::one(self.m.max_bit_len())?;
-                return int.add(&one);
+                return int.add(&one, RoundingMode::ToZero);
             }
         }
         Ok(int)
@@ -521,7 +546,7 @@ impl BigFloatNumber {
         }
     }
 
-    /// Returns the rounded number with `n` decimal positions in the fractional part of the number using rounding mode `rm`.
+    /// Returns the rounded number with `n` binary positions in the fractional part of the number using rounding mode `rm`.
     pub fn round(&mut self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         let mut ret = self.clone()?;
         let e = (-self.e) as usize;
@@ -547,10 +572,11 @@ impl BigFloatNumber {
     #[cfg(feature="random")]
     /// Generate random normal float value with exponent being in the specified range.
     pub fn random_normal(p: usize, exp_from: Exponent, exp_to: Exponent) -> Result<Self, Error> {
+        Self::p_assertion(p)?;
         let m = Mantissa::random_normal(p)?;
         let e = if exp_from < exp_to {
-            (rand::random::<DoubleExponent>().abs() % (exp_to as DoubleExponent - exp_from as DoubleExponent) 
-                + exp_from as DoubleExponent) as Exponent
+            (rand::random::<isize>().abs() % (exp_to as isize - exp_from as isize) 
+                + exp_from as isize) as Exponent
         } else {
             exp_from
         };
@@ -602,11 +628,13 @@ mod tests {
     fn test_number() {
 
         let p = 160; // 10 of "Digit"
+        let rm = RoundingMode::ToEven;
 
         let mut d1;
         let mut d2;
         let mut d3;
         let mut ref_num;
+        let one = BigFloatNumber::one(1).unwrap();
 
         // inf
         assert!(BigFloatNumber::from_f64(p, f64::INFINITY).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
@@ -633,157 +661,138 @@ mod tests {
         d1 = BigFloatNumber::new(p).unwrap();
         d2 = BigFloatNumber::new(p).unwrap();
         ref_num = BigFloatNumber::new(p).unwrap();
-        d3 = d1.mul(&d2).unwrap();
+        d3 = d1.mul(&d2, rm).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
         // 0.99 * 0
         d1 = BigFloatNumber::from_f64(p, 0.99).unwrap();
-        d3 = d1.mul(&d2).unwrap();
+        d3 = d1.mul(&d2, rm).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
         // 0 * 12349999
         d1 = BigFloatNumber::new(p).unwrap();
         d2 = BigFloatNumber::from_f64(p, 12349999.0).unwrap();
-        d3 = d1.mul(&d2).unwrap();
+        d3 = d1.mul(&d2, rm).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
         // 1 * 1
         d1 = BigFloatNumber::from_f64(p, 1.0).unwrap();
         d2 = BigFloatNumber::from_f64(p, 1.0).unwrap();
-        d3 = d1.mul(&d2).unwrap();
+        d3 = d1.mul(&d2, rm).unwrap();
         assert!(d3.cmp(&d1) == 0);
 
         // 1 * -1
         d1 = BigFloatNumber::from_f64(p, 1.0).unwrap();
         d2 = BigFloatNumber::from_f64(p, 1.0).unwrap().neg().unwrap();
-        d3 = d1.mul(&d2).unwrap();
+        d3 = d1.mul(&d2, rm).unwrap();
         assert!(d3.cmp(&d2) == 0);
 
         // -1 * 1
-        d3 = d2.mul(&d1).unwrap();
+        d3 = d2.mul(&d1, rm).unwrap();
         assert!(d3.cmp(&d2) == 0);
 
         // -1 * -1
         d1 = d1.neg().unwrap();
-        d3 = d1.mul(&d2).unwrap();
+        d3 = d1.mul(&d2, rm).unwrap();
         ref_num = BigFloatNumber::from_f64(p, 1.0).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
         // 0 / 0 
         d1 = BigFloatNumber::new(p).unwrap();
         d2 = BigFloatNumber::new(p).unwrap();
-        assert!(d1.div(&d2).unwrap_err() == Error::DivisionByZero);
+        assert!(d1.div(&d2, rm).unwrap_err() == Error::DivisionByZero);
 
         // d2 / 0
         d2 = BigFloatNumber::from_f64(p, 123.0).unwrap();
-        assert!(d2.div(&d1).unwrap_err() == Error::DivisionByZero);
+        assert!(d2.div(&d1, rm).unwrap_err() == Error::DivisionByZero);
 
         // 0 / d2
-        d3 = d1.div(&d2).unwrap();
+        d3 = d1.div(&d2, rm).unwrap();
         ref_num = BigFloatNumber::new(p).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
         // 0 / -d2
         d2 = d2.neg().unwrap();
-        d3 = d1.div(&d2).unwrap();
+        d3 = d1.div(&d2, rm).unwrap();
         assert!(d3.cmp(&ref_num) == 0);
 
         // add & sub & cmp
+        let mut eps = one.clone().unwrap();
         for _ in 0..10000 {
             // avoid subnormal numbers
-            let f1 = random_f64_exp(50, 25);
-            let f2 = random_f64_exp(50, 25);
-            if f1.is_finite() && f2.is_finite() {
-                let f3 = f1 + f2;
-                let f4 = f1 - f2;
-                d1 = BigFloatNumber::from_f64(p, f1).unwrap();
-                d2 = BigFloatNumber::from_f64(p, f2).unwrap();
-                if f3 == 0.0 {
-                    assert!(d1.add(&d2).unwrap().to_f64().abs() <= f64::EPSILON);
-                } else {
-                    assert!((d1.add(&d2).unwrap().to_f64() / f3 - 1.0).abs() <= f64::EPSILON);
-                }
-                if f4 == 0.0 {
-                    assert!(d1.sub(&d2).unwrap().to_f64().abs() <= f64::EPSILON);
-                } else {
-                    assert!((d1.sub(&d2).unwrap().to_f64() / f4 - 1.0).abs() <= f64::EPSILON);
-                }
-                if f1 > f2 {
-                    assert!(d1.cmp(&d2) > 0);
-                } else if f1 < f2 {
-                    assert!(d1.cmp(&d2) < 0);
-                } else {
-                    assert!(d1.cmp(&d2) == 0);
-                }
-            }
+            d1 = BigFloatNumber::random_normal(160, -80, 80).unwrap();
+            d2 = BigFloatNumber::random_normal(160, -80, 80).unwrap();
+            let d3 = d1.sub(&d2, RoundingMode::ToEven).unwrap();
+            let d4 = d3.add(&d2, RoundingMode::ToEven).unwrap();
+            eps.set_exponent(d1.get_exponent().max(d2.get_exponent()) - 157);
+            assert!(d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
         }
 
         // mul & div
         for _ in 0..10000 {
             // avoid subnormal numbers
-            let f1 = random_f64_exp(100, 50);
-            let f2 = random_f64_exp(100, 50);
-            if f1.is_finite() && f2.is_finite() && f2 != 0.0 {
-                let f3 = f1*f2;
-                let f4 = f1/f2;
-                d1 = BigFloatNumber::from_f64(p, f1).unwrap();
-                d2 = BigFloatNumber::from_f64(p, f2).unwrap();
-                assert!((d1.mul(&d2).unwrap().to_f64() / f3 - 1.0).abs() <= f64::EPSILON);
-                assert!((d1.div(&d2).unwrap().to_f64() / f4 - 1.0).abs() <= f64::EPSILON);
+            d1 = BigFloatNumber::random_normal(160, EXPONENT_MIN/2+160, EXPONENT_MAX/2).unwrap();
+            d2 = BigFloatNumber::random_normal(160, EXPONENT_MIN/2, EXPONENT_MAX/2).unwrap();
+            if !d2.is_zero() {
+                let d3 = d1.div(&d2, RoundingMode::ToEven).unwrap();
+                let d4 = d3.mul(&d2, RoundingMode::ToEven).unwrap();
+                eps.set_exponent(d1.get_exponent() - 158);
+                assert!(d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
             }
         }
 
         // reciprocal
         let f1 = random_f64_exp(50, 25);
         d1 = BigFloatNumber::from_f64(p, f1).unwrap();
-        assert!((d1.recip().unwrap().to_f64() * f1 - 1.0).abs() <= f64::EPSILON);
+        assert!((d1.recip(rm).unwrap().to_f64() * f1 - 1.0).abs() <= f64::EPSILON);
 
         // subnormal numbers
         d1 = BigFloatNumber::min_positive(p).unwrap();
         d2 = BigFloatNumber::min_positive(p).unwrap();
         ref_num = BigFloatNumber::min_positive(p).unwrap();
         let one  = BigFloatNumber::one(p).unwrap();
-        ref_num = ref_num.mul(&one.add(&one).unwrap()).unwrap();
+        ref_num = ref_num.mul(&one.add(&one, rm).unwrap(), rm).unwrap();
 
         // min_positive + min_positive = 2*min_positive
-        assert!(d1.add(&d2).unwrap().cmp(&ref_num) == 0);
-        assert!(d1.add(&d2).unwrap().cmp(&d1) > 0);
-        assert!(d1.cmp(&d1.add(&d2).unwrap()) < 0);
+        assert!(d1.add(&d2, rm).unwrap().cmp(&ref_num) == 0);
+        assert!(d1.add(&d2, rm).unwrap().cmp(&d1) > 0);
+        assert!(d1.cmp(&d1.add(&d2, rm).unwrap()) < 0);
 
         // min_positive - min_positive = 0
         ref_num = BigFloatNumber::new(p).unwrap();
-        assert!(d1.sub(&d2).unwrap().cmp(&ref_num) == 0);
+        assert!(d1.sub(&d2, rm).unwrap().cmp(&ref_num) == 0);
 
         // 1 * min_positive = min_positive
-        assert!(one.mul(&d2).unwrap().cmp(&d2) == 0);
+        assert!(one.mul(&d2, rm).unwrap().cmp(&d2) == 0);
 
         // min_positive / 1 = min_positive
-        assert!(d2.div(&one).unwrap().cmp(&d2) == 0);
+        assert!(d2.div(&one, rm).unwrap().cmp(&d2) == 0);
 
         // min_positive / 1 = min_positive
-        assert!(d2.div(&one).unwrap().cmp(&d2) == 0);
+        assert!(d2.div(&one, rm).unwrap().cmp(&d2) == 0);
 
         // normal -> subnormal -> normal
         d1 = one.clone().unwrap();
         d1.e = EXPONENT_MIN;
         d2 = BigFloatNumber::min_positive(p).unwrap();
         assert!(!d1.is_subnormal());
-        assert!(d1.sub(&d2).unwrap().cmp(&d1) < 0);
-        assert!(d1.cmp(&d1.sub(&d2).unwrap()) > 0);
-        d1 = d1.sub(&d2).unwrap();
+        assert!(d1.sub(&d2, rm).unwrap().cmp(&d1) < 0);
+        assert!(d1.cmp(&d1.sub(&d2, rm).unwrap()) > 0);
+        d1 = d1.sub(&d2, rm).unwrap();
         assert!(d1.is_subnormal());
-        d1 = d1.add(&d2).unwrap();
+        d1 = d1.add(&d2, rm).unwrap();
         assert!(!d1.is_subnormal());
 
         // overflow
         d1 = one.clone().unwrap();
         d1.e = EXPONENT_MAX - (d1.m.max_bit_len() - 1) as Exponent;
-        assert!(BigFloatNumber::max(p).unwrap().add(&d1).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
-        assert!(BigFloatNumber::min(p).unwrap().sub(&d1).unwrap_err() == Error::ExponentOverflow(Sign::Neg));
-        assert!(BigFloatNumber::max(p).unwrap().mul(&BigFloatNumber::max(p).unwrap()).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+        assert!(BigFloatNumber::max(p).unwrap().add(&d1, rm).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+        assert!(BigFloatNumber::min(p).unwrap().sub(&d1, rm).unwrap_err() == Error::ExponentOverflow(Sign::Neg));
+        assert!(BigFloatNumber::max(p).unwrap().mul(&BigFloatNumber::max(p).unwrap(), rm)
+            .unwrap_err() == Error::ExponentOverflow(Sign::Pos));
         d1 = one.clone().unwrap();
         d1.e = EXPONENT_MIN;
-        assert!(BigFloatNumber::max(p).unwrap().div(&d1).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+        assert!(BigFloatNumber::max(p).unwrap().div(&d1, rm).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
 
         // decompose and compose
         let f1 = random_f64_exp(50, 25);

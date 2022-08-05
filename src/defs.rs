@@ -12,9 +12,6 @@ pub type DoubleDigit = u32;
 /// Digit with sign.
 pub type DigitSigned = i32;
 
-/// Doubled exponent.
-pub type DoubleExponent = i32;
-
 
 /// Maximum exponent value.
 pub const EXPONENT_MAX: Exponent = Exponent::MAX;
@@ -32,6 +29,8 @@ pub const DIGIT_BASE: DoubleDigit = DIGIT_MAX as DoubleDigit + 1;
 /// Size of a "digit" in bits.
 pub const DIGIT_BIT_SIZE: usize = std::mem::size_of::<Digit>() * 8;
 
+// Digit with the most significant bit set.
+pub const DIGIT_SIGNIFICANT_BIT: Digit = DIGIT_MAX << (DIGIT_BIT_SIZE - 1);
 
 /// Sign.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]

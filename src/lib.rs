@@ -3,11 +3,14 @@
 mod defs;
 mod mantissa;
 mod num;
-mod format;
+mod strop;
+mod parser;
 
 pub use crate::num::BigFloatNumber;
 pub use crate::defs::Sign;
 pub use crate::defs::Exponent;
+pub use crate::defs::Radix;
+pub use crate::defs::RoundingMode;
 
 
 #[cfg(test)]
