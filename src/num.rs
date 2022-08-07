@@ -1,5 +1,6 @@
 //! BigFloatNumber definition and basic arithmetic, comparison, and number manipulation operations.
 
+use crate::defs::DigitSigned;
 use crate::defs::Exponent;
 use crate::defs::Sign;
 use crate::defs::Digit;
@@ -10,6 +11,11 @@ use crate::defs::RoundingMode;
 use crate::defs::DIGIT_BIT_SIZE;
 use crate::mantissa::Mantissa;
 
+use std::cell::RefCell;
+thread_local! {
+    static DUR1: RefCell<u128>  = RefCell::new(0);
+    static DUR2: RefCell<u128> = RefCell::new(0);
+}
 
 /// BigFloatNumber represents floating point number with mantissa of a fixed size, and exponent.
 #[derive(Debug)]
@@ -116,12 +122,14 @@ impl BigFloatNumber {
 
         let s = if self.s == d2.s { Sign::Pos } else {Sign::Neg};
 
-        let (e1, m1_normalized) = self.normalized(false)?;
-        let (e2, m2_normalized) = d2.normalized(false)?;
+        let (e1, m1_opt) = self.normalize()?;
+        let m1_normalized = m1_opt.as_ref().unwrap_or(&self.m);
+        let (e2, m2_opt) = d2.normalize()?;
+        let m2_normalized = m2_opt.as_ref().unwrap_or(&d2.m);
 
-        let (e_shift, mut m3) = m1_normalized.mul(&m2_normalized, rm, s == Sign::Pos)?;
+        let (e_shift, mut m3) = m1_normalized.mul(m2_normalized, rm, s == Sign::Pos)?;
 
-        assert!(e1 <= isize::MAX/2 && e1 > isize::MIN/2 && e2 <= isize::MAX/2 && e2 > isize::MIN/2 && e_shift <= 2);
+        debug_assert!(e1 <= isize::MAX/2 && e1 > isize::MIN/2 && e2 <= isize::MAX/2 && e2 > isize::MIN/2 && e_shift <= 2);
 
         let mut e = e1 + e2 - e_shift as isize;
         if e > EXPONENT_MAX as isize {
@@ -160,12 +168,14 @@ impl BigFloatNumber {
 
         let s = if self.s == d2.s { Sign::Pos } else { Sign::Neg };
 
-        let (e1, m1_normalized) = self.normalized(false)?;
-        let (e2, m2_normalized) = d2.normalized(false)?;
+        let (e1, m1_opt) = self.normalize()?;
+        let m1_normalized = m1_opt.as_ref().unwrap_or(&self.m);
+        let (e2, m2_opt) = d2.normalize()?;
+        let m2_normalized = m2_opt.as_ref().unwrap_or(&d2.m);
 
-        let (e_shift, mut m3) = m1_normalized.div(&m2_normalized, rm, s == Sign::Pos)?;
+        let (e_shift, mut m3) = m1_normalized.div(m2_normalized, rm, s == Sign::Pos)?;
 
-        assert!(e1 < isize::MAX/2 && e1 > isize::MIN/2 && e2 < isize::MAX/2 && e2 > isize::MIN/2 && e_shift <= 2);
+        debug_assert!(e1 < isize::MAX/2 && e1 > isize::MIN/2 && e2 < isize::MAX/2 && e2 > isize::MIN/2 && e_shift <= 2);
 
         let mut e = e1 - e2 + e_shift as isize;
         if e > EXPONENT_MAX as isize {
@@ -187,39 +197,23 @@ impl BigFloatNumber {
     }
 
     /// Return normilized mantissa and exponent with corresponding shift.
-    fn normalized(&self, guard: bool) -> Result<(isize, Mantissa), Error> {
-        Ok(if self.m.is_subnormal() {
-            let (shift, mantissa) = self.m.normilize(guard)?;
-            assert!(shift < (isize::MAX/2 + EXPONENT_MIN as isize) as usize);
+    fn normalize(&self) -> Result<(isize, Option<Mantissa>), Error> {
+        if self.is_subnormal() {
+            let (shift, mantissa) = self.m.normilize()?;
+            debug_assert!(shift < (isize::MAX/2 + EXPONENT_MIN as isize) as usize);
             if (self.e as isize) - shift as isize <= isize::MIN/2 {
                 return Err(Error::ExponentOverflow(self.s));
             }
-            (self.e as isize - shift as isize, mantissa)
+            Ok((self.e as isize - shift as isize, Some(mantissa)))
         } else {
-            let mantissa = if guard {
-                self.m.clone_guard()
-            } else {
-                self.m.clone()
-            }?;
-            (self.e as isize, mantissa)
-        })
-    }
-
-    // round the mantissa before right shift and then do the shift
-    fn shift_with_round(m1: &mut Mantissa, shift: usize, rm: RoundingMode, is_positive: bool) {
-        let actual_shift = if m1.round_mantissa(shift, rm, is_positive) {
-            shift - 1
-        } else {
-            shift
-        };
-        if actual_shift > 0 {
-            m1.shift_right(actual_shift);
+            Ok((self.e as isize, None))
         }
     }
 
+
     /// Combined add and sub operations.
     fn add_sub(&self, d2: &Self, op: i8, rm: RoundingMode) -> Result<Self, Error> {
-        let mut d3 = Self::new(1)?;
+        let mut d3 = Self::new(0)?;
 
         // one of the numbers is zero
         if self.m.is_zero() {
@@ -233,32 +227,28 @@ impl BigFloatNumber {
             return self.clone();
         }
 
-        let (e1, mut m1) = self.normalized(true)?;
-        let (e2, mut m2) = d2.normalized(true)?;
+        let (e1, m1_opt) = self.normalize()?;
+        let m1 = m1_opt.as_ref().unwrap_or(&self.m);
+        let (e2, m2_opt) = d2.normalize()?;
+        let m2 = m2_opt.as_ref().unwrap_or(&d2.m);
 
-        // shift manitissa of the smaller number.
-        let mut e = if e1 >= e2 {
-            Self::shift_with_round(&mut m2,(e1 - e2) as usize, rm, d2.is_positive());
-            e1
-        } else {
-            Self::shift_with_round(&mut m1,(e2 - e1) as usize, rm, self.is_positive());
-            e2
-        };
-
+        let mut e = 0;
         if (self.s != d2.s && op >= 0) || (op < 0 && self.s == d2.s) {
             // subtract
-            let cmp = m1.abs_cmp(&m2);
+            let cmp = self.abs_cmp(d2);
             let (shift, mut m3) = if cmp > 0 {
                 d3.s = self.s;
-                m1.abs_sub(&m2, rm, d3.s == Sign::Pos)?
+                e = e1;
+                m1.abs_sub(&m2, (e1 - e2) as usize, rm, self.is_positive())?
             } else if cmp < 0 {
                 d3.s = if op >= 0 { d2.s } else { d2.s.invert() };
-                m2.abs_sub(&m1, rm, d3.s == Sign::Pos)?
+                e = e2;
+                m2.abs_sub(&m1, (e2 - e1) as usize, rm, self.is_positive())?
             } else {
                 return Self::new(self.m.max_bit_len());
             };
 
-            assert!(shift as isize <= isize::MAX/2 && e >= isize::MIN/2);
+            debug_assert!(shift as isize <= isize::MAX/2 && e >= isize::MIN/2);
             e -= shift as isize;
 
             if e < EXPONENT_MIN as isize {
@@ -271,7 +261,13 @@ impl BigFloatNumber {
         } else {
             // add
             d3.s = self.s;
-            let (c, mut m3) = m1.abs_add(&m2, rm, d3.is_positive())?;
+            let (c, mut m3) = if e1 >= e2 {
+                e = e1;
+                m1.abs_add(&m2, (e1 - e2) as usize, rm, d3.is_positive())
+            } else {
+                e = e2;
+                m2.abs_add(&m1, (e2 - e1) as usize, rm, d3.is_positive())
+            }?;
             if c {
                 if e == EXPONENT_MAX as isize {
                     return Err(Error::ExponentOverflow(self.s));
@@ -292,7 +288,7 @@ impl BigFloatNumber {
     /// If exponent is too small try to present number in subnormal form.
     /// If sucessful return true.
     fn process_subnormal(m3: &mut Mantissa, e: &mut isize, rm: RoundingMode, is_positive: bool) -> bool {
-        assert!(*e < 0);
+        debug_assert!(*e < 0);
         if (m3.max_bit_len() as isize) + *e > EXPONENT_MIN as isize {
             // subnormal
             let mut shift = (EXPONENT_MIN as isize - *e) as usize;
@@ -312,16 +308,16 @@ impl BigFloatNumber {
 
     /// Compare to d2.
     /// Returns positive if self > d2, negative if self < d2, 0 otherwise.
-    pub fn cmp(&self, d2: &Self) -> i32 {
+    pub fn cmp(&self, d2: &Self) -> DigitSigned {
         if self.s != d2.s {
-            return self.s as i32;
+            return self.s as DigitSigned;
         }
 
         if self.m.is_zero() || d2.m.is_zero() {
             if !d2.m.is_zero() {
-                return d2.s.invert() as i32;
+                return d2.s.invert() as DigitSigned;
             } else if !self.m.is_zero() {
-                return self.s as i32;
+                return self.s as DigitSigned;
             } else {
                 return 0;
             }
@@ -329,13 +325,36 @@ impl BigFloatNumber {
 
         let e: isize = self.e as isize - d2.e as isize;
         if e > 0 {
-            return 1*self.s as i32;
+            return 1*self.s as DigitSigned;
         }
         if e < 0 {
-            return -1*self.s as i32;
+            return -1*self.s as DigitSigned;
         }
 
-        self.m.abs_cmp(&d2.m) as i32 * self.s as i32
+        self.m.abs_cmp(&d2.m) as DigitSigned * self.s as DigitSigned
+    }
+
+    // Compare absolute values of two numbers.
+    fn abs_cmp(&self, d2: &Self) -> DigitSigned {
+        if self.m.is_zero() || d2.m.is_zero() {
+            if !d2.m.is_zero() {
+                return -1;
+            } else if !self.m.is_zero() {
+                return 1;
+            } else {
+                return 0;
+            }
+        }
+
+        let e: isize = self.e as isize - d2.e as isize;
+        if e > 0 {
+            return 1;
+        }
+        if e < 0 {
+            return -1;
+        }
+
+        self.m.abs_cmp(&d2.m)
     }
 
     /// Return absolute value of a number.
@@ -729,7 +748,8 @@ mod tests {
             d2 = BigFloatNumber::random_normal(160, -80, 80).unwrap();
             let d3 = d1.sub(&d2, RoundingMode::ToEven).unwrap();
             let d4 = d3.add(&d2, RoundingMode::ToEven).unwrap();
-            eps.set_exponent(d1.get_exponent().max(d2.get_exponent()) - 158);
+            eps.set_exponent(d1.get_exponent().max(d2.get_exponent()) - 157);
+//            println!("=== res {:?} {:?} {:?}", d4, d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap(), eps);
             assert!(d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
         }
 
@@ -871,5 +891,71 @@ mod tests {
             f = -f;
         }
         f
+    }
+
+    #[test]
+    fn add_sub() {
+        let mut n = vec![];
+        for _ in 0..1000000 {
+            n.push(BigFloatNumber::random_normal(132, -20, 20).unwrap());
+        }
+
+        for _ in 0..5 {
+            let start_time = std::time::Instant::now();
+            let mut f = n[0].clone().unwrap();
+            for (i, ni) in n.iter().enumerate().skip(1) {
+                if i & 1 == 0 {
+                    f = f.add(ni, RoundingMode::ToEven).unwrap();
+                } else {
+                    f = f.sub(ni, RoundingMode::ToEven).unwrap();
+                }
+            }
+
+            let time = start_time.elapsed();
+            println!("{}", time.as_millis());
+
+            DUR1.with(|v| {
+                println!("dur1 {}", *v.borrow()/1000000);
+            });
+    
+            DUR2.with(|v| {
+                println!("dur2 {}", *v.borrow()/1000000);
+            });
+        }
+
+    }
+
+
+    #[test]
+    fn mul_div() {
+        let mut n = vec![];
+        for _ in 0..1000000 {
+            n.push(BigFloatNumber::random_normal(132, -20, 20).unwrap());
+        }
+
+        for _ in 0..5 {
+            let start_time = std::time::Instant::now();
+            let f1 = n[0].clone().unwrap();
+            let mut f = f1.clone().unwrap();
+            for (i, ni) in n.iter().enumerate().skip(1) {
+                if i & 1 == 0 {
+                    f = ni.mul(&f1, RoundingMode::ToEven).unwrap();
+                } else {
+                    f = ni.div(&f1, RoundingMode::ToEven).unwrap();
+                }
+            }
+
+            let time = start_time.elapsed();
+            println!("{}", time.as_millis());
+
+            DUR1.with(|v| {
+                println!("dur1 {}", *v.borrow()/1000000);
+            });
+    
+            DUR2.with(|v| {
+                println!("dur2 {}", *v.borrow()/1000000);
+            });
+        }
+
     }
 }

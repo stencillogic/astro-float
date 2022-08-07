@@ -1,16 +1,16 @@
 ///! Definitions.
 
 /// A digit.
-pub type Digit = u16;
+pub type Digit = u32;
 
 /// An exponent.
 pub type Exponent = i16;
 
 /// Doubled digit.
-pub type DoubleDigit = u32;
+pub type DoubleDigit = u64;
 
 /// Digit with sign.
-pub type DigitSigned = i32;
+pub type DigitSigned = i64;
 
 
 /// Maximum exponent value.

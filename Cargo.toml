@@ -15,6 +15,7 @@ rand = "0.8.5"
 
 [dependencies]
 rand = { version = "0.8.5", optional = true }
+itertools = { version = "0.10.3", features = [] }
 
 [features]
 default = ["std", "random"]

@@ -10,6 +10,8 @@ use crate::defs::DIGIT_BASE;
 use crate::defs::DIGIT_BIT_SIZE;
 use crate::defs::DIGIT_SIGNIFICANT_BIT;
 use crate::defs::RoundingMode;
+use crate::util::ExtendedSlice;
+use crate::util::ShiftedSlice;
 use core::mem::size_of;
 
 
@@ -23,6 +25,7 @@ pub struct Mantissa {
 impl Mantissa {
 
     // bit lenth to length in "digits".
+    #[inline]
     fn bit_len_to_digit_len(p: usize) -> usize {
         (p + DIGIT_BIT_SIZE - 1) / size_of::<Digit>() / 8
     }
@@ -91,6 +94,7 @@ impl Mantissa {
     }
 
     /// Return true if mantissa represents zero.
+    #[inline]
     pub fn is_zero(&self) -> bool {
         self.n == 0
     }
@@ -127,6 +131,7 @@ impl Mantissa {
     }
 
     /// Shift self left by n digits.
+    #[inline]
     pub fn shift_left(&mut self, n: usize) {
         Self::shift_left_m(&mut self.m, n)
     }
@@ -183,7 +188,7 @@ impl Mantissa {
             shift += DIGIT_BIT_SIZE;
             i -= 1;
         }
-        assert!(i >= 0); // m must not contain just zeroes.
+        debug_assert!(i >= 0); // m must not contain just zeroes.
         let mut d = m[i as usize];
         while DIGIT_SIGNIFICANT_BIT & d == 0 {
             d <<= 1;
@@ -195,39 +200,66 @@ impl Mantissa {
 
     /// Compare to m2 and return positive if self > m2, negative if self < m2, 0 otherwise.
     pub fn abs_cmp(&self, m2: &Self) -> DigitSigned {
-        let len = self.len().max(m2.len());
-        for i in 1..len+1 {
-            let v1 = if len - i < self.len() { 
-                self.m[len - i] as DoubleDigit 
-            } else {
-                0
-            };
-            let v2 = if len - i < m2.len() { 
-                m2.m[len - i] as DoubleDigit
-            } else {
-                0
-            };
-            let diff = v1 as DigitSigned - v2 as DigitSigned;
+        let len = self.len().min(m2.len());
+        for (a, b) in core::iter::zip(self.m.iter().rev(), m2.m.iter().rev()) {
+            let diff = *a as DigitSigned - *b as DigitSigned;
             if diff != 0 {
                 return diff;
+            }
+        }
+        for v in &self.m[..self.m.len() - len] {
+            if *v != 0 {
+                return 1;
+            }
+        }
+        for v in &m2.m[..m2.m.len() - len] {
+            if *v != 0 {
+                return -1;
             }
         }
         0
     }
 
+    /// Subtracts m2 from self. m2 is supposed to be shifted right by m2_shift bits.
+    pub fn abs_sub(&self, m2: &Self, m2_shift: usize, rm: RoundingMode, is_positive: bool) -> Result<(usize, Self), Error> {
+        // Input is expected to be normalized.
+        let mut c: DoubleDigit = 0;
+        let l = self.len().max(m2.len()) + 1;
+        let mut m3 = Mantissa::new(l*DIGIT_BIT_SIZE)?;
+        let m1 = ExtendedSlice::new(self.m.iter(), l - self.len(), &0);
+        let m2 = ShiftedSlice::new(&m2.m, m2_shift, 0, true);
+        for (a, b, d) in itertools::izip!(m1, m2, m3.m.iter_mut()) {
+            let v1 = *a as DoubleDigit;
+            let v2 = b as DoubleDigit;
+            if v1 < v2 + c {
+                *d = (v1 + DIGIT_BASE - v2 - c) as Digit;
+                c = 1;
+            } else {
+                *d = (v1 - v2 - c) as Digit;
+                c = 0;
+            }
+        }
+        debug_assert!(c == 0);
+        let shift = Self::maximize(&mut m3.m);
+        debug_assert!(!m3.round_mantissa(DIGIT_BIT_SIZE, rm, is_positive));
+        m3.trunc_to((l-1)*DIGIT_BIT_SIZE);
+        m3.n = m3.max_bit_len();
+        Ok((shift, m3))
+    }
+
     /// Subtracts m2 from self.
-    pub fn abs_sub(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(usize, Self), Error> {
+    pub fn abs_sub2(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(usize, Self), Error> {
         let mut c: DoubleDigit = 0;
         let mut i: usize = 0;
         let l = self.len().max(m2.len());
         let mut m3 = Mantissa::new(l*DIGIT_BIT_SIZE)?;
         while i < l {
-            let v1 = if i < self.len() {
+            let v1 = if i < self.m.len() {
                 self.m[i] as DoubleDigit 
             } else {
                 0
             };
-            let v2 = if i < m2.len() {
+            let v2 = if i < m2.m.len() {
                 m2.m[i] as DoubleDigit
             } else {
                 0
@@ -241,16 +273,47 @@ impl Mantissa {
             }
             i += 1;
         }
-        assert!(c == 0);
+        debug_assert!(c == 0);
         let shift = Self::maximize(&mut m3.m);
-        assert!(!m3.round_mantissa(DIGIT_BIT_SIZE, rm, is_positive));
+        debug_assert!(!m3.round_mantissa(DIGIT_BIT_SIZE, rm, is_positive));
         m3.trunc_to((l-1)*DIGIT_BIT_SIZE);
         m3.n = m3.max_bit_len();
         Ok((shift, m3))
     }
 
     /// Returns carry flag, and self + m2.
-    pub fn abs_add(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(bool, Self), Error> {
+    pub fn abs_add(&self, m2: &Self, m2_shift: usize, rm: RoundingMode, is_positive: bool) -> Result<(bool, Self), Error> {
+        let mut c = 0;
+        let mut i: usize = 0;
+        let l = self.len().max(m2.len()) + 1;
+        let mut m3 = Mantissa::new(l*DIGIT_BIT_SIZE)?;
+        let m1 = ExtendedSlice::new(self.m.iter(), l - self.len(), &0);
+        let m2 = ShiftedSlice::new(&m2.m, m2_shift, 0, true);
+        for (a, b, d) in itertools::izip!(m1, m2, m3.m.iter_mut()) {
+            let mut s = c + *a as DoubleDigit + b as DoubleDigit;
+            if s >= DIGIT_BASE {
+                s -= DIGIT_BASE;
+                c = 1;
+            } else {
+                c = 0;
+            }
+            *d = s as Digit;
+        }
+        if c > 0 {
+            debug_assert!(!m3.round_mantissa(1 + DIGIT_BIT_SIZE, rm, is_positive));  // it is not possible that rounding overflows, and c > 0 at the same time.
+            m3.shift_right(1);
+            let l = m3.m.len();
+            m3.m[l - 1] |= DIGIT_SIGNIFICANT_BIT;
+        } else if m3.round_mantissa(DIGIT_BIT_SIZE, rm, is_positive) {
+            c = 1;
+        }
+        m3.trunc_to((l-1)*DIGIT_BIT_SIZE);
+        m3.n = m3.max_bit_len();
+        Ok((c > 0, m3))
+    }
+
+    /// Returns carry flag, and self + m2.
+    pub fn abs_add2(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(bool, Self), Error> {
         let mut c = 0;
         let mut i: usize = 0;
         let l = self.len().max(m2.len());
@@ -260,7 +323,7 @@ impl Mantissa {
             if i < self.len() {
                 s += self.m[i] as DoubleDigit 
             }
-            if i < m2.len() { 
+            if i < m2.len() {
                 s += m2.m[i] as DoubleDigit;
             }
             if s >= DIGIT_BASE {
@@ -273,7 +336,7 @@ impl Mantissa {
             i += 1;
         }
         if c > 0 {
-            assert!(!m3.round_mantissa(1 + DIGIT_BIT_SIZE, rm, is_positive));  // it is not possible that rounding overflows, and c > 0 at the same time.
+            debug_assert!(!m3.round_mantissa(1 + DIGIT_BIT_SIZE, rm, is_positive));  // it is not possible that rounding overflows, and c > 0 at the same time.
             m3.shift_right(1);
             let l = m3.m.len();
             m3.m[l - 1] |= DIGIT_SIGNIFICANT_BIT;
@@ -316,7 +379,7 @@ impl Mantissa {
         }
         ret.trunc_to(l);
         ret.n = l;
-        assert!(shift <= 2);  // prevent exponent overflow
+        debug_assert!(shift <= 2);  // prevent exponent overflow
         Ok((shift, ret))
     }
 
@@ -442,7 +505,7 @@ impl Mantissa {
                         }
                         buf[n1j + l as usize] = val as Digit;
                     }
-                    assert!(c > 0);
+                    debug_assert!(c > 0);
                 }
 
                 if i < l1 as isize - 1 || qh > 0 {
@@ -506,18 +569,15 @@ impl Mantissa {
     }
 
     /// Returns true if `self` is subnormal.
+    #[inline]
     pub fn is_subnormal(&self)-> bool {
         self.n < self.max_bit_len()
     }
 
     /// Shift to the left and return shift value.
-    pub fn normilize(&self, guard: bool) -> Result<(usize, Self), Error> {
+    pub fn normilize(&self) -> Result<(usize, Self), Error> {
         let shift = self.max_bit_len() - self.n;
-        let mut m = if guard {
-            self.clone_guard()
-        } else {
-            self.clone()
-        }?;
+        let mut m = self.clone()?;
         if shift > 0 {
             Self::shift_left_m(&mut m.m, shift);
             m.n = self.max_bit_len();
@@ -571,11 +631,13 @@ impl Mantissa {
     }
 
     /// Returns length of the mantissa in digits of the mantissa's base.
+    #[inline]
     pub fn len(&self) -> usize {
         self.m.len()
     }
 
     /// Returns maximum possible length of the mantissa in digits of the mantissa's base.
+    #[inline]
     pub fn max_bit_len(&self) -> usize {
         self.len()*DIGIT_BIT_SIZE
     }
@@ -718,18 +780,6 @@ impl Mantissa {
         })
     }
 
-    /// Clones the mantissa, and adds the guard digit.
-    pub fn clone_guard(&self) -> Result<Self, Error> {
-        let sz = self.m.len() + 1;
-        let mut m = Self::reserve_new(sz, 0)?;
-        (&mut m[1..]).copy_from_slice(&self.m);
-        let n = self.n + DIGIT_BIT_SIZE;
-        Ok(Mantissa {
-            m,
-            n,
-        })
-    }
-
     /// Copy the contents of `m2`. 
     /// If `m2` is shorter than `self`, then the remaining digits are set to 0.
     pub fn copy_from(&mut self, m2: &Self) {
@@ -748,6 +798,5 @@ impl Mantissa {
         } else if l < l1 {
             self.n += (l1 - l)*DIGIT_BIT_SIZE;
         }
-        println!("{:?} {:?}", self, m2);
     }
 }
