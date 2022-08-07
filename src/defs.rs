@@ -49,10 +49,10 @@ impl Sign {
     }
 }
 
-use std::collections::TryReserveError;
+use smallvec::CollectionAllocErr;
 
 /// Possible errors.
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Debug)]
 pub enum Error {
     /// Exponent value becomes greater than the upper bound for exponent value.
     ExponentOverflow(Sign),
@@ -67,7 +67,23 @@ pub enum Error {
     IncorrectAllocationSize,
 
     /// Memory allocation error.
-    MemoryAllocation(TryReserveError),
+    MemoryAllocation(CollectionAllocErr),
+}
+
+impl Eq for Error {
+
+}
+
+impl PartialEq for Error {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::ExponentOverflow(l0), Self::ExponentOverflow(r0)) => l0 == r0,
+            (Self::MemoryAllocation(l0), Self::MemoryAllocation(r0)) => {
+                core::mem::discriminant(l0) == core::mem::discriminant(r0)
+            },
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
 }
 
 

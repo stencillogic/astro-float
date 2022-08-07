@@ -115,7 +115,7 @@ impl BigFloatNumber {
     }
 
     /// Multiplication operation.
-    pub fn mul(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
+    pub fn mul(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {        
         if self.m.is_zero() || d2.m.is_zero() {
             return Self::new(self.m.max_bit_len())
         }
@@ -239,11 +239,11 @@ impl BigFloatNumber {
             let (shift, mut m3) = if cmp > 0 {
                 d3.s = self.s;
                 e = e1;
-                m1.abs_sub(&m2, (e1 - e2) as usize, rm, self.is_positive())?
+                m1.abs_sub(m2, (e1 - e2) as usize, rm, self.is_positive())?
             } else if cmp < 0 {
                 d3.s = if op >= 0 { d2.s } else { d2.s.invert() };
                 e = e2;
-                m2.abs_sub(&m1, (e2 - e1) as usize, rm, self.is_positive())?
+                m2.abs_sub(m1, (e2 - e1) as usize, rm, self.is_positive())?
             } else {
                 return Self::new(self.m.max_bit_len());
             };
@@ -263,10 +263,10 @@ impl BigFloatNumber {
             d3.s = self.s;
             let (c, mut m3) = if e1 >= e2 {
                 e = e1;
-                m1.abs_add(&m2, (e1 - e2) as usize, rm, d3.is_positive())
+                m1.abs_add(m2, (e1 - e2) as usize, rm, d3.is_positive())
             } else {
                 e = e2;
-                m2.abs_add(&m1, (e2 - e1) as usize, rm, d3.is_positive())
+                m2.abs_add(m1, (e2 - e1) as usize, rm, d3.is_positive())
             }?;
             if c {
                 if e == EXPONENT_MAX as isize {
@@ -367,7 +367,7 @@ impl BigFloatNumber {
     /// Construct from f64.
     pub fn from_f64(p: usize, mut f: f64) -> Result<Self, Error> {
         Self::p_assertion(p)?;
-        let mut ret = BigFloatNumber::new(p)?;
+        let mut ret = BigFloatNumber::new(0)?;
         if f == 0.0f64 {
             return Ok(ret);
         }
@@ -956,6 +956,5 @@ mod tests {
                 println!("dur2 {}", *v.borrow()/1000000);
             });
         }
-
     }
 }
