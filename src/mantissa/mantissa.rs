@@ -334,20 +334,17 @@ impl Mantissa {
             // division by single digit
             let d = m2.m[0] as DoubleDigit;
             rh = 0;
-            let mut j = m as isize;
-            if (self.m[j as usize] as DoubleDigit) < d {
-                rh = self.m[j as usize] as DoubleDigit;
-                j -= 1;
+            let mut iter = self.m.iter().rev();
+            let mut val = *iter.next().unwrap_or(&0) as DoubleDigit;
+            if val < d {
+                rh = val;
                 e_shift = 0;
+                val = *iter.next().unwrap_or(&0) as DoubleDigit;
             }
 
             let mut m3iter = m3.m.iter_mut().rev();
             loop {
-                qh = rh * DIGIT_BASE as DoubleDigit + if j >= 0 {
-                    self.m[j as usize] as DoubleDigit
-                } else {
-                    0
-                };
+                qh = rh * DIGIT_BASE as DoubleDigit + val;
                 rh = qh % d;
 
                 if let Some(v) = m3iter.next() {
@@ -355,12 +352,7 @@ impl Mantissa {
                 } else {
                     break;
                 }
-
-                if j == 0 && rh == 0 {
-                    break;
-                }
-
-                j -= 1;
+                val = *iter.next().unwrap_or(&0) as DoubleDigit;
             }
         } else {
             // normalize: buf1 = d1 * d, buf2 = d2 * d
@@ -382,7 +374,7 @@ impl Mantissa {
 
             j = m as isize - n as isize;
             n1j = (n1 as isize + j) as usize;
-            let mut m3iter = m3.m[..l1].iter_mut().rev();
+            let mut m3iter = m3.m.iter_mut().rev();
             let mut in_loop = false;
             let mut buf12;
             let mut buf11;
