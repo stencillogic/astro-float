@@ -11,7 +11,7 @@ use crate::defs::DIGIT_BIT_SIZE;
 use crate::defs::DIGIT_SIGNIFICANT_BIT;
 use crate::defs::RoundingMode;
 use crate::mantissa::util::ExtendedSlice;
-use crate::mantissa::util::ShiftedSlice;
+use crate::mantissa::util::RightShiftedSlice;
 use crate::mantissa::buf::DigitBuf;
 use core::mem::size_of;
 use itertools::izip;
@@ -225,7 +225,7 @@ impl Mantissa {
         let l = self.len().max(m2.len()) + 1;
         let mut m3 = Mantissa::new(l*DIGIT_BIT_SIZE)?;
         let m1 = ExtendedSlice::new(self.m.iter(), l - self.len(), &0);
-        let m2 = ShiftedSlice::new(&m2.m, m2_shift, 0, true);
+        let m2 = RightShiftedSlice::new(&m2.m, m2_shift, 0, true);
         for (a, b, d) in izip!(m1, m2, m3.m.iter_mut()) {
             let v1 = *a as DoubleDigit;
             let v2 = b as DoubleDigit;
@@ -251,7 +251,7 @@ impl Mantissa {
         let l = self.len().max(m2.len()) + 1;
         let mut m3 = Mantissa::new(l*DIGIT_BIT_SIZE)?;
         let m1 = ExtendedSlice::new(self.m.iter(), l - self.len(), &0);
-        let m2 = ShiftedSlice::new(&m2.m, m2_shift, 0, true);
+        let m2 = RightShiftedSlice::new(&m2.m, m2_shift, 0, true);
         for (a, b, d) in izip!(m1, m2, m3.m.iter_mut()) {
             let mut s = c + *a as DoubleDigit + b as DoubleDigit;
             if s >= DIGIT_BASE {

@@ -1,3 +1,5 @@
+use crate::defs::DIGIT_BIT_SIZE;
+
 /// Length of the slice extended by extra size.
 pub struct ExtendedSlice<T, V> where V: Iterator<Item = T> {
     s: V,
@@ -28,15 +30,16 @@ impl<T, V> Iterator for ExtendedSlice<T, V> where V: Iterator<Item = T>, T: Copy
     }
 }
 
-/// Slice values shifted by the specified amount of bits.
-pub struct ShiftedSlice<'a, T> {
+/// Slice values shifted t the right by the specified amount of bits 
+/// with optional additional guard digit.
+pub struct RightShiftedSlice<'a, T> {
     s: core::slice::Iter<'a, T>,
     bits: usize,
     prev: Option<T>,
     default: T,
 }
 
-impl<'a, T> ShiftedSlice<'a, T> where T: Copy + Clone {
+impl<'a, T> RightShiftedSlice<'a, T> where T: Copy + Clone {
     pub fn new(s: &'a [T], shift: usize, default: T, guard: bool) -> Self {
         let elsz = core::mem::size_of::<T>()*8;
         let mut idx = shift / elsz;
@@ -53,7 +56,7 @@ impl<'a, T> ShiftedSlice<'a, T> where T: Copy + Clone {
             (None, s.iter())
         };
         let bits = shift % elsz;
-        ShiftedSlice {
+        RightShiftedSlice {
             s: iter,
             bits,
             prev,
@@ -63,7 +66,7 @@ impl<'a, T> ShiftedSlice<'a, T> where T: Copy + Clone {
 }
 
 
-impl<'a, T> Iterator for ShiftedSlice<'a, T> 
+impl<'a, T> Iterator for RightShiftedSlice<'a, T> 
     where T: core::ops::Shl<usize, Output = T> 
         + core::ops::Shr<usize, Output = T> 
         + core::ops::BitOr<T, Output = T> 
@@ -87,3 +90,4 @@ impl<'a, T> Iterator for ShiftedSlice<'a, T>
         }
     }
 }
+
