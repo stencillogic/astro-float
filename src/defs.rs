@@ -4,7 +4,7 @@
 pub type Digit = u32;
 
 /// An exponent.
-pub type Exponent = i16;
+pub type Exponent = i32;
 
 /// Doubled digit.
 pub type DoubleDigit = u64;
@@ -70,9 +70,6 @@ pub enum Error {
     MemoryAllocation(CollectionAllocErr),
 }
 
-impl Eq for Error {
-
-}
 
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {

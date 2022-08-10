@@ -11,12 +11,6 @@ use crate::defs::RoundingMode;
 use crate::defs::DIGIT_BIT_SIZE;
 use crate::mantissa::Mantissa;
 
-use std::cell::RefCell;
-thread_local! {
-    static DUR1: RefCell<u128>  = RefCell::new(0);
-    static DUR2: RefCell<u128> = RefCell::new(0);
-}
-
 /// BigFloatNumber represents floating point number with mantissa of a fixed size, and exponent.
 #[derive(Debug)]
 pub struct BigFloatNumber {
@@ -115,7 +109,7 @@ impl BigFloatNumber {
     }
 
     /// Multiplication operation.
-    pub fn mul(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {        
+    pub fn mul(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
         if self.m.is_zero() || d2.m.is_zero() {
             return Self::new(self.m.max_bit_len())
         }
@@ -766,6 +760,19 @@ mod tests {
             }
         }
 
+        // large mantissa
+        for _ in 0..20 {
+            // avoid subnormal numbers
+            d1 = BigFloatNumber::random_normal(32000, EXPONENT_MIN/2+160, EXPONENT_MAX/2).unwrap();
+            d2 = BigFloatNumber::random_normal(32000, EXPONENT_MIN/2, EXPONENT_MAX/2).unwrap();
+            if !d2.is_zero() {
+                let d3 = d1.div(&d2, RoundingMode::ToEven).unwrap();
+                let d4 = d3.mul(&d2, RoundingMode::ToEven).unwrap();
+                eps.set_exponent(d1.get_exponent() - 31998);
+                assert!(d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+            }
+        }
+
         // reciprocal
         let f1 = random_f64_exp(50, 25);
         d1 = BigFloatNumber::from_f64(p, f1).unwrap();
@@ -893,8 +900,9 @@ mod tests {
         f
     }
 
+    #[ignore]
     #[test]
-    fn add_sub() {
+    fn add_sub_perf() {
         let mut n = vec![];
         for _ in 0..1000000 {
             n.push(BigFloatNumber::random_normal(132, -20, 20).unwrap());
@@ -913,21 +921,13 @@ mod tests {
 
             let time = start_time.elapsed();
             println!("{}", time.as_millis());
-
-            DUR1.with(|v| {
-                println!("dur1 {}", *v.borrow()/1000000);
-            });
-    
-            DUR2.with(|v| {
-                println!("dur2 {}", *v.borrow()/1000000);
-            });
         }
 
     }
 
-
+    #[ignore]
     #[test]
-    fn mul_div() {
+    fn mul_div_perf() {
         let mut n = vec![];
         for _ in 0..1000000 {
             n.push(BigFloatNumber::random_normal(132, -20, 20).unwrap());
@@ -947,14 +947,6 @@ mod tests {
 
             let time = start_time.elapsed();
             println!("{}", time.as_millis());
-
-            DUR1.with(|v| {
-                println!("dur1 {}", *v.borrow()/1000000);
-            });
-    
-            DUR2.with(|v| {
-                println!("dur2 {}", *v.borrow()/1000000);
-            });
         }
     }
 }

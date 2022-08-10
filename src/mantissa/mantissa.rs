@@ -277,23 +277,38 @@ impl Mantissa {
 
     /// Multiply two mantissas, return result and exponent shift as positive value.
     pub fn mul(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(usize, Self), Error> {
-        let l = self.len().max(m2.len())*DIGIT_BIT_SIZE;
+        let (l, sm, lg) = if self.len() < m2.len() {
+            (m2.len(), self, m2)
+        } else {
+            (self.len(), m2, self)
+        };
+        let l = l*DIGIT_BIT_SIZE;
+
         let mut m3 = Self::reserve_new(self.len() + m2.len())?;
-        m3.fill(0);
-        for (i, d1mi) in self.m.iter().enumerate() {
-            let d1mi = *d1mi as DoubleDigit;
-            if d1mi == 0 {
-                continue;
-            }
+        if Self::toom3_cost_estimate(sm.len(), lg.len()) {
+            // toom-3
+            m3[..sm.len()].copy_from_slice(&sm.m);
+            m3[sm.len()..].fill(0);
+            let sign = Self::toom3(&mut m3, &lg.m)?;
+            debug_assert!(sign > 0);
+        } else {
+            // plain multiplication
+            m3.fill(0);
+            for (i, d1mi) in self.m.iter().enumerate() {
+                let d1mi = *d1mi as DoubleDigit;
+                if d1mi == 0 {
+                    continue;
+                }
 
-            let mut k = 0;
-            for (m2j, m3ij) in m2.m.iter().zip(m3[i..].iter_mut()) {
-                let m = d1mi * (*m2j as DoubleDigit) + *m3ij as DoubleDigit + k;
+                let mut k = 0;
+                for (m2j, m3ij) in m2.m.iter().zip(m3[i..].iter_mut()) {
+                    let m = d1mi * (*m2j as DoubleDigit) + *m3ij as DoubleDigit + k;
 
-                *m3ij = m as Digit;
-                k = m >> (DIGIT_BIT_SIZE);
+                    *m3ij = m as Digit;
+                    k = m >> (DIGIT_BIT_SIZE);
+                }
+                m3[i + m2.len()] += k as Digit;
             }
-            m3[i + m2.len()] += k as Digit;
         }
         // TODO: since leading digit is always >= 0x8000 (most significant bit is set),
         // then shift is always 0 or 1
@@ -309,6 +324,37 @@ impl Mantissa {
         Ok((shift, ret))
     }
 
+    // Estimate cost of multiplication with toom-3. 
+    // Return true if toom-3 is better than plain multiplication.
+    // l1 is supposed to be smaller or equal to l2.
+    fn toom3_cost_estimate(l1: usize, l2: usize) -> bool {
+        if l1 < 70 && l2 < 70 {
+            return false;
+        }
+        for (thrsh1, thrsh2) in [
+            (120, 210),
+            (200, 630),
+            (340, 1890),
+            (580, 5670),
+            (900, 17010),
+            (1500, 51030)]
+        {
+            if l2 < thrsh2 {
+                return l1 >= thrsh1;
+            }
+        }
+        let mut thrsh2 = 51030;
+        let mut thrsh1 = 1500;
+        while thrsh2 < usize::MAX / 3 {
+            thrsh2 *= 3;
+            thrsh1 *= 16;
+            thrsh1 /= 10;
+            if l2 < thrsh2 {
+                return l1 >= thrsh1;
+            }
+        }
+        false
+    }
 
     /// Divide mantissa by mantissa, return result and exponent ajustment.
     pub fn div(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(usize, Self), Error> {
