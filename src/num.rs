@@ -625,36 +625,51 @@ impl BigFloatNumber {
     }
 
     /// Compute reciprocal of a number.
-    /// This funtion can be more efficient than direct division for numbers with large mantissa (> 1000 binary digits).
+    /// This funtion can be more efficient than direct division for numbers with large mantissa (> 20000 binary digits).
     pub fn reciprocal(&self, rm: RoundingMode) -> Result<Self, Error> {
+        let mut p = self.get_mantissa_max_bit_len();
+        let mut err = 1;
+        while p > 500 {
+            p >>= 1;
+            err += 5;
+        }
+
+        let e = self.get_exponent();
+        let mut x = self.clone()?;
+        x.set_exponent(0);
+        x.set_precision(x.get_mantissa_max_bit_len() + err, RoundingMode::None)?;
+        let mut ret= x.recip()?;
+        ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+        if ret.get_exponent() as isize - e as isize > EXPONENT_MAX as isize || 
+            (ret.get_exponent() as isize - e as isize) < EXPONENT_MIN as isize {
+            return Err(Error::ExponentOverflow(ret.s));
+        }
+        ret.set_exponent(ret.get_exponent()-e);
+        Ok(ret)
+    }
+
+    // reciprocal computation.
+    fn recip(&self) -> Result<Self, Error> {
         if self.m.len() <= 500 {
             let one = Self::one(1)?;
-            one.div(self, rm)
+            one.div(self, RoundingMode::None)
         } else {
-            let e = self.get_exponent();
             //  Newton's method: x(n+1) = 2*x(n) - self*x(n)*x(n)
+            let prec = self.get_mantissa_max_bit_len();
             let mut x = self.clone()?;
-            x.set_exponent(0);
-            let slf = x.clone()?;
-            x.set_precision(x.get_mantissa_max_bit_len() / 2 + DIGIT_BIT_SIZE, rm)?;
-            let mut ret= x.reciprocal(RoundingMode::None)?;
-            ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+            x.set_precision(prec / 2, RoundingMode::None)?;
+            let mut ret= x.recip()?;
+            ret.set_precision(prec, RoundingMode::None)?;
 
             // one iteration
-            let d = ret.mul(&slf, rm)?;
-            let dx = d.mul(&ret, rm)?;
+            let d = ret.mul(self, RoundingMode::None)?;
+            let dx = d.mul(&ret, RoundingMode::None)?;
             if ret.get_exponent() == EXPONENT_MAX {
                 return Err(Error::ExponentOverflow(ret.s));
             }
             ret.set_exponent(ret.get_exponent() + 1);
-            ret = ret.sub(&dx, rm)?;
+            ret = ret.sub(&dx, RoundingMode::None)?;
 
-            if ret.get_exponent() as isize - e as isize > EXPONENT_MAX as isize || 
-                (ret.get_exponent() as isize - e as isize) < EXPONENT_MIN as isize {
-                return Err(Error::ExponentOverflow(ret.s));
-            }
-
-            ret.set_exponent(ret.get_exponent()-e);
             Ok(ret)
         }
     }
@@ -809,7 +824,7 @@ mod tests {
         }
 
         // reciprocal
-        for _ in 0..10000 {
+        for _ in 0..100 {
             // avoid subnormal numbers
             d1 = BigFloatNumber::random_normal(3200, EXPONENT_MIN/2+3200, EXPONENT_MAX/2).unwrap();
             if !d1.is_zero() {
@@ -995,15 +1010,15 @@ mod tests {
     fn recip_perf() {
         let mut n = vec![];
         for _ in 0..100 {
-            n.push(BigFloatNumber::random_normal(32*1300, -20, 20).unwrap());
+            n.push(BigFloatNumber::random_normal(20000, -20, 20).unwrap());
         }
+        let one = BigFloatNumber::one(1).unwrap();
 
         for _ in 0..5 {
             let f1 = n[0].clone().unwrap();
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
                 let f = f1.reciprocal(RoundingMode::None).unwrap();
-                let f = f.mul(ni, RoundingMode::ToEven).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());
@@ -1013,7 +1028,7 @@ mod tests {
             let f1 = n[0].clone().unwrap();
             let start_time = std::time::Instant::now();
             for (i, ni) in n.iter().enumerate().skip(1) {
-                let f = ni.div(&f1, RoundingMode::ToEven).unwrap();
+                let f = one.div(&f1, RoundingMode::ToEven).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());
