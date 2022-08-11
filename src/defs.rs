@@ -96,6 +96,9 @@ pub enum Radix {
 /// Possible errors.
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum RoundingMode {
+    /// None
+    None,
+
     /// Round half toward positive infinity.
     Up,
 

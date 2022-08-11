@@ -123,8 +123,6 @@ impl BigFloatNumber {
 
         let (e_shift, mut m3) = m1_normalized.mul(m2_normalized, rm, s == Sign::Pos)?;
 
-        debug_assert!(e1 <= isize::MAX/2 && e1 > isize::MIN/2 && e2 <= isize::MAX/2 && e2 > isize::MIN/2 && e_shift <= 2);
-
         let mut e = e1 + e2 - e_shift as isize;
         if e > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(s));
@@ -142,11 +140,6 @@ impl BigFloatNumber {
         };
 
         Ok(ret)
-    }
-
-    /// Return reciprocal.
-    pub fn recip(&self, rm: RoundingMode) -> Result<Self, Error> {
-        Self::one(self.m.max_bit_len())?.div(self, rm)
     }
 
     /// division operation.
@@ -168,8 +161,6 @@ impl BigFloatNumber {
         let m2_normalized = m2_opt.as_ref().unwrap_or(&d2.m);
 
         let (e_shift, mut m3) = m1_normalized.div(m2_normalized, rm, s == Sign::Pos)?;
-
-        debug_assert!(e1 < isize::MAX/2 && e1 > isize::MIN/2 && e2 < isize::MAX/2 && e2 > isize::MIN/2 && e_shift <= 2);
 
         let mut e = e1 - e2 + e_shift as isize;
         if e > EXPONENT_MAX as isize {
@@ -226,7 +217,7 @@ impl BigFloatNumber {
         let (e2, m2_opt) = d2.normalize()?;
         let m2 = m2_opt.as_ref().unwrap_or(&d2.m);
 
-        let mut e = 0;
+        let mut e;
         if (self.s != d2.s && op >= 0) || (op < 0 && self.s == d2.s) {
             // subtract
             let cmp = self.abs_cmp(d2);
@@ -611,19 +602,48 @@ impl BigFloatNumber {
         })
     }
 
-    /// Assign `self` the value of `d2`. 
-    /// If d2 has more precision than `self`, then d2 will be rounded according to the rounding mode `rm`.
-    pub fn assign(&mut self, d2: &Self, rm: RoundingMode) -> Result<(), Error> {
-        if self.m.len() < d2.m.len() {
-            let mut r = d2.clone()?;
-            r.round(self.m.len(), rm)?;
-            self.m.copy_from(&r.m);
-        } else {
-            self.m.copy_from(&d2.m);
+    /// Set precision of the number (number of bits in mantissa).
+    /// If the new precision is smaller than the existing, the number is rounded using specified rounding mode.
+    pub fn set_precision(&mut self, p: usize, rm: RoundingMode) -> Result<(), Error> {
+        if self.get_mantissa_max_bit_len() > p {
+            self.m.round_mantissa(self.get_mantissa_max_bit_len() - p, rm, self.is_positive());
         }
-        self.e = d2.e;
-        self.s = d2.s;
-        Ok(())
+        self.m.set_length(p)
+    }
+
+    /// Compute reciprocal of a number.
+    /// This funtion can be more efficient than direct division for numbers with large mantissa (> 1000 binary digits).
+    pub fn reciprocal(&self, rm: RoundingMode) -> Result<Self, Error> {
+        if self.m.len() <= 100 {
+            let one = Self::one(1)?;
+            one.div(self, rm)
+        } else {
+            let e = self.get_exponent();
+            //  Newton's method: x(n+1) = 2*x(n) - self*x(n)*x(n)
+            let mut x = self.clone()?;
+            x.set_exponent(0);
+            let slf = x.clone()?;
+            x.set_precision(x.get_mantissa_max_bit_len() / 2 + DIGIT_BIT_SIZE, rm)?;
+            let mut ret= x.reciprocal(RoundingMode::None)?;
+            ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+
+            // one iteration
+            let d = ret.mul(&slf, rm)?;
+            let dx = d.mul(&ret, rm)?;
+            if ret.get_exponent() == EXPONENT_MAX {
+                return Err(Error::ExponentOverflow(ret.s));
+            }
+            ret.set_exponent(ret.get_exponent() + 1);
+            ret = ret.sub(&dx, rm)?;
+
+            if ret.get_exponent() as isize - e as isize > EXPONENT_MAX as isize || 
+                (ret.get_exponent() as isize - e as isize) < EXPONENT_MIN as isize {
+                return Err(Error::ExponentOverflow(ret.s));
+            }
+
+            ret.set_exponent(ret.get_exponent()-e);
+            Ok(ret)
+        }
     }
 }
 
@@ -645,6 +665,7 @@ mod tests {
     #[test]
     fn test_number() {
 
+
         let p = 160; // 10 of "Digit"
         let rm = RoundingMode::ToEven;
 
@@ -653,6 +674,8 @@ mod tests {
         let mut d3;
         let mut ref_num;
         let one = BigFloatNumber::one(1).unwrap();
+        let mut eps = one.clone().unwrap();
+
 
         // inf
         assert!(BigFloatNumber::from_f64(p, f64::INFINITY).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
@@ -735,7 +758,6 @@ mod tests {
         assert!(d3.cmp(&ref_num) == 0);
 
         // add & sub & cmp
-        let mut eps = one.clone().unwrap();
         for _ in 0..10000 {
             // avoid subnormal numbers
             d1 = BigFloatNumber::random_normal(160, -80, 80).unwrap();
@@ -743,7 +765,7 @@ mod tests {
             let d3 = d1.sub(&d2, RoundingMode::ToEven).unwrap();
             let d4 = d3.add(&d2, RoundingMode::ToEven).unwrap();
             eps.set_exponent(d1.get_exponent().max(d2.get_exponent()) - 157);
-//            println!("=== res {:?} {:?} {:?}", d4, d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap(), eps);
+//            println!("\n=== res \n{:?} \n{:?} \n{:?} \n{:?} \n{:?} \n{:?}", d1, d2, d3, d4, d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap(), eps);
             assert!(d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
         }
 
@@ -763,7 +785,7 @@ mod tests {
         // large mantissa
         for _ in 0..20 {
             // avoid subnormal numbers
-            d1 = BigFloatNumber::random_normal(32000, EXPONENT_MIN/2+160, EXPONENT_MAX/2).unwrap();
+            d1 = BigFloatNumber::random_normal(32000, EXPONENT_MIN/2+32000, EXPONENT_MAX/2).unwrap();
             d2 = BigFloatNumber::random_normal(32000, EXPONENT_MIN/2, EXPONENT_MAX/2).unwrap();
             if !d2.is_zero() {
                 let d3 = d1.div(&d2, RoundingMode::ToEven).unwrap();
@@ -774,9 +796,17 @@ mod tests {
         }
 
         // reciprocal
-        let f1 = random_f64_exp(50, 25);
-        d1 = BigFloatNumber::from_f64(p, f1).unwrap();
-        assert!((d1.recip(rm).unwrap().to_f64() * f1 - 1.0).abs() <= f64::EPSILON);
+        for _ in 0..1000 {
+            // avoid subnormal numbers
+            d1 = BigFloatNumber::random_normal(640, EXPONENT_MIN/2+640, EXPONENT_MAX/2).unwrap();
+            if !d1.is_zero() {
+                let d3 = d1.reciprocal(rm).unwrap();
+                let d4 = one.div(&d3, rm).unwrap();
+                eps.set_exponent(d1.get_exponent() - 638);
+                println!("{:?} {:?}", d1, d4);
+                assert!(d1.sub(&d4, rm).unwrap().abs().unwrap().cmp(&eps) < 0);
+            }
+        }
 
         // subnormal numbers
         d1 = BigFloatNumber::min_positive(p).unwrap();
@@ -929,8 +959,8 @@ mod tests {
     #[test]
     fn mul_div_perf() {
         let mut n = vec![];
-        for _ in 0..1000000 {
-            n.push(BigFloatNumber::random_normal(132, -20, 20).unwrap());
+        for _ in 0..10000 {
+            n.push(BigFloatNumber::random_normal(10000, -20, 20).unwrap());
         }
 
         for _ in 0..5 {
@@ -938,13 +968,39 @@ mod tests {
             let f1 = n[0].clone().unwrap();
             let mut f = f1.clone().unwrap();
             for (i, ni) in n.iter().enumerate().skip(1) {
-                if i & 1 == 0 {
-                    f = ni.mul(&f1, RoundingMode::ToEven).unwrap();
-                } else {
-                    f = ni.div(&f1, RoundingMode::ToEven).unwrap();
-                }
+                    f = ni.reciprocal(RoundingMode::ToEven).unwrap();
             }
 
+            let time = start_time.elapsed();
+            println!("{}", time.as_millis());
+        }
+    }
+
+    #[ignore]
+    #[test]
+    fn recip_perf() {
+        let mut n = vec![];
+        for _ in 0..100 {
+            n.push(BigFloatNumber::random_normal(32*1300, -20, 20).unwrap());
+        }
+
+        for _ in 0..5 {
+            let f1 = n[0].clone().unwrap();
+            let start_time = std::time::Instant::now();
+            for ni in n.iter() {
+                let f = f1.reciprocal(RoundingMode::None).unwrap();
+                let f = f.mul(ni, RoundingMode::ToEven).unwrap();
+            }
+            let time = start_time.elapsed();
+            println!("{}", time.as_millis());
+        }
+
+        for _ in 0..5 {
+            let f1 = n[0].clone().unwrap();
+            let start_time = std::time::Instant::now();
+            for (i, ni) in n.iter().enumerate().skip(1) {
+                let f = ni.div(&f1, RoundingMode::ToEven).unwrap();
+            }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());
         }

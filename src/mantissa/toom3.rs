@@ -1,344 +1,13 @@
 //! Toom-3 multiplication.
 
-use crate::defs::DIGIT_BASE;
-use crate::defs::DIGIT_BIT_SIZE;
-use crate::defs::DoubleDigit;
-use crate::defs::DigitSigned;
 use crate::defs::Error;
 use crate::defs::Digit;
 use crate::mantissa::Mantissa;
 use crate::mantissa::buf::DigitBuf;
+use crate::mantissa::util::SliceWithSign;
 use core::ops::DerefMut;
 use core::ops::Deref;
-use itertools::izip;
 
-
-enum SliceWithSignType<'a> {
-    Mut(&'a mut [Digit]),
-    Immut(&'a [Digit])
-}
-
-// Auxiliary structure: slice of digits with sign.
-struct SliceWithSign<'a> {
-    m: SliceWithSignType<'a>,
-    sign: i8,
-}
-
-impl<'a> SliceWithSign<'a> {
-    fn new_mut(m: &'a mut [Digit], sign: i8) -> Self {
-        SliceWithSign {
-            m: SliceWithSignType::Mut(m),
-            sign,
-        }
-    }
-
-    fn new(m: &'a[Digit], sign: i8) -> Self {
-        SliceWithSign {
-            m: SliceWithSignType::Immut(m),
-            sign,
-        }
-    }
-
-    fn add<'b, 'c>(&self, s2: &SliceWithSign<'b>, dst: &mut SliceWithSign<'c>) {
-        self.add_sub(s2, dst, 1);
-    }
-
-    fn sub<'b, 'c>(&self, s2: &SliceWithSign<'b>, dst: &mut SliceWithSign<'c>) {
-        self.add_sub(s2, dst, -1);
-    }
-
-    fn add_assign<'c>(&mut self, s2: &SliceWithSign<'c>, work_buf: &mut [Digit]) {
-        self.add_sub_assign(s2, 1, work_buf);
-    }
-
-    fn sub_assign<'c>(&mut self, s2: &SliceWithSign<'c>, work_buf: &mut [Digit]) {
-        self.add_sub_assign(s2, -1, work_buf);
-    }
-
-    fn add_sub<'b, 'c>(&self, s2: &SliceWithSign<'b>, dst: &mut SliceWithSign<'c>, op: i8) {
-        if (self.sign != s2.sign && op > 0) || (op < 0 && self.sign == s2.sign) {
-            // subtract
-            let cmp = Self::abs_cmp(self, s2);
-            if cmp > 0 {
-                dst.sign = self.sign;
-                Self::abs_sub(self, s2, dst);
-            } else if cmp < 0 {
-                dst.sign = s2.sign*op;
-                Self::abs_sub(s2, self, dst);
-            } else {
-                dst.fill(0);
-            };
-        } else {
-            dst.sign = self.sign;
-            Self::abs_add(self, s2, dst);
-        }
-    }
-
-    fn add_sub_assign<'b>(&mut self, s2: &SliceWithSign<'b>, op: i8, work_buf: &mut [Digit]) {
-        if (self.sign != s2.sign && op > 0) || (op < 0 && self.sign == s2.sign) {
-            // subtract
-            let cmp = Self::abs_cmp(self, s2);
-            if cmp > 0 {
-                Self::abs_sub_assign(self, s2);
-            } else if cmp < 0 {
-                self.sign = s2.sign*op;
-                work_buf.copy_from_slice(s2.deref());
-                Self::abs_sub_assign(work_buf, self);
-                let mut dst = self.deref_mut();
-                let max_len = dst.len().min(work_buf.len());
-                dst[..max_len].copy_from_slice(&work_buf[..max_len]);
-                dst[max_len..].fill(0);
-            } else {
-                self.fill(0);
-            };
-        } else {
-            Self::abs_add_assign(self, s2);
-        }
-    }
-
-    fn mul_assign<'c, 'd>(&mut self, s2: &SliceWithSign<'c>, work_buf: &mut [Digit]) {
-        work_buf.fill(0);
-        for (i, d1mi) in self.deref().iter().enumerate() {
-            let d1mi = *d1mi as DoubleDigit;
-            if d1mi == 0 {
-                continue;
-            }
-
-            let mut k = 0;
-            for (m2j, m3ij) in s2.deref().iter().zip(work_buf[i..].iter_mut()) {
-                let m = d1mi * (*m2j as DoubleDigit) + *m3ij as DoubleDigit + k;
-
-                *m3ij = m as Digit;
-                k = m >> (DIGIT_BIT_SIZE);
-            }
-            work_buf[i + s2.len()] += k as Digit;
-        }
-        self.deref_mut().copy_from_slice(work_buf);
-        self.sign *= s2.sign;
-    }
-
-    fn shift_left(&mut self, shift: usize) {
-        debug_assert!(shift < DIGIT_BIT_SIZE);
-        let mut prev = 0;
-        let rshift = DIGIT_BIT_SIZE - shift;
-        for v in self.deref_mut().iter_mut() {
-            let t = *v;
-            *v = (t << shift) | (prev >> rshift);
-            prev = t;
-        }
-        debug_assert!((prev >> rshift) == 0);
-    }
-
-    fn shift_right(&mut self, shift: usize) {
-        debug_assert!(shift < DIGIT_BIT_SIZE);
-        let mut prev = 0;
-        let lshift = DIGIT_BIT_SIZE - shift;
-        for v in self.deref_mut().iter_mut().rev() {
-            let t = *v;
-            *v = (t >> shift) | (prev << lshift);
-            prev = t;
-        }
-    }
-
-    fn div_by_digit(&mut self, d: Digit) {
-        debug_assert!(d != 0);
-        let d = d as DoubleDigit;
-        let mut rh = 0;
-        let m = self.deref_mut();
-        let mut iter = m.iter_mut().rev();
-        let mut val;
-        if let Some(v) = iter.next() {
-            val = v;
-        } else {
-            return;
-        }
-
-        if (*val as DoubleDigit) < d {
-            rh = *val as DoubleDigit;
-            *val = 0;
-            if let Some(v) = iter.next() {
-                val = v;
-            } else {
-                return;
-            }
-        }
-
-        loop {
-            let qh = rh * DIGIT_BASE as DoubleDigit + *val as DoubleDigit;
-
-            rh = qh % d;
-
-            *val = (qh / d) as Digit;
-
-            if let Some(v) = iter.next() {
-                val = v;
-            } else {
-                break;
-            }
-        }
-    }
-
-    fn copy_from<'c>(&mut self, s2: &SliceWithSign<'c>) {
-        match &mut self.m {
-            SliceWithSignType::Mut(m) => {
-                match &s2.m {
-                    SliceWithSignType::Mut(s) => m[..s.len()].copy_from_slice(s),
-                    SliceWithSignType::Immut(s) => m[..s.len()].copy_from_slice(s),
-                };
-            },
-            _ => panic!(),
-        }
-    }
-
-
-    fn abs_add(s1: &[Digit], s2: &[Digit], dst: &mut [Digit]) {
-        let mut c = 0;
-        let mut iter1 = s1.iter();
-        let mut iter2 = s2.iter();
-        let mut iter3 = dst.iter_mut();
-        let l = s1.len().min(s2.len());
-        for _ in 0..l {
-            let a = if let Some(v) = iter1.next() { v } else { break };
-            let b = if let Some(v) = iter2.next() { v } else { break };
-            let mut s = c + *a as DoubleDigit + *b as DoubleDigit;
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c = 1;
-            } else {
-                c = 0;
-            }
-            *iter3.next().unwrap() = s as Digit;
-        }
-        if let Some(v) = iter1.next() {
-            let mut s = c + *v as DoubleDigit;
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c = 1;
-            } else {
-                c = 0;
-            }
-            *iter3.next().unwrap() = s as Digit;
-        }
-        if let Some(v) = iter2.next() {
-            let mut s = c + *v as DoubleDigit;
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c = 1;
-            } else {
-                c = 0;
-            }
-            *iter3.next().unwrap() = s as Digit;
-        }
-        if c > 0 {
-            *iter3.next().unwrap() = c as Digit;
-        }
-    }
-
-    fn abs_add_assign(s1: &mut [Digit], s2: &[Digit]) {
-        let mut c = 0;
-        let mut iter1 = s1.iter_mut();
-        let iter2 = s2.iter();
-        for (b, a) in izip!(iter2, iter1.by_ref()) {
-            let mut s = c + *a as DoubleDigit + *b as DoubleDigit;
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c = 1;
-            } else {
-                c = 0;
-            }
-            *a = s as Digit;
-        }
-        if let Some(v) = iter1.next() {
-            *v += c as Digit;
-        }
-    }
-
-    fn abs_sub_assign(s1: &mut [Digit], s2: &[Digit]) {
-        let mut c = 0;
-        let mut iter1 = s1.iter_mut();
-        let iter2 = s2.iter();
-        for (b, a) in izip!(iter2, iter1.by_ref()) {
-            let v1 = *a as DoubleDigit;
-            let v2 = *b as DoubleDigit;
-            if v1 < v2 + c {
-                *a = (v1 + DIGIT_BASE - v2 - c) as Digit;
-                c = 1;
-            } else {
-                *a = (v1 - v2 - c) as Digit;
-                c = 0;
-            }
-        }
-        if let Some(v) = iter1.next() {
-            *v -= c as Digit;
-        }
-    }
-
-    fn abs_sub(s1: &[Digit], s2: &[Digit], dst: &mut [Digit]) {
-        let mut c = 0;
-        let mut iter1 = s1.iter();
-        let iter2 = s2.iter();
-        let mut iter3 = dst.iter_mut();
-        for (b, a, d) in izip!(iter2, iter1.by_ref(), iter3.by_ref()) {
-            let v1 = *a as DoubleDigit;
-            let v2 = *b as DoubleDigit;
-            if v1 < v2 + c {
-                *d = (v1 + DIGIT_BASE - v2 - c) as Digit;
-                c = 1;
-            } else {
-                *d = (v1 - v2 - c) as Digit;
-                c = 0;
-            }
-        }
-        if let Some(v) = iter1.next() {
-            *iter3.next().unwrap() = *v - c as Digit;
-        }
-    }
-
-    fn abs_cmp(s1: &[Digit], s2: &[Digit]) -> DigitSigned {
-        let len = s1.len().min(s2.len());
-        for v in &s1[len..] {
-            if *v != 0 {
-                return 1;
-            }
-        }
-        for v in &s2[len..] {
-            if *v != 0 {
-                return -1;
-            }
-        }
-        for (a, b) in core::iter::zip(s1[..len].iter().rev(), s2[..len].iter().rev()) {
-            let diff = *a as DigitSigned - *b as DigitSigned;
-            if diff != 0 {
-                return diff;
-            }
-        }
-        0
-    }
-}
-
-
-impl<'a> Deref for SliceWithSign<'a> {
-    type Target = [Digit];
-
-    #[inline]
-    fn deref(&self) -> &[Digit] {
-        match &self.m {
-            SliceWithSignType::Mut(m) => m,
-            SliceWithSignType::Immut(m) => m,
-        }
-    }
-}
-
-impl<'a> DerefMut for SliceWithSign<'a> {
-
-    #[inline]
-    fn deref_mut(&mut self) -> &mut [Digit] {
-        match &mut self.m {
-            SliceWithSignType::Mut(m) => m,
-            _ => panic!(),
-        }
-    }
-}
 
 impl Mantissa {
 
@@ -446,11 +115,16 @@ impl Mantissa {
             p3.mul_assign(&q3, buf16);
             p4.mul_assign(&q4, buf16);
         } else {
-            p0.sign *= Self::toom3(&mut p0, &q0)? * q0.sign;
-            p1.sign *= Self::toom3(&mut p1, &q1)? * q1.sign;
-            p2.sign *= Self::toom3(&mut p2, &q2)? * q2.sign;
-            p3.sign *= Self::toom3(&mut p3, &q3)? * q3.sign;
-            p4.sign *= Self::toom3(&mut p4, &q4)? * q4.sign;
+            let s0 = Self::toom3(&mut p0, &q0)? * q0.sign() * p0.sign();
+            let s1 = Self::toom3(&mut p1, &q1)? * q1.sign() * p1.sign();
+            let s2 = Self::toom3(&mut p2, &q2)? * q2.sign() * p2.sign();
+            let s3 = Self::toom3(&mut p3, &q3)? * q3.sign() * p3.sign();
+            let s4 = Self::toom3(&mut p4, &q4)? * q4.sign() * p4.sign();
+            p0.set_sign(s0);
+            p1.set_sign(s1);
+            p2.set_sign(s2);
+            p3.set_sign(s3);
+            p4.set_sign(s4);
         }
 
         buf16.fill(0);
@@ -462,7 +136,7 @@ impl Mantissa {
         p2.sub(&p0, &mut w2);
         buf4.fill(0);   // p1 not used further, let's reuse its buffer
         w3.sub_assign(&w2, buf4);
-        w3.sign = -w3.sign;
+        w3.set_sign(-w3.sign());
         x3.copy_from(&p4);
         x3.shift_left(2);
         w3.add_assign(&x3, buf4);
@@ -480,14 +154,46 @@ impl Mantissa {
                 let mut a = SliceWithSign::new_mut(&mut d1[start..], sign);
                 let len = d1len - start;
                 if w.len() > len {
-                    a.add_assign(&SliceWithSign::new(&w[..len], w.sign), &mut buf16[..len]);
+                    a.add_assign(&SliceWithSign::new(&w[..len], w.sign()), &mut buf16[..len]);
                 } else {
                     a.add_assign(w, buf16);
                 }
-                sign = a.sign;
+                sign = a.sign();
             }
         }
         Ok(sign)
+    }
+
+    // Estimate the cost of multiplication with toom-3. 
+    // Return true if toom-3 is better than plain multiplication.
+    // l1 is supposed to be smaller or equal to l2.
+    pub(super) fn toom3_cost_estimate(l1: usize, l2: usize) -> bool {
+        if l1 < 70 && l2 < 70 {
+            return false;
+        }
+        for (thrsh1, thrsh2) in [
+            (120, 210),
+            (200, 630),
+            (340, 1890),
+            (580, 5670),
+            (900, 17010),
+            (1500, 51030)]
+        {
+            if l2 < thrsh2 {
+                return l1 >= thrsh1;
+            }
+        }
+        let mut thrsh2 = 51030;
+        let mut thrsh1 = 1500;
+        while thrsh2 < usize::MAX / 3 {
+            thrsh2 *= 3;
+            thrsh1 *= 16;
+            thrsh1 /= 10;
+            if l2 < thrsh2 {
+                return l1 >= thrsh1;
+            }
+        }
+        false
     }
 }
 
@@ -497,19 +203,12 @@ mod tests {
 
     use super::*;
     use rand::random;
+    use crate::defs::DoubleDigit;
+    use crate::defs::DIGIT_BIT_SIZE;
 
     #[ignore]
     #[test]
     fn toom3_perf() {
-
-        // 70x70
-        // 120x210
-        // 200x630
-        // 340x1890
-        // 580x5670
-        // 900x17010
-        // 1500x51030
-
 
         for _ in 0..5 {
             let sz = 3840;

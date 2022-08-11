@@ -55,6 +55,17 @@ impl DigitBuf {
         self.inner.rotate_left(sz - n);
         self.inner.truncate(n);
     }
+
+    /// Try to exted the size to fit the precision p. Fill new elements with 0.
+    pub fn try_extend(&mut self, p: usize) -> Result<(), Error> {
+        let n = (p + DIGIT_BIT_SIZE - 1)/DIGIT_BIT_SIZE;
+        let l = self.inner.len();
+        self.inner.try_grow(n).map_err(Error::MemoryAllocation)?;
+        unsafe { self.inner.set_len(n); }
+        self.inner.rotate_right(n - l);
+        self.inner[..l].fill(0);
+        Ok(())
+    }
 }
 
 
