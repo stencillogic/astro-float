@@ -92,6 +92,7 @@ impl BigFloatNumber {
     }
 
     /// Summation operation.
+    #[inline]
     pub fn add(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
         self.add_sub(d2, 1, rm)
     }
@@ -104,6 +105,7 @@ impl BigFloatNumber {
     }
 
     /// Subtraction operation.
+    #[inline]
     pub fn sub(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
         self.add_sub(d2, -1, rm)
     }
@@ -427,21 +429,25 @@ impl BigFloatNumber {
     }
 
     /// Construct from f32.
+    #[inline]
     pub fn from_f32(p: usize, f: f32) -> Result<Self, Error> {
         Self::from_f64(p, f as f64)
     }
 
     /// Convert to f32.
+    #[inline]
     pub fn to_f32(&self) -> f32 {
         self.to_f64() as f32
     }
 
     /// Return true if number is subnormal.
+    #[inline]
     pub fn is_subnormal(&self) -> bool {
         self.m.is_subnormal()
     }
 
     /// Decompose to raw parts.
+    #[inline]
     pub fn to_raw_parts(&self) -> (&[Digit], usize, Sign, Exponent) {
         let (m, n) = self.m.to_raw_parts();
         (m, n, self.s, self.e)
@@ -456,26 +462,31 @@ impl BigFloatNumber {
     }
 
     /// Returns sign of a number.
+    #[inline]
     pub fn get_sign(&self) -> Sign {
         self.s
     }
 
     /// Returns true if number is positive.
+    #[inline]
     pub fn is_positive(&self) -> bool {
         self.s == Sign::Pos
     }
 
     /// Returns true if number is negative.
+    #[inline]
     pub fn is_negative(&self) -> bool {
         self.s == Sign::Neg
     }
 
     /// Returns exponent of a number.
+    #[inline]
     pub fn get_exponent(&self) -> Exponent {
         self.e
     }
 
     // Return true if number is zero.
+    #[inline]
     pub fn is_zero(&self) -> bool {
         self.m.is_zero()
     }
@@ -535,11 +546,13 @@ impl BigFloatNumber {
     }
 
     /// Sets exponent part of the number.
+    #[inline]
     pub fn set_exponent(&mut self, e: Exponent) {
         self.e = e;
     }
 
     /// Returns maximum mantissa length in bits.
+    #[inline]
     pub fn get_mantissa_max_bit_len(&self) -> usize {
         self.m.max_bit_len()
     }
@@ -614,7 +627,7 @@ impl BigFloatNumber {
     /// Compute reciprocal of a number.
     /// This funtion can be more efficient than direct division for numbers with large mantissa (> 1000 binary digits).
     pub fn reciprocal(&self, rm: RoundingMode) -> Result<Self, Error> {
-        if self.m.len() <= 100 {
+        if self.m.len() <= 500 {
             let one = Self::one(1)?;
             one.div(self, rm)
         } else {
@@ -665,7 +678,6 @@ mod tests {
     #[test]
     fn test_number() {
 
-
         let p = 160; // 10 of "Digit"
         let rm = RoundingMode::ToEven;
 
@@ -676,6 +688,7 @@ mod tests {
         let one = BigFloatNumber::one(1).unwrap();
         let mut eps = one.clone().unwrap();
 
+        //let n1 = BigFloatNumber::from_raw_parts(&[4165624164, 2129500405, 2551748857, 998953334, 3485534795, 1427512576, 426727679, 2298894833, 2107497530, 385370716, 2626967463, 2694802314, 2373730166], 416, Sign::Neg, 301499356).unwrap();
 
         // inf
         assert!(BigFloatNumber::from_f64(p, f64::INFINITY).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
@@ -796,14 +809,14 @@ mod tests {
         }
 
         // reciprocal
-        for _ in 0..1000 {
+        for _ in 0..10000 {
             // avoid subnormal numbers
-            d1 = BigFloatNumber::random_normal(640, EXPONENT_MIN/2+640, EXPONENT_MAX/2).unwrap();
+            d1 = BigFloatNumber::random_normal(3200, EXPONENT_MIN/2+3200, EXPONENT_MAX/2).unwrap();
             if !d1.is_zero() {
                 let d3 = d1.reciprocal(rm).unwrap();
                 let d4 = one.div(&d3, rm).unwrap();
-                eps.set_exponent(d1.get_exponent() - 638);
-                println!("{:?} {:?}", d1, d4);
+                eps.set_exponent(d1.get_exponent() - 3200 + 2);
+                //println!("{:?} {:?}", d1, d4);
                 assert!(d1.sub(&d4, rm).unwrap().abs().unwrap().cmp(&eps) < 0);
             }
         }
@@ -959,18 +972,19 @@ mod tests {
     #[test]
     fn mul_div_perf() {
         let mut n = vec![];
-        for _ in 0..10000 {
-            n.push(BigFloatNumber::random_normal(10000, -20, 20).unwrap());
+        for _ in 0..1000 {
+            n.push(BigFloatNumber::random_normal(32*600, -20, 20).unwrap());
         }
 
         for _ in 0..5 {
-            let start_time = std::time::Instant::now();
             let f1 = n[0].clone().unwrap();
+            let one = BigFloatNumber::one(1).unwrap();
             let mut f = f1.clone().unwrap();
+            let start_time = std::time::Instant::now();
             for (i, ni) in n.iter().enumerate().skip(1) {
-                    f = ni.reciprocal(RoundingMode::ToEven).unwrap();
+                f = ni.reciprocal(RoundingMode::ToEven).unwrap();
+                //f = one.div(ni, RoundingMode::ToEven).unwrap();
             }
-
             let time = start_time.elapsed();
             println!("{}", time.as_millis());
         }

@@ -63,7 +63,7 @@ impl DigitBuf {
         self.inner.try_grow(n).map_err(Error::MemoryAllocation)?;
         unsafe { self.inner.set_len(n); }
         self.inner.rotate_right(n - l);
-        self.inner[..l].fill(0);
+        self.inner[..n-l].fill(0);
         Ok(())
     }
 }

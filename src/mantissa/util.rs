@@ -204,7 +204,7 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
-    pub fn mul_assign<'c, 'd>(&mut self, s2: &SliceWithSign<'c>, work_buf: &mut [Digit]) {
+    pub fn mul_assign<'c>(&mut self, s2: &SliceWithSign<'c>, work_buf: &mut [Digit]) {
         work_buf.fill(0);
         for (i, d1mi) in self.deref().iter().enumerate() {
             let d1mi = *d1mi as DoubleDigit;
