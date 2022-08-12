@@ -91,6 +91,26 @@ impl BigFloatNumber {
         })
     }
 
+    /// Returns new number with value of 10.
+    pub fn three(p: usize) -> Result<Self, Error> {
+        Self::p_assertion(p)?;
+        Ok(BigFloatNumber {
+            m: Mantissa::three(p)?,
+            e: 2,
+            s: Sign::Pos,
+        })
+    }
+
+    /// Returns new number with value of 10.
+    pub fn fifteen(p: usize) -> Result<Self, Error> {
+        Self::p_assertion(p)?;
+        Ok(BigFloatNumber {
+            m: Mantissa::fifteen(p)?,
+            e: 4,
+            s: Sign::Pos,
+        })
+    }
+
     /// Summation operation.
     #[inline]
     pub fn add(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
@@ -638,7 +658,7 @@ impl BigFloatNumber {
         let mut x = self.clone()?;
         x.set_exponent(0);
         x.set_precision(x.get_mantissa_max_bit_len() + err, RoundingMode::None)?;
-        let mut ret= x.recip()?;
+        let mut ret= x.recip_iter()?;
         ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
         if ret.get_exponent() as isize - e as isize > EXPONENT_MAX as isize || 
             (ret.get_exponent() as isize - e as isize) < EXPONENT_MIN as isize {
@@ -649,7 +669,7 @@ impl BigFloatNumber {
     }
 
     // reciprocal computation.
-    fn recip(&self) -> Result<Self, Error> {
+    fn recip_iter(&self) -> Result<Self, Error> {
         if self.m.len() <= 500 {
             let one = Self::one(1)?;
             one.div(self, RoundingMode::None)
@@ -658,7 +678,7 @@ impl BigFloatNumber {
             let prec = self.get_mantissa_max_bit_len();
             let mut x = self.clone()?;
             x.set_precision(prec / 2, RoundingMode::None)?;
-            let mut ret= x.recip()?;
+            let mut ret= x.recip_iter()?;
             ret.set_precision(prec, RoundingMode::None)?;
 
             // one iteration
@@ -671,6 +691,20 @@ impl BigFloatNumber {
             ret = ret.sub(&dx, RoundingMode::None)?;
 
             Ok(ret)
+        }
+    }
+
+    /// Set the sign of a number.
+    pub fn set_sign(&mut self, s: Sign) {
+        self.s = s;
+    }
+
+    /// Invert the sign of a number.
+    pub fn inv_sign(&mut self) {
+        if self.is_negative() {
+            self.set_sign(Sign::Pos);
+        } else {
+            self.set_sign(Sign::Neg);
         }
     }
 }

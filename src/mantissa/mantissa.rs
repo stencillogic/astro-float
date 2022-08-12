@@ -96,6 +96,32 @@ impl Mantissa {
         })
     }
 
+    /// New mantissa with length of at least `p` bits for the value of 3.
+    pub fn three(p: usize) -> Result<Self, Error> {
+        let mut m = Self::reserve_new(Self::bit_len_to_digit_len(p))?;
+        m.fill(0);
+        let l = m.len();
+        m[l - 1] = (DIGIT_BASE >> 1 | DIGIT_BASE >> 2) as Digit;
+        let n = DIGIT_BIT_SIZE*m.len();
+        Ok(Mantissa {
+            m,
+            n,
+        })
+    }
+
+    /// New mantissa with length of at least `p` bits for the value of 15.
+    pub fn fifteen(p: usize) -> Result<Self, Error> {
+        let mut m = Self::reserve_new(Self::bit_len_to_digit_len(p))?;
+        m.fill(0);
+        let l = m.len();
+        m[l - 1] = (DIGIT_BASE >> 1 | DIGIT_BASE >> 2 | DIGIT_BASE >> 3 | DIGIT_BASE >> 4) as Digit;
+        let n = DIGIT_BIT_SIZE*m.len();
+        Ok(Mantissa {
+            m,
+            n,
+        })
+    }
+
     /// Return true if mantissa represents zero.
     #[inline]
     pub fn is_zero(&self) -> bool {

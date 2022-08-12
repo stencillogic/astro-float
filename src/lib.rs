@@ -5,6 +5,7 @@ mod mantissa;
 mod num;
 mod strop;
 mod parser;
+mod ops;
 
 pub use crate::num::BigFloatNumber;
 pub use crate::defs::Sign;
