@@ -14,9 +14,9 @@ use crate::mantissa::Mantissa;
 /// BigFloatNumber represents floating point number with mantissa of a fixed size, and exponent.
 #[derive(Debug)]
 pub struct BigFloatNumber {
-    e: Exponent,
-    s: Sign,
-    m: Mantissa,
+    pub(super) e: Exponent,
+    pub(super) s: Sign,
+    pub(super) m: Mantissa,
 }
 
 /// Low-level operations on a number.
@@ -294,7 +294,7 @@ impl BigFloatNumber {
 
     /// If exponent is too small try to present number in subnormal form.
     /// If sucessful return true.
-    fn process_subnormal(m3: &mut Mantissa, e: &mut isize, rm: RoundingMode, is_positive: bool) -> bool {
+    pub(super) fn process_subnormal(m3: &mut Mantissa, e: &mut isize, rm: RoundingMode, is_positive: bool) -> bool {
         debug_assert!(*e < 0);
         if (m3.max_bit_len() as isize) + *e > EXPONENT_MIN as isize {
             // subnormal

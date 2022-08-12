@@ -3,7 +3,7 @@
 use crate::{
     num::BigFloatNumber, 
     RoundingMode, 
-    defs::Error,
+    defs::{Error, EXPONENT_MIN, EXPONENT_MAX},
 };
 
 
@@ -44,8 +44,21 @@ impl BigFloatNumber {
         x.set_exponent(e & 1);
         let mut ret= x.sqrt_iter(&three, &ten, &fifteen)?;
         ret = x.mul(&ret, RoundingMode::None)?;
-        ret.set_exponent(ret.get_exponent() + e / 2 - e_shift);
         ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+
+        // new exponent
+        let mut e_corr = ret.get_exponent() as isize + e as isize / 2 - e_shift as isize;
+        if e_corr < EXPONENT_MIN as isize {
+            let is_positive = ret.is_positive();
+            if !Self::process_subnormal(&mut ret.m, &mut e_corr, rm, is_positive) {
+                return Self::new(self.get_mantissa_max_bit_len());
+            }
+        }
+        if e_corr > EXPONENT_MAX as isize {
+            return Err(Error::ExponentOverflow(ret.get_sign()));
+        }
+        ret.set_exponent(ret.get_exponent() + e / 2 - e_shift);
+
         Ok(ret)
     }
 
