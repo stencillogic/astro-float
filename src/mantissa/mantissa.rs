@@ -71,50 +71,16 @@ impl Mantissa {
     }
 
     /// New mantissa with length of at least `p` bits for the value of 1.
-    pub fn one(p: usize) -> Result<Self, Error> {
+    pub fn from_digit(p: usize, mut d: Digit) -> Result<Self, Error> {
         let mut m = Self::reserve_new(Self::bit_len_to_digit_len(p))?;
         m.fill(0);
         let l = m.len();
-        m[l - 1] = (DIGIT_BASE >> 1) as Digit;
-        let n = DIGIT_BIT_SIZE*m.len();
-        Ok(Mantissa {
-            m,
-            n,
-        })
-    }
-
-    /// New mantissa with length of at least `p` bits for the value of 10.
-    pub fn ten(p: usize) -> Result<Self, Error> {
-        let mut m = Self::reserve_new(Self::bit_len_to_digit_len(p))?;
-        m.fill(0);
-        let l = m.len();
-        m[l - 1] = (DIGIT_BASE >> 1 | DIGIT_BASE >> 3) as Digit;
-        let n = DIGIT_BIT_SIZE*m.len();
-        Ok(Mantissa {
-            m,
-            n,
-        })
-    }
-
-    /// New mantissa with length of at least `p` bits for the value of 3.
-    pub fn three(p: usize) -> Result<Self, Error> {
-        let mut m = Self::reserve_new(Self::bit_len_to_digit_len(p))?;
-        m.fill(0);
-        let l = m.len();
-        m[l - 1] = (DIGIT_BASE >> 1 | DIGIT_BASE >> 2) as Digit;
-        let n = DIGIT_BIT_SIZE*m.len();
-        Ok(Mantissa {
-            m,
-            n,
-        })
-    }
-
-    /// New mantissa with length of at least `p` bits for the value of 15.
-    pub fn fifteen(p: usize) -> Result<Self, Error> {
-        let mut m = Self::reserve_new(Self::bit_len_to_digit_len(p))?;
-        m.fill(0);
-        let l = m.len();
-        m[l - 1] = (DIGIT_BASE >> 1 | DIGIT_BASE >> 2 | DIGIT_BASE >> 3 | DIGIT_BASE >> 4) as Digit;
+        if d > 0 {
+            while d & DIGIT_SIGNIFICANT_BIT == 0 {
+                d <<= 1;
+            }
+        }
+        m[l - 1] = d;
         let n = DIGIT_BIT_SIZE*m.len();
         Ok(Mantissa {
             m,
@@ -223,6 +189,50 @@ impl Mantissa {
         }
     }
 
+    /// Find the position of the first occurence of "1" starting from start_pos.
+    pub fn find_one_from(&self, start_pos: usize) -> Option<usize> {
+        let mut d;
+        let start_idx = start_pos / DIGIT_BIT_SIZE;
+        let mut shift = start_pos;
+        if start_idx >= self.m.len() {
+            None
+        } else {
+            let start_bit = start_pos % DIGIT_BIT_SIZE;
+            d = self.m[self.m.len() - 1 - start_idx];
+            d <<= start_bit;
+            if d != 0 {
+                while DIGIT_SIGNIFICANT_BIT & d == 0 {
+                    d <<= 1;
+                    shift += 1;
+                }
+                Some(shift)
+            } else {
+                shift += DIGIT_BIT_SIZE;
+                let start_idx = start_idx + 1;
+                if start_idx < self.m.len() {
+                    for v in self.m.iter().rev().skip(start_idx) {
+                        d = *v;
+                        if d != 0 {
+                            break;
+                        }
+                        shift += DIGIT_BIT_SIZE;
+                    }
+                    if d != 0 {
+                        while DIGIT_SIGNIFICANT_BIT & d == 0 {
+                            d <<= 1;
+                            shift += 1;
+                        }
+                        Some(shift)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
     /// Compare to m2 and return positive if self > m2, negative if self < m2, 0 otherwise.
     pub fn abs_cmp(&self, m2: &Self) -> DigitSigned {
         let len = self.len().min(m2.len());
@@ -269,10 +279,12 @@ impl Mantissa {
             }
         }
         debug_assert!(c == 0);
-        let shift = Self::maximize(&mut m3.m);
+        let mut shift = Self::maximize(&mut m3.m);
         if m2_shift > 0 {
             // remove guard
-            debug_assert!(!m3.round_mantissa(DIGIT_BIT_SIZE, rm, is_positive));
+            if m3.round_mantissa(DIGIT_BIT_SIZE, rm, is_positive) {
+                shift -= 1;
+            }
             m3.m.trunc_to((l-1)*DIGIT_BIT_SIZE);
         }
         m3.n = m3.max_bit_len();
@@ -332,6 +344,9 @@ impl Mantissa {
             debug_assert!(sign > 0);
         } else {
             // plain multiplication
+
+            // TODO: consider multiplying by the lowest and the highest "digit" and 
+            // assigning result to m3 first to avoid filling with zeroes.
             m3.fill(0);
             for (i, d1mi) in self.m.iter().enumerate() {
                 let d1mi = *d1mi as DoubleDigit;
@@ -350,7 +365,7 @@ impl Mantissa {
             }
         }
         // TODO: since leading digit is always >= 0x8000 (most significant bit is set),
-        // then shift is always 0 or 1
+        // then shift is always 0 or 1. Is it possible to do shift on the fly?
         let mut shift = Self::maximize(&mut m3) as isize;
         let bit_len = m3.len()*DIGIT_BIT_SIZE;
         let mut ret = Mantissa {m: m3, n: bit_len};

@@ -34,9 +34,9 @@ impl BigFloatNumber {
             }
         }
 
-        let three = Self::three(1)?;
-        let ten = Self::ten(1)?;
-        let fifteen = Self::fifteen(1)?;
+        let three = Self::from_digit(3, 1)?;
+        let ten = Self::from_digit(10, 1)?;
+        let fifteen = Self::from_digit(15, 1)?;
 
         let mut x = self.clone()?;
         x.set_precision(x.get_mantissa_max_bit_len() + err, RoundingMode::None)?;
@@ -68,7 +68,7 @@ impl BigFloatNumber {
         let mut x = self.clone()?;
         if prec <= 128 {
             prec *= 3;
-            x = Self::one(1)?.div(&x, RoundingMode::None)?;
+            x = Self::from_digit(1, 1)?.div(&x, RoundingMode::None)?;
             while prec > 0 {
                 x = self.sqrt_step(x, three, ten, fifteen)?;
                 prec /= 3;
@@ -112,7 +112,7 @@ mod tests {
         println!("{:?}", n2.mul(&n2, RoundingMode::ToEven).unwrap());
         return;  */
 
-        let one = BigFloatNumber::one(1).unwrap();
+        let one = BigFloatNumber::from_digit(1, 1).unwrap();
         let mut eps = one.clone().unwrap();
         let prec = 3200;
         for _ in 0..1000 {

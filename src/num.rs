@@ -7,6 +7,7 @@ use crate::defs::Digit;
 use crate::defs::Error;
 use crate::defs::EXPONENT_MAX;
 use crate::defs::EXPONENT_MIN;
+use crate::defs::DIGIT_SIGNIFICANT_BIT;
 use crate::defs::RoundingMode;
 use crate::defs::DIGIT_BIT_SIZE;
 use crate::mantissa::Mantissa;
@@ -72,43 +73,22 @@ impl BigFloatNumber {
     }
 
     /// Returns new number with value of 1.
-    pub fn one(p: usize) -> Result<Self, Error> {
+    pub fn from_digit(mut d: Digit, p: usize) -> Result<Self, Error> {
         Self::p_assertion(p)?;
-        Ok(BigFloatNumber {
-            m: Mantissa::one(p)?,
-            e: 1,
-            s: Sign::Pos,
-        })
-    }
-
-    /// Returns new number with value of 10.
-    pub fn ten(p: usize) -> Result<Self, Error> {
-        Self::p_assertion(p)?;
-        Ok(BigFloatNumber {
-            m: Mantissa::ten(p)?,
-            e: 4,
-            s: Sign::Pos,
-        })
-    }
-
-    /// Returns new number with value of 10.
-    pub fn three(p: usize) -> Result<Self, Error> {
-        Self::p_assertion(p)?;
-        Ok(BigFloatNumber {
-            m: Mantissa::three(p)?,
-            e: 2,
-            s: Sign::Pos,
-        })
-    }
-
-    /// Returns new number with value of 10.
-    pub fn fifteen(p: usize) -> Result<Self, Error> {
-        Self::p_assertion(p)?;
-        Ok(BigFloatNumber {
-            m: Mantissa::fifteen(p)?,
-            e: 4,
-            s: Sign::Pos,
-        })
+        if d == 0 {
+            Self::new(p)
+        } else {
+            let mut shift = 0;
+            while d & DIGIT_SIGNIFICANT_BIT == 0 {
+                d <<= 1;
+                shift += 1;
+            }
+            Ok(BigFloatNumber {
+                m: Mantissa::from_digit(p, d)?,
+                e: (DIGIT_BIT_SIZE - shift) as Exponent,
+                s: Sign::Pos,
+            })
+        }
     }
 
     /// Summation operation.
@@ -132,6 +112,9 @@ impl BigFloatNumber {
 
     /// Multiplication operation.
     pub fn mul(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
+
+        // TODO: consider short multiplication.
+
         if self.m.is_zero() || d2.m.is_zero() {
             return Self::new(self.m.max_bit_len())
         }
@@ -516,7 +499,7 @@ impl BigFloatNumber {
         let int = self.int()?;
         if self.is_negative() {
             if !self.fract()?.m.is_zero() {
-                let one = Self::one(self.m.max_bit_len())?;
+                let one = Self::from_digit(1, 1)?;
                 return int.sub(&one, RoundingMode::ToZero);
             }
         }
@@ -528,7 +511,7 @@ impl BigFloatNumber {
         let int = self.int()?;
         if self.is_positive() {
             if !self.fract()?.m.is_zero() {
-                let one = Self::one(self.m.max_bit_len())?;
+                let one = Self::from_digit(1, 1)?;
                 return int.add(&one, RoundingMode::ToZero);
             }
         }
@@ -541,11 +524,12 @@ impl BigFloatNumber {
         if self.e > 0 {
             if (self.e as usize) < self.m.max_bit_len() {
                 // remove integer part of mantissa & normalize at the same time
-                ret.m.shift_left(self.e as usize);
-                if ret.m.is_all_zero() {
+                if let Some(shift) = self.m.find_one_from(self.e as usize) {
+                    ret.m.shift_left(shift);
+                    ret.e = -((shift - self.e as usize) as Exponent);
+                } else {
                     return Self::new(self.m.max_bit_len())
                 }
-                ret.e = 0;
             } else {
                 return Self::new(self.m.max_bit_len())
             }
@@ -565,6 +549,33 @@ impl BigFloatNumber {
         Self::new(self.m.max_bit_len())
     }
 
+    /// Returns integer part as a digit.
+    pub fn get_int_as_digit(&self) -> Digit {
+        if self.e > 0 && DIGIT_BIT_SIZE > self.e as usize {
+            let d = self.m.get_most_significant_digit();
+            let shift = DIGIT_BIT_SIZE - self.e as usize;
+            d >> shift
+        } else {
+            0
+        }
+    }
+
+    /// Return integer part of a number as built-in integer.
+    pub(super) fn get_int_as_usize(&self) -> Result<usize, Error> {
+        if self.e > 0 {
+            debug_assert!(core::mem::size_of::<usize>() > core::mem::size_of::<Digit>());
+            if (self.e as usize) <= DIGIT_BIT_SIZE {
+                let shift = DIGIT_BIT_SIZE - self.e as usize;
+                let mut ret = self.m.get_most_significant_digit() as usize;
+                Ok(ret >> shift)
+            } else {
+                Err(Error::InvalidArgument)
+            }
+        } else {
+            Ok(0)
+        }
+    }
+
     /// Sets exponent part of the number.
     #[inline]
     pub fn set_exponent(&mut self, e: Exponent) {
@@ -575,17 +586,6 @@ impl BigFloatNumber {
     #[inline]
     pub fn get_mantissa_max_bit_len(&self) -> usize {
         self.m.max_bit_len()
-    }
-
-    // Returns integer part as a digit.
-    pub fn get_int_as_digit(&self) -> Digit {
-        if self.e > 0 && DIGIT_BIT_SIZE > self.e as usize {
-            let d = self.m.get_most_significant_digit();
-            let shift = DIGIT_BIT_SIZE - self.e as usize;
-            d >> shift
-        } else {
-            0
-        }
     }
 
     /// Returns the rounded number with `n` binary positions in the fractional part of the number using rounding mode `rm`.
@@ -671,7 +671,7 @@ impl BigFloatNumber {
     // reciprocal computation.
     fn recip_iter(&self) -> Result<Self, Error> {
         if self.m.len() <= 500 {
-            let one = Self::one(1)?;
+            let one = Self::from_digit(1, 1)?;
             one.div(self, RoundingMode::None)
         } else {
             //  Newton's method: x(n+1) = 2*x(n) - self*x(n)*x(n)
@@ -734,7 +734,7 @@ mod tests {
         let mut d2;
         let mut d3;
         let mut ref_num;
-        let one = BigFloatNumber::one(1).unwrap();
+        let one = BigFloatNumber::from_digit(1, 1).unwrap();
         let mut eps = one.clone().unwrap();
 
         //let n1 = BigFloatNumber::from_raw_parts(&[4165624164, 2129500405, 2551748857, 998953334, 3485534795, 1427512576, 426727679, 2298894833, 2107497530, 385370716, 2626967463, 2694802314, 2373730166], 416, Sign::Neg, 301499356).unwrap();
@@ -874,7 +874,7 @@ mod tests {
         d1 = BigFloatNumber::min_positive(p).unwrap();
         d2 = BigFloatNumber::min_positive(p).unwrap();
         ref_num = BigFloatNumber::min_positive(p).unwrap();
-        let one  = BigFloatNumber::one(p).unwrap();
+        let one  = BigFloatNumber::from_digit(1, p).unwrap();
         ref_num = ref_num.mul(&one.add(&one, rm).unwrap(), rm).unwrap();
 
         // min_positive + min_positive = 2*min_positive
@@ -1027,7 +1027,7 @@ mod tests {
 
         for _ in 0..5 {
             let f1 = n[0].clone().unwrap();
-            let one = BigFloatNumber::one(1).unwrap();
+            let one = BigFloatNumber::from_digit(1, 1).unwrap();
             let mut f = f1.clone().unwrap();
             let start_time = std::time::Instant::now();
             for (i, ni) in n.iter().enumerate().skip(1) {
@@ -1046,7 +1046,7 @@ mod tests {
         for _ in 0..100 {
             n.push(BigFloatNumber::random_normal(20000, -20, 20).unwrap());
         }
-        let one = BigFloatNumber::one(1).unwrap();
+        let one = BigFloatNumber::from_digit(1, 1).unwrap();
 
         for _ in 0..5 {
             let f1 = n[0].clone().unwrap();

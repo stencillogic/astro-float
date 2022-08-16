@@ -90,12 +90,14 @@ impl BigFloatNumber {
         Ok("".to_owned())
     }
 */
-    fn fp3(&self, rdx: Radix, rm: RoundingMode) -> Result<Vec<u8>, Error> {
+
+    // TODO: remove pub when printing is implemented.
+    pub(super) fn fp3(&self, rdx: Radix, rm: RoundingMode) -> Result<Vec<u8>, Error> {
         let mut ret = Vec::new();
         ret.push(0);
         if !self.is_zero() {
             let mut r = self.clone()?;
-            let one = Self::one(1)?;
+            let one = Self::from_digit(1, 1)?;
             let mut m = one.clone()?;
             m.set_exponent(-(self.get_mantissa_max_bit_len() as Exponent + 1));
             let rdx_num = Self::number_for_radix(rdx)?;
@@ -105,10 +107,10 @@ impl BigFloatNumber {
                 r = d.fract()?;
                 digit = d.get_int_as_digit();
                 m = m.mul(&rdx_num, rm).unwrap();
+                ret.push(digit as u8);
                 if r.cmp(&m) < 0 || r.cmp(&one.sub(&m, rm).unwrap()) > 0 {
                     break;
                 }
-                ret.push(digit as u8);
             }
             if !r.round(0, RoundingMode::ToEven).unwrap().is_zero() {
                 digit += 1;
@@ -139,19 +141,8 @@ impl BigFloatNumber {
     }
 
     fn number_for_radix(rdx: Radix) -> Result<Self, Error> {
-        match rdx {
-            Radix::Bin => Self::one_shifted(1),
-            Radix::Oct => Self::one_shifted(3),
-            Radix::Dec => Self::ten(4),
-            Radix::Hex => Self::one_shifted(4),
-        }
-    }
-
-    fn one_shifted(n: Exponent) -> Result<Self, Error> {
-        let one = Self::one(1)?;
-        let mut ret = one.clone()?;
-        ret.set_exponent(one.get_exponent() + n); 
-        Ok(ret)
+        let rdx_num = Self::digit_for_radix(rdx);
+        Self::from_digit(rdx_num, 1)
     }
 }
 
@@ -159,13 +150,14 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
-    use crate::defs::{EXPONENT_MIN, EXPONENT_MAX};
+    use crate::{defs::{EXPONENT_MIN, EXPONENT_MAX}, Sign};
 
     use super::*;
 
     #[test]
     fn test_format() {
-        let n = BigFloatNumber::from_f64(160, 0.3).unwrap();
+
+        let n = BigFloatNumber::from_f64(160, 0.03125f64).unwrap();
         println!("{:?}", n.fp3(Radix::Dec, RoundingMode::ToEven).unwrap());
     }
 }

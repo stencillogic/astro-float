@@ -6,6 +6,7 @@ mod num;
 mod strop;
 mod parser;
 mod ops;
+mod common;
 
 pub use crate::num::BigFloatNumber;
 pub use crate::defs::Sign;

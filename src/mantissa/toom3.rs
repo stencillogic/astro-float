@@ -46,8 +46,8 @@ impl Mantissa {
 
         let l = (d1.len() - d2.len()).max(d2.len());
         let l = if l%3 == 0 { l / 3 } else { l / 3 + 1 };
-        let (m0, m1, m2) = Self::toom3_get_splits(d1, l);
-        let (n0, n1, n2) = Self::toom3_get_splits(d2, l);
+        let params0 = Self::toom3_get_splits(d1, l);
+        let params1 = Self::toom3_get_splits(d2, l);
 
         let mut buf = DigitBuf::new(25*(l+1))?;
         buf.fill(0);
@@ -83,7 +83,7 @@ impl Mantissa {
         let mut w2 = SliceWithSign::new_mut(buf12, 1);
         let mut w3 = SliceWithSign::new_mut(buf13, 1);
 
-        let (m0, m1, m2) = Self::toom3_prepare_params((m0,m1,m2), l, buf14, buf15);
+        let (m0, m1, m2) = Self::toom3_prepare_params(params0, l, buf14, buf15);
 
         m0.add(&m2, &mut x1);
         x1.add(&m1, &mut p1);
@@ -95,7 +95,7 @@ impl Mantissa {
         p4.copy_from(&m2);
 
         buf14.fill(0);
-        let (n0, n1, n2) = Self::toom3_prepare_params((n0,n1,n2), l, buf14, buf15);
+        let (n0, n1, n2) = Self::toom3_prepare_params(params1, l, buf14, buf15);
 
         x1.deref_mut().fill(0);
         x2.deref_mut().fill(0);
