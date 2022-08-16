@@ -38,8 +38,9 @@ pub fn sqrt_int(a: u32) -> u32 {
     }
     x as u32
 }
-/* 
+ 
 /// n-root integer approximation.
+#[allow(dead_code)]
 pub fn nroot_int(a: u32, n: usize) -> u32 {
     let a = a as u64;
     let mut x = a;
@@ -64,4 +65,25 @@ fn nroot_step(x: u64, n: u64, a: u64) -> u64 {
     }
     ((n - 1) * x + xx) / n
 }
- */
+
+// cost of multiplication of two numbers with precision p.
+pub fn get_mul_cost(p: usize) -> usize {
+    if p < 70 {
+        p*p
+    } else {
+        // toom-3
+        if p < 1625 {
+            sqrt_int((p*p*p) as u32) as usize
+        } else {
+            let q = sqrt_int(p as u32) as usize;
+            q*q*q
+        }
+    }
+}
+
+
+// cost of addition/subtraction of two numbers with precision p.
+#[inline]
+pub fn get_add_cost(p: usize) -> usize {
+    p
+}

@@ -1,12 +1,15 @@
 //! High-level operations on the numbers.
 
+use crate::common::util::get_add_cost;
+use crate::common::util::get_mul_cost;
 use crate::num::BigFloatNumber;
 use crate::defs::RoundingMode;
 use crate::defs::Error;
 use crate::ops::series::PolycoeffGen;
-use crate::ops::series::series_horner;
-use crate::ops::series::series_rect;
-use crate::ops::series::series_niter;
+use crate::ops::series::ArgReductionEstimator;
+use crate::ops::series::series_run;
+use crate::ops::series::series_cost_optimize;
+
 
 
 // Polynomial coefficient generator.
@@ -15,6 +18,7 @@ struct SinhPolycoeffGen {
     one_full_p: BigFloatNumber,
     inc: BigFloatNumber,
     fct: BigFloatNumber,
+    iter_cost: usize,
 }
 
 impl SinhPolycoeffGen {
@@ -24,11 +28,15 @@ impl SinhPolycoeffGen {
         let inc = BigFloatNumber::from_digit(1, 1)?;
         let fct = BigFloatNumber::from_digit(1, p)?;
         let one_full_p = BigFloatNumber::from_digit(1, p)?;
+
+        let iter_cost = (get_mul_cost(p) + get_add_cost(p)) << 1; // 2 * (cost(mul) + cost(add))
+
         Ok(SinhPolycoeffGen {
             one,
             one_full_p,
             inc,
             fct,
+            iter_cost,
         })
     }
 }
@@ -43,6 +51,28 @@ impl PolycoeffGen for SinhPolycoeffGen {
         self.fct = self.fct.mul(&inv_inc, rm)?;
         Ok(&self.fct)
     }
+
+    #[inline]
+    fn get_iter_cost(&self) -> usize {
+        self.iter_cost
+    }
+}
+
+struct SinhArgReductionEstimator {}
+
+impl ArgReductionEstimator for SinhArgReductionEstimator {
+    fn get_reduction_cost(n: usize, p: usize) -> usize {
+        // n * (4 * cost(mul) + 2 * cost(add))
+        let cost_mul = get_mul_cost(p);
+        let cost_add = get_add_cost(p);
+        (n * ((cost_mul << 1) + cost_add )) << 1
+    }
+
+    #[inline]
+    fn reduction_effect(n: usize, m: usize) -> usize {
+        // n*log2(3) + m
+        n*1000/631 + m
+    }
 }
 
 impl BigFloatNumber {
@@ -55,31 +85,29 @@ impl BigFloatNumber {
 
     /// sinh using series, for |x| < 1
     pub(super) fn sinh_series(&self, rm: RoundingMode) -> Result<Self, Error> {
+        // sinh:  x + x^3/3! + x^5/5! + x^7/7! + ...
 
-        let reduction_times = 10;
+        let p = self.get_mantissa_max_bit_len();
+        let mut polycoeff_gen = SinhPolycoeffGen::new(p)?;
+        let (reduction_times, niter) = series_cost_optimize::<SinhPolycoeffGen, SinhArgReductionEstimator>(
+            p, &polycoeff_gen, (-self.e) as usize);
 
         let arg_holder;
         let arg = if reduction_times > 0 {
-            arg_holder = self.arg_reduce(reduction_times, rm)?;
+            arg_holder = self.sinh_arg_reduce(reduction_times, rm)?;
             &arg_holder
         } else {
             self
         };
 
-        // x + x^3/3! + x^5/5! + x^7/7! + ...
-        let polycoeff_gen = SinhPolycoeffGen::new(arg.get_mantissa_max_bit_len())?;
         let acc = arg.clone()?;    // x
         let x_step = arg.mul(arg, rm)?;   // x^2
         let x_first = arg.mul(&x_step, rm)?;   // x^3
-        let niter = series_niter(arg.get_mantissa_max_bit_len(), (-arg.e) as usize) / 2;
-        let ret = if niter >= 16 {
-            series_rect(niter, acc, x_first, x_step, polycoeff_gen, rm)
-        } else {
-            series_horner(acc, x_first, x_step, polycoeff_gen, rm)
-        }?;
+
+        let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
 
         if reduction_times > 0 {
-            ret.arg_restore(reduction_times, rm)
+            ret.sinh_arg_restore(reduction_times, rm)
         } else {
             Ok(ret)
         }
@@ -87,7 +115,7 @@ impl BigFloatNumber {
 
     // reduce argument n times.
     // cost: n * O(add)
-    fn arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+    fn sinh_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // sinh(3*x) = 3*sinh(x) + 4*sinh(x)^3
         let mut ret = self.clone()?;
         let three = Self::from_digit(3, 1)?;
@@ -99,7 +127,7 @@ impl BigFloatNumber {
 
     // restore value for the argument reduced n times.
     // cost: n * (4*O(mul) + O(add))
-    fn arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+    fn sinh_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // sinh(3*x) = 3*sinh(x) + 4*sinh(x)^3
         let mut sinh = self.clone()?;
         let three = Self::from_digit(3, 1)?;
@@ -130,12 +158,12 @@ mod tests {
         println!("{:?}", n2.fp3(crate::Radix::Dec, rm).unwrap());
     }
 
-    //#[ignore]
+    #[ignore]
     #[test]
     fn trigh_perf() {
         let mut n = vec![];
-        for _ in 0..10000 {
-            n.push(BigFloatNumber::random_normal(320*2, -0, -0).unwrap());
+        for _ in 0..10 {
+            n.push(BigFloatNumber::random_normal(32000, -0, -0).unwrap());
         }
 
         for _ in 0..5 {
