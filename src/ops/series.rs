@@ -46,7 +46,7 @@ pub trait ArgReductionEstimator {
 /// polycoeff_gen is the polynomial coefficient ganerator
 /// m is the negative exponent of the number.
 pub fn series_cost_optimize<T: PolycoeffGen, S: ArgReductionEstimator>(p: usize, polycoeff_gen: &T, m: usize) -> (usize, usize) {
-    let reduction_num_step = log2_floor(p)/4;
+    let reduction_num_step = log2_floor(p)/2;
     let mut reduction_times = if reduction_num_step > m {
         reduction_num_step - m
     } else {
