@@ -13,7 +13,7 @@ use crate::mantissa::util::SliceWithSign;
 impl Mantissa {
 
     // Basic integer division.
-    fn basic_div(m1: &[Digit], m2: &[Digit]) -> Result<(DigitBuf, DigitBuf), Error> {
+    fn div_basic(m1: &[Digit], m2: &[Digit]) -> Result<(DigitBuf, DigitBuf), Error> {
         let l1 = m1.len();
         let l2 = m2.len();
         let mut c: DoubleDigit;
@@ -207,11 +207,11 @@ impl Mantissa {
     // Recursive integer division from the book of Richard P. Brent and Paul Zimmermann.
     // Divides m1 by m2, returns quotinent and remainder.
     // prereq: m <= n, m2 is balanced
-    pub(super) fn recursive_div(m1: &[Digit], m2: &[Digit]) -> Result<(DigitBuf, DigitBuf), Error> {
+    fn div_recursive(m1: &[Digit], m2: &[Digit]) -> Result<(DigitBuf, DigitBuf), Error> {
         let m = m1.len() - m2.len();
-        if m <= 2 {
+        if m < 2 {
             // basic div
-            Self::basic_div(m1, m2)
+            Self::div_basic(m1, m2)
         } else {
             let k = m / 2;
             let k2 = k << 1;
@@ -228,7 +228,7 @@ impl Mantissa {
             let b = SliceWithSign::new(m2, 1);
             let b1 = SliceWithSign::new(&m2[k..], 1);   // m2 div 2^k
 
-            let (mut q1buf, _r1) = Self::recursive_div(&a1, &b1)?;
+            let (mut q1buf, _r1) = Self::div_recursive(&a1, &b1)?;
             let mut q1 = SliceWithSign::new_mut(&mut q1buf, 1);
 
             // a3 = a - b*q1*2^k
@@ -261,7 +261,7 @@ impl Mantissa {
 
             if ub > k {
                 let a31 = SliceWithSign::new(&rembuf[k..ub], 1);  // a3 div 2^(k)
-                let (mut q0, _r0) = Self::recursive_div(&a31, &b1)?;
+                let (mut q0, _r0) = Self::div_recursive(&a31, &b1)?;
                 let mut q0 = SliceWithSign::new_mut(&mut q0, 1);
                 let mut a3 = SliceWithSign::new_mut(&mut rembuf, 1);
 
@@ -283,47 +283,50 @@ impl Mantissa {
         }
     }
 
-    // division in case m > n
     pub(super) fn div_unbalanced(m1: &[Digit], m2: &[Digit]) -> Result<(DigitBuf, DigitBuf), Error> {
-
         let mut m = m1.len() - m2.len();
         let n = m2.len();
-
-        let mut buf1 = DigitBuf::new(m + 1)?;
-        buf1.fill(0);
-        let mut tmp_buf = DigitBuf::new(m1.len()*3+1)?;
-        let (buf2, rest) = tmp_buf.split_at_mut(m1.len());
-        let (buf3, rest) = rest.split_at_mut(m1.len());
-        let buf4 = rest;
-        buf3.copy_from_slice(m1);
-        let mut a = SliceWithSign::new_mut(buf3, 1);
-        let mut nn = 0;
-
-        while m > n {
-            let mn = m - n;
-            let a1 = SliceWithSign::new(&a[mn..m1.len()-nn], 1);  // m1 div 2^(m-n)
-            nn += n;
-
-            let (q, _r) = Self::recursive_div(&a1, m2)?;
+        if m <= n {
+            Self::div_recursive(m1, m2)
+        } else if n < 2 {
+            Self::div_basic(m1, m2)
+        } else {
+            let mut buf1 = DigitBuf::new(m + 1)?;
+            buf1.fill(0);
+            let mut tmp_buf = DigitBuf::new(m1.len()*3+1)?;
+            let (buf2, rest) = tmp_buf.split_at_mut(m1.len());
+            let (buf3, rest) = rest.split_at_mut(m1.len());
+            let buf4 = rest;
+            buf3.copy_from_slice(m1);
+            let mut a = SliceWithSign::new_mut(buf3, 1);
+            let mut nn = 0;
+    
+            while m > n {
+                let mn = m - n;
+                let a1 = SliceWithSign::new(&a[mn..m1.len()-nn], 1);  // m1 div 2^(m-n)
+                nn += n;
+    
+                let (q, _r) = Self::div_recursive(&a1, m2)?;
+                let q = SliceWithSign::new(&q, 1);
+    
+                let mut full_q = SliceWithSign::new_mut(&mut buf1[mn..], 1);
+                full_q.add_assign(&q, buf2);
+    
+                buf4.fill(0);
+                Self::mul_slices(m2, &q, &mut buf4[mn..])?;
+    
+                let qbmn = SliceWithSign::new(buf4, 1);
+                a.sub_assign(&qbmn, buf2);
+                m -= n;
+            }
+    
+            let (q, r) = Self::div_recursive(&a[..m1.len()-nn], m2)?;
             let q = SliceWithSign::new(&q, 1);
-
-            let mut full_q = SliceWithSign::new_mut(&mut buf1[mn..], 1);
+            let mut full_q = SliceWithSign::new_mut(&mut buf1, 1);
             full_q.add_assign(&q, buf2);
-
-            buf4.fill(0);
-            Self::mul_slices(m2, &q, &mut buf4[mn..])?;
-
-            let qbmn = SliceWithSign::new(buf4, 1);
-            a.sub_assign(&qbmn, buf2);
-            m -= n;
+    
+            Ok((buf1, r))
         }
-
-        let (q, r) = Self::recursive_div(&a[..m1.len()-nn], m2)?;
-        let q = SliceWithSign::new(&q, 1);
-        let mut full_q = SliceWithSign::new_mut(&mut buf1, 1);
-        full_q.add_assign(&q, buf2);
-
-        Ok((buf1, r))
     }
 }
 
@@ -331,28 +334,81 @@ impl Mantissa {
 #[cfg(test)]
 mod tests {
 
-    use crate::defs::DIGIT_MAX;
-
     use super::*;
+    use crate::defs::DIGIT_SIGNIFICANT_BIT;
+    use rand::random;
+
+    #[ignore]
+    #[test]
+    fn test_div_perf() {
+
+        for _ in 0..5 {
+            let sz1 = 10000;
+            let sz2 = 5000;
+            let f = random_normalized_slice(sz1, sz1);
+            let mut n = vec![];
+            let l = 1;
+            for _ in 0..l {
+                let v = random_normalized_slice(sz2, sz2);
+                n.push(v);
+            }
+            
+            // basic
+            let start_time = std::time::Instant::now();
+            for ni in &n {
+                let _ = Mantissa::div_basic(&f, ni).unwrap();
+            }
+            let time = start_time.elapsed();
+            println!("div_basic {}", time.as_millis());
+            
+            // unbalanced
+            let start_time = std::time::Instant::now();
+            for ni in &n {
+                let _ = Mantissa::div_unbalanced(&f, ni).unwrap();
+            }
+            let time = start_time.elapsed();
+            println!("div_unbalanced {}", time.as_millis());
+        }
+    }
 
     #[test]
-    fn test_recursive_div() {
-        let d1 = [55, 219, 221, 666, 777, 123, 456, 789, 1, 219, 333, 222, 111, 777, 56, 34, 65, 67, 354, DIGIT_MAX];
-        let d2 = [44, 219, 221, 666, 3, DIGIT_MAX];
-        let (q, r) = Mantissa::basic_div(&d1, &d2).unwrap();
-        println!("{:?} {:?}", q, r);
+    fn test_div_unbalanced() {
 
-        let mut m = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
-        let mut wb = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
-        m[..d2.len()].copy_from_slice(&d2);
-        let mut s1 = SliceWithSign::new_mut(&mut m, 1);
-        let s2 = SliceWithSign::new(&q, 1);
-        let s3 = SliceWithSign::new(&r, 1);
-        s1.mul_assign(&s2, &mut wb);
-        s1.add_assign(&s3, &mut wb);
-        println!("{:?}", m);
+        const MAX_BUF: usize = 100;
+        let mut wb = [0; MAX_BUF];
+        let mut buf = [0; MAX_BUF];
+        for _ in 0..1000 {
+            let s1 = random_normalized_slice(1, MAX_BUF);
+            let s2 = random_normalized_slice(s1.len(), MAX_BUF);
 
-        let (q, r) = Mantissa::div_unbalanced(&d1, &d2).unwrap();
-        println!("{:?} {:?}", q, r);
+            //println!("s1{:?}\ns2{:?}", s1, s2);
+
+            let (q, r) = Mantissa::div_unbalanced(&s2, &s1).unwrap();
+
+            buf[..s1.len()].copy_from_slice(&s1);
+            buf[s1.len()..].fill(0);
+            let mut d1 = SliceWithSign::new_mut(&mut buf, 1);
+            let d2 = SliceWithSign::new(&q, 1);
+            let d3 = SliceWithSign::new(&r, 1);
+            d1.mul_assign(&d2, &mut wb);
+            d1.add_assign(&d3, &mut wb);
+            //println!("{:?}\n{:?}\n{:?}\n", q, r, &d1[..s2.len()]);
+            assert!(s2 == d1[..s2.len()]);
+        }
+    }
+
+    fn random_normalized_slice(min_len: usize, max_len: usize) -> Vec<Digit> {
+        let mut s1 = Vec::new();
+        let l = if max_len > min_len {
+            random::<usize>() % (max_len - min_len) + min_len
+        } else {
+            min_len
+        };
+        for _ in 0..l {
+            s1.push(random());
+        }
+        let l = s1.len();
+        s1[l-1] |= DIGIT_SIGNIFICANT_BIT;
+        s1
     }
 }

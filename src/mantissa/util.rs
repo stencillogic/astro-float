@@ -259,7 +259,8 @@ impl<'a> SliceWithSign<'a> {
                 Self::abs_sub_assign(self, s2);
             } else if cmp < 0 {
                 self.sign = s2.sign*op;
-                work_buf.copy_from_slice(s2.deref());
+                work_buf[..s2.len()].copy_from_slice(s2.deref());
+                work_buf[s2.len()..].fill(0);
                 Self::abs_sub_assign(work_buf, self);
                 let dst = self.deref_mut();
                 let max_len = dst.len().min(work_buf.len());
