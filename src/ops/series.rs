@@ -13,7 +13,7 @@ use smallvec::SmallVec;
 
 
 const MAX_CACHE: usize = 128;
-const RECT_ITER_THRESHOLD: usize = 16;
+const RECT_ITER_THRESHOLD: usize = MAX_CACHE/10*9;
 
 
 //
@@ -45,7 +45,8 @@ pub trait ArgReductionEstimator {
 /// p is the number precision
 /// polycoeff_gen is the polynomial coefficient ganerator
 /// m is the negative exponent of the number.
-pub fn series_cost_optimize<T: PolycoeffGen, S: ArgReductionEstimator>(p: usize, polycoeff_gen: &T, m: usize) -> (usize, usize) {
+/// pwr_step - increment of power of x in each iteration
+pub fn series_cost_optimize<T: PolycoeffGen, S: ArgReductionEstimator>(p: usize, polycoeff_gen: &T, m: usize, pwr_step: usize) -> (usize, usize) {
     let reduction_num_step = log2_floor(p)/2;
     let mut reduction_times = if reduction_num_step > m {
         reduction_num_step - m
@@ -55,7 +56,7 @@ pub fn series_cost_optimize<T: PolycoeffGen, S: ArgReductionEstimator>(p: usize,
     let mut cost1 = usize::MAX;
     loop {
         let m_eff = S::reduction_effect(reduction_times, m);
-        let niter = series_niter(p, m_eff);
+        let niter = series_niter(p, m_eff) / pwr_step;
         let cost2 = series_cost(niter, p, polycoeff_gen) + S::get_reduction_cost(reduction_times, p);
         if cost2 < cost1 {
             cost1 = cost2;
@@ -85,9 +86,9 @@ pub fn series_run<T: PolycoeffGen>(acc: BigFloatNumber, x_first: BigFloatNumber,
 /// p is the precision, m is the negative power of x 
 /// (i.e. x = f*2^(-m), where 0.5 <= f < 1).
 fn series_niter(p: usize, m: usize) -> usize {
-    let ln = log2_ceil(p);
+    let ln = log2_floor(p);
     let lln = log2_floor(ln);
-    p / (ln - lln + m)
+    p / (ln - lln + m - 2)
 }
 
 /// Estimate cost of execution for series.

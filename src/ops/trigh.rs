@@ -90,7 +90,7 @@ impl BigFloatNumber {
         let p = self.get_mantissa_max_bit_len();
         let mut polycoeff_gen = SinhPolycoeffGen::new(p)?;
         let (reduction_times, niter) = series_cost_optimize::<SinhPolycoeffGen, SinhArgReductionEstimator>(
-            p, &polycoeff_gen, (-self.e) as usize);
+            p, &polycoeff_gen, (-self.e) as usize, 2);
 
         let arg_holder;
         let arg = if reduction_times > 0 {
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn test_trigh() {
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_digit(1,320).unwrap();
+        let mut n1 = BigFloatNumber::from_digit(1,32000).unwrap();
         n1.set_exponent(0);
         let n2 = n1.sinh_series(rm).unwrap();
         println!("{:?}", n2.fp3(crate::Radix::Dec, rm).unwrap());
@@ -162,8 +162,8 @@ mod tests {
     #[test]
     fn trigh_perf() {
         let mut n = vec![];
-        for _ in 0..10 {
-            n.push(BigFloatNumber::random_normal(32000, -0, -0).unwrap());
+        for _ in 0..100 {
+            n.push(BigFloatNumber::random_normal(3200, -0, -0).unwrap());
         }
 
         for _ in 0..5 {

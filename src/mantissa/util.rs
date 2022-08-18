@@ -2,6 +2,7 @@
 
 
 use itertools::izip;
+use crate::defs::DIGIT_MAX;
 use crate::defs::Digit;
 use crate::defs::DIGIT_BASE;
 use crate::defs::DIGIT_BIT_SIZE;
@@ -119,6 +120,74 @@ impl<'a, T> Iterator for RightShiftedSlice<'a, T>
     }
 }
 
+// Shift m right by n digits.
+pub fn shift_slice_right(m: &mut [Digit], n: usize) {
+    let idx = n / DIGIT_BIT_SIZE;
+    let shift = n % DIGIT_BIT_SIZE;
+    let mut d;
+    if idx >= m.len() {
+        m.fill(0);
+    } else if shift > 0 {
+        for i in 0..m.len() {
+            d = 0;
+            if idx + i + 1 < m.len() {
+                d = m[idx + i + 1] as DoubleDigit;
+                d <<= DIGIT_BIT_SIZE;
+            }
+            if i + idx < m.len() {
+                d |= m[idx + i] as DoubleDigit;    
+            }
+            d >>= shift;
+            m[i] = d as Digit;
+        }
+    } else if idx > 0 {
+        let src = m[idx..].as_ptr();
+        let dst = m.as_mut_ptr();
+        let cnt = m.len() - idx;
+        unsafe {
+            core::intrinsics::copy(src, dst, cnt);
+        };
+        m[cnt..].fill(0);
+    }
+}
+
+
+// Shift m left by n digits.
+pub fn shift_slice_left(m: &mut [Digit], n: usize) {
+    let idx = n / DIGIT_BIT_SIZE;
+    let shift = n % DIGIT_BIT_SIZE;
+    let mut d;
+    if idx >= m.len() {
+        m.fill(0);
+    } else if shift > 0 {
+        let mut i = m.len() - 1;
+        loop {
+            d = 0;
+            if i >= idx {
+                d = m[i - idx] as DoubleDigit;
+                d <<= DIGIT_BIT_SIZE;
+            }
+            if i > idx {
+                d |= m[i - idx - 1] as DoubleDigit;    
+            }
+            d >>= DIGIT_BIT_SIZE - shift;
+            m[i] = d as Digit;
+            if i == 0 {
+                break;
+            }
+            i -= 1;
+        }
+    } else if idx > 0 {
+        let dst = m[idx..].as_mut_ptr();
+        let src = m.as_ptr();
+        unsafe {
+            core::intrinsics::copy(src, dst, m.len()-idx);
+        };
+        m[..idx].fill(0);
+    }
+}
+
+
 
 // Internal repr of SliceWithSign.
 enum SliceWithSignType<'a> {
@@ -226,25 +295,30 @@ impl<'a> SliceWithSign<'a> {
     }
 
     pub fn shift_left(&mut self, shift: usize) {
-        debug_assert!(shift < DIGIT_BIT_SIZE);
-        let mut prev = 0;
-        let rshift = DIGIT_BIT_SIZE - shift;
-        for v in self.deref_mut().iter_mut() {
-            let t = *v;
-            *v = (t << shift) | (prev >> rshift);
-            prev = t;
-        }
-        debug_assert!((prev >> rshift) == 0);
+        shift_slice_left(self, shift);
     }
 
     pub fn shift_right(&mut self, shift: usize) {
-        debug_assert!(shift < DIGIT_BIT_SIZE);
-        let mut prev = 0;
-        let lshift = DIGIT_BIT_SIZE - shift;
-        for v in self.deref_mut().iter_mut().rev() {
-            let t = *v;
-            *v = (t >> shift) | (prev << lshift);
-            prev = t;
+        shift_slice_right(self, shift);
+    }
+
+    // set bits bits to 0 from the left (effectively: self mod 2^bits)
+    pub fn mask_bits_left(&mut self, mut bits: usize) {
+        let mut iter = self.deref_mut().iter_mut().rev();
+        loop {
+            if bits < DIGIT_BIT_SIZE {
+                break;
+            }
+            if let Some(v) = iter.next() {
+                *v = 0;
+                bits -= DIGIT_BIT_SIZE;
+            }
+        }
+        if bits > 0 {
+            let mask = DIGIT_MAX >> (bits % DIGIT_BIT_SIZE);
+            if let Some(v) = iter.next() {
+                *v &= mask;
+            }
         }
     }
 
@@ -297,7 +371,6 @@ impl<'a> SliceWithSign<'a> {
             _ => panic!(),
         }
     }
-
 
     fn abs_add(s1: &[Digit], s2: &[Digit], dst: &mut [Digit]) {
         let mut c = 0;
@@ -400,6 +473,19 @@ impl<'a> SliceWithSign<'a> {
         if let Some(v) = iter1.next() {
             *iter3.next().unwrap() = *v - c as Digit;
         }
+    }
+
+    // decrement absolute value by 1
+    pub fn decrement_abs(&mut self) {
+        for v in self.iter_mut() {
+            if *v == 0 {
+                *v = DIGIT_MAX;
+            } else {
+                *v -= 1;
+                return;
+            }
+        }
+        panic!("numeric overflow");
     }
 
     fn abs_cmp(s1: &[Digit], s2: &[Digit]) -> DigitSigned {

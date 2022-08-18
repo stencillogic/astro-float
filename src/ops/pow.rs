@@ -66,9 +66,15 @@ impl BigFloatNumber {
         Ok(ret)
     }
 
-    // e^self for self < 1.
+    // e^self for |self| < 1.
     fn expf(&self, rm: RoundingMode) -> Result<Self, Error> {
-        Err(Error::InvalidArgument)
+        let sh = Self::sinh(self, rm)?; // faster convergence than direct series
+        // e = sh + sqrt(sh^2 + 1)
+        let one = Self::from_digit(1, 1)?;
+        let sq = sh.mul(&sh, rm)?;
+        let sq2 = sq.add(&one, rm)?;
+        let sq3 = sq2.sqrt(rm)?;
+        sq3.add(&sh, rm)
     }
 }
 

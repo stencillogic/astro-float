@@ -12,6 +12,8 @@ use crate::defs::DIGIT_SIGNIFICANT_BIT;
 use crate::defs::RoundingMode;
 use crate::mantissa::util::ExtendedSlice;
 use crate::mantissa::util::RightShiftedSlice;
+use crate::mantissa::util::shift_slice_left;
+use crate::mantissa::util::shift_slice_right;
 use crate::mantissa::buf::DigitBuf;
 use core::mem::size_of;
 use itertools::izip;
@@ -96,74 +98,13 @@ impl Mantissa {
 
     /// Shift right by n bits.
     pub fn shift_right(&mut self, n: usize) {
-        let idx = n / DIGIT_BIT_SIZE;
-        let shift = n % DIGIT_BIT_SIZE;
-        let mut d;
-        if idx >= self.len() {
-            self.m.fill(0);
-        } else if shift > 0 {
-            for i in 0..self.len() {
-                d = 0;
-                if idx + i + 1 < self.len() {
-                    d = self.m[idx + i + 1] as DoubleDigit;
-                    d <<= DIGIT_BIT_SIZE;
-                }
-                if i + idx < self.len() {
-                    d |= self.m[idx + i] as DoubleDigit;    
-                }
-                d >>= shift;
-                self.m[i] = d as Digit;
-            }
-        } else if idx > 0 {
-            let src = self.m[idx..].as_ptr();
-            let dst = self.m.as_mut_ptr();
-            let cnt = self.len() - idx;
-            unsafe {
-                core::intrinsics::copy(src, dst, cnt);
-            };
-            self.m[cnt..].fill(0);
-        }
+        shift_slice_right(&mut self.m, n)
     }
 
     /// Shift self left by n digits.
     #[inline]
     pub fn shift_left(&mut self, n: usize) {
-        Self::shift_left_m(&mut self.m, n)
-    }
-
-    // Shift m left by n digits.
-    fn shift_left_m(m: &mut [Digit], n: usize) {
-        let idx = n / DIGIT_BIT_SIZE;
-        let shift = n % DIGIT_BIT_SIZE;
-        let mut d;
-        if idx >= m.len() {
-            m.fill(0);
-        } else if shift > 0 {
-            let mut i = m.len() - 1;
-            loop {
-                d = 0;
-                if i >= idx {
-                    d = m[i - idx] as DoubleDigit;
-                    d <<= DIGIT_BIT_SIZE;
-                }
-                if i > idx {
-                    d |= m[i - idx - 1] as DoubleDigit;    
-                }
-                d >>= DIGIT_BIT_SIZE - shift;
-                m[i] = d as Digit;
-                if i == 0 {
-                    break;
-                }
-                i -= 1;
-            }
-        } else if idx > 0 {
-            let dst = m[idx..].as_mut_ptr();
-            let src = m.as_ptr();
-            unsafe {
-                core::intrinsics::copy(src, dst, m.len()-idx);
-            };
-            m[..idx].fill(0);
-        }
+        shift_slice_left(&mut self.m, n)
     }
 
     /// Shift to the left, returns exponent shift as positive value.
@@ -182,7 +123,7 @@ impl Mantissa {
                 d <<= 1;
                 shift += 1;
             }
-            Self::shift_left_m(m, shift);
+            shift_slice_left(m, shift);
             shift
         } else {
             0
@@ -328,42 +269,9 @@ impl Mantissa {
 
     /// Multiply two mantissas, return result and exponent shift as positive value.
     pub fn mul(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(isize, Self), Error> {
-        let (l, sm, lg) = if self.len() < m2.len() {
-            (m2.len(), self, m2)
-        } else {
-            (self.len(), m2, self)
-        };
-        let l = l*DIGIT_BIT_SIZE;
-
+        let l = self.len().max(m2.len())*DIGIT_BIT_SIZE;
         let mut m3 = Self::reserve_new(self.len() + m2.len())?;
-        if Self::toom3_cost_estimate(sm.len(), lg.len()) {
-            // toom-3
-            m3[..sm.len()].copy_from_slice(&sm.m);
-            m3[sm.len()..].fill(0);
-            let sign = Self::toom3(&mut m3, &lg.m)?;
-            debug_assert!(sign > 0);
-        } else {
-            // plain multiplication
-
-            // TODO: consider multiplying by the lowest and the highest "digit" and 
-            // assigning result to m3 first to avoid filling with zeroes.
-            m3.fill(0);
-            for (i, d1mi) in self.m.iter().enumerate() {
-                let d1mi = *d1mi as DoubleDigit;
-                if d1mi == 0 {
-                    continue;
-                }
-
-                let mut k = 0;
-                for (m2j, m3ij) in m2.m.iter().zip(m3[i..].iter_mut()) {
-                    let m = d1mi * (*m2j as DoubleDigit) + *m3ij as DoubleDigit + k;
-
-                    *m3ij = m as Digit;
-                    k = m >> (DIGIT_BIT_SIZE);
-                }
-                m3[i + m2.len()] += k as Digit;
-            }
-        }
+        Self::mul_slices(&self.m, &m2.m, &mut m3)?;
         // TODO: since leading digit is always >= 0x8000 (most significant bit is set),
         // then shift is always 0 or 1. Is it possible to do shift on the fly?
         let mut shift = Self::maximize(&mut m3) as isize;
@@ -376,6 +284,44 @@ impl Mantissa {
         ret.n = l;
         debug_assert!(shift >= -1 && shift <= 1);  // prevent exponent overflow
         Ok((shift, ret))
+    }
+
+    // ll multiplication
+    pub(super) fn mul_slices(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
+        let (sm, lg) = if m1.len() < m2.len() {
+            (m1, m2)
+        } else {
+            (m2, m1)
+        };
+        if Self::toom3_cost_estimate(sm.len(), lg.len()) {
+            // toom-3
+            m3[..sm.len()].copy_from_slice(sm);
+            m3[sm.len()..].fill(0);
+            let sign = Self::toom3(m3, lg)?;
+            debug_assert!(sign > 0);
+        } else {
+            // plain multiplication
+
+            // TODO: consider multiplying by the lowest and the highest word and 
+            // assigning result to m3 first to avoid filling with zeroes.
+            m3.fill(0);
+            for (i, d1mi) in m1.iter().enumerate() {
+                let d1mi = *d1mi as DoubleDigit;
+                if d1mi == 0 {
+                    continue;
+                }
+
+                let mut k = 0;
+                for (m2j, m3ij) in m2.iter().zip(m3[i..].iter_mut()) {
+                    let m = d1mi * (*m2j as DoubleDigit) + *m3ij as DoubleDigit + k;
+
+                    *m3ij = m as Digit;
+                    k = m >> (DIGIT_BIT_SIZE);
+                }
+                m3[i + m2.len()] += k as Digit;
+            }
+        }
+        Ok(())
     }
 
     /// Divide mantissa by mantissa, return result and exponent ajustment.
@@ -534,7 +480,7 @@ impl Mantissa {
     }
 
     // Multiply d1 by digit d and put result to d3 with overflow.
-    fn mul_by_digit(d1: &[Digit], d: DoubleDigit, d3: &mut [Digit]) {
+    pub(super) fn mul_by_digit(d1: &[Digit], d: DoubleDigit, d3: &mut [Digit]) {
         let mut m: DoubleDigit = 0;
         for (v1, v2) in d1.iter().zip(d3.iter_mut()) {
             m = *v1 as DoubleDigit * d + m / DIGIT_BASE;
@@ -582,7 +528,7 @@ impl Mantissa {
         let shift = self.max_bit_len() - self.n;
         let mut m = self.clone()?;
         if shift > 0 {
-            Self::shift_left_m(&mut m.m, shift);
+            shift_slice_left(&mut m.m, shift);
             m.n = self.max_bit_len();
         }
         Ok((shift, m))
