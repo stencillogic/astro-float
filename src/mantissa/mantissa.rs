@@ -286,44 +286,6 @@ impl Mantissa {
         Ok((shift, ret))
     }
 
-    // ll multiplication
-    pub(super) fn mul_slices(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
-        let (sm, lg) = if m1.len() < m2.len() {
-            (m1, m2)
-        } else {
-            (m2, m1)
-        };
-        if Self::toom3_cost_estimate(sm.len(), lg.len()) {
-            // toom-3
-            m3[..sm.len()].copy_from_slice(sm);
-            m3[sm.len()..].fill(0);
-            let sign = Self::toom3(m3, lg)?;
-            debug_assert!(sign > 0);
-        } else {
-            // plain multiplication
-
-            // TODO: consider multiplying by the lowest and the highest word and 
-            // assigning result to m3 first to avoid filling with zeroes.
-            m3.fill(0);
-            for (i, d1mi) in m1.iter().enumerate() {
-                let d1mi = *d1mi as DoubleDigit;
-                if d1mi == 0 {
-                    continue;
-                }
-
-                let mut k = 0;
-                for (m2j, m3ij) in m2.iter().zip(m3[i..].iter_mut()) {
-                    let m = d1mi * (*m2j as DoubleDigit) + *m3ij as DoubleDigit + k;
-
-                    *m3ij = m as Digit;
-                    k = m >> (DIGIT_BIT_SIZE);
-                }
-                m3[i + m2.len()] += k as Digit;
-            }
-        }
-        Ok(())
-    }
-
     /// Divide mantissa by mantissa, return result and exponent ajustment.
     pub fn div(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(isize, Self), Error> {
         // Knuth's division

@@ -134,16 +134,15 @@ impl Mantissa {
         p1.sub(&p2, &mut w1);
         w1.shift_right(1);
         p2.sub(&p0, &mut w2);
-        buf4.fill(0);   // p1 not used further, let's reuse its buffer
-        w3.sub_assign(&w2, buf4);
+        w3.sub_assign(&w2);
         w3.set_sign(-w3.sign());
         x3.copy_from(&p4);
         x3.shift_left(2);
-        w3.add_assign(&x3, buf4);
+        w3.add_assign(&x3);
         w3.shift_right(1);
-        w2.add_assign(&w1, buf4);
-        w2.sub_assign(&p4, buf4);
-        w1.sub_assign(&w3, buf4);
+        w2.add_assign(&w1);
+        w2.sub_assign(&p4);
+        w1.sub_assign(&w3);
 
         d1.fill(0);
         let d1len = d1.len();
@@ -154,9 +153,9 @@ impl Mantissa {
                 let mut a = SliceWithSign::new_mut(&mut d1[start..], sign);
                 let len = d1len - start;
                 if w.len() > len {
-                    a.add_assign(&SliceWithSign::new(&w[..len], w.sign()), &mut buf16[..len]);
+                    a.add_assign(&SliceWithSign::new(&w[..len], w.sign()));
                 } else {
-                    a.add_assign(w, buf16);
+                    a.add_assign(w);
                 }
                 sign = a.sign();
             }

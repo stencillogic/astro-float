@@ -155,7 +155,7 @@ mod tests {
         let mut n1 = BigFloatNumber::from_digit(1,32000).unwrap();
         n1.set_exponent(0);
         let n2 = n1.sinh_series(rm).unwrap();
-        println!("{:?}", n2.fp3(crate::Radix::Dec, rm).unwrap());
+        //println!("{:?}", n2.fp3(crate::Radix::Dec, rm).unwrap());
     }
 
     #[ignore]

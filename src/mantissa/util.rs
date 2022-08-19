@@ -195,7 +195,7 @@ enum SliceWithSignType<'a> {
     Immut(&'a [Digit])
 }
 
-// Slice of digits with sign is a simplified integer number representation.
+// Slice of digits with sign is a lightweight integer number representation.
 pub struct SliceWithSign<'a> {
     m: SliceWithSignType<'a>,
     sign: i8,
@@ -224,12 +224,12 @@ impl<'a> SliceWithSign<'a> {
         self.add_sub(s2, dst, -1);
     }
 
-    pub fn add_assign<'c>(&mut self, s2: &SliceWithSign<'c>, work_buf: &mut [Digit]) {
-        self.add_sub_assign(s2, 1, work_buf);
+    pub fn add_assign<'c>(&mut self, s2: &SliceWithSign<'c>) {
+        self.add_sub_assign(s2, 1);
     }
 
-    pub fn sub_assign<'c>(&mut self, s2: &SliceWithSign<'c>, work_buf: &mut [Digit]) {
-        self.add_sub_assign(s2, -1, work_buf);
+    pub fn sub_assign<'c>(&mut self, s2: &SliceWithSign<'c>) {
+        self.add_sub_assign(s2, -1);
     }
 
     fn add_sub<'b, 'c>(&self, s2: &SliceWithSign<'b>, dst: &mut SliceWithSign<'c>, op: i8) {
@@ -251,21 +251,15 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
-    fn add_sub_assign<'b>(&mut self, s2: &SliceWithSign<'b>, op: i8, work_buf: &mut [Digit]) {
+    fn add_sub_assign<'b>(&mut self, s2: &SliceWithSign<'b>, op: i8) {
         if (self.sign != s2.sign && op > 0) || (op < 0 && self.sign == s2.sign) {
             // subtract
             let cmp = Self::abs_cmp(self, s2);
             if cmp > 0 {
                 Self::abs_sub_assign(self, s2);
             } else if cmp < 0 {
+                Self::abs_sub_assign2(self, s2);
                 self.sign = s2.sign*op;
-                work_buf[..s2.len()].copy_from_slice(s2.deref());
-                work_buf[s2.len()..].fill(0);
-                Self::abs_sub_assign(work_buf, self);
-                let dst = self.deref_mut();
-                let max_len = dst.len().min(work_buf.len());
-                dst[..max_len].copy_from_slice(&work_buf[..max_len]);
-                dst[max_len..].fill(0);
             } else {
                 self.fill(0);
             };
@@ -301,26 +295,6 @@ impl<'a> SliceWithSign<'a> {
 
     pub fn shift_right(&mut self, shift: usize) {
         shift_slice_right(self, shift);
-    }
-
-    // set bits bits to 0 from the left (effectively: self mod 2^bits)
-    pub fn mask_bits_left(&mut self, mut bits: usize) {
-        let mut iter = self.deref_mut().iter_mut().rev();
-        loop {
-            if bits < DIGIT_BIT_SIZE {
-                break;
-            }
-            if let Some(v) = iter.next() {
-                *v = 0;
-                bits -= DIGIT_BIT_SIZE;
-            }
-        }
-        if bits > 0 {
-            let mask = DIGIT_MAX >> (bits % DIGIT_BIT_SIZE);
-            if let Some(v) = iter.next() {
-                *v &= mask;
-            }
-        }
     }
 
     pub fn div_by_digit(&mut self, d: Digit) {
@@ -455,6 +429,27 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
+    // val of s2 > val of s1
+    fn abs_sub_assign2(s1: &mut [Digit], s2: &[Digit]) {
+        let mut c = 0;
+        let mut iter1 = s1.iter_mut();
+        let iter2 = s2.iter();
+        for (a, b) in izip!(iter2, iter1.by_ref()) {
+            let v1 = *a as DoubleDigit;
+            let v2 = *b as DoubleDigit;
+            if v1 < v2 + c {
+                *b = (v1 + DIGIT_BASE - v2 - c) as Digit;
+                c = 1;
+            } else {
+                *b = (v1 - v2 - c) as Digit;
+                c = 0;
+            }
+        }
+        if let Some(v) = iter1.next() {
+            *v -= c as Digit;
+        }
+    }
+
     fn abs_sub(s1: &[Digit], s2: &[Digit], dst: &mut [Digit]) {
         let mut c = 0;
         let mut iter1 = s1.iter();
@@ -541,5 +536,27 @@ impl<'a> DerefMut for SliceWithSign<'a> {
             SliceWithSignType::Mut(m) => m,
             _ => panic!(),
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_abs_sub_assign2() {
+        let mut s1 = [1, 2, 5, 4, 0];
+        let s2 =     [1, 2, 3, 4, 1];
+        let s3 = [1, 2, 5, 4, 0];
+
+        let mut s1 = SliceWithSign::new_mut(&mut s1, 1);
+        let s2 = SliceWithSign::new(&s2, 1);
+        let s3 = SliceWithSign::new(&s3, 1);
+
+        SliceWithSign::abs_sub_assign2(&mut s1, &s2);
+        SliceWithSign::abs_add_assign(&mut s1, &s3);
+        assert!(s1[..] == s2[..]);
     }
 }
