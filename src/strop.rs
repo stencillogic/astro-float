@@ -158,6 +158,6 @@ mod tests {
     fn test_format() {
 
         let n = BigFloatNumber::from_f64(160, 0.03125f64).unwrap();
-        println!("{:?}", n.fp3(Radix::Dec, RoundingMode::ToEven).unwrap());
+        //println!("{:?}", n.fp3(Radix::Dec, RoundingMode::ToEven).unwrap());
     }
 }

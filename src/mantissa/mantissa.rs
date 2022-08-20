@@ -271,7 +271,7 @@ impl Mantissa {
     pub fn mul(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(isize, Self), Error> {
         let l = self.len().max(m2.len())*DIGIT_BIT_SIZE;
         let mut m3 = Self::reserve_new(self.len() + m2.len())?;
-        Self::mul_slices(&self.m, &m2.m, &mut m3)?;
+        Self::mul_unbalanced(&self.m, &m2.m, &mut m3)?;
         // TODO: since leading digit is always >= 0x8000 (most significant bit is set),
         // then shift is always 0 or 1. Is it possible to do shift on the fly?
         let mut shift = Self::maximize(&mut m3) as isize;

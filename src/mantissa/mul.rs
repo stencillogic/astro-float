@@ -30,18 +30,13 @@ impl Mantissa {
         }
     }
 
-    // general case multiplication: quardric or toom-3
-    pub(super) fn mul_slices(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
-        let (sm, lg) = if m1.len() < m2.len() {
-            (m1, m2)
-        } else {
-            (m2, m1)
-        };
-        if Self::toom3_cost_estimate(sm.len(), lg.len()) {
+    fn mul_slices(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
+        debug_assert!(m1.len() <= m2.len());
+        if Self::toom3_cost_estimate(m1.len(), m2.len()) {
             // toom-3
-            m3[..sm.len()].copy_from_slice(sm);
-            m3[sm.len()..].fill(0);
-            let sign = Self::toom3(m3, lg)?;
+            m3[..m1.len()].copy_from_slice(m1);
+            m3[m1.len()..].fill(0);
+            let sign = Self::toom3(m3, m2)?;
             debug_assert!(sign > 0);
         } else {
             // plain multiplication
@@ -50,8 +45,38 @@ impl Mantissa {
         Ok(())
     }
 
+    // general case multiplication
+    pub(super) fn mul_unbalanced(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
+        let (sm, lg) = if m1.len() < m2.len() {
+            (m1, m2)
+        } else {
+            (m2, m1)
+        };
+
+        if lg.len()/2 >= sm.len() && sm.len() > 70 {
+            // balancing
+            let mut lb = 0;
+            let mut buf = DigitBuf::new(2*sm.len())?;
+            while lb  < lg.len() {
+                let ub = if lb + sm.len() < lg.len() {
+                    lb+sm.len()
+                } else {
+                    lg.len()
+                };
+                Self::mul_slices(&lg[lb..ub], sm, &mut buf)?;
+                let src = SliceWithSign::new(&buf[..sm.len()+ub-lb], 1);
+                let mut dst = SliceWithSign::new_mut(&mut m3[lb..], 1);
+                dst.add_assign(&src);
+                lb += sm.len();
+            }
+            Ok(())
+        } else {
+            Self::mul_slices(sm, lg, m3)
+        }
+    }
+
     // short multiplication
-    #[allow(dead_code)] // TODO: can it be faster than just mul_slices ? 
+    #[allow(dead_code)] // TODO: can it be faster than just mul_unbalanced ? 
     pub(super) fn mul_short(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
         debug_assert!(m1.len() == m2.len());    // TODO: consider relaxing this
         let n = m1.len();
@@ -62,7 +87,7 @@ impl Mantissa {
     // short multiplication
     fn mul_short_step(m1: &[Digit], m2: &[Digit], m3: &mut [Digit], n: usize) -> Result<(), Error> {
         if n <= 1000 {
-            Self::mul_slices(m1, m2, m3)?;
+            Self::mul_unbalanced(m1, m2, m3)?;
             let mut c1 = SliceWithSign::new_mut(m3, 1);
             c1.shift_right(n*DIGIT_BIT_SIZE);
         } else {
@@ -77,7 +102,7 @@ impl Mantissa {
             let b2 = SliceWithSign::new(&m2[..l], 1);  // m2 mod 2^l
             let b3 = SliceWithSign::new(&m2[k..], 1);  // m2 div 2^k
 
-            Self::mul_slices(&a1, &b1, m3)?;
+            Self::mul_unbalanced(&a1, &b1, m3)?;
             let mut c1 = SliceWithSign::new_mut(m3, 1);
             c1.shift_right((k-l)*DIGIT_BIT_SIZE);
 
@@ -104,7 +129,24 @@ mod tests {
     use crate::defs::DIGIT_MAX;
     use super::*;
     use rand::random;
-    
+
+
+    #[test]
+    fn test_mul_unbalanced() {
+        let sz1 = random::<usize>()%10 + 1;
+        let sz2 = random::<usize>()%10*sz1 + random::<usize>()%sz1 + sz1;
+        let f = random_slice(1, sz1);
+        let mut ret1 = DigitBuf::new(sz1 + sz2).unwrap();
+        let mut ret2 = DigitBuf::new(sz1 + sz2).unwrap();
+        for _ in 0..1000 {
+            let v = random_slice(sz1, sz2);
+            Mantissa::mul_unbalanced(&f, &v, &mut ret1).unwrap();
+            Mantissa::mul_slices(&f, &v, &mut ret2).unwrap();
+            assert!(ret1[..] == ret2[..]);
+        }
+    }
+
+    #[ignore]
     #[test]
     fn test_mul_short() {
         let s1 = [1,2,3,4];
@@ -122,13 +164,12 @@ mod tests {
         Mantissa::mul_short(&s1, &s2, &mut ret).unwrap();
 
         let mut s3 = DigitBuf::new(20).unwrap();
-        Mantissa::mul_slices(&s1, &s2, &mut s3).unwrap();
+        Mantissa::mul_unbalanced(&s1, &s2, &mut s3).unwrap();
 
         ret[0] &= DIGIT_MAX<<10; // 10 = ceil(log2(3*(p-1)))
         s3[10] &= DIGIT_MAX<<10;
         assert!(ret[..10] == s3[10..]);
     }
-
 
     #[ignore]
     #[test]
@@ -149,7 +190,7 @@ mod tests {
             // basic
             let start_time = std::time::Instant::now();
             for ni in &n {
-                Mantissa::mul_slices(&f, ni, &mut ret).unwrap();
+                Mantissa::mul_unbalanced(&f, ni, &mut ret).unwrap();
             }
             let time = start_time.elapsed();
             println!("mul_slices {}", time.as_millis());
