@@ -2,6 +2,7 @@
 
 mod mantissa;
 mod div;
+mod fft;
 mod mul;
 mod buf;
 mod util;

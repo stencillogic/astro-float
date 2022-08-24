@@ -484,6 +484,23 @@ impl<'a> SliceWithSign<'a> {
         panic!("numeric overflow");
     }
 
+    pub fn cmp(&self, s2: &SliceWithSign) -> DigitSigned {
+        if self.sign != s2.sign {
+            return self.sign as DigitSigned;
+        }
+
+        Self::abs_cmp(self, s2) as DigitSigned * self.sign as DigitSigned
+    }
+
+    pub fn is_zero(&self) -> bool {
+        for v in self.iter() {
+            if *v != 0 {
+                return false;
+            }
+        }
+        true
+    }
+
     fn abs_cmp(s1: &[Digit], s2: &[Digit]) -> DigitSigned {
         let len = s1.len().min(s2.len());
         for v in &s1[len..] {
