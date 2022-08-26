@@ -333,15 +333,13 @@ impl Mantissa {
         d3.fill(0);
         let mut out = SliceWithSign::new_mut(d3, 1);
         for (j, part3) in parts3.iter_mut().enumerate() {
+
             Self::fft_div_mod(part3, k + t*j, n1, &modulus, tmp_buf);
-            let mut i = 0;
+
             while part3.sign() < 0 && !part3.is_zero() {
-                i += 1;
                 part3.add_assign(&modulus);
             }
-            if i > 3 {
-                println!("--- {}", i);
-            }
+
             /* thres[m*2 / DIGIT_BIT_SIZE] = 0;
             thres[m*2 / DIGIT_BIT_SIZE + 1] = 0;
             thres[0] = (j + 1) as Digit;
@@ -349,6 +347,7 @@ impl Mantissa {
             if part3.cmp(&thres) >= 0 {
                 part3.sub_assign(&modulus);
             } */
+
             part3.shift_left(j*m);
             out.add_assign(part3);
         }
@@ -368,7 +367,6 @@ mod tests {
 
     #[test]
     fn test_fft_mul() {
-
 
         // d1*d2
         let s1 = [1975132958, 2865607635, 3785004856, 2329109360, 82327679, 1315874535, 144553447, 431779413];
