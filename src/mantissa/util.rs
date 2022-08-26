@@ -10,6 +10,7 @@ use crate::defs::DoubleDigit;
 use crate::defs::DigitSigned;
 use core::ops::DerefMut;
 use core::ops::Deref;
+use std::ops::Add;
 
 
 /// Length of the slice extended by extra size.
@@ -120,63 +121,33 @@ impl<'a, T> Iterator for RightShiftedSlice<'a, T>
     }
 }
 
-// Shift m right by n digits.
-pub fn shift_slice_right(m: &mut [Digit], n: usize) {
-    let idx = n / DIGIT_BIT_SIZE;
-    let shift = n % DIGIT_BIT_SIZE;
-    let mut d;
-    if idx >= m.len() {
-        m.fill(0);
-    } else if shift > 0 {
-        for i in 0..m.len() {
-            d = 0;
-            if idx + i + 1 < m.len() {
-                d = m[idx + i + 1] as DoubleDigit;
-                d <<= DIGIT_BIT_SIZE;
-            }
-            if i + idx < m.len() {
-                d |= m[idx + i] as DoubleDigit;    
-            }
-            d >>= shift;
-            m[i] = d as Digit;
-        }
-    } else if idx > 0 {
-        let src = m[idx..].as_ptr();
-        let dst = m.as_mut_ptr();
-        let cnt = m.len() - idx;
-        unsafe {
-            core::intrinsics::copy(src, dst, cnt);
-        };
-        m[cnt..].fill(0);
-    }
-}
-
 
 // Shift m left by n digits.
 pub fn shift_slice_left(m: &mut [Digit], n: usize) {
     let idx = n / DIGIT_BIT_SIZE;
     let shift = n % DIGIT_BIT_SIZE;
-    let mut d;
     if idx >= m.len() {
         m.fill(0);
     } else if shift > 0 {
-        let mut i = m.len() - 1;
-        loop {
-            d = 0;
-            if i >= idx {
-                d = m[i - idx] as DoubleDigit;
-                d <<= DIGIT_BIT_SIZE;
+        let l = m.len() - 1;
+        let end = m.as_mut_ptr();
+        unsafe {    // use of slices is almost 50% slower
+            let mut dst = end.add(l);
+            let mut src = end.add(l - idx);
+            loop {
+                if src > end {
+                    let mut d = *src << shift;
+                    src = src.sub(1);
+                    d |= *src >> (DIGIT_BIT_SIZE - shift);
+                    *dst = d;
+                    dst = dst.sub(1);
+                } else {
+                    break;
+                }
             }
-            if i > idx {
-                d |= m[i - idx - 1] as DoubleDigit;    
-            }
-            d >>= DIGIT_BIT_SIZE - shift;
-            m[i] = d as Digit;
-            if i == 0 {
-                break;
-            }
-            i -= 1;
+            *dst = *src << shift;
         }
+        m[0..idx].fill(0);
     } else if idx > 0 {
         let dst = m[idx..].as_mut_ptr();
         let src = m.as_ptr();
@@ -187,6 +158,43 @@ pub fn shift_slice_left(m: &mut [Digit], n: usize) {
     }
 }
 
+
+// Shift m right by n digits.
+pub fn shift_slice_right(m: &mut [Digit], n: usize) {
+    let idx = n / DIGIT_BIT_SIZE;
+    let shift = n % DIGIT_BIT_SIZE;
+    if idx >= m.len() {
+        m.fill(0);
+    } else if shift > 0 {
+        let l = m.len();
+        let mut dst = m.as_mut_ptr();
+        unsafe {    // use of slices is almost 50% slower
+            let end = dst.add(l - 1);
+            let mut src = dst.add(idx);
+            loop {
+                if src < end {
+                    let mut d = *src >> shift;
+                    src = src.add(1);
+                    d |= *src << (DIGIT_BIT_SIZE - shift);
+                    *dst = d;
+                    dst = dst.add(1);
+                } else {
+                    break;
+                }
+            }
+            *dst = *src >> shift;
+        }
+        m[l - idx..].fill(0);
+    } else if idx > 0 {
+        let src = m[idx..].as_ptr();
+        let dst = m.as_mut_ptr();
+        let cnt = m.len() - idx;
+        unsafe {
+            core::intrinsics::copy(src, dst, cnt);
+        };
+        m[cnt..].fill(0);
+    }
+}
 
 
 // Internal repr of SliceWithSign.
@@ -251,6 +259,7 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
+    #[inline]
     fn add_sub_assign<'b>(&mut self, s2: &SliceWithSign<'b>, op: i8) {
         if (self.sign != s2.sign && op > 0) || (op < 0 && self.sign == s2.sign) {
             // subtract
@@ -289,10 +298,12 @@ impl<'a> SliceWithSign<'a> {
         self.sign *= s2.sign;
     }
 
+    #[inline]
     pub fn shift_left(&mut self, shift: usize) {
         shift_slice_left(self, shift);
     }
 
+    #[inline]
     pub fn shift_right(&mut self, shift: usize) {
         shift_slice_right(self, shift);
     }
@@ -390,6 +401,7 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
+    #[inline]
     fn abs_add_assign(s1: &mut [Digit], s2: &[Digit]) {
         let mut c = 0;
         let mut iter1 = s1.iter_mut();
@@ -409,6 +421,7 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
+    #[inline]
     fn abs_sub_assign(s1: &mut [Digit], s2: &[Digit]) {
         let mut c = 0;
         let mut iter1 = s1.iter_mut();
