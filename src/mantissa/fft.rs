@@ -183,7 +183,10 @@ impl Mantissa {
     }
 
     fn fft_params(n: usize) -> (usize, usize, usize, usize, usize, usize) {
-        let k1 = sqrt_int(n as u32) as usize;
+        let mut k1 = sqrt_int(n as u32) as usize;
+        if n / DIGIT_BIT_SIZE < 50000 {
+            k1 /= 2;
+        }
         let k = log2_ceil(k1).max(6);
         let k1 = 1 << k;
         let m = (n + k1 - 1) / k1;
@@ -407,7 +410,7 @@ impl Mantissa {
     // multiply two integer numbers.
     fn fft_mul(d1: &[Digit], d2: &[Digit], d3: &mut [Digit]) -> Result<(), Error> {
 
-        let l: usize = (d1.len() + d2.len())*DIGIT_BIT_SIZE;
+        let l: usize = (d1.len() + d2.len()) * DIGIT_BIT_SIZE;
 
         let (_n, k1, k, m, n1, t) = Self::fft_params(l);
 
@@ -508,7 +511,7 @@ mod tests {
     use crate::defs::DoubleDigit;
     use crate::defs::DIGIT_BIT_SIZE;
 
-    //#[ignore]
+    
     #[test]
     fn test_fft_mul() {
 
@@ -601,7 +604,7 @@ mod tests {
 
 
         // random
-        for _ in 0..1000 {
+        for _ in 0..100 {
 
             let s1 = random_slice(30, 50);
             let s2 = random_slice(30, 50);
@@ -621,13 +624,13 @@ mod tests {
     }
 
 
-    //#[ignore]
+    #[ignore]
     #[test]
     fn fft_mul_perf() {
 
         for _ in 0..5 {
 
-            let sz = 10000;
+            let sz = 5000;
 
             let f = random_slice(sz, sz);
 
@@ -635,7 +638,7 @@ mod tests {
             let mut ret2 = DigitBuf::new(sz + sz).unwrap();
 
             let mut n = vec![];
-            let l = 10;
+            let l = 100;
             for _ in 0..l {
                 let v = random_slice(sz, sz);
                 n.push(v);
