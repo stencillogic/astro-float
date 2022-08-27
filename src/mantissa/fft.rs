@@ -32,14 +32,14 @@ impl Mantissa {
     }
 
     #[inline]
-    fn fft_butterfly(a: &mut SliceWithSign, b: &mut SliceWithSign, n1: usize, modulus: &mut SliceWithSign, tmp_buf: &mut [Digit]) {
+    fn fft_butterfly(a: &mut SliceWithSign, b: &mut SliceWithSign, n1: usize, modulus: &SliceWithSign) {
         a.add_assign(b);
         b.shift_left(1);
         b.sub_assign(a);
         b.set_sign(-b.sign());
 
-        Self::fft_mul_mod(a, 0, n1, modulus, tmp_buf);
-        Self::fft_mul_mod(b, 0, n1, modulus, tmp_buf);
+        Self::fft_normalize(a, n1, modulus);
+        Self::fft_normalize(b, n1, modulus);
     }
 
     // diagnostic with plain fft
@@ -67,12 +67,12 @@ impl Mantissa {
         }
     }
 
-    fn fft_forward(parts: &mut [SliceWithSign], w: usize, k1: usize, k: usize, s: usize, n1: usize, modulus: &mut SliceWithSign, tmp_buf: &mut [Digit]) {
+    fn fft_forward(parts: &mut [SliceWithSign], w: usize, k1: usize, k: usize, s: usize, n1: usize, modulus: &SliceWithSign, tmp_buf: &mut [Digit]) {
 
         if k1 == 2 {
 
             let (a, b) = parts.split_at_mut(s);
-            Self::fft_butterfly(a.first_mut().unwrap(), b.first_mut().unwrap(), n1, modulus, tmp_buf);
+            Self::fft_butterfly(a.first_mut().unwrap(), b.first_mut().unwrap(), n1, modulus);
 
         } else {
 
@@ -94,19 +94,19 @@ impl Mantissa {
 
                 let w_shift = Self::fft_w_shift(j, kk) * w;
 
-                b.shift_left(w_shift);
+                Self::fft_mul_mod(b, w_shift, n1, modulus, tmp_buf);
 
-                Self::fft_butterfly(a, b, n1, modulus, tmp_buf);
+                Self::fft_butterfly(a, b, n1, modulus);
             }
         }
     }
 
-    fn fft_reverse(parts: &mut [SliceWithSign], w: usize, k1: usize, n1: usize, modulus: &mut SliceWithSign, tmp_buf: &mut [Digit]) {
+    fn fft_reverse(parts: &mut [SliceWithSign], w: usize, k1: usize, n1: usize, modulus: &SliceWithSign, tmp_buf: &mut [Digit]) {
 
         if k1 == 2 {
 
             let (a, b) = parts.split_at_mut(1);
-            Self::fft_butterfly(&mut a[0], &mut b[0], n1, modulus, tmp_buf);
+            Self::fft_butterfly(&mut a[0], &mut b[0], n1, modulus);
 
         } else {
 
@@ -120,15 +120,15 @@ impl Mantissa {
 
             if let Some((a, b)) = iter.next() {
 
-                Self::fft_butterfly(a, b, n1, modulus, tmp_buf);
+                Self::fft_butterfly(a, b, n1, modulus);
 
                 for (j, (a, b)) in iter.enumerate() {
 
                     let w_shift = w * (k1 - j - 1);
 
-                    b.shift_left(w_shift);
+                    Self::fft_mul_mod(b, w_shift, n1, modulus, tmp_buf);
     
-                    Self::fft_butterfly(a, b, n1, modulus, tmp_buf);
+                    Self::fft_butterfly(a, b, n1, modulus);
                 }
             }
         }
@@ -190,8 +190,7 @@ impl Mantissa {
         }
     }
 
-    #[inline]
-    fn fft_compute_chunks<'a>(num: &SliceWithSign, n: usize, tmp_buf: &'a mut [Digit]) -> SliceWithSign<'a> {
+    fn fft_compute_chunks<'a>(num: &SliceWithSign, n: usize, tmp_buf: &'a mut [Digit], s: i8) -> SliceWithSign<'a> {
 
         let mut chunks = num.chunks(n / DIGIT_BIT_SIZE);
 
@@ -199,11 +198,11 @@ impl Mantissa {
 
             tmp_buf[first_chunk.len()..].fill(0);
 
-            let mut acc = SliceWithSign::new_mut(tmp_buf, 1);
-            let n0 = SliceWithSign::new(first_chunk, 1);
+            let mut acc = SliceWithSign::new_mut(tmp_buf, s);
+            let n0 = SliceWithSign::new(first_chunk, s);
             acc.copy_from(&n0);
 
-            let mut sign = -1;
+            let mut sign = -s;
 
             for chunk in chunks {
 
@@ -223,24 +222,62 @@ impl Mantissa {
         }
     }
 
+    // results in  0 <= num < modulus, assuming abs(num) not much greater than modulus
+    fn fft_normalize(num: &mut SliceWithSign, n: usize, modulus: &SliceWithSign) {       
+
+        if num.sign() < 0 && !num.is_zero() { 
+
+            let last = n / DIGIT_BIT_SIZE;
+
+            while num.sign() < 0 {
+
+                if num[last] > 0 && num[0] > 0 {
+
+                    // simplified add
+                    num[0] -= 1;
+                    num[last] -= 1;
+
+                } else {
+
+                    num.add_assign(modulus);
+                }
+            }
+
+        } else {
+
+            let last = n / DIGIT_BIT_SIZE;
+
+            while num[last] > 0 {
+
+                if num[0] > 0 {
+
+                    // simplified sub
+                    num[0] -= 1;
+                    num[last] -= 1;
+                    
+                } else {
+                    num.sub_assign(modulus);
+                }
+            }
+
+            if num.sign() < 0 && !num.is_zero() {     // unlikely
+                num.add_assign(modulus);
+            }
+        }
+    }
+
     // compute num*2^j mod (2^n+1) inplace
     // num and modulus should have up to n bits of additional free space for shifting.
     // tmp_buf is a reusable buffer of size == num.len().
-    fn fft_mul_mod(num: &mut SliceWithSign, j: usize, n: usize, modulus: &mut SliceWithSign, tmp_buf: &mut [Digit]) {
+    fn fft_mul_mod(num: &mut SliceWithSign, j: usize, n: usize, modulus: &SliceWithSign, tmp_buf: &mut [Digit]) {
 
         debug_assert!(n % DIGIT_BIT_SIZE == 0);
 
         if j == 0 {
 
-            let mut acc = Self::fft_compute_chunks(num, n, tmp_buf);
+            let mut acc = Self::fft_compute_chunks(num, n, tmp_buf, 1);
 
-            while acc.sign() < 0 {
-                acc.add_assign(modulus);
-            }
-
-            while acc.cmp(modulus) >= 0 {
-                acc.sub_assign(modulus);
-            }
+            Self::fft_normalize(&mut acc, n, modulus);
 
             num.copy_from_slice(tmp_buf);
 
@@ -251,19 +288,9 @@ impl Mantissa {
 
             num.shift_left(shift);
 
-            let mut acc = Self::fft_compute_chunks(num, n, tmp_buf);
+            let mut acc = Self::fft_compute_chunks(num, n, tmp_buf, 1);
 
-            modulus.shift_left(shift);
-
-            while acc.sign() < 0 {
-                acc.add_assign(modulus);
-            }
-
-            modulus.shift_right(shift);
-    
-            while acc.cmp(modulus) >= 0 {
-                acc.sub_assign(modulus);
-            }
+            Self::fft_normalize(&mut acc, n, modulus);
     
             if q & 1 != 0 {
                 acc.set_sign(-acc.sign());
@@ -277,26 +304,26 @@ impl Mantissa {
     }
 
     // compute num / 2^j mod (2^n+1) inplace
-    // num should have up to 2*n bits of additional free space for shifting.
+    // num should have up to n bits of additional free space for shifting.
     // tmp_buf is a reusable buffer of size == num.len().
     fn fft_div_mod(num: &mut SliceWithSign, j: usize, n: usize, modulus: &SliceWithSign, tmp_buf: &mut [Digit]) {
 
         debug_assert!(n % DIGIT_BIT_SIZE == 0);
 
         let n2 = n*2;
-        let shift = ((j + n2 - 1) / n2) * n2 - j;
+        let mut shift = ((j + n2 - 1) / n2) * n2 - j;
+
+        let mut s = 1;
+        if shift >= n {
+            shift -= n;
+            s = -1;
+        }
 
         num.shift_left(shift);
 
-        let mut acc = Self::fft_compute_chunks(num, n, tmp_buf);
-
-        while acc.sign() < 0 {
-            acc.add_assign(modulus);
-        }
-
-        while acc.cmp(modulus) >= 0 {
-            acc.sub_assign(modulus);
-        }
+        let mut acc = Self::fft_compute_chunks(num, n, tmp_buf, s);
+        
+        Self::fft_normalize(&mut acc, n, modulus);
 
         num.copy_from_slice(tmp_buf);
     }
@@ -328,7 +355,7 @@ impl Mantissa {
         let (_n, k1, k, m, n1, t) = Self::fft_params(l);
 
         let w = t*2;
-        let part_len = (2*n1 + k1*w) / DIGIT_BIT_SIZE + 1;
+        let part_len = (2*n1) / DIGIT_BIT_SIZE + 1;
 
         let start_time = std::time::Instant::now();
 
@@ -369,16 +396,16 @@ impl Mantissa {
         let start_time = std::time::Instant::now();
 
         for (j, (part1, part2)) in parts1.iter_mut().zip(parts2.iter_mut()).enumerate() {
-            Self::fft_mul_mod(part1, t*j, n1, &mut modulus, &mut tmp_buf[..part_len]);
-            Self::fft_mul_mod(part2, t*j, n1, &mut modulus, &mut tmp_buf[..part_len]);
+            Self::fft_mul_mod(part1, t*j, n1, &modulus, &mut tmp_buf[..part_len]);
+            Self::fft_mul_mod(part2, t*j, n1, &modulus, &mut tmp_buf[..part_len]);
         }
 
         let time = start_time.elapsed();
         println!("weight {}", time.as_micros());
         let start_time = std::time::Instant::now();
 
-        Self::fft_forward(&mut parts1, w, k1, k, 1, n1, &mut modulus, &mut tmp_buf[..part_len]);
-        Self::fft_forward(&mut parts2, w, k1, k, 1, n1, &mut modulus, &mut tmp_buf[..part_len]);
+        Self::fft_forward(&mut parts1, w, k1, k, 1, n1, &modulus, &mut tmp_buf[..part_len]);
+        Self::fft_forward(&mut parts2, w, k1, k, 1, n1, &modulus, &mut tmp_buf[..part_len]);
 
         let time = start_time.elapsed();
         println!("fwd {}", time.as_micros());
@@ -391,7 +418,7 @@ impl Mantissa {
             part3.set_sign(part1.sign() * part2.sign());
 
             let mut t0 = SliceWithSign::new_mut(tmp_buf2, part3.sign());
-            Self::fft_mul_mod(&mut t0, 0, n1, &mut modulus, tmp_buf);
+            Self::fft_mul_mod(&mut t0, 0, n1, &modulus, tmp_buf);
 
             part3.copy_from_slice(&tmp_buf2[..part_len]);
         }
@@ -400,7 +427,7 @@ impl Mantissa {
         println!("mul {}", time.as_micros());
         let start_time = std::time::Instant::now();
 
-        Self::fft_reverse(&mut parts3, w, k1, n1, &mut modulus, &mut tmp_buf[..part_len]);
+        Self::fft_reverse(&mut parts3, w, k1, n1, &modulus, &mut tmp_buf[..part_len]);
 
         let time = start_time.elapsed();
         println!("rev {}", time.as_micros());
@@ -551,7 +578,7 @@ mod tests {
 
 
         // random
-        for _ in 0..100 {
+        for _ in 0..1000 {
 
             let s1 = random_slice(30, 50);
             let s2 = random_slice(30, 50);
@@ -577,7 +604,7 @@ mod tests {
 
         for _ in 0..5 {
 
-            let sz = 2000000;
+            let sz = 100000;
 
             let f = random_slice(sz, sz);
 
