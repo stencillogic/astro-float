@@ -10,7 +10,6 @@ use crate::defs::DoubleDigit;
 use crate::defs::DigitSigned;
 use core::ops::DerefMut;
 use core::ops::Deref;
-use std::ops::Add;
 
 
 /// Length of the slice extended by extra size.
@@ -155,6 +154,39 @@ pub fn shift_slice_left(m: &mut [Digit], n: usize) {
             core::intrinsics::copy(src, dst, m.len()-idx);
         };
         m[..idx].fill(0);
+    }
+}
+
+// Shift m left by n digits and put result in m2.
+pub fn shift_slice_left_copy(m: &[Digit], m2: &mut [Digit], n: usize) {
+    let idx = n / DIGIT_BIT_SIZE;
+    let shift = n % DIGIT_BIT_SIZE;
+    if idx >= m2.len() {
+        m2.fill(0);
+    } else if shift > 0 {
+        m2[..idx].fill(0);
+        let mut dst = m2[idx..].iter_mut();
+        let src = m.iter();
+        let mut prev = 0;
+        for (a, b) in src.zip(dst.by_ref()) {
+            *b = (prev >> (DIGIT_BIT_SIZE - shift)) | (*a << shift);
+            prev = *a;
+        }
+        if let Some(b) = dst.next() {
+            *b = prev >> (DIGIT_BIT_SIZE - shift);
+        }
+        for b in dst {
+            *b = 0;
+        }
+    } else {
+        m2[..idx].fill(0);
+        let mut dst = m2[idx..].iter_mut();
+        for (a, b) in m.iter().zip(dst.by_ref()) {
+            *b = *a;
+        }
+        for b in dst {
+            *b = 0;
+        }
     }
 }
 
