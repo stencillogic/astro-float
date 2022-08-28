@@ -31,22 +31,33 @@ impl Mantissa {
     }
 
     fn mul_slices(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
+
         debug_assert!(m1.len() <= m2.len());
-        if Self::toom3_cost_estimate(m1.len(), m2.len()) {
+
+        if m1.len() <= 70 || m2.len() <= 70 {
+
+            Self::mul_basic(m1, m2, m3);
+
+        } else if m1.len() <= 4000 && m2.len() <= 4000 {
+            
             // toom-3
             m3[..m1.len()].copy_from_slice(m1);
             m3[m1.len()..].fill(0);
             let sign = Self::toom3(m3, m2)?;
+
             debug_assert!(sign > 0);
+
         } else {
-            // plain multiplication
-            Self::mul_basic(m1, m2, m3)
+            
+            Mantissa::fft_mul(m1, m2, m3)?;
+
         }
         Ok(())
     }
 
     // general case multiplication
     pub(super) fn mul_unbalanced(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
+        
         let (sm, lg) = if m1.len() < m2.len() {
             (m1, m2)
         } else {
@@ -54,23 +65,33 @@ impl Mantissa {
         };
 
         if lg.len()/2 >= sm.len() && sm.len() > 70 {
+
             // balancing
             let mut lb = 0;
             let mut buf = DigitBuf::new(2*sm.len())?;
+
             while lb  < lg.len() {
+                
                 let ub = if lb + sm.len() < lg.len() {
-                    lb+sm.len()
+                    lb + sm.len()
                 } else {
                     lg.len()
                 };
+
                 Self::mul_slices(&lg[lb..ub], sm, &mut buf)?;
+
                 let src = SliceWithSign::new(&buf[..sm.len()+ub-lb], 1);
                 let mut dst = SliceWithSign::new_mut(&mut m3[lb..], 1);
+
                 dst.add_assign(&src);
+
                 lb += sm.len();
             }
+
             Ok(())
+
         } else {
+
             Self::mul_slices(sm, lg, m3)
         }
     }

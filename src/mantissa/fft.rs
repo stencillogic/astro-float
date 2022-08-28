@@ -408,7 +408,7 @@ impl Mantissa {
     }
 
     // multiply two integer numbers.
-    fn fft_mul(d1: &[Digit], d2: &[Digit], d3: &mut [Digit]) -> Result<(), Error> {
+    pub(super) fn fft_mul(d1: &[Digit], d2: &[Digit], d3: &mut [Digit]) -> Result<(), Error> {
 
         let l: usize = (d1.len() + d2.len()) * DIGIT_BIT_SIZE;
 

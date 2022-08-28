@@ -269,20 +269,29 @@ impl Mantissa {
 
     /// Multiply two mantissas, return result and exponent shift as positive value.
     pub fn mul(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(isize, Self), Error> {
+
         let l = self.len().max(m2.len())*DIGIT_BIT_SIZE;
+
         let mut m3 = Self::reserve_new(self.len() + m2.len())?;
+
         Self::mul_unbalanced(&self.m, &m2.m, &mut m3)?;
+
         // TODO: since leading digit is always >= 0x8000 (most significant bit is set),
         // then shift is always 0 or 1. Is it possible to do shift on the fly?
         let mut shift = Self::maximize(&mut m3) as isize;
+        
         let bit_len = m3.len()*DIGIT_BIT_SIZE;
         let mut ret = Mantissa {m: m3, n: bit_len};
+
         if ret.round_mantissa(bit_len - l, rm, is_positive) {
             shift -= 1;
         }
+
         ret.m.trunc_to(l);
         ret.n = l;
+
         debug_assert!(shift >= -1 && shift <= 1);  // prevent exponent overflow
+
         Ok((shift, ret))
     }
 
