@@ -11,9 +11,8 @@ use crate::mantissa::util::SliceWithSign;
 
 impl Mantissa {
 
-    pub(super) fn mul_basic(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) {
-        // TODO: consider multiplying by the lowest and the highest word and 
-        // assigning result to m3 first to avoid filling with zeroes.
+    fn mul_basic(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) {
+
         m3.fill(0);
         
         for (i, d1mi) in m1.iter().enumerate() {
@@ -38,18 +37,17 @@ impl Mantissa {
 
         debug_assert!(m1.len() <= m2.len());
 
-        if m1.len() <= 70 || m2.len() <= 70 {
+        if m1.len() <= 32 || m2.len() <= 32 {
 
             Self::mul_basic(m1, m2, m3);
 
-        } else if m1.len() <= 4000 && m2.len() <= 4000 {
-            
-            // toom-3
-            m3[..m1.len()].copy_from_slice(m1);
-            m3[m1.len()..].fill(0);
-            let sign = Self::toom3(m3, m2)?;
+        } else if m1.len() <= 512 || m2.len() <= 512 {
 
-            debug_assert!(sign > 0);
+            Self::toom2(m1, m2, m3)?;
+
+        } else if m1.len() <= 5400 && m2.len() <= 5400 {
+            
+            Self::toom3(m1, m2, m3)?;
 
         } else {
             

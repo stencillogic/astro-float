@@ -605,7 +605,7 @@ mod tests {
 
 
         // random
-        for _ in 0..100 {
+        for _ in 0..1000 {
 
             let s1 = random_slice(30, 50);
             let s2 = random_slice(30, 50);
@@ -631,7 +631,7 @@ mod tests {
 
         for _ in 0..5 {
 
-            let sz = 5000;
+            let sz = 5400;
 
             let f = random_slice(sz, sz);
 

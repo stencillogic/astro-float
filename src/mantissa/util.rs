@@ -242,6 +242,7 @@ pub struct SliceWithSign<'a> {
 }
 
 impl<'a> SliceWithSign<'a> {
+    
     pub fn new_mut(m: &'a mut [Digit], sign: i8) -> Self {
         SliceWithSign {
             m: SliceWithSignType::Mut(m),
@@ -256,26 +257,32 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
+    #[inline]
     pub fn add<'b, 'c>(&self, s2: &SliceWithSign<'b>, dst: &mut SliceWithSign<'c>) {
         self.add_sub(s2, dst, 1);
     }
 
+    #[inline]
     pub fn sub<'b, 'c>(&self, s2: &SliceWithSign<'b>, dst: &mut SliceWithSign<'c>) {
         self.add_sub(s2, dst, -1);
     }
 
+    #[inline]
     pub fn add_assign<'c>(&mut self, s2: &SliceWithSign<'c>) {
         self.add_sub_assign(s2, 1);
     }
 
+    #[inline]
     pub fn sub_assign<'c>(&mut self, s2: &SliceWithSign<'c>) {
         self.add_sub_assign(s2, -1);
     }
 
     fn add_sub<'b, 'c>(&self, s2: &SliceWithSign<'b>, dst: &mut SliceWithSign<'c>, op: i8) {
         if (self.sign != s2.sign && op > 0) || (op < 0 && self.sign == s2.sign) {
+
             // subtract
             let cmp = Self::abs_cmp(self, s2);
+
             if cmp > 0 {
                 dst.sign = self.sign;
                 Self::abs_sub(self, s2, dst);
@@ -285,21 +292,21 @@ impl<'a> SliceWithSign<'a> {
             } else {
                 dst.fill(0);
             };
+
         } else {
             dst.sign = self.sign;
             Self::abs_add(self, s2, dst);
         }
     }
 
-    #[inline]
     fn add_sub_assign<'b>(&mut self, s2: &SliceWithSign<'b>, op: i8) {
         if (self.sign != s2.sign && op > 0) || (op < 0 && self.sign == s2.sign) {
             // subtract
             let cmp = Self::abs_cmp(self, s2);
             if cmp > 0 {
-                Self::abs_sub_assign(self, s2);
+                Self::abs_sub_assign_1(self, s2);
             } else if cmp < 0 {
-                Self::abs_sub_assign2(self, s2);
+                Self::abs_sub_assign_2(self, s2);
                 self.sign = s2.sign*op;
             } else {
                 self.fill(0);
@@ -341,12 +348,15 @@ impl<'a> SliceWithSign<'a> {
     }
 
     pub fn div_by_digit(&mut self, d: Digit) {
+
         debug_assert!(d != 0);
+
         let d = d as DoubleDigit;
         let mut rh = 0;
         let m = self.deref_mut();
         let mut iter = m.iter_mut().rev();
         let mut val;
+
         if let Some(v) = iter.next() {
             val = v;
         } else {
@@ -391,82 +401,101 @@ impl<'a> SliceWithSign<'a> {
     }
 
     fn abs_add(s1: &[Digit], s2: &[Digit], dst: &mut [Digit]) {
+
         let mut c = 0;
-        let mut iter1 = s1.iter();
-        let mut iter2 = s2.iter();
+
+        let (iter1, mut iter2) = if s1.len() < s2.len() {
+            (s1.iter(), s2.iter())
+        } else {
+            (s2.iter(), s1.iter())
+        };
+
         let mut iter3 = dst.iter_mut();
-        let l = s1.len().min(s2.len());
-        for _ in 0..l {
-            let a = if let Some(v) = iter1.next() { v } else { break };
-            let b = if let Some(v) = iter2.next() { v } else { break };
+
+        for (a, b, x) in izip!(iter1, iter2.by_ref(), iter3.by_ref()) {
+
             let mut s = c + *a as DoubleDigit + *b as DoubleDigit;
+
             if s >= DIGIT_BASE {
                 s -= DIGIT_BASE;
                 c = 1;
             } else {
                 c = 0;
             }
-            *iter3.next().unwrap() = s as Digit;
+
+            *x = s as Digit;
         }
-        if let Some(v) = iter1.next() {
-            let mut s = c + *v as DoubleDigit;
+
+        for (b, x) in iter2.zip(iter3.by_ref()) {
+
+            let mut s = c + *b as DoubleDigit;
+
             if s >= DIGIT_BASE {
                 s -= DIGIT_BASE;
                 c = 1;
             } else {
                 c = 0;
             }
-            *iter3.next().unwrap() = s as Digit;
+
+            *x = s as Digit;
         }
-        if let Some(v) = iter2.next() {
-            let mut s = c + *v as DoubleDigit;
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c = 1;
-            } else {
-                c = 0;
-            }
-            *iter3.next().unwrap() = s as Digit;
-        }
+
         if c > 0 {
             *iter3.next().unwrap() = c as Digit;
         }
+
+        for v in iter3 {
+            *v = 0;
+        }
     }
 
-    #[inline]
     fn abs_add_assign(s1: &mut [Digit], s2: &[Digit]) {
+
         let mut c = 0;
         let mut iter1 = s1.iter_mut();
         let iter2 = s2.iter();
+
         for (b, a) in izip!(iter2, iter1.by_ref()) {
+
             let mut s = c + *a as DoubleDigit + *b as DoubleDigit;
+
             if s >= DIGIT_BASE {
                 s -= DIGIT_BASE;
                 c = 1;
             } else {
                 c = 0;
             }
+
             *a = s as Digit;
         }
+
         for a in iter1 {
+
             let mut s = c + *a as DoubleDigit;
+
             if s >= DIGIT_BASE {
                 s -= DIGIT_BASE;
                 c = 1;
             } else {
                 c = 0;
             }
+
             *a = s as Digit;
         }
     }
 
-    fn abs_sub_assign(s1: &mut [Digit], s2: &[Digit]) {
+    // prereq: val of s1 >= val of s2
+    fn abs_sub_assign_1(s1: &mut [Digit], s2: &[Digit]) {
+
         let mut c = 0;
         let mut iter1 = s1.iter_mut();
         let iter2 = s2.iter();
+
         for (b, a) in izip!(iter2, iter1.by_ref()) {
+
             let v1 = *a as DoubleDigit;
             let v2 = *b as DoubleDigit + c;
+
             if v1 < v2 {
                 *a = (v1 + DIGIT_BASE - v2) as Digit;
                 c = 1;
@@ -475,8 +504,11 @@ impl<'a> SliceWithSign<'a> {
                 c = 0;
             }
         }
+
         for a in iter1 {
+
             let v1 = *a as DoubleDigit;
+
             if v1 < c {
                 *a = (v1 + DIGIT_BASE - c) as Digit;
                 c = 1;
@@ -485,16 +517,20 @@ impl<'a> SliceWithSign<'a> {
                 c = 0;
             }
         }
+
+        debug_assert!(c == 0);
     }
 
-    // val of s2 > val of s1
-    fn abs_sub_assign2(s1: &mut [Digit], s2: &[Digit]) {
+    // prereq: val of s2 > val of s1
+    fn abs_sub_assign_2(s1: &mut [Digit], s2: &[Digit]) {
+
         let mut c = 0;
-        let mut iter1 = s1.iter_mut();
-        let iter2 = s2.iter();
-        for (a, b) in izip!(iter2, iter1.by_ref()) {
+
+        for (a, b) in s2.iter().zip(s1.iter_mut()) {
+
             let v1 = *a as DoubleDigit;
             let v2 = *b as DoubleDigit + c;
+
             if v1 < v2 {
                 *b = (v1 + DIGIT_BASE - v2) as Digit;
                 c = 1;
@@ -503,19 +539,23 @@ impl<'a> SliceWithSign<'a> {
                 c = 0;
             }
         }
-        if let Some(v) = iter1.next() {
-            *v -= c as Digit;
-        }
+
+        debug_assert!(c == 0);
     }
 
     fn abs_sub(s1: &[Digit], s2: &[Digit], dst: &mut [Digit]) {
+
         let mut c = 0;
+
         let mut iter1 = s1.iter();
         let iter2 = s2.iter();
         let mut iter3 = dst.iter_mut();
+
         for (b, a, d) in izip!(iter2, iter1.by_ref(), iter3.by_ref()) {
+
             let v1 = *a as DoubleDigit;
             let v2 = *b as DoubleDigit + c;
+
             if v1 < v2 {
                 *d = (v1 + DIGIT_BASE - v2) as Digit;
                 c = 1;
@@ -524,8 +564,28 @@ impl<'a> SliceWithSign<'a> {
                 c = 0;
             }
         }
-        if let Some(v) = iter1.next() {
-            *iter3.next().unwrap() = *v - c as Digit;
+
+        if c > 0 {
+            for (a, d) in iter1.zip(iter3.by_ref()) {
+            
+                let v1 = *a as DoubleDigit;
+    
+                if v1 < c {
+                    *d = (v1 + DIGIT_BASE - c) as Digit;
+                    c = 1;
+                } else {
+                    *d = (v1 - c) as Digit;
+                    c = 0;
+                }
+            }
+        } else {
+            for (a, d) in iter1.zip(iter3.by_ref()) {
+                *d = *a;
+            }
+        }
+
+        for v in iter3 {
+            *v = 0;
         }
     }
 
@@ -542,14 +602,6 @@ impl<'a> SliceWithSign<'a> {
         panic!("numeric overflow");
     }
 
-    pub fn cmp(&self, s2: &SliceWithSign) -> DigitSigned {
-        if self.sign != s2.sign {
-            return self.sign as DigitSigned;
-        }
-
-        Self::abs_cmp(self, s2) as DigitSigned * self.sign as DigitSigned
-    }
-
     pub fn is_zero(&self) -> bool {
         for v in self.iter() {
             if *v != 0 {
@@ -560,23 +612,28 @@ impl<'a> SliceWithSign<'a> {
     }
 
     fn abs_cmp(s1: &[Digit], s2: &[Digit]) -> DigitSigned {
+
         let len = s1.len().min(s2.len());
+
         for v in &s1[len..] {
             if *v != 0 {
                 return 1;
             }
         }
+
         for v in &s2[len..] {
             if *v != 0 {
                 return -1;
             }
         }
+
         for (a, b) in core::iter::zip(s1[..len].iter().rev(), s2[..len].iter().rev()) {
             let diff = *a as DigitSigned - *b as DigitSigned;
             if diff != 0 {
                 return diff;
             }
         }
+
         0
     }
 
@@ -630,7 +687,7 @@ mod tests {
         let s2 = SliceWithSign::new(&s2, 1);
         let s3 = SliceWithSign::new(&s3, 1);
 
-        SliceWithSign::abs_sub_assign2(&mut s1, &s2);
+        SliceWithSign::abs_sub_assign_2(&mut s1, &s2);
         SliceWithSign::abs_add_assign(&mut s1, &s3);
         assert!(s1[..] == s2[..]);
     }

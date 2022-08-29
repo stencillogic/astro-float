@@ -50,7 +50,7 @@ impl Mantissa {
             *x = s as Digit;
         }
 
-        *iter3.next().unwrap() =  c as Digit;
+        *iter3.next().unwrap() = c as Digit;
     }
 
     fn paired_sub(s1: &[Digit], s2: &[Digit], s3: &mut [Digit]) {
@@ -58,13 +58,13 @@ impl Mantissa {
         let mut c = 0;
         let mut iter3 = s3.iter_mut();
 
-        let (mut iter1, mut iter2) = if s1.len() > s2.len() {
+        let (mut iter1, iter2) = if s1.len() > s2.len() {
             (s1.iter(), s2.iter())
         } else {
             (s2.iter(), s1.iter())
         };
 
-        for (a, b, x) in izip!(iter2.by_ref(), iter1.by_ref(), iter3.by_ref()) {
+        for (a, b, x) in izip!(iter2, iter1.by_ref(), iter3.by_ref()) {
 
             let v = *x as DoubleDigit;
             let s = *a as DoubleDigit + *b as DoubleDigit + c;
@@ -84,18 +84,38 @@ impl Mantissa {
         for (a, x) in iter1.zip(iter3.by_ref()) {
 
             let v = *x as DoubleDigit;
-            let s = c + *a as DoubleDigit;
+            let s = *a as DoubleDigit + c;
 
             if v >= s {
                 *x = (v - s) as Digit;
                 c = 0;
-            } else {
+            } else if v + DIGIT_BASE >= s {
                 *x = (v + DIGIT_BASE - s) as Digit;
                 c = 1;
+            } else {
+                *x = (v + DIGIT_BASE*2 - s) as Digit;
+                c = 2;
             }
         }
 
-        *iter3.next().unwrap() -= c as Digit;
+        if c > 0 {
+            for x in iter3 {
+
+                let v = *x as DoubleDigit;
+                let s = c;
+    
+                if v >= s {
+                    *x = (v - s) as Digit;
+                    c = 0;
+                } else if v + DIGIT_BASE >= s {
+                    *x = (v + DIGIT_BASE - s) as Digit;
+                    c = 1;
+                } else {
+                    *x = (v + DIGIT_BASE*2 - s) as Digit;
+                    c = 2;
+                }
+            }
+        }
     }
 
     fn add_assign_slices(s1: &mut [Digit], s2: &[Digit]) {
@@ -117,7 +137,21 @@ impl Mantissa {
             *b = s as Digit;
         }
 
-        *s3iter.next().unwrap() += c as Digit;
+        if c > 0 {
+            for b in s3iter {
+
+                let mut s = c + *b as DoubleDigit;
+    
+                if s >= DIGIT_BASE {
+                    s -= DIGIT_BASE;
+                    c = 1;
+                } else {
+                    c = 0;
+                }
+    
+                *b = s as Digit;
+            }
+        }
     }
 
     pub(super) fn toom2(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
@@ -150,9 +184,9 @@ impl Mantissa {
         Self::add_slices(m11, m12, x1);
         Self::add_slices(m21, m22, x2);
 
-        Self::mul_basic(x1, x2, z2buf);
-        Self::mul_basic(m11, m21, m31);
-        Self::mul_basic(m12, m22, m32);
+        Self::mul_unbalanced(x1, x2, z2buf)?;
+        Self::mul_unbalanced(m11, m21, m31)?;
+        Self::mul_unbalanced(m12, m22, m32)?;
 
         Self::paired_sub(m31, m32, z2buf);
         Self::add_assign_slices(&mut m3[n..], z2buf);
@@ -229,9 +263,13 @@ mod tests {
         assert!(ret_s == ref_s);
 
         // random
-        for _ in 0..10000 {
+        for _ in 0..1000 {
             let s1 = random_slice(80, 300);
             let s2 = random_slice(80, 300);
+
+            //println!("s1 {:?}", s1);
+            //println!("s2 {:?}", s2);
+
             let mut ref_s = Vec::new();
             ref_s.resize(s1.len() + s2.len(), 0);
             mul(&s1, &s2, &mut ref_s);
@@ -240,20 +278,16 @@ mod tests {
             ret_s.resize(s1.len() + s2.len(), 0);
             Mantissa::toom2(&s1, &s2, &mut ret_s).unwrap();
 
-            //println!("s1 {:?}", s1);
-            //println!("s2 {:?}", s2);
-
             assert!(ret_s == ref_s);
         }
     }
-
 
     #[ignore]
     #[test]
     fn toom2_perf() {
 
         for _ in 0..5 {
-            let sz = 32;
+            let sz = 34;
             let f = random_slice(sz, sz);
             let mut n = vec![];
             let mut ret = vec![];
