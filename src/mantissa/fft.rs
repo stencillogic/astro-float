@@ -72,11 +72,12 @@ impl Mantissa {
                 std::mem::swap(&mut v1, &mut v2);
             }
             
-            if v1 < v2 + c2 {
-                *b = (v1 + DIGIT_BASE - v2 - c2) as Digit;
+            let v2c = v2 + c2;
+            if v1 < v2c {
+                *b = (v1 + DIGIT_BASE - v2c) as Digit;
                 c2 = 1;
             } else {
-                *b = (v1 - v2 - c2) as Digit;
+                *b = (v1 - v2c) as Digit;
                 c2 = 0;
             }
         }

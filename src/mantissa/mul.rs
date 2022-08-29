@@ -11,21 +11,25 @@ use crate::mantissa::util::SliceWithSign;
 
 impl Mantissa {
 
-    fn mul_basic(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) {
+    pub(super) fn mul_basic(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) {
         // TODO: consider multiplying by the lowest and the highest word and 
         // assigning result to m3 first to avoid filling with zeroes.
         m3.fill(0);
+        
         for (i, d1mi) in m1.iter().enumerate() {
+
             let d1mi = *d1mi as DoubleDigit;
             if d1mi == 0 {
                 continue;
             }
+
             let mut k = 0;
             for (m2j, m3ij) in m2.iter().zip(m3[i..].iter_mut()) {
                 let m = d1mi * (*m2j as DoubleDigit) + *m3ij as DoubleDigit + k;
                 *m3ij = m as Digit;
                 k = m >> (DIGIT_BIT_SIZE);
             }
+
             m3[i + m2.len()] += k as Digit;
         }
     }
@@ -67,25 +71,45 @@ impl Mantissa {
         if lg.len()/2 >= sm.len() && sm.len() > 70 {
 
             // balancing
-            let mut lb = 0;
+            
             let mut buf = DigitBuf::new(2*sm.len())?;
+            let mut even = true;
+            let mut lb = 0;
+            let mut ub = 0;
 
-            while lb  < lg.len() {
-                
-                let ub = if lb + sm.len() < lg.len() {
-                    lb + sm.len()
-                } else {
-                    lg.len()
-                };
+            for _ in 0..2 {
 
-                Self::mul_slices(&lg[lb..ub], sm, &mut buf)?;
+                while lb < lg.len() {
 
-                let src = SliceWithSign::new(&buf[..sm.len()+ub-lb], 1);
-                let mut dst = SliceWithSign::new_mut(&mut m3[lb..], 1);
+                    ub = if lb + sm.len() <= lg.len() {
+                        lb + sm.len()
+                    } else {
+                        lg.len()
+                    };
 
-                dst.add_assign(&src);
+                    Self::mul_slices(&lg[lb..ub], sm, &mut buf)?;
 
-                lb += sm.len();
+                    let src = SliceWithSign::new(&buf[..ub - lb + sm.len()], 1);
+                    let mut dst = SliceWithSign::new_mut(&mut m3[lb..], 1);
+
+                    if even {
+                        dst.copy_from(&src);
+                    } else {
+                        dst.add_assign(&src);
+                    }
+
+                    lb += sm.len()*2;
+                }
+
+                if even {
+
+                    if ub + sm.len() < m3.len() {
+                        m3[ub + sm.len()..].fill(0);
+                    }
+
+                    even = false;
+                    lb = sm.len();
+                }
             }
 
             Ok(())

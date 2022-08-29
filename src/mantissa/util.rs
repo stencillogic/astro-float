@@ -448,29 +448,42 @@ impl<'a> SliceWithSign<'a> {
             }
             *a = s as Digit;
         }
-        if let Some(v) = iter1.next() {
-            *v += c as Digit;
+        for a in iter1 {
+            let mut s = c + *a as DoubleDigit;
+            if s >= DIGIT_BASE {
+                s -= DIGIT_BASE;
+                c = 1;
+            } else {
+                c = 0;
+            }
+            *a = s as Digit;
         }
     }
 
-    #[inline]
     fn abs_sub_assign(s1: &mut [Digit], s2: &[Digit]) {
         let mut c = 0;
         let mut iter1 = s1.iter_mut();
         let iter2 = s2.iter();
         for (b, a) in izip!(iter2, iter1.by_ref()) {
             let v1 = *a as DoubleDigit;
-            let v2 = *b as DoubleDigit;
-            if v1 < v2 + c {
-                *a = (v1 + DIGIT_BASE - v2 - c) as Digit;
+            let v2 = *b as DoubleDigit + c;
+            if v1 < v2 {
+                *a = (v1 + DIGIT_BASE - v2) as Digit;
                 c = 1;
             } else {
-                *a = (v1 - v2 - c) as Digit;
+                *a = (v1 - v2) as Digit;
                 c = 0;
             }
         }
-        if let Some(v) = iter1.next() {
-            *v -= c as Digit;
+        for a in iter1 {
+            let v1 = *a as DoubleDigit;
+            if v1 < c {
+                *a = (v1 + DIGIT_BASE - c) as Digit;
+                c = 1;
+            } else {
+                *a = (v1 - c) as Digit;
+                c = 0;
+            }
         }
     }
 
@@ -481,12 +494,12 @@ impl<'a> SliceWithSign<'a> {
         let iter2 = s2.iter();
         for (a, b) in izip!(iter2, iter1.by_ref()) {
             let v1 = *a as DoubleDigit;
-            let v2 = *b as DoubleDigit;
-            if v1 < v2 + c {
-                *b = (v1 + DIGIT_BASE - v2 - c) as Digit;
+            let v2 = *b as DoubleDigit + c;
+            if v1 < v2 {
+                *b = (v1 + DIGIT_BASE - v2) as Digit;
                 c = 1;
             } else {
-                *b = (v1 - v2 - c) as Digit;
+                *b = (v1 - v2) as Digit;
                 c = 0;
             }
         }
@@ -502,12 +515,12 @@ impl<'a> SliceWithSign<'a> {
         let mut iter3 = dst.iter_mut();
         for (b, a, d) in izip!(iter2, iter1.by_ref(), iter3.by_ref()) {
             let v1 = *a as DoubleDigit;
-            let v2 = *b as DoubleDigit;
-            if v1 < v2 + c {
-                *d = (v1 + DIGIT_BASE - v2 - c) as Digit;
+            let v2 = *b as DoubleDigit + c;
+            if v1 < v2 {
+                *d = (v1 + DIGIT_BASE - v2) as Digit;
                 c = 1;
             } else {
-                *d = (v1 - v2 - c) as Digit;
+                *d = (v1 - v2) as Digit;
                 c = 0;
             }
         }

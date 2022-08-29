@@ -162,38 +162,6 @@ impl Mantissa {
         }
         Ok(sign)
     }
-
-    // Estimate the cost of multiplication with toom-3. 
-    // Return true if toom-3 is better than plain multiplication.
-    // l1 is supposed to be smaller or equal to l2.
-    pub(super) fn toom3_cost_estimate(l1: usize, l2: usize) -> bool {
-        if l1 < 70 && l2 < 70 {
-            return false;
-        }
-        for (thrsh1, thrsh2) in [
-            (120, 210),
-            (200, 630),
-            (340, 1890),
-            (580, 5670),
-            (900, 17010),
-            (1500, 51030)]
-        {
-            if l2 < thrsh2 {
-                return l1 >= thrsh1;
-            }
-        }
-        let mut thrsh2 = 51030;
-        let mut thrsh1 = 1500;
-        while thrsh2 < usize::MAX / 3 {
-            thrsh2 *= 3;
-            thrsh1 *= 16;
-            thrsh1 /= 10;
-            if l2 < thrsh2 {
-                return l1 >= thrsh1;
-            }
-        }
-        false
-    }
 }
 
 
@@ -347,6 +315,7 @@ mod tests {
     }
 
     fn mul(s1: &[Digit], s2: &[Digit], ret: &mut [Digit]) {
+        ret.fill(0);
         for (i, d1mi) in s1.iter().enumerate() {
             let d1mi = *d1mi as DoubleDigit;
             if d1mi == 0 {
