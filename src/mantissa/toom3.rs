@@ -176,12 +176,12 @@ mod tests {
 
         for _ in 0..5 {
 
-            let sz = 512;
+            let sz = 256;
             let f = random_slice(sz, sz);
             let mut n = vec![];            
             let mut ret = vec![];
             ret.resize(sz + f.len(), 0);
-            let l = 1000;
+            let l = 100000;
 
             for _ in 0..l {
                 let v = random_slice(sz, sz);

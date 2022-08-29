@@ -41,7 +41,7 @@ impl Mantissa {
 
             Self::mul_basic(m1, m2, m3);
 
-        } else if m1.len() <= 512 || m2.len() <= 512 {
+        } else if m1.len() <= 256 || m2.len() <= 256 {
 
             Self::toom2(m1, m2, m3)?;
 
