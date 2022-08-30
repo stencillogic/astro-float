@@ -5,6 +5,7 @@ use crate::defs::Digit;
 use crate::mantissa::Mantissa;
 use crate::mantissa::buf::DigitBuf;
 use crate::mantissa::util::SliceWithSign;
+use crate::mantissa::util::shift_slice_left_copy;
 
 
 impl Mantissa {
@@ -23,11 +24,12 @@ impl Mantissa {
     }
 
     fn toom3_factors<'a, 'b>(params: (SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>), 
-                    x1: &mut SliceWithSign<'b>, x2: &mut SliceWithSign<'b>,
+                    x1: &mut SliceWithSign<'b>,
                     buf1: &'a mut [Digit], buf2: &'a mut [Digit], buf3: &'a mut [Digit]) 
                     -> (SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>) {
 
         let (m0, m1, m2) = params;
+
         let mut p1 = SliceWithSign::new_mut(buf1, 1);
         let mut p2 = SliceWithSign::new_mut(buf2, 1);
         let mut p3 = SliceWithSign::new_mut(buf3, 1);
@@ -36,9 +38,9 @@ impl Mantissa {
         x1.add(&m1, &mut p1);
         x1.sub(&m1, &mut p2);
 
-        p2.add(&m2, x2);
-        x2.shift_left(1);
-        x2.sub(&m0, &mut p3);
+        p2.add(&m2, &mut p3);
+        p3.shift_left(1);
+        p3.sub_assign(&m0);
 
         (m0, p1, p2, p3, m2)
     }
@@ -50,10 +52,9 @@ impl Mantissa {
 
         let l = (d1.len().max(d2.len()) + 2) / 3;
 
-        let mut buf = DigitBuf::new(26*(l+1))?;
+        let mut buf = DigitBuf::new(25*(l+1))?;
 
         let (x1buf, rest) = buf.split_at_mut(l+1);
-        let (x2buf, rest) = rest.split_at_mut(l+1);
         let (x3buf, rest) = rest.split_at_mut(2*(l+1));
 
         let (p1buf, rest) = rest.split_at_mut(l+1);
@@ -75,39 +76,28 @@ impl Mantissa {
         let s4buf = rest; // (l+1)*2
 
         let mut x1 = SliceWithSign::new_mut(x1buf, 1);
-        let mut x2 = SliceWithSign::new_mut(x2buf, 1);
         let mut x3 = SliceWithSign::new_mut(x3buf, 1);
 
         let mut w1 = SliceWithSign::new_mut(w1buf, 1);
         let mut w2 = SliceWithSign::new_mut(w2buf, 1);
         let mut w3 = SliceWithSign::new_mut(w3buf, 1);
 
-        let mut s0 = SliceWithSign::new_mut(s0buf, 1);
-        let mut s1 = SliceWithSign::new_mut(s1buf, 1);
-        let mut s2 = SliceWithSign::new_mut(s2buf, 1);
-        let mut s3 = SliceWithSign::new_mut(s3buf, 1);
-        let mut s4 = SliceWithSign::new_mut(s4buf, 1);
-
         let params0 = Self::toom3_get_splits(d1, l);
         let params1 = Self::toom3_get_splits(d2, l);
 
-        let (p0, p1, p2, p3, p4) = Self::toom3_factors(params0, &mut x1, &mut x2, p1buf, p2buf, p3buf);
+        let mut s0 = SliceWithSign::new_mut(&mut s0buf[..params0.0.len()+params1.0.len()], 1);
+        let mut s1 = SliceWithSign::new_mut(s1buf, 1);
+        let mut s2 = SliceWithSign::new_mut(s2buf, 1);
+        let mut s3 = SliceWithSign::new_mut(s3buf, 1);
+        let mut s4 = SliceWithSign::new_mut(&mut s4buf[..params0.2.len()+params1.2.len()], 1);
 
-        let (q0, q1, q2, q3, q4) = Self::toom3_factors(params1, &mut x1, &mut x2, q1buf, q2buf, q3buf);
+        let (p0, p1, p2, p3, p4) = Self::toom3_factors(params0, &mut x1, p1buf, p2buf, p3buf);
+
+        let (q0, q1, q2, q3, q4) = Self::toom3_factors(params1, &mut x1, q1buf, q2buf, q3buf);
 
         debug_assert!(p1.len() + q1.len() == s1.len());
         debug_assert!(p2.len() + q2.len() == s2.len());
         debug_assert!(p3.len() + q3.len() == s3.len());
-
-        let t = p0.len() + q0.len();
-        if t < s0.len() {
-            s0[t..].fill(0);
-        }
-
-        let t = p4.len() + q4.len();
-        if t < s4.len() {
-            s4[t..].fill(0);
-        }
 
         Self::mul_unbalanced(&p0, &q0, &mut s0)?;
         Self::mul_unbalanced(&p1, &q1, &mut s1)?;
@@ -115,11 +105,9 @@ impl Mantissa {
         Self::mul_unbalanced(&p3, &q3, &mut s3)?;
         Self::mul_unbalanced(&p4, &q4, &mut s4)?;
 
-        s0.set_sign(p0.sign() * q0.sign());
         s1.set_sign(p1.sign() * q1.sign());
         s2.set_sign(p2.sign() * q2.sign());
         s3.set_sign(p3.sign() * q3.sign());
-        s4.set_sign(p4.sign() * q4.sign());
 
         s3.sub(&s1, &mut w3);
         w3.div_by_digit(3);
@@ -128,31 +116,45 @@ impl Mantissa {
         s2.sub(&s0, &mut w2);
         w3.sub_assign(&w2);
         w3.set_sign(-w3.sign());
-        x3.copy_from(&s4);
-        x3.shift_left(2);
+        shift_slice_left_copy(&s4, &mut x3, 2);
         w3.add_assign(&x3);
         w3.shift_right(1);
         w2.add_assign(&w1);
         w2.sub_assign(&s4);
         w1.sub_assign(&w3);
 
+        let l4 = 4*l;
+
+        d3[..s0.len()].copy_from_slice(&s0);
+        if l4 < d3.len() {
+            d3[s0.len()..l4].fill(0);
+
+            if d3.len() < l4 + s4.len() {
+                let ll = d3.len();
+                d3[l4..].copy_from_slice(&s4[..ll-l4]);
+            } else {
+                d3[l4..l4 + s4.len()].copy_from_slice(&s4);
+                d3[l4 + s4.len()..].fill(0);
+            }
+        } else {
+            d3[s0.len()..].fill(0);
+        }
+
         let w1s = w1.sign();
         let w2s = w1.sign();
 
-        let mut parts = [(4, s4), (0, s0), (1, w1), (2, w2), (3, w3)];
+        let mut parts = [(l, w1), (l*2, w2), (l*3, w3)];
 
         if w1s < 0 {
-            parts.swap(2, 4);
+            parts.swap(0, 2);
         }
         if w2s < 0 {
-            parts.swap(3, 4);
+            parts.swap(1, 2);
         }
 
-        d3.fill(0);
-        for (i, w) in &parts {
-            let start = i*l;
-            if start < d3.len() {
-                let mut a = SliceWithSign::new_mut(&mut d3[start..], 1);
+        for (start, w) in &parts {
+            if *start < d3.len() {
+                let mut a = SliceWithSign::new_mut(&mut d3[*start..], 1);
                 a.add_assign(w);
             }
         }
@@ -176,12 +178,12 @@ mod tests {
 
         for _ in 0..5 {
 
-            let sz = 256;
+            let sz = 220;
             let f = random_slice(sz, sz);
-            let mut n = vec![];            
+            let mut n = vec![];
             let mut ret = vec![];
             ret.resize(sz + f.len(), 0);
-            let l = 100000;
+            let l = 10000;
 
             for _ in 0..l {
                 let v = random_slice(sz, sz);

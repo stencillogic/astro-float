@@ -6,6 +6,7 @@ use crate::defs::DoubleDigit;
 use crate::defs::DIGIT_BASE;
 use crate::mantissa::Mantissa;
 use crate::mantissa::buf::DigitBuf;
+use crate::mantissa::util::add_carry;
 use itertools::izip;
 
 
@@ -23,31 +24,11 @@ impl Mantissa {
         let mut iter3 = s3.iter_mut();
 
         for (a, b, x) in izip!(iter2.by_ref(), iter1.by_ref(), iter3.by_ref()) {
-
-            let mut s = c + *a as DoubleDigit + *b as DoubleDigit;
-
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c = 1;
-            } else {
-                c = 0;
-            }
-
-            *x = s as Digit;
+            c = add_carry(*a, *b, c, x);
         }
 
         for (a, x) in iter1.zip(iter3.by_ref()) {
-    
-            let mut s = c + *a as DoubleDigit;
-
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c = 1;
-            } else {
-                c = 0;
-            }
-
-            *x = s as Digit;
+            c = add_carry(*a, 0, c, x);
         }
 
         *iter3.next().unwrap() = c as Digit;
@@ -124,32 +105,12 @@ impl Mantissa {
 
         let mut s3iter = s1.iter_mut();
         for (a, b) in s2.iter().zip(s3iter.by_ref()) {
-
-            let mut s = c + *a as DoubleDigit + *b as DoubleDigit;
-
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c = 1;
-            } else {
-                c = 0;
-            }
-
-            *b = s as Digit;
+            c = add_carry(*a, *b, c, b);
         }
 
         if c > 0 {
             for b in s3iter {
-
-                let mut s = c + *b as DoubleDigit;
-    
-                if s >= DIGIT_BASE {
-                    s -= DIGIT_BASE;
-                    c = 1;
-                } else {
-                    c = 0;
-                }
-    
-                *b = s as Digit;
+                c = add_carry(0, *b, c, b);
             }
         }
     }

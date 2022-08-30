@@ -15,6 +15,8 @@ use crate::mantissa::util::RightShiftedSlice;
 use crate::mantissa::util::shift_slice_left;
 use crate::mantissa::util::shift_slice_right;
 use crate::mantissa::buf::DigitBuf;
+use crate::mantissa::util::sub_borrow;
+use crate::mantissa::util::add_carry;
 use core::mem::size_of;
 use itertools::izip;
 
@@ -199,28 +201,27 @@ impl Mantissa {
     /// Subtracts m2 from self. m2 is supposed to be shifted right by m2_shift bits.
     pub fn abs_sub(&self, m2: &Self, m2_shift: usize, rm: RoundingMode, is_positive: bool) -> Result<(usize, Self), Error> {
         // Input is expected to be normalized.
-        let mut c: DoubleDigit = 0;
+
+        let mut c = 0;
+
         let mut l = self.len().max(m2.len());
         if m2_shift > 0 {
             l += 1; // guard
         }
+
         let mut m3 = Mantissa::new(l*DIGIT_BIT_SIZE)?;
+
         let m1iter = ExtendedSlice::new(self.m.iter(), l - self.len(), &0);
         let m2iter = RightShiftedSlice::new(&m2.m, m2_shift, 0, l - m2.len());
         let m3iter = m3.m.iter_mut();
-        for (a, b, d) in izip!(m1iter, m2iter, m3iter) {
-            let v1 = *a as DoubleDigit;
-            let v2 = b as DoubleDigit;
-            if v1 < v2 + c {
-                *d = (v1 + DIGIT_BASE - v2 - c) as Digit;
-                c = 1;
-            } else {
-                *d = (v1 - v2 - c) as Digit;
-                c = 0;
-            }
+
+        for (d, a, b) in izip!(m3iter, m1iter, m2iter) {
+            c = sub_borrow(*a, b, c, d);
         }
         debug_assert!(c == 0);
+
         let mut shift = Self::maximize(&mut m3.m);
+
         if m2_shift > 0 {
             // remove guard
             if m3.round_mantissa(DIGIT_BIT_SIZE, rm, is_positive) {
@@ -228,30 +229,31 @@ impl Mantissa {
             }
             m3.m.trunc_to((l-1)*DIGIT_BIT_SIZE);
         }
+
         m3.n = m3.max_bit_len();
+
         Ok((shift, m3))
     }
 
     /// Returns carry flag, and self + m2.
     pub fn abs_add(&self, m2: &Self, m2_shift: usize, rm: RoundingMode, is_positive: bool) -> Result<(bool, Self), Error> {
+
         let mut c = 0;
+
         let mut l = self.len().max(m2.len());
         if m2_shift > 0 {
             l += 1;
         }
+
         let mut m3 = Mantissa::new(l*DIGIT_BIT_SIZE)?;
         let m1iter = ExtendedSlice::new(self.m.iter(), l - self.len(), &0);
         let m2iter = RightShiftedSlice::new(&m2.m, m2_shift, 0, l - m2.len());
-        for (a, b, d) in izip!(m1iter, m2iter, m3.m.iter_mut()) {
-            let mut s = c + *a as DoubleDigit + b as DoubleDigit;
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c = 1;
-            } else {
-                c = 0;
-            }
-            *d = s as Digit;
+        let m3iter = m3.m.iter_mut();
+
+        for (d, a, b) in izip!(m3iter, m1iter, m2iter) {
+            c = add_carry(*a, b, c, d);
         }
+
         if c > 0 {
             debug_assert!(!m3.round_mantissa(1, rm, is_positive));  // it is not possible that rounding overflows, and c > 0 at the same time.
             m3.shift_right(1);
@@ -260,10 +262,13 @@ impl Mantissa {
         } else if m3.round_mantissa(DIGIT_BIT_SIZE, rm, is_positive) {
             c = 1;
         }
+
         if m2_shift > 0 {
             m3.m.trunc_to((l-1)*DIGIT_BIT_SIZE);
         }
+
         m3.n = m3.max_bit_len();
+
         Ok((c > 0, m3))
     }
 
@@ -407,15 +412,7 @@ impl Mantissa {
                     qh -= 1;
                     c = 0;
                     for (a, b) in buf2[..n+2].iter().zip(buf1[n1j..n1j+n+2].iter_mut()) {
-                        let mut val = *b as DoubleDigit;
-                        val += *a as DoubleDigit + c;
-                        if val >= DIGIT_BASE {
-                            val -= DIGIT_BASE;
-                            c = 1;
-                        } else {
-                            c = 0;
-                        }
-                        *b = val as Digit;
+                        c = add_carry(*a, *b, c as Digit, b) as DoubleDigit;
                     }
                     debug_assert!(c > 0);
                 }
@@ -444,9 +441,12 @@ impl Mantissa {
         if m3.round_mantissa(extra_p*DIGIT_BIT_SIZE, rm, is_positive) {
             e_shift -= 1;
         }
+
         m3.m.trunc_to((l1-extra_p)*DIGIT_BIT_SIZE);
         m3.n = m3.max_bit_len();
+
         debug_assert!(e_shift >= -1 && e_shift <= 1);
+
         Ok((e_shift, m3))
     }
 

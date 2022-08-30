@@ -645,7 +645,7 @@ impl BigFloatNumber {
     }
 
     /// Compute reciprocal of a number.
-    /// This funtion can be more efficient than direct division for numbers with large mantissa (> 20000 binary digits).
+    /// This funtion can be more efficient than direct division for numbers with large mantissa.
     pub fn reciprocal(&self, rm: RoundingMode) -> Result<Self, Error> {
         let mut p = self.get_mantissa_max_bit_len();
         let mut err = 1;
@@ -1001,8 +1001,10 @@ mod tests {
         }
 
         for _ in 0..5 {
+
             let start_time = std::time::Instant::now();
             let mut f = n[0].clone().unwrap();
+
             for (i, ni) in n.iter().enumerate().skip(1) {
                 if i & 1 == 0 {
                     f = f.add(ni, RoundingMode::ToEven).unwrap();
@@ -1019,53 +1021,60 @@ mod tests {
 
     #[ignore]
     #[test]
-    fn mul_div_perf() {
-        let mut n = vec![];
-        for _ in 0..1000 {
-            n.push(BigFloatNumber::random_normal(32*600, -20, 20).unwrap());
-        }
+    fn recip_perf() {
 
-        for _ in 0..5 {
-            let f1 = n[0].clone().unwrap();
-            let one = BigFloatNumber::from_digit(1, 1).unwrap();
-            let mut f = f1.clone().unwrap();
+        let one = BigFloatNumber::from_digit(1, 1).unwrap();
+
+        for _ in 0..5 {    
+
+            let mut n = vec![];
+            for _ in 0..1000 {
+                n.push(BigFloatNumber::random_normal(32*450, -20, 20).unwrap());
+            }
+
             let start_time = std::time::Instant::now();
-            for (i, ni) in n.iter().enumerate().skip(1) {
-                f = ni.reciprocal(RoundingMode::ToEven).unwrap();
-                //f = one.div(ni, RoundingMode::ToEven).unwrap();
+            for ni in n.iter() {
+                let _f = one.div(ni, RoundingMode::ToEven).unwrap();
             }
             let time = start_time.elapsed();
-            println!("{}", time.as_millis());
+            println!("div {}", time.as_millis());
+
+            let start_time = std::time::Instant::now();
+            for ni in n.iter() {
+                let _f = ni.reciprocal(RoundingMode::ToEven).unwrap();
+            }
+            let time = start_time.elapsed();
+            println!("recip {}", time.as_millis());
         }
     }
 
     #[ignore]
     #[test]
-    fn recip_perf() {
-        let mut n = vec![];
-        for _ in 0..100 {
-            n.push(BigFloatNumber::random_normal(20000, -20, 20).unwrap());
-        }
-        let one = BigFloatNumber::from_digit(1, 1).unwrap();
+    fn recip_mul_perf() {
 
         for _ in 0..5 {
+
+            let mut n = vec![];
+            for _ in 0..1000 {
+                n.push(BigFloatNumber::random_normal(1000*32, -20, 20).unwrap());
+            }
+
             let f1 = n[0].clone().unwrap();
+
             let start_time = std::time::Instant::now();
-            for ni in n.iter() {
+            for ni in n.iter().skip(1) {
                 let f = f1.reciprocal(RoundingMode::None).unwrap();
+                let _f = f.mul(ni, RoundingMode::None).unwrap();
             }
             let time = start_time.elapsed();
-            println!("{}", time.as_millis());
-        }
+            println!("recip {}", time.as_millis());
 
-        for _ in 0..5 {
-            let f1 = n[0].clone().unwrap();
             let start_time = std::time::Instant::now();
-            for (i, ni) in n.iter().enumerate().skip(1) {
-                let f = one.div(&f1, RoundingMode::ToEven).unwrap();
+            for ni in n.iter().skip(1) {
+                let _f = ni.div(&f1, RoundingMode::ToEven).unwrap();
             }
             let time = start_time.elapsed();
-            println!("{}", time.as_millis());
+            println!("div {}", time.as_millis());
         }
     }
 }

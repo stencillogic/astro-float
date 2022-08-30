@@ -9,6 +9,7 @@ use crate::defs::DoubleDigit;
 use crate::mantissa::Mantissa;
 use crate::mantissa::buf::DigitBuf;
 use crate::mantissa::util::SliceWithSign;
+use crate::mantissa::util::add_carry;
 
 
 impl Mantissa {
@@ -125,15 +126,7 @@ impl Mantissa {
                     qh -= 1;
                     c = 0;
                     for (a, b) in buf2[..n+2].iter().zip(buf1[j..j+n+2].iter_mut()) {
-                        let mut val = *b as DoubleDigit;
-                        val += *a as DoubleDigit + c;
-                        if val >= DIGIT_BASE {
-                            val -= DIGIT_BASE;
-                            c = 1;
-                        } else {
-                            c = 0;
-                        }
-                        *b = val as Digit;
+                        c = add_carry(*a, *b, c as Digit, b) as DoubleDigit;
                     }
                     debug_assert!(c > 0);
                 }
@@ -300,18 +293,26 @@ impl Mantissa {
     // division for the case m > n
     #[allow(dead_code)] // TODO: can it be faster than reciprocal?
     pub(super) fn div_unbalanced(m1: &[Digit], m2: &[Digit]) -> Result<(DigitBuf, DigitBuf), Error> {
+
         let mut m = m1.len() - m2.len();
         let n = m2.len();
+
         if m <= n {
+
             Self::div_recursive(m1, m2)
+
         } else if n < 2 {
+
             Self::div_basic(m1, m2)
+
         } else {
+
             let mut buf1 = DigitBuf::new(m + 1)?;
             buf1.fill(0);
+
             let mut tmp_buf = DigitBuf::new(m1.len()*2+1)?;
-            let (buf3, rest) = tmp_buf.split_at_mut(m1.len());
-            let buf4 = rest;
+            let (buf3, buf4) = tmp_buf.split_at_mut(m1.len());
+
             buf3.copy_from_slice(m1);
             let mut a = SliceWithSign::new_mut(buf3, 1);
             let mut nn = 0;
@@ -474,11 +475,11 @@ mod tests {
     fn test_div_perf() {
 
         for _ in 0..5 {
-            let sz1 = 20000;
-            let sz2 = 10000;
+            let sz1 = 600;
+            let sz2 = 300;
             let f = random_normalized_slice(sz1, sz1);
             let mut n = vec![];
-            let l = 1;
+            let l = 10000;
             for _ in 0..l {
                 let v = random_normalized_slice(sz2, sz2);
                 n.push(v);

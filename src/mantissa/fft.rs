@@ -2,16 +2,16 @@
 
 use crate::common::util::log2_ceil;
 use crate::common::util::sqrt_int;
-use crate::defs::DIGIT_BASE;
 use crate::defs::DIGIT_BIT_SIZE;
 use crate::defs::DIGIT_MAX;
-use crate::defs::DoubleDigit;
 use crate::defs::Error;
 use crate::defs::Digit;
 use crate::mantissa::Mantissa;
 use crate::mantissa::buf::DigitBuf;
 use crate::mantissa::util::SliceWithSign;
+use crate::mantissa::util::add_carry;
 use crate::mantissa::util::shift_slice_left_copy;
+use crate::mantissa::util::sub_borrow;
 use itertools::izip;
 use smallvec::SmallVec;
 
@@ -54,32 +54,16 @@ impl Mantissa {
         let iter2 = b.iter_mut();
         for (a, b) in iter1.zip(iter2) {
 
-            let mut v1 = *a as DoubleDigit;
-            let mut v2 = *b as DoubleDigit;
+            let mut v1 = *a;
+            let mut v2 = *b;
 
-            // +
-            let mut s = c1 + v1 + v2;
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c1 = 1;
-            } else {
-                c1 = 0;
-            }
-            *a = s as Digit;
+            c1 = add_carry(v1, v2, c1, a);
 
-            // -
             if b_gt_a {
                 std::mem::swap(&mut v1, &mut v2);
             }
             
-            let v2c = v2 + c2;
-            if v1 < v2c {
-                *b = (v1 + DIGIT_BASE - v2c) as Digit;
-                c2 = 1;
-            } else {
-                *b = (v1 - v2c) as Digit;
-                c2 = 0;
-            }
+            c2 = sub_borrow(v1, v2, c2, b);
         }
         debug_assert!(c1 == 0 && c2 == 0);
 

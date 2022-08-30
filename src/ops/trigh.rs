@@ -163,7 +163,7 @@ mod tests {
     fn trigh_perf() {
         let mut n = vec![];
         for _ in 0..100 {
-            n.push(BigFloatNumber::random_normal(3200, -0, -0).unwrap());
+            n.push(BigFloatNumber::random_normal(32000, -0, -0).unwrap());
         }
 
         for _ in 0..5 {

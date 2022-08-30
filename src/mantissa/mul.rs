@@ -41,7 +41,7 @@ impl Mantissa {
 
             Self::mul_basic(m1, m2, m3);
 
-        } else if m1.len() <= 256 || m2.len() <= 256 {
+        } else if m1.len() <= 220 || m2.len() <= 220 {
 
             Self::toom2(m1, m2, m3)?;
 
@@ -119,7 +119,7 @@ impl Mantissa {
     }
 
     // short multiplication
-    #[allow(dead_code)] // TODO: can it be faster than just mul_unbalanced ? 
+    #[allow(dead_code)] // TODO: can it be faster than mul_unbalanced by more than 90% ?
     pub(super) fn mul_short(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
         debug_assert!(m1.len() == m2.len());    // TODO: consider relaxing this
         let n = m1.len();
@@ -129,12 +129,15 @@ impl Mantissa {
     
     // short multiplication
     fn mul_short_step(m1: &[Digit], m2: &[Digit], m3: &mut [Digit], n: usize) -> Result<(), Error> {
-        if n <= 1000 {
+        if n <= 10 {
+
             Self::mul_unbalanced(m1, m2, m3)?;
+
             let mut c1 = SliceWithSign::new_mut(m3, 1);
             c1.shift_right(n*DIGIT_BIT_SIZE);
+
         } else {
-            let k = n*775/1000;
+            let k = n * 775 / 1000;
             let l = n - k;
 
             let a1 = SliceWithSign::new(&m1[l..], 1);  // m1 div 2^l
@@ -146,6 +149,7 @@ impl Mantissa {
             let b3 = SliceWithSign::new(&m2[k..], 1);  // m2 div 2^k
 
             Self::mul_unbalanced(&a1, &b1, m3)?;
+
             let mut c1 = SliceWithSign::new_mut(m3, 1);
             c1.shift_right((k-l)*DIGIT_BIT_SIZE);
 
@@ -161,6 +165,7 @@ impl Mantissa {
             c1.add_assign(&c2);
             c1.add_assign(&c3);
         }
+
         Ok(())
     }
 }
@@ -219,12 +224,12 @@ mod tests {
     fn test_mul_short_perf() {
 
         for _ in 0..5 {
-            let sz1 = 10000;
-            let sz2 = 10000;
+            let sz1 = 1000;
+            let sz2 = 1000;
             let f = random_slice(sz1, sz1);
             let mut ret = DigitBuf::new(sz1 + sz2).unwrap();
             let mut n = vec![];
-            let l = 10;
+            let l = 1000;
             for _ in 0..l {
                 let v = random_slice(sz2, sz2);
                 n.push(v);

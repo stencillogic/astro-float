@@ -413,31 +413,11 @@ impl<'a> SliceWithSign<'a> {
         let mut iter3 = dst.iter_mut();
 
         for (a, b, x) in izip!(iter1, iter2.by_ref(), iter3.by_ref()) {
-
-            let mut s = c + *a as DoubleDigit + *b as DoubleDigit;
-
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c = 1;
-            } else {
-                c = 0;
-            }
-
-            *x = s as Digit;
+            c = add_carry(*a, *b, c, x);
         }
 
         for (b, x) in iter2.zip(iter3.by_ref()) {
-
-            let mut s = c + *b as DoubleDigit;
-
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c = 1;
-            } else {
-                c = 0;
-            }
-
-            *x = s as Digit;
+            c = add_carry(0, *b, c, x);
         }
 
         if c > 0 {
@@ -456,31 +436,11 @@ impl<'a> SliceWithSign<'a> {
         let iter2 = s2.iter();
 
         for (b, a) in izip!(iter2, iter1.by_ref()) {
-
-            let mut s = c + *a as DoubleDigit + *b as DoubleDigit;
-
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c = 1;
-            } else {
-                c = 0;
-            }
-
-            *a = s as Digit;
+            c = add_carry(*a, *b, c, a);
         }
 
         for a in iter1 {
-
-            let mut s = c + *a as DoubleDigit;
-
-            if s >= DIGIT_BASE {
-                s -= DIGIT_BASE;
-                c = 1;
-            } else {
-                c = 0;
-            }
-
-            *a = s as Digit;
+            c = add_carry(*a, 0, c, a);
         }
     }
 
@@ -492,30 +452,11 @@ impl<'a> SliceWithSign<'a> {
         let iter2 = s2.iter();
 
         for (b, a) in izip!(iter2, iter1.by_ref()) {
-
-            let v1 = *a as DoubleDigit;
-            let v2 = *b as DoubleDigit + c;
-
-            if v1 < v2 {
-                *a = (v1 + DIGIT_BASE - v2) as Digit;
-                c = 1;
-            } else {
-                *a = (v1 - v2) as Digit;
-                c = 0;
-            }
+            c = sub_borrow(*a, *b, c, a);
         }
 
         for a in iter1 {
-
-            let v1 = *a as DoubleDigit;
-
-            if v1 < c {
-                *a = (v1 + DIGIT_BASE - c) as Digit;
-                c = 1;
-            } else {
-                *a = (v1 - c) as Digit;
-                c = 0;
-            }
+            c = sub_borrow(*a, 0, c, a);
         }
 
         debug_assert!(c == 0);
@@ -527,17 +468,7 @@ impl<'a> SliceWithSign<'a> {
         let mut c = 0;
 
         for (a, b) in s2.iter().zip(s1.iter_mut()) {
-
-            let v1 = *a as DoubleDigit;
-            let v2 = *b as DoubleDigit + c;
-
-            if v1 < v2 {
-                *b = (v1 + DIGIT_BASE - v2) as Digit;
-                c = 1;
-            } else {
-                *b = (v1 - v2) as Digit;
-                c = 0;
-            }
+            c = sub_borrow(*a, *b, c, b);
         }
 
         debug_assert!(c == 0);
@@ -552,31 +483,12 @@ impl<'a> SliceWithSign<'a> {
         let mut iter3 = dst.iter_mut();
 
         for (b, a, d) in izip!(iter2, iter1.by_ref(), iter3.by_ref()) {
-
-            let v1 = *a as DoubleDigit;
-            let v2 = *b as DoubleDigit + c;
-
-            if v1 < v2 {
-                *d = (v1 + DIGIT_BASE - v2) as Digit;
-                c = 1;
-            } else {
-                *d = (v1 - v2) as Digit;
-                c = 0;
-            }
+            c = sub_borrow(*a, *b, c, d);
         }
 
         if c > 0 {
             for (a, d) in iter1.zip(iter3.by_ref()) {
-            
-                let v1 = *a as DoubleDigit;
-    
-                if v1 < c {
-                    *d = (v1 + DIGIT_BASE - c) as Digit;
-                    c = 1;
-                } else {
-                    *d = (v1 - c) as Digit;
-                    c = 0;
-                }
+                c = sub_borrow(*a, 0, c, d);
             }
         } else {
             for (a, d) in iter1.zip(iter3.by_ref()) {
@@ -667,6 +579,61 @@ impl<'a> DerefMut for SliceWithSign<'a> {
         match &mut self.m {
             SliceWithSignType::Mut(m) => m,
             _ => panic!(),
+        }
+    }
+}
+
+#[inline(always)]
+pub fn add_carry(a: Digit, b: Digit, c: Digit, r: &mut Digit) -> Digit {
+
+    #[cfg(target_arch = "x86_64")] 
+    {
+        unsafe { core::arch::x86_64::_addcarry_u32(c as u8, a, b, r) as Digit } 
+    }
+    
+    #[cfg(target_arch = "x86")] 
+    {
+        unsafe { core::arch::x86::_addcarry_u32(c as u8, a, b, r) as Digit } 
+    }
+    
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+    {
+        let mut s = c as DoubleDigit + a as DoubleDigit + b as DoubleDigit;
+        if s >= DIGIT_BASE {
+            s -= DIGIT_BASE;
+            *r = s as Digit;
+            1
+        } else {
+            *r = s as Digit;
+            0
+        }
+    }
+}
+
+#[inline(always)]
+pub fn sub_borrow(a: Digit, b: Digit, c: Digit, r: &mut Digit) -> Digit {
+
+    #[cfg(target_arch = "x86_64")] 
+    {
+        unsafe { core::arch::x86_64::_subborrow_u32(c as u8, a, b, r) as Digit }
+    }
+
+    #[cfg(target_arch = "x86")] 
+    {
+        unsafe { core::arch::x86::_subborrow_u32(c as u8, a, b, r) as Digit }
+    }
+    
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+    {
+        let v1 = a as DoubleDigit;
+        let v2 = b as DoubleDigit + c as DoubleDigit;
+    
+        if v1 < v2 {
+            *r = (v1 + DIGIT_BASE - v2) as Digit;
+            1
+        } else {
+            *r = (v1 - v2) as Digit;
+            0
         }
     }
 }
