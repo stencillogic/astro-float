@@ -1,20 +1,20 @@
 //! Mantissa of a number.
 
 
-use crate::defs::Digit;
+use crate::defs::Word;
 use crate::defs::Error;
-use crate::defs::DoubleDigit;
-use crate::defs::DigitSigned;
-use crate::defs::DIGIT_MAX;
-use crate::defs::DIGIT_BASE;
-use crate::defs::DIGIT_BIT_SIZE;
-use crate::defs::DIGIT_SIGNIFICANT_BIT;
+use crate::defs::DoubleWord;
+use crate::defs::SignedWord;
+use crate::defs::WORD_MAX;
+use crate::defs::WORD_BASE;
+use crate::defs::WORD_BIT_SIZE;
+use crate::defs::WORD_SIGNIFICANT_BIT;
 use crate::defs::RoundingMode;
 use crate::mantissa::util::ExtendedSlice;
 use crate::mantissa::util::RightShiftedSlice;
 use crate::mantissa::util::shift_slice_left;
 use crate::mantissa::util::shift_slice_right;
-use crate::mantissa::buf::DigitBuf;
+use crate::mantissa::buf::WordBuf;
 use crate::mantissa::util::sub_borrow;
 use crate::mantissa::util::add_carry;
 use core::mem::size_of;
@@ -25,26 +25,26 @@ use itertools::izip;
 /// Mantissa representation.
 #[derive(Debug)]
 pub struct Mantissa {
-    pub(super) m: DigitBuf,
+    pub(super) m: WordBuf,
     pub(super) n: usize,   // number of bits, 0 is for number 0
 }
 
 impl Mantissa {
 
-    // bit lenth to length in "digits".
+    // bit lenth to length in words.
     #[inline]
-    fn bit_len_to_digit_len(p: usize) -> usize {
-        (p + DIGIT_BIT_SIZE - 1) / size_of::<Digit>() / 8
+    fn bit_len_to_word_len(p: usize) -> usize {
+        (p + WORD_BIT_SIZE - 1) / size_of::<Word>() / 8
     }
 
     // reserve a buffer for mantissa.
-    fn reserve_new(sz: usize) -> Result<DigitBuf, Error> {
-        DigitBuf::new(sz)
+    fn reserve_new(sz: usize) -> Result<WordBuf, Error> {
+        WordBuf::new(sz)
     }
 
     /// New mantissa with length of at least `p` bits filled with zeroes.
     pub fn new(p: usize) -> Result<Self, Error> {
-        let mut m = Self::reserve_new(Self::bit_len_to_digit_len(p))?;
+        let mut m = Self::reserve_new(Self::bit_len_to_word_len(p))?;
         m.fill(0);
         Ok(Mantissa {
             m,
@@ -54,9 +54,9 @@ impl Mantissa {
 
     /// New mantissa with length of at least `p` bits filled with 1.
     pub fn oned_mantissa(p: usize) -> Result<Self, Error> {
-        let mut m = Self::reserve_new(Self::bit_len_to_digit_len(p))?;
-        let n = DIGIT_BIT_SIZE*m.len();
-        m.fill(DIGIT_MAX);
+        let mut m = Self::reserve_new(Self::bit_len_to_word_len(p))?;
+        let n = WORD_BIT_SIZE*m.len();
+        m.fill(WORD_MAX);
         Ok(Mantissa {
             m,
             n,
@@ -65,7 +65,7 @@ impl Mantissa {
 
     /// New mantissa with length of at least `p` bits for the value of minimum positive value.
     pub fn min(p: usize) -> Result<Self, Error> {
-        let mut m = Self::reserve_new(Self::bit_len_to_digit_len(p))?;
+        let mut m = Self::reserve_new(Self::bit_len_to_word_len(p))?;
         m.fill(0);
         m[0] = 1;
         Ok(Mantissa {
@@ -75,17 +75,17 @@ impl Mantissa {
     }
 
     /// New mantissa with length of at least `p` bits for the value of 1.
-    pub fn from_digit(p: usize, mut d: Digit) -> Result<Self, Error> {
-        let mut m = Self::reserve_new(Self::bit_len_to_digit_len(p))?;
+    pub fn from_word(p: usize, mut d: Word) -> Result<Self, Error> {
+        let mut m = Self::reserve_new(Self::bit_len_to_word_len(p))?;
         m.fill(0);
         let l = m.len();
         if d > 0 {
-            while d & DIGIT_SIGNIFICANT_BIT == 0 {
+            while d & WORD_SIGNIFICANT_BIT == 0 {
                 d <<= 1;
             }
         }
         m[l - 1] = d;
-        let n = DIGIT_BIT_SIZE*m.len();
+        let n = WORD_BIT_SIZE*m.len();
         Ok(Mantissa {
             m,
             n,
@@ -110,7 +110,7 @@ impl Mantissa {
     }
 
     /// Shift to the left, returns exponent shift as positive value.
-    fn maximize(m: &mut [Digit]) -> usize {
+    fn maximize(m: &mut [Word]) -> usize {
         let mut shift = 0;
         let mut d = 0;
         for v in m.iter().rev() {
@@ -118,10 +118,10 @@ impl Mantissa {
             if d != 0 {
                 break;
             }
-            shift += DIGIT_BIT_SIZE;
+            shift += WORD_BIT_SIZE;
         }
         if d != 0 {
-            while DIGIT_SIGNIFICANT_BIT & d == 0 {
+            while WORD_SIGNIFICANT_BIT & d == 0 {
                 d <<= 1;
                 shift += 1;
             }
@@ -135,22 +135,22 @@ impl Mantissa {
     /// Find the position of the first occurence of "1" starting from start_pos.
     pub fn find_one_from(&self, start_pos: usize) -> Option<usize> {
         let mut d;
-        let start_idx = start_pos / DIGIT_BIT_SIZE;
+        let start_idx = start_pos / WORD_BIT_SIZE;
         let mut shift = start_pos;
         if start_idx >= self.m.len() {
             None
         } else {
-            let start_bit = start_pos % DIGIT_BIT_SIZE;
+            let start_bit = start_pos % WORD_BIT_SIZE;
             d = self.m[self.m.len() - 1 - start_idx];
             d <<= start_bit;
             if d != 0 {
-                while DIGIT_SIGNIFICANT_BIT & d == 0 {
+                while WORD_SIGNIFICANT_BIT & d == 0 {
                     d <<= 1;
                     shift += 1;
                 }
                 Some(shift)
             } else {
-                shift += DIGIT_BIT_SIZE;
+                shift += WORD_BIT_SIZE;
                 let start_idx = start_idx + 1;
                 if start_idx < self.m.len() {
                     for v in self.m.iter().rev().skip(start_idx) {
@@ -158,10 +158,10 @@ impl Mantissa {
                         if d != 0 {
                             break;
                         }
-                        shift += DIGIT_BIT_SIZE;
+                        shift += WORD_BIT_SIZE;
                     }
                     if d != 0 {
-                        while DIGIT_SIGNIFICANT_BIT & d == 0 {
+                        while WORD_SIGNIFICANT_BIT & d == 0 {
                             d <<= 1;
                             shift += 1;
                         }
@@ -177,10 +177,10 @@ impl Mantissa {
     }
 
     /// Compare to m2 and return positive if self > m2, negative if self < m2, 0 otherwise.
-    pub fn abs_cmp(&self, m2: &Self) -> DigitSigned {
+    pub fn abs_cmp(&self, m2: &Self) -> SignedWord {
         let len = self.len().min(m2.len());
         for (a, b) in core::iter::zip(self.m.iter().rev(), m2.m.iter().rev()) {
-            let diff = *a as DigitSigned - *b as DigitSigned;
+            let diff = *a as SignedWord - *b as SignedWord;
             if diff != 0 {
                 return diff;
             }
@@ -209,7 +209,7 @@ impl Mantissa {
             l += 1; // guard
         }
 
-        let mut m3 = Mantissa::new(l*DIGIT_BIT_SIZE)?;
+        let mut m3 = Mantissa::new(l*WORD_BIT_SIZE)?;
 
         let m1iter = ExtendedSlice::new(self.m.iter(), l - self.len(), &0);
         let m2iter = RightShiftedSlice::new(&m2.m, m2_shift, 0, l - m2.len());
@@ -224,10 +224,10 @@ impl Mantissa {
 
         if m2_shift > 0 {
             // remove guard
-            if m3.round_mantissa(DIGIT_BIT_SIZE, rm, is_positive) {
+            if m3.round_mantissa(WORD_BIT_SIZE, rm, is_positive) {
                 shift -= 1;
             }
-            m3.m.trunc_to((l-1)*DIGIT_BIT_SIZE);
+            m3.m.trunc_to((l-1)*WORD_BIT_SIZE);
         }
 
         m3.n = m3.max_bit_len();
@@ -245,7 +245,7 @@ impl Mantissa {
             l += 1;
         }
 
-        let mut m3 = Mantissa::new(l*DIGIT_BIT_SIZE)?;
+        let mut m3 = Mantissa::new(l*WORD_BIT_SIZE)?;
         let m1iter = ExtendedSlice::new(self.m.iter(), l - self.len(), &0);
         let m2iter = RightShiftedSlice::new(&m2.m, m2_shift, 0, l - m2.len());
         let m3iter = m3.m.iter_mut();
@@ -258,13 +258,13 @@ impl Mantissa {
             debug_assert!(!m3.round_mantissa(1, rm, is_positive));  // it is not possible that rounding overflows, and c > 0 at the same time.
             m3.shift_right(1);
             let l = m3.m.len();
-            m3.m[l - 1] |= DIGIT_SIGNIFICANT_BIT;
-        } else if m3.round_mantissa(DIGIT_BIT_SIZE, rm, is_positive) {
+            m3.m[l - 1] |= WORD_SIGNIFICANT_BIT;
+        } else if m3.round_mantissa(WORD_BIT_SIZE, rm, is_positive) {
             c = 1;
         }
 
         if m2_shift > 0 {
-            m3.m.trunc_to((l-1)*DIGIT_BIT_SIZE);
+            m3.m.trunc_to((l-1)*WORD_BIT_SIZE);
         }
 
         m3.n = m3.max_bit_len();
@@ -275,7 +275,7 @@ impl Mantissa {
     /// Multiply two mantissas, return result and exponent shift as positive value.
     pub fn mul(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(isize, Self), Error> {
 
-        let l = self.len().max(m2.len())*DIGIT_BIT_SIZE;
+        let l = self.len().max(m2.len())*WORD_BIT_SIZE;
 
         let mut m3 = Self::reserve_new(self.len() + m2.len())?;
 
@@ -285,7 +285,7 @@ impl Mantissa {
         // then shift is always 0 or 1. Is it possible to do shift on the fly?
         let mut shift = Self::maximize(&mut m3) as isize;
         
-        let bit_len = m3.len()*DIGIT_BIT_SIZE;
+        let bit_len = m3.len()*WORD_BIT_SIZE;
         let mut ret = Mantissa {m: m3, n: bit_len};
 
         if ret.round_mantissa(bit_len - l, rm, is_positive) {
@@ -313,7 +313,7 @@ impl Mantissa {
 
         let (q, _r) = Self::div_unbalanced(&m1, &m2.m)?;
 
-        let n = q.len() * DIGIT_BIT_SIZE;
+        let n = q.len() * WORD_BIT_SIZE;
         let mut m3 = Mantissa {
             m: q,
             n,
@@ -326,11 +326,11 @@ impl Mantissa {
         };
 
         let _ = Self::maximize(&mut m3.m) as isize;
-        if m3.round_mantissa((extra_p + 1) * DIGIT_BIT_SIZE, rm, is_positive) {
+        if m3.round_mantissa((extra_p + 1) * WORD_BIT_SIZE, rm, is_positive) {
             e_shift -= 1;
         }
 
-        m3.m.trunc_to(l * DIGIT_BIT_SIZE);
+        m3.m.trunc_to(l * WORD_BIT_SIZE);
         m3.n = m3.max_bit_len();
 
         debug_assert!(e_shift >= -1 && e_shift <= 1);
@@ -338,23 +338,23 @@ impl Mantissa {
         Ok((e_shift, m3))
     }
 
-    // Multiply d1 by digit d and put result to d3 with overflow.
-    pub(super) fn mul_by_digit(d1: &[Digit], d: DoubleDigit, d3: &mut [Digit]) {
-        let mut m: DoubleDigit = 0;
+    // Multiply d1 by word d and put result to d3 with overflow.
+    pub(super) fn mul_by_word(d1: &[Word], d: DoubleWord, d3: &mut [Word]) {
+        let mut m: DoubleWord = 0;
         for (v1, v2) in d1.iter().zip(d3.iter_mut()) {
-            m = *v1 as DoubleDigit * d + m / DIGIT_BASE;
-            *v2 = (m % DIGIT_BASE) as Digit;
+            m = *v1 as DoubleWord * d + m / WORD_BASE;
+            *v2 = (m % WORD_BASE) as Word;
         }
-        d3[d1.len()] = (m / DIGIT_BASE) as Digit;
+        d3[d1.len()] = (m / WORD_BASE) as Word;
     }
 
     pub fn from_u64(p: usize, mut u: u64) -> Result<(usize, Self), Error> {
-        let mut m = Self::reserve_new(Self::bit_len_to_digit_len(p))?;
-        let nd = m.len() - size_of::<u64>()/size_of::<Digit>();
+        let mut m = Self::reserve_new(Self::bit_len_to_word_len(p))?;
+        let nd = m.len() - size_of::<u64>()/size_of::<Word>();
         m[..nd].fill(0);
         for v in &mut m[nd..] {
-            *v = u as Digit;
-            u >>= DIGIT_BIT_SIZE;
+            *v = u as Word;
+            u >>= WORD_BIT_SIZE;
         }
         let shift = Self::maximize(&mut m);
         let mut ret = Mantissa {
@@ -367,10 +367,10 @@ impl Mantissa {
 
     pub fn to_u64(&self) -> u64 {
         let mut ret: u64 = 0;
-        let nd = size_of::<u64>()/size_of::<Digit>();
+        let nd = size_of::<u64>()/size_of::<Word>();
         ret |= self.m[self.len() - 1] as u64;
         for i in 1..nd {
-            ret <<= DIGIT_BIT_SIZE;
+            ret <<= WORD_BIT_SIZE;
             ret |= if self.len() > i { self.m[self.len() - i - 1] as u64 } else { 0 };
         }
         ret
@@ -396,23 +396,23 @@ impl Mantissa {
     /// Set n bits to 0 from the right.
     pub fn mask_bits(&mut self, mut n: usize) {
         for v in self.m.iter_mut() {
-            if n >= DIGIT_BIT_SIZE {
+            if n >= WORD_BIT_SIZE {
                 *v = 0;
-                n -= DIGIT_BIT_SIZE;
+                n -= WORD_BIT_SIZE;
             } else {
-                let mask = DIGIT_MAX << n;
+                let mask = WORD_MAX << n;
                 *v &= mask;
             }
         }
     }
 
     /// Decompose to raw parts.
-    pub fn to_raw_parts(&self) -> (&[Digit], usize) {
+    pub fn to_raw_parts(&self) -> (&[Word], usize) {
         (&self.m, self.n)
     }
 
     /// Construct from raw parts.
-    pub fn from_raw_parts(m: &[Digit], n: usize) -> Result<Self, Error> {
+    pub fn from_raw_parts(m: &[Word], n: usize) -> Result<Self, Error> {
         let mut mm = Self::reserve_new(m.len())?;
         mm.copy_from_slice(m);
         Ok(Mantissa {m: mm, n})
@@ -437,7 +437,7 @@ impl Mantissa {
         }
     }
 
-    /// Returns length of the mantissa in digits of the mantissa's base.
+    /// Returns length of the mantissa in words.
     #[inline]
     pub fn len(&self) -> usize {
         self.m.len()
@@ -446,7 +446,7 @@ impl Mantissa {
     /// Returns maximum possible length of the mantissa in digits of the mantissa's base.
     #[inline]
     pub fn max_bit_len(&self) -> usize {
-        self.len()*DIGIT_BIT_SIZE
+        self.len()*WORD_BIT_SIZE
     }
 
     // Round n positons, return true if exponent is to be incremented.
@@ -458,24 +458,24 @@ impl Mantissa {
         if n > 0 && n <= self.max_bit_len() {
             let n = n-1;
             let mut rem_zero = true;
-            // anything before n'th digit becomes 0
-            for v in &mut self.m[..n / DIGIT_BIT_SIZE] {
+            // anything before n'th word becomes 0
+            for v in &mut self.m[..n / WORD_BIT_SIZE] {
                 if *v != 0 {
                     rem_zero = false;
                 }
                 *v = 0;
             }
 
-            // analyze digits at n and at n+1
+            // analyze words at n and at n+1
             // to decide if we need to add 1 or not.
             let mut c = false;
             let np1 = n + 1;
-            let mut i = n / DIGIT_BIT_SIZE;
-            let i1 = np1 / DIGIT_BIT_SIZE;
-            let t = n % DIGIT_BIT_SIZE;
-            let t2 = np1 % DIGIT_BIT_SIZE;
+            let mut i = n / WORD_BIT_SIZE;
+            let i1 = np1 / WORD_BIT_SIZE;
+            let t = n % WORD_BIT_SIZE;
+            let t2 = np1 % WORD_BIT_SIZE;
             let num = (self.m[i] >> t) & 1;
-            if t > 0 && self.m[i] << (DIGIT_BIT_SIZE - t) as Digit != 0 {
+            if t > 0 && self.m[i] << (WORD_BIT_SIZE - t) as Word != 0 {
                 rem_zero = false;
             }
 
@@ -524,7 +524,7 @@ impl Mantissa {
                 }
                 i = i1;
                 if i < self_len {
-                    if (self.m[i] >> t2) as DoubleDigit + 1 < (DIGIT_BASE >> t2) {
+                    if (self.m[i] >> t2) as DoubleWord + 1 < (WORD_BASE >> t2) {
                         self.m[i] = ((self.m[i] >> t2) + 1) << t2;
                         return false;
                     } else {
@@ -535,7 +535,7 @@ impl Mantissa {
                 // process overflows
                 i += 1;
                 for v in &mut self.m[i..] {
-                    if *v < DIGIT_MAX {
+                    if *v < WORD_MAX {
                         *v += 1;
                         return false;
                     } else {
@@ -543,33 +543,33 @@ impl Mantissa {
                     }
                     i += 1;
                 }
-                self.m[self_len - 1] = DIGIT_SIGNIFICANT_BIT;
+                self.m[self_len - 1] = WORD_SIGNIFICANT_BIT;
                 return true;
             } else {
-                // just remove trailing digits
+                // just remove trailing words
                 let t = t + 1;
-                self.m[i] = if t >= DIGIT_BIT_SIZE { 0 } else { (self.m[i] >> t) << t };
+                self.m[i] = if t >= WORD_BIT_SIZE { 0 } else { (self.m[i] >> t) << t };
             }
         }
         false
     }
 
     pub fn set_length(&mut self, p: usize) -> Result<(), Error> {
-        let sz = Self::bit_len_to_digit_len(p);
+        let sz = Self::bit_len_to_word_len(p);
         let orig_len = self.m.len();
         if sz < orig_len {
             self.m.trunc_to(p);
-            self.n -= (orig_len - sz)*DIGIT_BIT_SIZE;
+            self.n -= (orig_len - sz)*WORD_BIT_SIZE;
         } else if sz > orig_len {
             self.m.try_extend(p)?;
-            self.n += (sz - orig_len)*DIGIT_BIT_SIZE;
+            self.n += (sz - orig_len)*WORD_BIT_SIZE;
         }
         Ok(())
     }
 
-    pub fn get_most_significant_digit(&self) -> Digit {
+    pub fn get_most_significant_word(&self) -> Word {
         if self.n > 0 {
-            self.m[(self.n - 1) / DIGIT_BIT_SIZE]
+            self.m[(self.n - 1) / WORD_BIT_SIZE]
         } else {
             0
         }
@@ -578,9 +578,9 @@ impl Mantissa {
     #[cfg(feature="random")]
     /// Returns randomized mantissa with at least p bits of length.
     pub fn random_normal(p: usize) -> Result<Self, Error> {
-        let mut m = Self::reserve_new(Self::bit_len_to_digit_len(p))?;
+        let mut m = Self::reserve_new(Self::bit_len_to_word_len(p))?;
         for v in (&mut m).iter_mut() {
-            *v = rand::random::<Digit>();
+            *v = rand::random::<Word>();
         }
         let mut ret = Mantissa {
             m,
@@ -588,8 +588,8 @@ impl Mantissa {
         };
         if !ret.is_all_zero() {
             Self::maximize(&mut ret.m);
-            ret.n = DIGIT_BIT_SIZE*ret.m.len();
-            ret.m[0] ^= rand::random::<Digit>();
+            ret.n = WORD_BIT_SIZE*ret.m.len();
+            ret.m[0] ^= rand::random::<Word>();
         }
         Ok(ret)
     }

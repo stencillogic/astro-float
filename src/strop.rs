@@ -1,12 +1,12 @@
-use crate::defs::DIGIT_BIT_SIZE;
-use crate::defs::DIGIT_MAX;
-use crate::defs::DIGIT_SIGNIFICANT_BIT;
+use crate::defs::WORD_BIT_SIZE;
+use crate::defs::WORD_MAX;
+use crate::defs::WORD_SIGNIFICANT_BIT;
 /// BigFloatNumber formatting.
 
 use crate::defs::Exponent;
 use crate::defs::Radix;
 use crate::defs::Error;
-use crate::defs::Digit;
+use crate::defs::Word;
 use crate::defs::RoundingMode;
 use crate::parser::parse;
 use crate::num::BigFloatNumber;
@@ -37,22 +37,22 @@ impl BigFloatNumber {
                 // We want |err2| <= 0.5, so increasing precision by 2 (1.5/4 = 0.375)
                 let rdx_num = Self::number_for_radix(Radix::Dec)?;
                 let p = Self::precision_10_to_2(m.len());
-                let mut digit: u32 = 0;
+                let mut word: u32 = 0;
                 let mut f = Self::new(p + 2)?;
                 for d in m {
                     let d = *d as u32;
-                    if digit <= core::u32::MAX - d {
-                        digit *= 10;
-                        digit += d;
+                    if word <= WORD_MAX - d {
+                        word *= 10;
+                        word += d;
                     } else {
-                        let d2 = Self::from_u32(digit)?;
+                        let d2 = Self::from_u32(word)?;
                         f = f.mul(&rdx_num)?;
                         f = f.add(&d2)?;
-                        digit = 0;
+                        word = 0;
                     }
                 }
-                if digit != 0 {
-                    let d2 = Self::from_u32(digit)?;
+                if word != 0 {
+                    let d2 = Self::from_u32(word)?;
                     f = f.mul(&rdx_num)?;
                     f = f.add(&d2)?;
                 }
@@ -97,41 +97,41 @@ impl BigFloatNumber {
         ret.push(0);
         if !self.is_zero() {
             let mut r = self.clone()?;
-            let one = Self::from_digit(1, 1)?;
+            let one = Self::from_word(1, 1)?;
             let mut m = one.clone()?;
             m.set_exponent(-(self.get_mantissa_max_bit_len() as Exponent + 1));
             let rdx_num = Self::number_for_radix(rdx)?;
-            let mut digit;
+            let mut word;
             loop {
                 let d = r.mul(&rdx_num, rm).unwrap();
                 r = d.fract()?;
-                digit = d.get_int_as_digit();
+                word = d.get_int_as_word();
                 m = m.mul(&rdx_num, rm).unwrap();
-                ret.push(digit as u8);
+                ret.push(word as u8);
                 if r.cmp(&m) < 0 || r.cmp(&one.sub(&m, rm).unwrap()) > 0 {
                     break;
                 }
             }
             if !r.round(0, RoundingMode::ToEven).unwrap().is_zero() {
-                digit += 1;
-                let rdx_digit = Self::digit_for_radix(rdx);
-                if digit == rdx_digit {
+                word += 1;
+                let rdx_word = Self::word_for_radix(rdx);
+                if word == rdx_word {
                     ret.push(0);
                     let mut i = ret.len() - 2;
-                    while i > 0 && ret[i] + 1 == rdx_digit as u8 {
+                    while i > 0 && ret[i] + 1 == rdx_word as u8 {
                         ret[i] = 0;
                         i -= 1;
                     }
                     ret[i] += 1;
                 } else {
-                    ret.push(digit as u8);
+                    ret.push(word as u8);
                 }
             }
         }
         Ok(ret)
     }
 
-    fn digit_for_radix(rdx: Radix) -> Digit {
+    fn word_for_radix(rdx: Radix) -> Word {
         match rdx {
             Radix::Bin => 2,
             Radix::Oct => 8,
@@ -141,8 +141,8 @@ impl BigFloatNumber {
     }
 
     fn number_for_radix(rdx: Radix) -> Result<Self, Error> {
-        let rdx_num = Self::digit_for_radix(rdx);
-        Self::from_digit(rdx_num, 1)
+        let rdx_num = Self::word_for_radix(rdx);
+        Self::from_word(rdx_num, 1)
     }
 }
 

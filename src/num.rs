@@ -1,15 +1,15 @@
 //! BigFloatNumber definition and basic arithmetic, comparison, and number manipulation operations.
 
-use crate::defs::DigitSigned;
+use crate::defs::SignedWord;
 use crate::defs::Exponent;
 use crate::defs::Sign;
-use crate::defs::Digit;
+use crate::defs::Word;
 use crate::defs::Error;
 use crate::defs::EXPONENT_MAX;
 use crate::defs::EXPONENT_MIN;
-use crate::defs::DIGIT_SIGNIFICANT_BIT;
+use crate::defs::WORD_SIGNIFICANT_BIT;
 use crate::defs::RoundingMode;
-use crate::defs::DIGIT_BIT_SIZE;
+use crate::defs::WORD_BIT_SIZE;
 use crate::mantissa::Mantissa;
 
 /// BigFloatNumber represents floating point number with mantissa of a fixed size, and exponent.
@@ -73,19 +73,19 @@ impl BigFloatNumber {
     }
 
     /// Returns new number with value of 1.
-    pub fn from_digit(mut d: Digit, p: usize) -> Result<Self, Error> {
+    pub fn from_word(mut d: Word, p: usize) -> Result<Self, Error> {
         Self::p_assertion(p)?;
         if d == 0 {
             Self::new(p)
         } else {
             let mut shift = 0;
-            while d & DIGIT_SIGNIFICANT_BIT == 0 {
+            while d & WORD_SIGNIFICANT_BIT == 0 {
                 d <<= 1;
                 shift += 1;
             }
             Ok(BigFloatNumber {
-                m: Mantissa::from_digit(p, d)?,
-                e: (DIGIT_BIT_SIZE - shift) as Exponent,
+                m: Mantissa::from_word(p, d)?,
+                e: (WORD_BIT_SIZE - shift) as Exponent,
                 s: Sign::Pos,
             })
         }
@@ -306,16 +306,16 @@ impl BigFloatNumber {
 
     /// Compare to d2.
     /// Returns positive if self > d2, negative if self < d2, 0 otherwise.
-    pub fn cmp(&self, d2: &Self) -> DigitSigned {
+    pub fn cmp(&self, d2: &Self) -> SignedWord {
         if self.s != d2.s {
-            return self.s as DigitSigned;
+            return self.s as SignedWord;
         }
 
         if self.m.is_zero() || d2.m.is_zero() {
             if !d2.m.is_zero() {
-                return d2.s.invert() as DigitSigned;
+                return d2.s.invert() as SignedWord;
             } else if !self.m.is_zero() {
-                return self.s as DigitSigned;
+                return self.s as SignedWord;
             } else {
                 return 0;
             }
@@ -323,17 +323,17 @@ impl BigFloatNumber {
 
         let e: isize = self.e as isize - d2.e as isize;
         if e > 0 {
-            return 1*self.s as DigitSigned;
+            return 1*self.s as SignedWord;
         }
         if e < 0 {
-            return -1*self.s as DigitSigned;
+            return -1*self.s as SignedWord;
         }
 
-        self.m.abs_cmp(&d2.m) as DigitSigned * self.s as DigitSigned
+        self.m.abs_cmp(&d2.m) as SignedWord * self.s as SignedWord
     }
 
     // Compare absolute values of two numbers.
-    fn abs_cmp(&self, d2: &Self) -> DigitSigned {
+    fn abs_cmp(&self, d2: &Self) -> SignedWord {
         if self.m.is_zero() || d2.m.is_zero() {
             if !d2.m.is_zero() {
                 return -1;
@@ -459,14 +459,14 @@ impl BigFloatNumber {
 
     /// Decompose to raw parts.
     #[inline]
-    pub fn to_raw_parts(&self) -> (&[Digit], usize, Sign, Exponent) {
+    pub fn to_raw_parts(&self) -> (&[Word], usize, Sign, Exponent) {
         let (m, n) = self.m.to_raw_parts();
         (m, n, self.s, self.e)
     }
 
     /// Construct from raw parts.
-    pub fn from_raw_parts(m: &[Digit], n: usize, s: Sign, e: Exponent) -> Result<Self, Error> {
-        if m.len()*DIGIT_BIT_SIZE >= isize::MAX as usize/2 || n > m.len()*DIGIT_BIT_SIZE {
+    pub fn from_raw_parts(m: &[Word], n: usize, s: Sign, e: Exponent) -> Result<Self, Error> {
+        if m.len()*WORD_BIT_SIZE >= isize::MAX as usize/2 || n > m.len()*WORD_BIT_SIZE {
             return Err(Error::InvalidArgument);
         }
         Ok(BigFloatNumber { e, s, m: Mantissa::from_raw_parts(m, n)? })
@@ -507,7 +507,7 @@ impl BigFloatNumber {
         let int = self.int()?;
         if self.is_negative() {
             if !self.fract()?.m.is_zero() {
-                let one = Self::from_digit(1, 1)?;
+                let one = Self::from_word(1, 1)?;
                 return int.sub(&one, RoundingMode::ToZero);
             }
         }
@@ -519,7 +519,7 @@ impl BigFloatNumber {
         let int = self.int()?;
         if self.is_positive() {
             if !self.fract()?.m.is_zero() {
-                let one = Self::from_digit(1, 1)?;
+                let one = Self::from_word(1, 1)?;
                 return int.add(&one, RoundingMode::ToZero);
             }
         }
@@ -557,11 +557,11 @@ impl BigFloatNumber {
         Self::new(self.m.max_bit_len())
     }
 
-    /// Returns integer part as a digit.
-    pub fn get_int_as_digit(&self) -> Digit {
-        if self.e > 0 && DIGIT_BIT_SIZE > self.e as usize {
-            let d = self.m.get_most_significant_digit();
-            let shift = DIGIT_BIT_SIZE - self.e as usize;
+    /// Returns integer part as a word.
+    pub fn get_int_as_word(&self) -> Word {
+        if self.e > 0 && WORD_BIT_SIZE > self.e as usize {
+            let d = self.m.get_most_significant_word();
+            let shift = WORD_BIT_SIZE - self.e as usize;
             d >> shift
         } else {
             0
@@ -571,10 +571,10 @@ impl BigFloatNumber {
     /// Return integer part of a number as built-in integer.
     pub(super) fn get_int_as_usize(&self) -> Result<usize, Error> {
         if self.e > 0 {
-            debug_assert!(core::mem::size_of::<usize>() > core::mem::size_of::<Digit>());
-            if (self.e as usize) <= DIGIT_BIT_SIZE {
-                let shift = DIGIT_BIT_SIZE - self.e as usize;
-                let mut ret = self.m.get_most_significant_digit() as usize;
+            debug_assert!(core::mem::size_of::<usize>() > core::mem::size_of::<Word>());
+            if (self.e as usize) <= WORD_BIT_SIZE {
+                let shift = WORD_BIT_SIZE - self.e as usize;
+                let mut ret = self.m.get_most_significant_word() as usize;
                 Ok(ret >> shift)
             } else {
                 Err(Error::InvalidArgument)
@@ -679,7 +679,7 @@ impl BigFloatNumber {
     // reciprocal computation.
     fn recip_iter(&self) -> Result<Self, Error> {
         if self.m.len() <= 500 {
-            let one = Self::from_digit(1, 1)?;
+            let one = Self::from_word(1, 1)?;
             one.div(self, RoundingMode::None)
         } else {
             //  Newton's method: x(n+1) = 2*x(n) - self*x(n)*x(n)
@@ -742,7 +742,7 @@ mod tests {
         let mut d2;
         let mut d3;
         let mut ref_num;
-        let one = BigFloatNumber::from_digit(1, 1).unwrap();
+        let one = BigFloatNumber::from_word(1, 1).unwrap();
         let mut eps = one.clone().unwrap();
 
         //let n1 = BigFloatNumber::from_raw_parts(&[4165624164, 2129500405, 2551748857, 998953334, 3485534795, 1427512576, 426727679, 2298894833, 2107497530, 385370716, 2626967463, 2694802314, 2373730166], 416, Sign::Neg, 301499356).unwrap();
@@ -883,7 +883,7 @@ mod tests {
         d1 = BigFloatNumber::min_positive(p).unwrap();
         d2 = BigFloatNumber::min_positive(p).unwrap();
         ref_num = BigFloatNumber::min_positive(p).unwrap();
-        let one  = BigFloatNumber::from_digit(1, p).unwrap();
+        let one  = BigFloatNumber::from_word(1, p).unwrap();
         ref_num = ref_num.mul(&one.add(&one, rm).unwrap(), rm).unwrap();
 
         // min_positive + min_positive = 2*min_positive
@@ -1032,7 +1032,7 @@ mod tests {
     #[test]
     fn recip_perf() {
 
-        let one = BigFloatNumber::from_digit(1, 1).unwrap();
+        let one = BigFloatNumber::from_word(1, 1).unwrap();
 
         for _ in 0..5 {    
 

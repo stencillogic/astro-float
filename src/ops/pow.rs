@@ -3,7 +3,7 @@
 use crate::{
     num::BigFloatNumber, 
     RoundingMode, 
-    defs::{Error, EXPONENT_MIN, EXPONENT_MAX, Digit, DIGIT_SIGNIFICANT_BIT, DIGIT_BIT_SIZE},
+    defs::{Error, EXPONENT_MIN, EXPONENT_MAX, Word, WORD_SIGNIFICANT_BIT, WORD_BIT_SIZE},
 };
 
 
@@ -13,7 +13,7 @@ impl BigFloatNumber {
     pub fn exp(&self, rm: RoundingMode) -> Result<Self, Error> {
 
         if self.is_zero() {
-            return Self::from_digit(1, 1);
+            return Self::from_word(1, 1);
         }
 
         // compute separately for int and fract parts, then combine the results.
@@ -38,14 +38,14 @@ impl BigFloatNumber {
         }
 
         if i == 0 {
-            return Self::from_digit(1, 1);
+            return Self::from_word(1, 1);
         }
 
-        let mut bit_pos = DIGIT_BIT_SIZE;
+        let mut bit_pos = WORD_BIT_SIZE;
         while bit_pos > 0 {
             bit_pos -= 1;
             i <<= 1;
-            if i & DIGIT_SIGNIFICANT_BIT as usize != 0 {
+            if i & WORD_SIGNIFICANT_BIT as usize != 0 {
                 bit_pos -= 1;
                 i <<= 1;
                 break;
@@ -57,7 +57,7 @@ impl BigFloatNumber {
         while bit_pos > 0 {
             bit_pos -= 1;
             ret = ret.mul(&ret, rm)?;
-            if i & DIGIT_SIGNIFICANT_BIT as usize != 0 {
+            if i & WORD_SIGNIFICANT_BIT as usize != 0 {
                 ret = ret.mul(self, rm)?;
             }
             i <<= 1;
@@ -70,7 +70,7 @@ impl BigFloatNumber {
     fn expf(&self, rm: RoundingMode) -> Result<Self, Error> {
         let sh = Self::sinh(self, rm)?; // faster convergence than direct series
         // e = sh + sqrt(sh^2 + 1)
-        let one = Self::from_digit(1, 1)?;
+        let one = Self::from_word(1, 1)?;
         let sq = sh.mul(&sh, rm)?;
         let sq2 = sq.add(&one, rm)?;
         let sq3 = sq2.sqrt(rm)?;

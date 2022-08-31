@@ -1,16 +1,16 @@
 ///! Definitions.
 
-/// A digit.
-pub type Digit = u32;
+/// A word.
+pub type Word = u32;
 
 /// An exponent.
 pub type Exponent = i32;
 
-/// Doubled digit.
-pub type DoubleDigit = u64;
+/// Doubled word.
+pub type DoubleWord = u64;
 
-/// Digit with sign.
-pub type DigitSigned = i64;
+/// Word with sign.
+pub type SignedWord = i64;
 
 
 /// Maximum exponent value.
@@ -20,17 +20,17 @@ pub const EXPONENT_MAX: Exponent = Exponent::MAX;
 pub const EXPONENT_MIN: Exponent = Exponent::MIN;
 
 
-/// Maximum value of a "digit".
-pub const DIGIT_MAX: Digit = Digit::MAX;
+/// Maximum value of a word.
+pub const WORD_MAX: Word = Word::MAX;
 
-/// Base of digits.
-pub const DIGIT_BASE: DoubleDigit = DIGIT_MAX as DoubleDigit + 1;
+/// Base of words.
+pub const WORD_BASE: DoubleWord = WORD_MAX as DoubleWord + 1;
 
-/// Size of a "digit" in bits.
-pub const DIGIT_BIT_SIZE: usize = std::mem::size_of::<Digit>() * 8;
+/// Size of a word in bits.
+pub const WORD_BIT_SIZE: usize = std::mem::size_of::<Word>() * 8;
 
-// Digit with the most significant bit set.
-pub const DIGIT_SIGNIFICANT_BIT: Digit = DIGIT_MAX << (DIGIT_BIT_SIZE - 1);
+// word with the most significant bit set.
+pub const WORD_SIGNIFICANT_BIT: Word = WORD_MAX << (WORD_BIT_SIZE - 1);
 
 /// Sign.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]

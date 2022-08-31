@@ -1,39 +1,39 @@
 //! Multiplication algos.
 
-use crate::defs::DIGIT_BIT_SIZE;
+use crate::defs::WORD_BIT_SIZE;
 use crate::defs::Error;
-use crate::defs::Digit;
-use crate::defs::DoubleDigit;
+use crate::defs::Word;
+use crate::defs::DoubleWord;
 use crate::mantissa::Mantissa;
-use crate::mantissa::buf::DigitBuf;
+use crate::mantissa::buf::WordBuf;
 use crate::mantissa::util::SliceWithSign;
 
 
 impl Mantissa {
 
-    fn mul_basic(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) {
+    fn mul_basic(m1: &[Word], m2: &[Word], m3: &mut [Word]) {
 
         m3.fill(0);
         
         for (i, d1mi) in m1.iter().enumerate() {
 
-            let d1mi = *d1mi as DoubleDigit;
+            let d1mi = *d1mi as DoubleWord;
             if d1mi == 0 {
                 continue;
             }
 
             let mut k = 0;
             for (m2j, m3ij) in m2.iter().zip(m3[i..].iter_mut()) {
-                let m = d1mi * (*m2j as DoubleDigit) + *m3ij as DoubleDigit + k;
-                *m3ij = m as Digit;
-                k = m >> (DIGIT_BIT_SIZE);
+                let m = d1mi * (*m2j as DoubleWord) + *m3ij as DoubleWord + k;
+                *m3ij = m as Word;
+                k = m >> (WORD_BIT_SIZE);
             }
 
-            m3[i + m2.len()] += k as Digit;
+            m3[i + m2.len()] += k as Word;
         }
     }
 
-    fn mul_slices(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
+    fn mul_slices(m1: &[Word], m2: &[Word], m3: &mut [Word]) -> Result<(), Error> {
 
         debug_assert!(m1.len() <= m2.len());
 
@@ -58,7 +58,7 @@ impl Mantissa {
     }
 
     // general case multiplication
-    pub(super) fn mul_unbalanced(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
+    pub(super) fn mul_unbalanced(m1: &[Word], m2: &[Word], m3: &mut [Word]) -> Result<(), Error> {
         
         let (sm, lg) = if m1.len() < m2.len() {
             (m1, m2)
@@ -70,7 +70,7 @@ impl Mantissa {
 
             // balancing
             
-            let mut buf = DigitBuf::new(2*sm.len())?;
+            let mut buf = WordBuf::new(2*sm.len())?;
             let mut even = true;
             let mut lb = 0;
             let mut ub = 0;
@@ -120,7 +120,7 @@ impl Mantissa {
 
     // short multiplication
     #[allow(dead_code)] // TODO: can it be faster than mul_unbalanced by more than 90% ?
-    pub(super) fn mul_short(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
+    pub(super) fn mul_short(m1: &[Word], m2: &[Word], m3: &mut [Word]) -> Result<(), Error> {
         debug_assert!(m1.len() == m2.len());    // TODO: consider relaxing this
         let n = m1.len();
         Self::mul_short_step(m1, m2, m3, n)
@@ -128,13 +128,13 @@ impl Mantissa {
 
     
     // short multiplication
-    fn mul_short_step(m1: &[Digit], m2: &[Digit], m3: &mut [Digit], n: usize) -> Result<(), Error> {
+    fn mul_short_step(m1: &[Word], m2: &[Word], m3: &mut [Word], n: usize) -> Result<(), Error> {
         if n <= 10 {
 
             Self::mul_unbalanced(m1, m2, m3)?;
 
             let mut c1 = SliceWithSign::new_mut(m3, 1);
-            c1.shift_right(n*DIGIT_BIT_SIZE);
+            c1.shift_right(n*WORD_BIT_SIZE);
 
         } else {
             let k = n * 775 / 1000;
@@ -151,9 +151,9 @@ impl Mantissa {
             Self::mul_unbalanced(&a1, &b1, m3)?;
 
             let mut c1 = SliceWithSign::new_mut(m3, 1);
-            c1.shift_right((k-l)*DIGIT_BIT_SIZE);
+            c1.shift_right((k-l)*WORD_BIT_SIZE);
 
-            let mut tmp_buf = DigitBuf::new(a2.len() + b3.len() + a3.len() + b2.len())?;
+            let mut tmp_buf = WordBuf::new(a2.len() + b3.len() + a3.len() + b2.len())?;
             let (buf1, buf2) = tmp_buf.split_at_mut(a2.len() + b3.len());
 
             Self::mul_short_step(&a2, &b3, buf1, l)?;
@@ -174,7 +174,7 @@ impl Mantissa {
 #[cfg(test)]
 mod tests {
 
-    use crate::defs::DIGIT_MAX;
+    use crate::defs::WORD_MAX;
     use super::*;
     use rand::random;
 
@@ -184,8 +184,8 @@ mod tests {
         let sz1 = random::<usize>()%10 + 1;
         let sz2 = random::<usize>()%10*sz1 + random::<usize>()%sz1 + sz1;
         let f = random_slice(1, sz1);
-        let mut ret1 = DigitBuf::new(sz1 + sz2).unwrap();
-        let mut ret2 = DigitBuf::new(sz1 + sz2).unwrap();
+        let mut ret1 = WordBuf::new(sz1 + sz2).unwrap();
+        let mut ret2 = WordBuf::new(sz1 + sz2).unwrap();
         for _ in 0..1000 {
             let v = random_slice(sz1, sz2);
             Mantissa::mul_unbalanced(&f, &v, &mut ret1).unwrap();
@@ -208,14 +208,14 @@ mod tests {
         let s1=[1496867450, 1417658947, 3271802710, 2677751033, 3237139020, 3064555062, 1548441171, 778455770, 2436515277, 483318499];
         let s2=[3225363533, 3760565749, 1879799765, 4055875449, 305072033, 1248705486, 102752588, 2971455321, 1010393078, 2764359410];
 
-        let mut ret = DigitBuf::new(20).unwrap();
+        let mut ret = WordBuf::new(20).unwrap();
         Mantissa::mul_short(&s1, &s2, &mut ret).unwrap();
 
-        let mut s3 = DigitBuf::new(20).unwrap();
+        let mut s3 = WordBuf::new(20).unwrap();
         Mantissa::mul_unbalanced(&s1, &s2, &mut s3).unwrap();
 
-        ret[0] &= DIGIT_MAX<<10; // 10 = ceil(log2(3*(p-1)))
-        s3[10] &= DIGIT_MAX<<10;
+        ret[0] &= WORD_MAX<<10; // 10 = ceil(log2(3*(p-1)))
+        s3[10] &= WORD_MAX<<10;
         assert!(ret[..10] == s3[10..]);
     }
 
@@ -227,7 +227,7 @@ mod tests {
             let sz1 = 1000;
             let sz2 = 1000;
             let f = random_slice(sz1, sz1);
-            let mut ret = DigitBuf::new(sz1 + sz2).unwrap();
+            let mut ret = WordBuf::new(sz1 + sz2).unwrap();
             let mut n = vec![];
             let l = 1000;
             for _ in 0..l {
@@ -253,7 +253,7 @@ mod tests {
         }
     }
 
-    fn random_slice(min_len: usize, max_len: usize) -> Vec<Digit> {
+    fn random_slice(min_len: usize, max_len: usize) -> Vec<Word> {
         let mut s1 = Vec::new();
         let l = if max_len > min_len {
             random::<usize>() % (max_len - min_len) + min_len

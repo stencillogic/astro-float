@@ -1,16 +1,16 @@
 //! Toom-3 multiplication.
 
 use crate::defs::Error;
-use crate::defs::Digit;
+use crate::defs::Word;
 use crate::mantissa::Mantissa;
-use crate::mantissa::buf::DigitBuf;
+use crate::mantissa::buf::WordBuf;
 use crate::mantissa::util::SliceWithSign;
 use crate::mantissa::util::shift_slice_left_copy;
 
 
 impl Mantissa {
 
-    fn toom3_get_splits(m: &[Digit], l: usize) -> (SliceWithSign, SliceWithSign, SliceWithSign) {
+    fn toom3_get_splits(m: &[Word], l: usize) -> (SliceWithSign, SliceWithSign, SliceWithSign) {
 
         let b11 = l.min(m.len());
         let b12 = l.min(m.len() - b11) + b11;
@@ -25,7 +25,7 @@ impl Mantissa {
 
     fn toom3_factors<'a, 'b>(params: (SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>), 
                     x1: &mut SliceWithSign<'b>,
-                    buf1: &'a mut [Digit], buf2: &'a mut [Digit], buf3: &'a mut [Digit]) 
+                    buf1: &'a mut [Word], buf2: &'a mut [Word], buf3: &'a mut [Word]) 
                     -> (SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>) {
 
         let (m0, m1, m2) = params;
@@ -48,11 +48,11 @@ impl Mantissa {
     // Toom-3 multiplication.
     // d1 must contain input number + have reserve of d2.len() positions in addition for the output.
     // The result is placed in d1, and the sign is returned.
-    pub(super) fn toom3(d1: &[Digit], d2: &[Digit], d3: &mut [Digit]) -> Result<(), Error> {
+    pub(super) fn toom3(d1: &[Word], d2: &[Word], d3: &mut [Word]) -> Result<(), Error> {
 
         let l = (d1.len().max(d2.len()) + 2) / 3;
 
-        let mut buf = DigitBuf::new(25*(l+1))?;
+        let mut buf = WordBuf::new(25*(l+1))?;
 
         let (x1buf, rest) = buf.split_at_mut(l+1);
         let (x3buf, rest) = rest.split_at_mut(2*(l+1));
@@ -110,7 +110,7 @@ impl Mantissa {
         s3.set_sign(p3.sign() * q3.sign());
 
         s3.sub(&s1, &mut w3);
-        w3.div_by_digit(3);
+        w3.div_by_word(3);
         s1.sub(&s2, &mut w1);
         w1.shift_right(1);
         s2.sub(&s0, &mut w2);
@@ -169,8 +169,8 @@ mod tests {
 
     use super::*;
     use rand::random;
-    use crate::defs::DoubleDigit;
-    use crate::defs::DIGIT_BIT_SIZE;
+    use crate::defs::DoubleWord;
+    use crate::defs::WORD_BIT_SIZE;
 
     #[ignore]
     #[test]
@@ -222,8 +222,8 @@ mod tests {
 
 
         // 999..99 * 999..99
-        let s1 = [Digit::MAX; 8];
-        let s2 = [Digit::MAX; 7];
+        let s1 = [Word::MAX; 8];
+        let s2 = [Word::MAX; 7];
         let mut ref_s = [0; 15];
         mul(&s1, &s2, &mut ref_s);
 
@@ -303,7 +303,7 @@ mod tests {
         }
     }
 
-    fn random_slice(min_len: usize, max_len: usize) -> Vec<Digit> {
+    fn random_slice(min_len: usize, max_len: usize) -> Vec<Word> {
         let mut s1 = Vec::new();
         let l = if max_len > min_len {
             random::<usize>() % (max_len - min_len) + min_len
@@ -316,22 +316,22 @@ mod tests {
         s1
     }
 
-    fn mul(s1: &[Digit], s2: &[Digit], ret: &mut [Digit]) {
+    fn mul(s1: &[Word], s2: &[Word], ret: &mut [Word]) {
         ret.fill(0);
         for (i, d1mi) in s1.iter().enumerate() {
-            let d1mi = *d1mi as DoubleDigit;
+            let d1mi = *d1mi as DoubleWord;
             if d1mi == 0 {
                 continue;
             }
 
             let mut k = 0;
             for (m2j, m3ij) in s2.iter().zip(ret[i..].iter_mut()) {
-                let m = d1mi * (*m2j as DoubleDigit) + *m3ij as DoubleDigit + k;
+                let m = d1mi * (*m2j as DoubleWord) + *m3ij as DoubleWord + k;
 
-                *m3ij = m as Digit;
-                k = m >> (DIGIT_BIT_SIZE);
+                *m3ij = m as Word;
+                k = m >> (WORD_BIT_SIZE);
             }
-            ret[i + s2.len()] += k as Digit;
+            ret[i + s2.len()] += k as Word;
         }
     }
 }

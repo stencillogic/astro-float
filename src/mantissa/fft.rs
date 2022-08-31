@@ -2,12 +2,12 @@
 
 use crate::common::util::log2_ceil;
 use crate::common::util::sqrt_int;
-use crate::defs::DIGIT_BIT_SIZE;
-use crate::defs::DIGIT_MAX;
+use crate::defs::WORD_BIT_SIZE;
+use crate::defs::WORD_MAX;
 use crate::defs::Error;
-use crate::defs::Digit;
+use crate::defs::Word;
 use crate::mantissa::Mantissa;
-use crate::mantissa::buf::DigitBuf;
+use crate::mantissa::buf::WordBuf;
 use crate::mantissa::util::SliceWithSign;
 use crate::mantissa::util::add_carry;
 use crate::mantissa::util::shift_slice_left_copy;
@@ -79,7 +79,7 @@ impl Mantissa {
     #[allow(dead_code)]
     fn fft3(parts: &mut [SliceWithSign], dst: &mut [SliceWithSign], w: usize, k1: usize, rev: bool) {
 
-        let mut b = DigitBuf::new(parts[0].len() + k1).unwrap();
+        let mut b = WordBuf::new(parts[0].len() + k1).unwrap();
 
         for (i, dst_i) in dst.iter_mut().enumerate() {
 
@@ -100,7 +100,7 @@ impl Mantissa {
         }
     }
 
-    fn fft_forward(parts: &mut [SliceWithSign], w: usize, k1: usize, k: usize, s: usize, n1: usize, modulus: &SliceWithSign, tmp_buf: &mut [Digit]) {
+    fn fft_forward(parts: &mut [SliceWithSign], w: usize, k1: usize, k: usize, s: usize, n1: usize, modulus: &SliceWithSign, tmp_buf: &mut [Word]) {
 
         if k1 == 2 {
 
@@ -134,7 +134,7 @@ impl Mantissa {
         }
     }
 
-    fn fft_reverse(parts: &mut [SliceWithSign], w: usize, k1: usize, n1: usize, modulus: &SliceWithSign, tmp_buf: &mut [Digit]) {
+    fn fft_reverse(parts: &mut [SliceWithSign], w: usize, k1: usize, n1: usize, modulus: &SliceWithSign, tmp_buf: &mut [Word]) {
 
         if k1 == 2 {
 
@@ -169,7 +169,7 @@ impl Mantissa {
 
     fn fft_params(n: usize) -> (usize, usize, usize, usize, usize, usize) {
         let mut k1 = sqrt_int(n as u32) as usize;
-        if n / DIGIT_BIT_SIZE < 50000 {
+        if n / WORD_BIT_SIZE < 50000 {
             k1 /= 2;
         }
         let k = log2_ceil(k1).max(6);
@@ -183,29 +183,29 @@ impl Mantissa {
     }
 
     // decompose in parts.len() = k1 parts, each of size m
-    fn fft_decompose(d: &[Digit], m: usize, parts: &mut [SliceWithSign]) {
+    fn fft_decompose(d: &[Word], m: usize, parts: &mut [SliceWithSign]) {
 
         let mut parts_iter = parts.iter_mut();
 
-        if m % DIGIT_BIT_SIZE == 0 {
+        if m % WORD_BIT_SIZE == 0 {
 
-            for (chunk, part) in d.chunks(m / DIGIT_BIT_SIZE).zip(parts_iter.by_ref()) {
+            for (chunk, part) in d.chunks(m / WORD_BIT_SIZE).zip(parts_iter.by_ref()) {
                 part[..chunk.len()].copy_from_slice(chunk);
                 part[chunk.len()..].fill(0);
             }
 
         } else {
 
-            let chunk_sz = (m + DIGIT_BIT_SIZE - 1) / DIGIT_BIT_SIZE + 1;
-            let mask = DIGIT_MAX >> (DIGIT_BIT_SIZE - (m % DIGIT_BIT_SIZE));
+            let chunk_sz = (m + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE + 1;
+            let mask = WORD_MAX >> (WORD_BIT_SIZE - (m % WORD_BIT_SIZE));
             let mut s = 0;
             let mut idx;
             let mut shift;
 
             loop {
 
-                idx = s / DIGIT_BIT_SIZE;
-                shift = s % DIGIT_BIT_SIZE;
+                idx = s / WORD_BIT_SIZE;
+                shift = s % WORD_BIT_SIZE;
                 if idx + chunk_sz > d.len() {
                     break;
                 }
@@ -236,9 +236,9 @@ impl Mantissa {
         }
     }
 
-    fn fft_compute_chunks<'a>(num: &[Digit], n: usize, tmp_buf: &'a mut [Digit], s: i8) -> SliceWithSign<'a> {
+    fn fft_compute_chunks<'a>(num: &[Word], n: usize, tmp_buf: &'a mut [Word], s: i8) -> SliceWithSign<'a> {
 
-        let mut chunks = num.chunks(n / DIGIT_BIT_SIZE);
+        let mut chunks = num.chunks(n / WORD_BIT_SIZE);
 
         if let Some(first_chunk) = chunks.next() {
 
@@ -273,7 +273,7 @@ impl Mantissa {
 
         if num.sign() < 0 && !num.is_zero() { 
 
-            let last = n / DIGIT_BIT_SIZE;
+            let last = n / WORD_BIT_SIZE;
 
             while num.sign() < 0 {
 
@@ -291,7 +291,7 @@ impl Mantissa {
 
         } else {
 
-            let last = n / DIGIT_BIT_SIZE;
+            let last = n / WORD_BIT_SIZE;
 
             while num[last] > 0 {
 
@@ -315,9 +315,9 @@ impl Mantissa {
     // compute num*2^j mod (2^n+1) inplace
     // num and modulus should have up to n bits of additional free space for shifting.
     // tmp_buf is a reusable buffer of size == num.len().
-    fn fft_mul_mod(num: &mut SliceWithSign, j: usize, n: usize, modulus: &SliceWithSign, tmp_buf: &mut [Digit]) {
+    fn fft_mul_mod(num: &mut SliceWithSign, j: usize, n: usize, modulus: &SliceWithSign, tmp_buf: &mut [Word]) {
 
-        debug_assert!(n % DIGIT_BIT_SIZE == 0);
+        debug_assert!(n % WORD_BIT_SIZE == 0);
 
         let (work_buf, ext_buf) = tmp_buf.split_at_mut(num.len());
 
@@ -349,9 +349,9 @@ impl Mantissa {
     // compute num / 2^j mod (2^n+1) inplace
     // num should have up to n bits of additional free space for shifting.
     // tmp_buf is a reusable buffer of size == num.len().
-    fn fft_div_mod(num: &mut SliceWithSign, j: usize, n: usize, modulus: &SliceWithSign, tmp_buf: &mut [Digit]) {
+    fn fft_div_mod(num: &mut SliceWithSign, j: usize, n: usize, modulus: &SliceWithSign, tmp_buf: &mut [Word]) {
 
-        debug_assert!(n % DIGIT_BIT_SIZE == 0);
+        debug_assert!(n % WORD_BIT_SIZE == 0);
 
         let n2 = n*2;
         let mut shift = ((j + n2 - 1) / n2) * n2 - j;
@@ -373,7 +373,7 @@ impl Mantissa {
         num.copy_from(&acc);
     }
 
-    fn fft_prepare_parts(buf: &mut [Digit], k1: usize, part_len: usize) -> Result<SmallVec<[SliceWithSign; 0]>, Error> {
+    fn fft_prepare_parts(buf: &mut [Word], k1: usize, part_len: usize) -> Result<SmallVec<[SliceWithSign; 0]>, Error> {
 
         let mut parts = SmallVec::<[SliceWithSign; 0]>::new();
         parts.try_reserve_exact(k1).map_err(Error::MemoryAllocation)?;
@@ -393,16 +393,16 @@ impl Mantissa {
     }
 
     // multiply two integer numbers.
-    pub(super) fn fft_mul(d1: &[Digit], d2: &[Digit], d3: &mut [Digit]) -> Result<(), Error> {
+    pub(super) fn fft_mul(d1: &[Word], d2: &[Word], d3: &mut [Word]) -> Result<(), Error> {
 
-        let l: usize = (d1.len() + d2.len()) * DIGIT_BIT_SIZE;
+        let l: usize = (d1.len() + d2.len()) * WORD_BIT_SIZE;
 
         let (_n, k1, k, m, n1, t) = Self::fft_params(l);
 
         let w = t*2;
-        let part_len = n1 / DIGIT_BIT_SIZE + 1;
+        let part_len = n1 / WORD_BIT_SIZE + 1;
 
-        let mut buf = DigitBuf::new(3*k1*part_len + 6*part_len)?;
+        let mut buf = WordBuf::new(3*k1*part_len + 6*part_len)?;
 
         let (parts1_buf, rest) = buf.split_at_mut(k1*part_len);
         let (parts2_buf, rest) = rest.split_at_mut(k1*part_len);
@@ -420,7 +420,7 @@ impl Mantissa {
 
         modulus_buf.fill(0);
         modulus_buf[0] = 1;
-        modulus_buf[n1 / DIGIT_BIT_SIZE] = 1;
+        modulus_buf[n1 / WORD_BIT_SIZE] = 1;
         let modulus = SliceWithSign::new_mut(modulus_buf, 1);
 
         //let mut thres = SliceWithSign::new_mut(thres_buf, 1);
@@ -457,17 +457,17 @@ impl Mantissa {
                 part3.add_assign(&modulus);
             }
 
-            /* thres[m*2 / DIGIT_BIT_SIZE] = 0;
-            thres[m*2 / DIGIT_BIT_SIZE + 1] = 0;
-            thres[0] = (j + 1) as Digit;
+            /* thres[m*2 / WORD_BIT_SIZE] = 0;
+            thres[m*2 / WORD_BIT_SIZE + 1] = 0;
+            thres[0] = (j + 1) as Word;
             thres.shift_left(m*2);
             if part3.cmp(&thres) >= 0 {
                 part3.sub_assign(&modulus);
             } */
 
             let jm = j * m;
-            let idx = jm / DIGIT_BIT_SIZE;
-            let shift = jm % DIGIT_BIT_SIZE;
+            let idx = jm / WORD_BIT_SIZE;
+            let shift = jm % WORD_BIT_SIZE;
 
             if idx >= d3.len() {
                 break;
@@ -493,8 +493,8 @@ mod tests {
 
     use super::*;
     use rand::random;
-    use crate::defs::DoubleDigit;
-    use crate::defs::DIGIT_BIT_SIZE;
+    use crate::defs::DoubleWord;
+    use crate::defs::WORD_BIT_SIZE;
 
     
     #[test]
@@ -536,14 +536,14 @@ mod tests {
         assert!(ret_s == ref_s);
 
         // d1*d2
-        let mut s1 = [0 as Digit; 100];
-        let mut s2 = [0 as Digit; 100];
+        let mut s1 = [0 as Word; 100];
+        let mut s2 = [0 as Word; 100];
 
         for (i, v) in s1.iter_mut().enumerate() {
-            *v = i as Digit;
+            *v = i as Word;
         }
         for (i, v) in s2.iter_mut().enumerate() {
-            *v = i as Digit + 1;
+            *v = i as Word + 1;
         }
 
         let mut ref_s = [0; 200];
@@ -555,8 +555,8 @@ mod tests {
         assert!(ret_s == ref_s);
 
         // 999..99 * 999..99
-        let s1 = [Digit::MAX; 50];
-        let s2 = [Digit::MAX; 50];
+        let s1 = [Word::MAX; 50];
+        let s2 = [Word::MAX; 50];
         let mut ref_s = [0; 100];
         mul(&s1, &s2, &mut ref_s);
 
@@ -619,8 +619,8 @@ mod tests {
 
             let f = random_slice(sz, sz);
 
-            let mut ret1 = DigitBuf::new(sz + sz).unwrap();
-            let mut ret2 = DigitBuf::new(sz + sz).unwrap();
+            let mut ret1 = WordBuf::new(sz + sz).unwrap();
+            let mut ret2 = WordBuf::new(sz + sz).unwrap();
 
             let mut n = vec![];
             let l = 100;
@@ -645,7 +645,7 @@ mod tests {
         }
     }
 
-    fn random_slice(min_len: usize, max_len: usize) -> Vec<Digit> {
+    fn random_slice(min_len: usize, max_len: usize) -> Vec<Word> {
         let mut s1 = Vec::new();
         let l = if max_len > min_len {
             random::<usize>() % (max_len - min_len) + min_len
@@ -658,22 +658,22 @@ mod tests {
         s1
     }
 
-    fn mul(s1: &[Digit], s2: &[Digit], ret: &mut [Digit]) {
+    fn mul(s1: &[Word], s2: &[Word], ret: &mut [Word]) {
         ret.fill(0);
         for (i, d1mi) in s1.iter().enumerate() {
-            let d1mi = *d1mi as DoubleDigit;
+            let d1mi = *d1mi as DoubleWord;
             if d1mi == 0 {
                 continue;
             }
 
             let mut k = 0;
             for (m2j, m3ij) in s2.iter().zip(ret[i..].iter_mut()) {
-                let m = d1mi * (*m2j as DoubleDigit) + *m3ij as DoubleDigit + k;
+                let m = d1mi * (*m2j as DoubleWord) + *m3ij as DoubleWord + k;
 
-                *m3ij = m as Digit;
-                k = m >> (DIGIT_BIT_SIZE);
+                *m3ij = m as Word;
+                k = m >> (WORD_BIT_SIZE);
             }
-            ret[i + s2.len()] += k as Digit;
+            ret[i + s2.len()] += k as Word;
         }
     }
 }

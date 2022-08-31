@@ -2,9 +2,9 @@
 
 
 use smallvec::SmallVec;
-use crate::defs::Digit;
+use crate::defs::Word;
 use crate::defs::Error;
-use crate::defs::DIGIT_BIT_SIZE;
+use crate::defs::WORD_BIT_SIZE;
 use core::ops::Index;
 use core::ops::IndexMut;
 use core::ops::Deref;
@@ -17,24 +17,24 @@ const STATIC_ALLOCATION: usize = 5;
 
 /// Buffer for holding mantissa gidits.
 #[derive(Debug)]
-pub struct DigitBuf {
-    inner: SmallVec<[Digit; STATIC_ALLOCATION]>,
+pub struct WordBuf {
+    inner: SmallVec<[Word; STATIC_ALLOCATION]>,
 }
 
-impl DigitBuf {
+impl WordBuf {
 
     #[inline]
     pub fn new(sz: usize) -> Result<Self, Error> {
         let mut inner = SmallVec::new();
         inner.try_reserve_exact(sz).map_err(Error::MemoryAllocation)?;
         unsafe { inner.set_len(sz); }
-        Ok(DigitBuf {
+        Ok(WordBuf {
             inner,
         })
     }
 
     #[inline]
-    pub fn fill(&mut self, d: Digit) {
+    pub fn fill(&mut self, d: Word) {
         self.inner.fill(d);
     }
 
@@ -44,13 +44,13 @@ impl DigitBuf {
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut Digit {
+    pub fn as_mut_ptr(&mut self) -> *mut Word {
         self.inner.as_mut_ptr()
     }
 
     /// Decrease length of mantissa to l bits.
     pub fn trunc_to(&mut self, l: usize) {
-        let n = (l + DIGIT_BIT_SIZE - 1)/DIGIT_BIT_SIZE;
+        let n = (l + WORD_BIT_SIZE - 1)/WORD_BIT_SIZE;
         let sz = self.len();
         self.inner.rotate_left(sz - n);
         self.inner.truncate(n);
@@ -58,7 +58,7 @@ impl DigitBuf {
 
     /// Try to exted the size to fit the precision p. Fill new elements with 0.
     pub fn try_extend(&mut self, p: usize) -> Result<(), Error> {
-        let n = (p + DIGIT_BIT_SIZE - 1)/DIGIT_BIT_SIZE;
+        let n = (p + WORD_BIT_SIZE - 1)/WORD_BIT_SIZE;
         let l = self.inner.len();
         self.inner.try_grow(n).map_err(Error::MemoryAllocation)?;
         unsafe { self.inner.set_len(n); }
@@ -69,7 +69,7 @@ impl DigitBuf {
 }
 
 
-impl<I: SliceIndex<[Digit]>> IndexMut<I> for DigitBuf {
+impl<I: SliceIndex<[Word]>> IndexMut<I> for WordBuf {
 
     #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
@@ -77,7 +77,7 @@ impl<I: SliceIndex<[Digit]>> IndexMut<I> for DigitBuf {
     }
 }
 
-impl<I: SliceIndex<[Digit]>> Index<I> for DigitBuf {
+impl<I: SliceIndex<[Word]>> Index<I> for WordBuf {
     type Output = I::Output;
 
     #[inline]
@@ -86,19 +86,19 @@ impl<I: SliceIndex<[Digit]>> Index<I> for DigitBuf {
     }
 }
 
-impl Deref for DigitBuf {
-    type Target = [Digit];
+impl Deref for WordBuf {
+    type Target = [Word];
 
     #[inline]
-    fn deref(&self) -> &[Digit] {
+    fn deref(&self) -> &[Word] {
         self.inner.deref()
     }
 }
 
-impl DerefMut for DigitBuf {
+impl DerefMut for WordBuf {
 
     #[inline]
-    fn deref_mut(&mut self) -> &mut [Digit] {
+    fn deref_mut(&mut self) -> &mut [Word] {
         self.inner.deref_mut()
     }
 }

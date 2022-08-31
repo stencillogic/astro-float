@@ -1,18 +1,18 @@
 //! Karatsuba multiplication.
 
 use crate::defs::Error;
-use crate::defs::Digit;
-use crate::defs::DoubleDigit;
-use crate::defs::DIGIT_BASE;
+use crate::defs::Word;
+use crate::defs::DoubleWord;
+use crate::defs::WORD_BASE;
 use crate::mantissa::Mantissa;
-use crate::mantissa::buf::DigitBuf;
+use crate::mantissa::buf::WordBuf;
 use crate::mantissa::util::add_carry;
 use itertools::izip;
 
 
 impl Mantissa {
 
-    fn add_slices(s1: &[Digit], s2: &[Digit], s3: &mut [Digit]) {
+    fn add_slices(s1: &[Word], s2: &[Word], s3: &mut [Word]) {
 
         let mut c = 0;
 
@@ -31,10 +31,10 @@ impl Mantissa {
             c = add_carry(*a, 0, c, x);
         }
 
-        *iter3.next().unwrap() = c as Digit;
+        *iter3.next().unwrap() = c as Word;
     }
 
-    fn paired_sub(s1: &[Digit], s2: &[Digit], s3: &mut [Digit]) {
+    fn paired_sub(s1: &[Word], s2: &[Word], s3: &mut [Word]) {
 
         let mut c = 0;
         let mut iter3 = s3.iter_mut();
@@ -47,34 +47,34 @@ impl Mantissa {
 
         for (a, b, x) in izip!(iter2, iter1.by_ref(), iter3.by_ref()) {
 
-            let v = *x as DoubleDigit;
-            let s = *a as DoubleDigit + *b as DoubleDigit + c;
+            let v = *x as DoubleWord;
+            let s = *a as DoubleWord + *b as DoubleWord + c;
 
             if v >= s {
-                *x = (v - s) as Digit;
+                *x = (v - s) as Word;
                 c = 0;
-            } else if v + DIGIT_BASE >= s {
-                *x = (v + DIGIT_BASE - s) as Digit;
+            } else if v + WORD_BASE >= s {
+                *x = (v + WORD_BASE - s) as Word;
                 c = 1;
             } else {
-                *x = (v + DIGIT_BASE*2 - s) as Digit;
+                *x = (v + WORD_BASE*2 - s) as Word;
                 c = 2;
             }
         }
 
         for (a, x) in iter1.zip(iter3.by_ref()) {
 
-            let v = *x as DoubleDigit;
-            let s = *a as DoubleDigit + c;
+            let v = *x as DoubleWord;
+            let s = *a as DoubleWord + c;
 
             if v >= s {
-                *x = (v - s) as Digit;
+                *x = (v - s) as Word;
                 c = 0;
-            } else if v + DIGIT_BASE >= s {
-                *x = (v + DIGIT_BASE - s) as Digit;
+            } else if v + WORD_BASE >= s {
+                *x = (v + WORD_BASE - s) as Word;
                 c = 1;
             } else {
-                *x = (v + DIGIT_BASE*2 - s) as Digit;
+                *x = (v + WORD_BASE*2 - s) as Word;
                 c = 2;
             }
         }
@@ -82,24 +82,24 @@ impl Mantissa {
         if c > 0 {
             for x in iter3 {
 
-                let v = *x as DoubleDigit;
+                let v = *x as DoubleWord;
                 let s = c;
     
                 if v >= s {
-                    *x = (v - s) as Digit;
+                    *x = (v - s) as Word;
                     c = 0;
-                } else if v + DIGIT_BASE >= s {
-                    *x = (v + DIGIT_BASE - s) as Digit;
+                } else if v + WORD_BASE >= s {
+                    *x = (v + WORD_BASE - s) as Word;
                     c = 1;
                 } else {
-                    *x = (v + DIGIT_BASE*2 - s) as Digit;
+                    *x = (v + WORD_BASE*2 - s) as Word;
                     c = 2;
                 }
             }
         }
     }
 
-    fn add_assign_slices(s1: &mut [Digit], s2: &[Digit]) {
+    fn add_assign_slices(s1: &mut [Word], s2: &[Word]) {
 
         let mut c = 0;
 
@@ -115,7 +115,7 @@ impl Mantissa {
         }
     }
 
-    pub(super) fn toom2(m1: &[Digit], m2: &[Digit], m3: &mut [Digit]) -> Result<(), Error> {
+    pub(super) fn toom2(m1: &[Word], m2: &[Word], m3: &mut [Word]) -> Result<(), Error> {
 
         let n = (m1.len().min(m2.len()) + 1) >> 1;
         let n2 = n << 1;
@@ -134,7 +134,7 @@ impl Mantissa {
             buf_holder2 = [0; 256];
             &mut buf_holder2[..buf_sz]
         } else {
-            buf_holder1 = DigitBuf::new(buf_sz)?;
+            buf_holder1 = WordBuf::new(buf_sz)?;
             &mut buf_holder1
         };
         
@@ -162,7 +162,7 @@ mod tests {
 
     use super::*;
     use rand::random;
-    use crate::defs::{DoubleDigit, DIGIT_BIT_SIZE};
+    use crate::defs::{DoubleWord, WORD_BIT_SIZE};
 
     
     #[test]
@@ -180,8 +180,8 @@ mod tests {
         assert!(ret_s == ref_s);
 
         // 999..99 * 999..99
-        let s1 = [Digit::MAX; 8];
-        let s2 = [Digit::MAX; 7];
+        let s1 = [Word::MAX; 8];
+        let s2 = [Word::MAX; 7];
         let mut ref_s = [0; 15];
         mul(&s1, &s2, &mut ref_s);
 
@@ -275,7 +275,7 @@ mod tests {
         }
     }
 
-    fn random_slice(min_len: usize, max_len: usize) -> Vec<Digit> {
+    fn random_slice(min_len: usize, max_len: usize) -> Vec<Word> {
         let mut s1 = Vec::new();
         let l = if max_len > min_len {
             random::<usize>() % (max_len - min_len) + min_len
@@ -288,22 +288,22 @@ mod tests {
         s1
     }
 
-    fn mul(s1: &[Digit], s2: &[Digit], ret: &mut [Digit]) {
+    fn mul(s1: &[Word], s2: &[Word], ret: &mut [Word]) {
         ret.fill(0);
         for (i, d1mi) in s1.iter().enumerate() {
-            let d1mi = *d1mi as DoubleDigit;
+            let d1mi = *d1mi as DoubleWord;
             if d1mi == 0 {
                 continue;
             }
 
             let mut k = 0;
             for (m2j, m3ij) in s2.iter().zip(ret[i..].iter_mut()) {
-                let m = d1mi * (*m2j as DoubleDigit) + *m3ij as DoubleDigit + k;
+                let m = d1mi * (*m2j as DoubleWord) + *m3ij as DoubleWord + k;
 
-                *m3ij = m as Digit;
-                k = m >> (DIGIT_BIT_SIZE);
+                *m3ij = m as Word;
+                k = m >> (WORD_BIT_SIZE);
             }
-            ret[i + s2.len()] += k as Digit;
+            ret[i + s2.len()] += k as Word;
         }
     }
 }

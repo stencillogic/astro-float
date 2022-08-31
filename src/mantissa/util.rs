@@ -2,12 +2,12 @@
 
 
 use itertools::izip;
-use crate::defs::DIGIT_MAX;
-use crate::defs::Digit;
-use crate::defs::DIGIT_BASE;
-use crate::defs::DIGIT_BIT_SIZE;
-use crate::defs::DoubleDigit;
-use crate::defs::DigitSigned;
+use crate::defs::WORD_MAX;
+use crate::defs::Word;
+use crate::defs::WORD_BASE;
+use crate::defs::WORD_BIT_SIZE;
+use crate::defs::DoubleWord;
+use crate::defs::SignedWord;
 use core::ops::DerefMut;
 use core::ops::Deref;
 
@@ -122,9 +122,9 @@ impl<'a, T> Iterator for RightShiftedSlice<'a, T>
 
 
 // Shift m left by n digits.
-pub fn shift_slice_left(m: &mut [Digit], n: usize) {
-    let idx = n / DIGIT_BIT_SIZE;
-    let shift = n % DIGIT_BIT_SIZE;
+pub fn shift_slice_left(m: &mut [Word], n: usize) {
+    let idx = n / WORD_BIT_SIZE;
+    let shift = n % WORD_BIT_SIZE;
     if idx >= m.len() {
         m.fill(0);
     } else if shift > 0 {
@@ -137,7 +137,7 @@ pub fn shift_slice_left(m: &mut [Digit], n: usize) {
                 if src > end {
                     let mut d = *src << shift;
                     src = src.sub(1);
-                    d |= *src >> (DIGIT_BIT_SIZE - shift);
+                    d |= *src >> (WORD_BIT_SIZE - shift);
                     *dst = d;
                     dst = dst.sub(1);
                 } else {
@@ -158,9 +158,9 @@ pub fn shift_slice_left(m: &mut [Digit], n: usize) {
 }
 
 // Shift m left by n digits and put result in m2.
-pub fn shift_slice_left_copy(m: &[Digit], m2: &mut [Digit], n: usize) {
-    let idx = n / DIGIT_BIT_SIZE;
-    let shift = n % DIGIT_BIT_SIZE;
+pub fn shift_slice_left_copy(m: &[Word], m2: &mut [Word], n: usize) {
+    let idx = n / WORD_BIT_SIZE;
+    let shift = n % WORD_BIT_SIZE;
     if idx >= m2.len() {
         m2.fill(0);
     } else if shift > 0 {
@@ -169,11 +169,11 @@ pub fn shift_slice_left_copy(m: &[Digit], m2: &mut [Digit], n: usize) {
         let src = m.iter();
         let mut prev = 0;
         for (a, b) in src.zip(dst.by_ref()) {
-            *b = (prev >> (DIGIT_BIT_SIZE - shift)) | (*a << shift);
+            *b = (prev >> (WORD_BIT_SIZE - shift)) | (*a << shift);
             prev = *a;
         }
         if let Some(b) = dst.next() {
-            *b = prev >> (DIGIT_BIT_SIZE - shift);
+            *b = prev >> (WORD_BIT_SIZE - shift);
         }
         for b in dst {
             *b = 0;
@@ -192,9 +192,9 @@ pub fn shift_slice_left_copy(m: &[Digit], m2: &mut [Digit], n: usize) {
 
 
 // Shift m right by n digits.
-pub fn shift_slice_right(m: &mut [Digit], n: usize) {
-    let idx = n / DIGIT_BIT_SIZE;
-    let shift = n % DIGIT_BIT_SIZE;
+pub fn shift_slice_right(m: &mut [Word], n: usize) {
+    let idx = n / WORD_BIT_SIZE;
+    let shift = n % WORD_BIT_SIZE;
     if idx >= m.len() {
         m.fill(0);
     } else if shift > 0 {
@@ -207,7 +207,7 @@ pub fn shift_slice_right(m: &mut [Digit], n: usize) {
                 if src < end {
                     let mut d = *src >> shift;
                     src = src.add(1);
-                    d |= *src << (DIGIT_BIT_SIZE - shift);
+                    d |= *src << (WORD_BIT_SIZE - shift);
                     *dst = d;
                     dst = dst.add(1);
                 } else {
@@ -231,11 +231,11 @@ pub fn shift_slice_right(m: &mut [Digit], n: usize) {
 
 // Internal repr of SliceWithSign.
 enum SliceWithSignType<'a> {
-    Mut(&'a mut [Digit]),
-    Immut(&'a [Digit])
+    Mut(&'a mut [Word]),
+    Immut(&'a [Word])
 }
 
-// Slice of digits with sign is a lightweight integer number representation.
+// Slice of words with sign is a lightweight integer number representation.
 pub struct SliceWithSign<'a> {
     m: SliceWithSignType<'a>,
     sign: i8,
@@ -243,14 +243,14 @@ pub struct SliceWithSign<'a> {
 
 impl<'a> SliceWithSign<'a> {
     
-    pub fn new_mut(m: &'a mut [Digit], sign: i8) -> Self {
+    pub fn new_mut(m: &'a mut [Word], sign: i8) -> Self {
         SliceWithSign {
             m: SliceWithSignType::Mut(m),
             sign,
         }
     }
 
-    pub fn new(m: &'a[Digit], sign: i8) -> Self {
+    pub fn new(m: &'a[Word], sign: i8) -> Self {
         SliceWithSign {
             m: SliceWithSignType::Immut(m),
             sign,
@@ -316,22 +316,22 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
-    pub fn mul_assign<'c>(&mut self, s2: &SliceWithSign<'c>, work_buf: &mut [Digit]) {
+    pub fn mul_assign<'c>(&mut self, s2: &SliceWithSign<'c>, work_buf: &mut [Word]) {
         work_buf.fill(0);
         for (i, d1mi) in self.deref().iter().enumerate() {
-            let d1mi = *d1mi as DoubleDigit;
+            let d1mi = *d1mi as DoubleWord;
             if d1mi == 0 {
                 continue;
             }
 
             let mut k = 0;
             for (m2j, m3ij) in s2.deref().iter().zip(work_buf[i..].iter_mut()) {
-                let m = d1mi * (*m2j as DoubleDigit) + *m3ij as DoubleDigit + k;
+                let m = d1mi * (*m2j as DoubleWord) + *m3ij as DoubleWord + k;
 
-                *m3ij = m as Digit;
-                k = m >> (DIGIT_BIT_SIZE);
+                *m3ij = m as Word;
+                k = m >> (WORD_BIT_SIZE);
             }
-            work_buf[i + s2.len()] += k as Digit;
+            work_buf[i + s2.len()] += k as Word;
         }
         self.deref_mut().copy_from_slice(work_buf);
         self.sign *= s2.sign;
@@ -347,11 +347,11 @@ impl<'a> SliceWithSign<'a> {
         shift_slice_right(self, shift);
     }
 
-    pub fn div_by_digit(&mut self, d: Digit) {
+    pub fn div_by_word(&mut self, d: Word) {
 
         debug_assert!(d != 0);
 
-        let d = d as DoubleDigit;
+        let d = d as DoubleWord;
         let mut rh = 0;
         let m = self.deref_mut();
         let mut iter = m.iter_mut().rev();
@@ -363,8 +363,8 @@ impl<'a> SliceWithSign<'a> {
             return;
         }
 
-        if (*val as DoubleDigit) < d {
-            rh = *val as DoubleDigit;
+        if (*val as DoubleWord) < d {
+            rh = *val as DoubleWord;
             *val = 0;
             if let Some(v) = iter.next() {
                 val = v;
@@ -374,11 +374,11 @@ impl<'a> SliceWithSign<'a> {
         }
 
         loop {
-            let qh = rh * DIGIT_BASE as DoubleDigit + *val as DoubleDigit;
+            let qh = rh * WORD_BASE as DoubleWord + *val as DoubleWord;
 
             rh = qh % d;
 
-            *val = (qh / d) as Digit;
+            *val = (qh / d) as Word;
 
             if let Some(v) = iter.next() {
                 val = v;
@@ -400,7 +400,7 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
-    fn abs_add(s1: &[Digit], s2: &[Digit], dst: &mut [Digit]) {
+    fn abs_add(s1: &[Word], s2: &[Word], dst: &mut [Word]) {
 
         let mut c = 0;
 
@@ -421,7 +421,7 @@ impl<'a> SliceWithSign<'a> {
         }
 
         if c > 0 {
-            *iter3.next().unwrap() = c as Digit;
+            *iter3.next().unwrap() = c as Word;
         }
 
         for v in iter3 {
@@ -429,7 +429,7 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
-    fn abs_add_assign(s1: &mut [Digit], s2: &[Digit]) {
+    fn abs_add_assign(s1: &mut [Word], s2: &[Word]) {
 
         let mut c = 0;
         let mut iter1 = s1.iter_mut();
@@ -445,7 +445,7 @@ impl<'a> SliceWithSign<'a> {
     }
 
     // prereq: val of s1 >= val of s2
-    fn abs_sub_assign_1(s1: &mut [Digit], s2: &[Digit]) {
+    fn abs_sub_assign_1(s1: &mut [Word], s2: &[Word]) {
 
         let mut c = 0;
         let mut iter1 = s1.iter_mut();
@@ -463,7 +463,7 @@ impl<'a> SliceWithSign<'a> {
     }
 
     // prereq: val of s2 > val of s1
-    fn abs_sub_assign_2(s1: &mut [Digit], s2: &[Digit]) {
+    fn abs_sub_assign_2(s1: &mut [Word], s2: &[Word]) {
 
         let mut c = 0;
 
@@ -474,7 +474,7 @@ impl<'a> SliceWithSign<'a> {
         debug_assert!(c == 0);
     }
 
-    fn abs_sub(s1: &[Digit], s2: &[Digit], dst: &mut [Digit]) {
+    fn abs_sub(s1: &[Word], s2: &[Word], dst: &mut [Word]) {
 
         let mut c = 0;
 
@@ -505,7 +505,7 @@ impl<'a> SliceWithSign<'a> {
     pub fn decrement_abs(&mut self) {
         for v in self.iter_mut() {
             if *v == 0 {
-                *v = DIGIT_MAX;
+                *v = WORD_MAX;
             } else {
                 *v -= 1;
                 return;
@@ -523,7 +523,7 @@ impl<'a> SliceWithSign<'a> {
         true
     }
 
-    fn abs_cmp(s1: &[Digit], s2: &[Digit]) -> DigitSigned {
+    fn abs_cmp(s1: &[Word], s2: &[Word]) -> SignedWord {
 
         let len = s1.len().min(s2.len());
 
@@ -540,7 +540,7 @@ impl<'a> SliceWithSign<'a> {
         }
 
         for (a, b) in core::iter::zip(s1[..len].iter().rev(), s2[..len].iter().rev()) {
-            let diff = *a as DigitSigned - *b as DigitSigned;
+            let diff = *a as SignedWord - *b as SignedWord;
             if diff != 0 {
                 return diff;
             }
@@ -561,10 +561,10 @@ impl<'a> SliceWithSign<'a> {
 }
 
 impl<'a> Deref for SliceWithSign<'a> {
-    type Target = [Digit];
+    type Target = [Word];
 
     #[inline]
-    fn deref(&self) -> &[Digit] {
+    fn deref(&self) -> &[Word] {
         match &self.m {
             SliceWithSignType::Mut(m) => m,
             SliceWithSignType::Immut(m) => m,
@@ -575,7 +575,7 @@ impl<'a> Deref for SliceWithSign<'a> {
 impl<'a> DerefMut for SliceWithSign<'a> {
 
     #[inline]
-    fn deref_mut(&mut self) -> &mut [Digit] {
+    fn deref_mut(&mut self) -> &mut [Word] {
         match &mut self.m {
             SliceWithSignType::Mut(m) => m,
             _ => panic!(),
@@ -584,55 +584,55 @@ impl<'a> DerefMut for SliceWithSign<'a> {
 }
 
 #[inline(always)]
-pub fn add_carry(a: Digit, b: Digit, c: Digit, r: &mut Digit) -> Digit {
+pub fn add_carry(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
 
     #[cfg(target_arch = "x86_64")] 
     {
-        unsafe { core::arch::x86_64::_addcarry_u32(c as u8, a, b, r) as Digit } 
+        unsafe { core::arch::x86_64::_addcarry_u32(c as u8, a, b, r) as Word } 
     }
     
     #[cfg(target_arch = "x86")] 
     {
-        unsafe { core::arch::x86::_addcarry_u32(c as u8, a, b, r) as Digit } 
+        unsafe { core::arch::x86::_addcarry_u32(c as u8, a, b, r) as Word } 
     }
     
     #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
     {
-        let mut s = c as DoubleDigit + a as DoubleDigit + b as DoubleDigit;
-        if s >= DIGIT_BASE {
-            s -= DIGIT_BASE;
-            *r = s as Digit;
+        let mut s = c as DoubleWord + a as DoubleWord + b as DoubleWord;
+        if s >= WORD_BASE {
+            s -= WORD_BASE;
+            *r = s as Word;
             1
         } else {
-            *r = s as Digit;
+            *r = s as Word;
             0
         }
     }
 }
 
 #[inline(always)]
-pub fn sub_borrow(a: Digit, b: Digit, c: Digit, r: &mut Digit) -> Digit {
+pub fn sub_borrow(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
 
     #[cfg(target_arch = "x86_64")] 
     {
-        unsafe { core::arch::x86_64::_subborrow_u32(c as u8, a, b, r) as Digit }
+        unsafe { core::arch::x86_64::_subborrow_u32(c as u8, a, b, r) as Word }
     }
 
     #[cfg(target_arch = "x86")] 
     {
-        unsafe { core::arch::x86::_subborrow_u32(c as u8, a, b, r) as Digit }
+        unsafe { core::arch::x86::_subborrow_u32(c as u8, a, b, r) as Word }
     }
     
     #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
     {
-        let v1 = a as DoubleDigit;
-        let v2 = b as DoubleDigit + c as DoubleDigit;
+        let v1 = a as DoubleWord;
+        let v2 = b as DoubleWord + c as DoubleWord;
     
         if v1 < v2 {
-            *r = (v1 + DIGIT_BASE - v2) as Digit;
+            *r = (v1 + WORD_BASE - v2) as Word;
             1
         } else {
-            *r = (v1 - v2) as Digit;
+            *r = (v1 - v2) as Word;
             0
         }
     }

@@ -1,14 +1,14 @@
 //! Division algos.
 
 use crate::common::util::log2_ceil;
-use crate::defs::DIGIT_BIT_SIZE;
-use crate::defs::DIGIT_BASE;
-use crate::defs::DIGIT_SIGNIFICANT_BIT;
+use crate::defs::WORD_BIT_SIZE;
+use crate::defs::WORD_BASE;
+use crate::defs::WORD_SIGNIFICANT_BIT;
 use crate::defs::Error;
-use crate::defs::Digit;
-use crate::defs::DoubleDigit;
+use crate::defs::Word;
+use crate::defs::DoubleWord;
 use crate::mantissa::Mantissa;
-use crate::mantissa::buf::DigitBuf;
+use crate::mantissa::buf::WordBuf;
 use crate::mantissa::util::SliceWithSign;
 use crate::mantissa::util::add_carry;
 
@@ -16,52 +16,52 @@ use crate::mantissa::util::add_carry;
 impl Mantissa {
 
     // Basic integer division.
-    fn div_basic(m1: &[Digit], m2: &[Digit]) -> Result<(DigitBuf, DigitBuf), Error> {
+    fn div_basic(m1: &[Word], m2: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
 
         debug_assert!(m1.len() >= m2.len());
 
         let l1 = m1.len();
         let l2 = m2.len();
-        let mut c: DoubleDigit;
+        let mut c: DoubleWord;
         let mut j: usize;
-        let mut qh: DoubleDigit;
-        let mut k: DoubleDigit;
-        let mut rh: DoubleDigit;
-        let mut buf = DigitBuf::new(l1 + l2 + 2)?;
+        let mut qh: DoubleWord;
+        let mut k: DoubleWord;
+        let mut rh: DoubleWord;
+        let mut buf = WordBuf::new(l1 + l2 + 2)?;
         let (buf1, buf2) = (&mut buf).split_at_mut(l1 + 1);
         let n = l2 - 1;
         let m = l1 - 1;
-        let mut m3 = DigitBuf::new(m - n + 1)?;
-        let mut rem = DigitBuf::new(l2)?;
+        let mut m3 = WordBuf::new(m - n + 1)?;
+        let mut rem = WordBuf::new(l2)?;
 
         if n == 0 {
-            // division by single digit
-            let d = m2[0] as DoubleDigit;
+            // division by single word
+            let d = m2[0] as DoubleWord;
             rh = 0;
             let mut j = l1 - l2 + 1;
             let mut iter = m1.iter().rev();
-            let mut val = *iter.next().unwrap_or(&0) as DoubleDigit;
+            let mut val = *iter.next().unwrap_or(&0) as DoubleWord;
             let mut m3iter = m3.iter_mut().rev();
             if val < d {
                 rh = val;
-                val = *iter.next().unwrap_or(&0) as DoubleDigit;
+                val = *iter.next().unwrap_or(&0) as DoubleWord;
                 *m3iter.next().unwrap() = 0;
-                rem[0] = rh as Digit;
+                rem[0] = rh as Word;
                 j -= 1;
             }
         
             if j > 0 {
                 loop {
-                    qh = rh * DIGIT_BASE as DoubleDigit + val;
+                    qh = rh * WORD_BASE as DoubleWord + val;
                     rh = qh % d;
                 
                     if let Some(v) = m3iter.next() {
-                        *v = (qh / d) as Digit;
-                        rem[0] = rh as Digit;
+                        *v = (qh / d) as Word;
+                        rem[0] = rh as Word;
                     } else {
                         break;
                     }
-                    val = *iter.next().unwrap_or(&0) as DoubleDigit;
+                    val = *iter.next().unwrap_or(&0) as DoubleWord;
                 }
             } else {
                 for v in m3iter {
@@ -70,7 +70,7 @@ impl Mantissa {
             }
         } else {
             // normalize: buf1 = d1 * d, buf2 = d2 * d
-            let d = DIGIT_BASE / (m2[n] as DoubleDigit + 1); // factor d: d * m2[most significant] is close to DIGIT_MAX
+            let d = WORD_BASE / (m2[n] as DoubleWord + 1); // factor d: d * m2[most significant] is close to WORD_MAX
 
             if d == 1 {
                 buf1[..l1].clone_from_slice(m1);
@@ -78,12 +78,12 @@ impl Mantissa {
                 buf1[l1] = 0;
                 buf2[l2] = 0;
             } else {
-                Self::mul_by_digit(m1, d, buf1);
-                Self::mul_by_digit(m2, d, buf2);
+                Self::mul_by_word(m1, d, buf1);
+                Self::mul_by_word(m2, d, buf2);
             }
 
-            let v1 = buf2[n] as DoubleDigit;
-            let v2 = buf2[n - 1] as DoubleDigit;
+            let v1 = buf2[n] as DoubleWord;
+            let v2 = buf2[n - 1] as DoubleWord;
 
             j = m - n;
             let mut m3iter = m3.iter_mut().rev();
@@ -92,19 +92,19 @@ impl Mantissa {
             let mut buf11;
             let mut buf10;
             loop {
-                buf12 = buf1[j + n + 1] as DoubleDigit;
-                buf11 = buf1[j + n] as DoubleDigit;
-                buf10 = buf1[j + n - 1] as DoubleDigit;
+                buf12 = buf1[j + n + 1] as DoubleWord;
+                buf11 = buf1[j + n] as DoubleWord;
+                buf10 = buf1[j + n - 1] as DoubleWord;
 
-                qh = buf12 * DIGIT_BASE + buf11;
+                qh = buf12 * WORD_BASE + buf11;
                 rh = qh % v1;
                 qh /= v1;
 
-                if qh >= DIGIT_BASE || (qh * v2 > DIGIT_BASE * rh + buf10) {
+                if qh >= WORD_BASE || (qh * v2 > WORD_BASE * rh + buf10) {
                     qh -= 1;
                     rh += v1;
-                    if rh < DIGIT_BASE && 
-                        (qh >= DIGIT_BASE || (qh * v2 > DIGIT_BASE * rh + buf10)) {
+                    if rh < WORD_BASE && 
+                        (qh >= WORD_BASE || (qh * v2 > WORD_BASE * rh + buf10)) {
                             qh -= 1;
                     }
                 }
@@ -113,13 +113,13 @@ impl Mantissa {
                 c = 0;
                 k = 0;
                 for (a, b) in buf2[..n+2].iter().zip(buf1[j..j+n+2].iter_mut()) {
-                    k = *a as DoubleDigit * qh + k / DIGIT_BASE;
-                    let val = k % DIGIT_BASE + c;
-                    if (*b as DoubleDigit) < val {
-                        *b += (DIGIT_BASE - val) as Digit;
+                    k = *a as DoubleWord * qh + k / WORD_BASE;
+                    let val = k % WORD_BASE + c;
+                    if (*b as DoubleWord) < val {
+                        *b += (WORD_BASE - val) as Word;
                         c = 1;
                     } else {
-                        *b -= val as Digit;
+                        *b -= val as Word;
                         c = 0;
                     }
                 }
@@ -129,14 +129,14 @@ impl Mantissa {
                     qh -= 1;
                     c = 0;
                     for (a, b) in buf2[..n+2].iter().zip(buf1[j..j+n+2].iter_mut()) {
-                        c = add_carry(*a, *b, c as Digit, b) as DoubleDigit;
+                        c = add_carry(*a, *b, c as Word, b) as DoubleWord;
                     }
                     debug_assert!(c > 0);
                 }
 
                 if let Some(v) = m3iter.next() {
                     if in_loop || qh > 0 {
-                        *v = qh as Digit;
+                        *v = qh as Word;
                     } else {
                         *v = 0;
                     }
@@ -160,26 +160,26 @@ impl Mantissa {
                 rh = 0;
                 let mut j = l1 + 1;
                 let mut iter = buf1[..l2].iter().rev();
-                let mut val = *iter.next().unwrap_or(&0) as DoubleDigit;
+                let mut val = *iter.next().unwrap_or(&0) as DoubleWord;
                 let mut remiter = rem.iter_mut().rev();
                 if val < d {
                     rh = val;
-                    val = *iter.next().unwrap_or(&0) as DoubleDigit;
+                    val = *iter.next().unwrap_or(&0) as DoubleWord;
                     *remiter.next().unwrap() = 0;
                     j -= 1;
                 }
             
                 if j > 0 {
                     loop {
-                        qh = rh * DIGIT_BASE as DoubleDigit + val;
+                        qh = rh * WORD_BASE as DoubleWord + val;
                         rh = qh % d;
     
                         if let Some(v) = remiter.next() {
-                            *v = (qh / d) as Digit;
+                            *v = (qh / d) as Word;
                         } else {
                             break;
                         }
-                        val = *iter.next().unwrap_or(&0) as DoubleDigit;
+                        val = *iter.next().unwrap_or(&0) as DoubleWord;
                     }
                 } else {
                     for v in remiter {
@@ -204,9 +204,9 @@ impl Mantissa {
     // Recursive integer division from the book of Richard P. Brent and Paul Zimmermann.
     // Divides m1 by m2, returns quotinent and remainder.
     // prereq: m <= n, m2 is normalized
-    fn div_recursive(m1: &[Digit], m2: &[Digit]) -> Result<(DigitBuf, DigitBuf), Error> {
+    fn div_recursive(m1: &[Word], m2: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
 
-        debug_assert!(m2[m2.len()-1] & DIGIT_SIGNIFICANT_BIT != 0);
+        debug_assert!(m2[m2.len()-1] & WORD_SIGNIFICANT_BIT != 0);
 
         let m = m1.len() - m2.len();
 
@@ -219,8 +219,8 @@ impl Mantissa {
             let k = m / 2;
             let k2 = k << 1;
 
-            let mut rembuf = DigitBuf::new(m1.len())?;
-            let mut tmpbuf = DigitBuf::new(m1.len())?;
+            let mut rembuf = WordBuf::new(m1.len())?;
+            let mut tmpbuf = WordBuf::new(m1.len())?;
 
             let a1 = SliceWithSign::new(&m1[k2..], 1);  // m1 div 2^(2*k)
             let a0 = SliceWithSign::new(&m1[..k2], 1);  // m1 mod 2^(2*k)
@@ -263,7 +263,7 @@ impl Mantissa {
                 }
             }
 
-            q1buf.try_extend((m + 1)*DIGIT_BIT_SIZE)?;
+            q1buf.try_extend((m + 1)*WORD_BIT_SIZE)?;
             let mut q1 = SliceWithSign::new_mut(&mut q1buf, 1);
 
             if ub > k {
@@ -307,7 +307,7 @@ impl Mantissa {
     }
 
     // general case division
-    pub(super) fn div_unbalanced(m1: &[Digit], m2: &[Digit]) -> Result<(DigitBuf, DigitBuf), Error> {
+    pub(super) fn div_unbalanced(m1: &[Word], m2: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
 
         let mut m = m1.len() - m2.len();
         let n = m2.len();
@@ -322,10 +322,10 @@ impl Mantissa {
 
         } else {
 
-            let mut buf1 = DigitBuf::new(m + 1)?;
+            let mut buf1 = WordBuf::new(m + 1)?;
             buf1[m] = 0;
 
-            let mut buf3 = DigitBuf::new(m1.len())?;
+            let mut buf3 = WordBuf::new(m1.len())?;
             buf3.copy_from_slice(m1);
 
             let mut ub = m1.len();
@@ -362,9 +362,9 @@ impl Mantissa {
     // short division
     // prepreq: m1.len() = 2*m2.len()
     #[allow(dead_code)] // TODO: consider performance improvement
-    fn div_short(m1: &[Digit], m2: &[Digit]) -> Result<DigitBuf, Error> {
+    fn div_short(m1: &[Word], m2: &[Word]) -> Result<WordBuf, Error> {
         debug_assert!(m1.len() == 2*m2.len());
-        debug_assert!(m2[m2.len()-1] & DIGIT_SIGNIFICANT_BIT != 0);
+        debug_assert!(m2[m2.len()-1] & WORD_SIGNIFICANT_BIT != 0);
         if m2.len() <= 20 {
             let (q1, _r1) = Self::div_basic(m1, m2)?;
             Ok(q1)
@@ -381,7 +381,7 @@ impl Mantissa {
             let (mut q1, mut r1) = Self::div_basic(&a1, &b1)?;
 
             // a2 = a0 + r1*2^(2*k) - q1*b0*2^k
-            let mut tmp_buf = DigitBuf::new(m1.len() + 1)?;
+            let mut tmp_buf = WordBuf::new(m1.len() + 1)?;
 
             // TODO: consider using mul_short when it gets faster than mul_unbalanced
             tmp_buf[..k].fill(0);
@@ -391,13 +391,13 @@ impl Mantissa {
             let mut bqk = SliceWithSign::new_mut(&mut tmp_buf, -1);
             bqk.add_assign(&a0);
 
-            r1.try_extend((r1.len() + k*2)*DIGIT_BIT_SIZE)?;
+            r1.try_extend((r1.len() + k*2)*WORD_BIT_SIZE)?;
             let r1 = SliceWithSign::new(&r1, 1);
             bqk.add_assign(&r1);
 
             if bqk.sign() < 0 {
                 let mut q1 = SliceWithSign::new_mut(&mut q1, -1);
-                let mut bk = DigitBuf::new(m2.len() + k)?;
+                let mut bk = WordBuf::new(m2.len() + k)?;
                 bk[..k].fill(0);
                 bk[k..].copy_from_slice(m2);
                 let b = SliceWithSign::new(&bk, 1);
@@ -409,7 +409,7 @@ impl Mantissa {
             let q0 = Self::div_short(&a21[..b21.len()*2], &b21)?;
             let q0 = SliceWithSign::new(&q0, 1);
 
-            let mut full_q_buf = DigitBuf::new(m2.len() + 1)?;
+            let mut full_q_buf = WordBuf::new(m2.len() + 1)?;
             full_q_buf[..k].fill(0);
             full_q_buf[q1.len()+k..].fill(0);
             full_q_buf[k..q1.len()+k].copy_from_slice(&q1);
@@ -426,7 +426,7 @@ impl Mantissa {
 mod tests {
 
     use super::*;
-    use crate::defs::{DIGIT_SIGNIFICANT_BIT};
+    use crate::defs::{WORD_SIGNIFICANT_BIT};
     use rand::random;
 
     #[test]
@@ -550,7 +550,7 @@ mod tests {
         }
     }
 
-    fn random_normalized_slice(min_len: usize, max_len: usize) -> Vec<Digit> {
+    fn random_normalized_slice(min_len: usize, max_len: usize) -> Vec<Word> {
         let mut s1 = Vec::new();
         let l = if max_len > min_len {
             random::<usize>() % (max_len - min_len) + min_len
@@ -561,7 +561,7 @@ mod tests {
             s1.push(random());
         }
         let l = s1.len();
-        s1[l-1] |= DIGIT_SIGNIFICANT_BIT;
+        s1[l-1] |= WORD_SIGNIFICANT_BIT;
         s1
     }
 }

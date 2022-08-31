@@ -24,10 +24,10 @@ struct SinhPolycoeffGen {
 impl SinhPolycoeffGen {
 
     fn new(p: usize) -> Result<Self, Error> {
-        let one = BigFloatNumber::from_digit(1, 1)?;
-        let inc = BigFloatNumber::from_digit(1, 1)?;
-        let fct = BigFloatNumber::from_digit(1, p)?;
-        let one_full_p = BigFloatNumber::from_digit(1, p)?;
+        let one = BigFloatNumber::from_word(1, 1)?;
+        let inc = BigFloatNumber::from_word(1, 1)?;
+        let fct = BigFloatNumber::from_word(1, p)?;
+        let one_full_p = BigFloatNumber::from_word(1, p)?;
 
         let iter_cost = (get_mul_cost(p) + get_add_cost(p)) << 1; // 2 * (cost(mul) + cost(add))
 
@@ -118,7 +118,7 @@ impl BigFloatNumber {
     fn sinh_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // sinh(3*x) = 3*sinh(x) + 4*sinh(x)^3
         let mut ret = self.clone()?;
-        let three = Self::from_digit(3, 1)?;
+        let three = Self::from_word(3, 1)?;
         for _ in 0..n {
             ret = ret.div(&three, rm)?;
         }
@@ -130,8 +130,8 @@ impl BigFloatNumber {
     fn sinh_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // sinh(3*x) = 3*sinh(x) + 4*sinh(x)^3
         let mut sinh = self.clone()?;
-        let three = Self::from_digit(3, 1)?;
-        let four = Self::from_digit(4, 1)?;
+        let three = Self::from_word(3, 1)?;
+        let four = Self::from_word(4, 1)?;
         for _ in 0..n {
             let mut sinh_cub = sinh.mul(&sinh, rm)?;
             sinh_cub = sinh_cub.mul(&sinh, rm)?;
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn test_trigh() {
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_digit(1,32000).unwrap();
+        let mut n1 = BigFloatNumber::from_word(1,32000).unwrap();
         n1.set_exponent(0);
         let n2 = n1.sinh_series(rm).unwrap();
         //println!("{:?}", n2.fp3(crate::Radix::Dec, rm).unwrap());
