@@ -302,147 +302,35 @@ impl Mantissa {
 
     /// Divide mantissa by mantissa, return result and exponent ajustment.
     pub fn div(&self, m2: &Self, rm: RoundingMode, is_positive: bool) -> Result<(isize, Self), Error> {
-        // Knuth's division
-        let extra_p = 2;
-        let l1 = self.m.len().max(m2.m.len()) + extra_p;
-        let l2 = m2.m.len();
-        let mut m3 = Self::new(l1*DIGIT_BIT_SIZE)?;
-        let mut c: DoubleDigit;
-        let mut j: isize;
-        let mut qh: DoubleDigit;
-        let mut k: DoubleDigit;
-        let mut rh: DoubleDigit;
-        let mut buf = Self::reserve_new(l1 * 2 + l2 + 4)?;
-        let (buf1, buf2) = (&mut buf).split_at_mut(l1 * 2 + 3);
-        let n1: usize = 2 + l1;
-        let mut n1j: usize;
-        let n = l2 - 1;
-        let m = l1 - 1;
-        let mut e_shift = 1;
 
-        if n == 0 {
-            // division by single digit
-            let d = m2.m[0] as DoubleDigit;
-            rh = 0;
-            let mut iter = self.m.iter().rev();
-            let mut val = *iter.next().unwrap_or(&0) as DoubleDigit;
-            if val < d {
-                rh = val;
-                e_shift = 0;
-                val = *iter.next().unwrap_or(&0) as DoubleDigit;
-            }
+        let extra_p = 1;
+        let l = m2.len().max(self.len());
+        let k = extra_p + l - self.len() + m2.len();
 
-            let mut m3iter = m3.m.iter_mut().rev();
-            loop {
-                qh = rh * DIGIT_BASE as DoubleDigit + val;
-                rh = qh % d;
+        let mut m1 = Self::reserve_new(self.len() + k)?;
+        m1[k..].copy_from_slice(&self.m);
+        m1[..k].fill(0);
 
-                if let Some(v) = m3iter.next() {
-                    *v = (qh / d) as Digit;
-                } else {
-                    break;
-                }
-                val = *iter.next().unwrap_or(&0) as DoubleDigit;
-            }
+        let (q, _r) = Self::div_unbalanced(&m1, &m2.m)?;
+
+        let n = q.len() * DIGIT_BIT_SIZE;
+        let mut m3 = Mantissa {
+            m: q,
+            n,
+        };
+
+        let mut e_shift = if self.m[self.len() - 1] >= m2.m[m2.len() - 1] {
+            1
         } else {
-            // normalize: buf1 = d1 * d, buf2 = d2 * d
-            let d = DIGIT_BASE / (m2.m[m2.len()-1] as DoubleDigit + 1); // factor d: d * m2[most significant] is close to DIGIT_MAX
+            0
+        };
 
-            let mut dst_ptr = extra_p;
-            if self.len() < m2.len() {
-                // move self to the most significant digits.
-                dst_ptr += m2.len() - self.len();
-            }
-            (&mut buf1[..n1+dst_ptr]).fill(0);
-            (&mut buf1[self.len()+n1+dst_ptr..]).fill(0);
-            (&mut buf2[m2.len()..]).fill(0);
-            if d == 1 {
-                buf1[n1+dst_ptr..(self.len()+n1+dst_ptr)].clone_from_slice(&self.m[..]);
-                buf2[..m2.len()].clone_from_slice(&m2.m[..]);
-            } else {
-                Self::mul_by_digit(&self.m, d, &mut buf1[n1+dst_ptr..]);
-                Self::mul_by_digit(&m2.m, d, buf2);
-            }
-
-            let v1 = buf2[n] as DoubleDigit;
-            let v2 = buf2[n - 1] as DoubleDigit;
-
-            j = m as isize - n as isize;
-            n1j = (n1 as isize + j) as usize;
-            let mut m3iter = m3.m.iter_mut().rev();
-            let mut in_loop = false;
-            let mut buf12;
-            let mut buf11;
-            let mut buf10;
-            loop {
-                buf12 = buf1[n1j + n + 1] as DoubleDigit;
-                buf11 = buf1[n1j + n] as DoubleDigit;
-                buf10 = buf1[n1j + n - 1] as DoubleDigit;
-
-                qh = buf12 * DIGIT_BASE + buf11;
-                rh = qh % v1;
-                qh /= v1;
-
-                if qh >= DIGIT_BASE || (qh * v2 > DIGIT_BASE * rh + buf10) {
-                    qh -= 1;
-                    rh += v1;
-                    if rh < DIGIT_BASE && 
-                        (qh >= DIGIT_BASE || (qh * v2 > DIGIT_BASE * rh + buf10)) {
-                            qh -= 1;
-                    }
-                }
-
-                // n1_j = n1_j - n2 * qh
-                c = 0;
-                k = 0;
-                for (a, b) in buf2[..n+2].iter().zip(buf1[n1j..n1j+n+2].iter_mut()) {
-                    k = *a as DoubleDigit * qh + k / DIGIT_BASE;
-                    let val = k % DIGIT_BASE + c;
-                    if (*b as DoubleDigit) < val {
-                        *b += (DIGIT_BASE - val) as Digit;
-                        c = 1;
-                    } else {
-                        *b -= val as Digit;
-                        c = 0;
-                    }
-                }
-
-                if c > 0 {
-                    // compensate
-                    qh -= 1;
-                    c = 0;
-                    for (a, b) in buf2[..n+2].iter().zip(buf1[n1j..n1j+n+2].iter_mut()) {
-                        c = add_carry(*a, *b, c as Digit, b) as DoubleDigit;
-                    }
-                    debug_assert!(c > 0);
-                }
-
-                if let Some(v) = m3iter.next() {
-                    if in_loop || qh > 0 {
-                        *v = qh as Digit;
-                    } else {
-                        e_shift = 0;
-                    }
-                } else {
-                    break;
-                }
-
-                j -= 1;
-                if n1 as isize + j < 0 {
-                    break;
-                } else {
-                    n1j = (n1 as isize + j) as usize;
-                }
-                in_loop = true;
-            }
-        }
-
-        let _ = Self::maximize(&mut m3.m);
-        if m3.round_mantissa(extra_p*DIGIT_BIT_SIZE, rm, is_positive) {
+        let _ = Self::maximize(&mut m3.m) as isize;
+        if m3.round_mantissa((extra_p + 1) * DIGIT_BIT_SIZE, rm, is_positive) {
             e_shift -= 1;
         }
 
-        m3.m.trunc_to((l1-extra_p)*DIGIT_BIT_SIZE);
+        m3.m.trunc_to(l * DIGIT_BIT_SIZE);
         m3.n = m3.max_bit_len();
 
         debug_assert!(e_shift >= -1 && e_shift <= 1);
@@ -715,57 +603,4 @@ impl Mantissa {
             n: self.n,
         })
     }
-
-/* TODO: incomlete optimiztion implementation
-    /// Compute reciprocal of a number.
-    pub fn reciprocal(&self, rm: RoundingMode, is_positive: bool) -> Result<(usize, Self), Error> {
-        if self.len() < 500 {
-            let one = Self::one(1)?;
-            one.div(self, rm, is_positive)
-        } else {
-            //  Newton's method: x(n+1) = x(n)*2 - self*x(n)*x(n)
-            let mut x = self.clone()?;
-            x.set_length(x.len()/2 + DIGIT_BIT_SIZE)?;
-            let (mut shift, ret) = x.reciprocal(rm, is_positive)?;
-
-            // allocate just once
-            let buf_sz = (self.len() + ret.len()*2);
-            let mut buf = DigitBuf::new(buf_sz*3)?;
-            buf.fill(0);
-            let (buf1, rest) = buf.split_at_mut(buf_sz);
-            let (buf2, rest) = rest.split_at_mut(buf_sz);
-            let buf3 = rest;
-            let mut ml = SliceWithSign::new_mut(buf1, 1);
-            let mut dblx = SliceWithSign::new_mut(buf2, 1);
-
-            let Mantissa { mut m, n } = ret;
-            let l = m.len();
-
-            let x = SliceWithSign::new(&m, 1);
-
-            ml.copy_from(&x);
-            dblx.copy_from(&x);
-            Self::toom3(&mut ml[..l*2], &m)?;
-            Self::toom3(&mut ml, &self.m)?;
-            dblx.shift_left(1);
-            dblx.sub_assign(&ml, buf3);
-
-            if buf2[l..].iter().filter(|d| {**d != 0}).count() > 0 {
-                // sticky bit
-                buf2[l-1] |= 1;
-            }
-            m.deref_mut().copy_from_slice(&buf2[..l]);
-
-            let mut shift = Self::maximize(&mut m);
-            let mut ret = Mantissa { m, n };
-            let new_len = ret.len() - DIGIT_BIT_SIZE;
-            if ret.round_mantissa(new_len, rm, is_positive) {
-                shift += 1;
-            }
-            ret.m.trunc_to(new_len);
-            ret.n -= DIGIT_BIT_SIZE;
-            Ok((shift, ret))
-        }
-    }
-     */
 }

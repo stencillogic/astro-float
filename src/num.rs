@@ -278,19 +278,27 @@ impl BigFloatNumber {
     /// If exponent is too small try to present number in subnormal form.
     /// If sucessful return true.
     pub(super) fn process_subnormal(m3: &mut Mantissa, e: &mut isize, rm: RoundingMode, is_positive: bool) -> bool {
+
         debug_assert!(*e < 0);
+
         if (m3.max_bit_len() as isize) + *e > EXPONENT_MIN as isize {
             // subnormal
+
             let mut shift = (EXPONENT_MIN as isize - *e) as usize;
+
             if m3.round_mantissa(shift, rm, is_positive) {
                 shift -= 1;
             }
+
             if shift > 0 {
                 m3.shift_right(shift);
                 m3.dec_len(shift);
             }
+
             *e = EXPONENT_MIN as isize;
+
             true
+
         } else {
             false
         }
@@ -840,6 +848,7 @@ mod tests {
                 let d3 = d1.div(&d2, RoundingMode::ToEven).unwrap();
                 let d4 = d3.mul(&d2, RoundingMode::ToEven).unwrap();
                 eps.set_exponent(d1.get_exponent() - 158);
+                //println!("\n{:?}\n{:?}\n{:?}\n{:?}", d1,d2,d3,d4);
                 assert!(d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
             }
         }
@@ -865,7 +874,7 @@ mod tests {
                 let d3 = d1.reciprocal(rm).unwrap();
                 let d4 = one.div(&d3, rm).unwrap();
                 eps.set_exponent(d1.get_exponent() - 3200 + 2);
-                //println!("{:?} {:?}", d1, d4);
+                //println!("{:?} {:?} {:?}", d1, d3, d4);
                 assert!(d1.sub(&d4, rm).unwrap().abs().unwrap().cmp(&eps) < 0);
             }
         }
