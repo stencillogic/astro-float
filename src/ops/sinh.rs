@@ -1,4 +1,4 @@
-//! High-level operations on the numbers.
+//! Hyperbolic sine.
 
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
@@ -61,6 +61,8 @@ impl PolycoeffGen for SinhPolycoeffGen {
 struct SinhArgReductionEstimator {}
 
 impl ArgReductionEstimator for SinhArgReductionEstimator {
+
+    /// Estimates cost of reduction n times for number with precision p.
     fn get_reduction_cost(n: usize, p: usize) -> usize {
         // n * (4 * cost(mul) + 2 * cost(add))
         let cost_mul = get_mul_cost(p);
@@ -68,6 +70,7 @@ impl ArgReductionEstimator for SinhArgReductionEstimator {
         (n * ((cost_mul << 1) + cost_add )) << 1
     }
 
+    /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
     #[inline]
     fn reduction_effect(n: usize, m: usize) -> usize {
         // n*log2(3) + m
@@ -150,7 +153,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_trigh() {
+    fn test_sinh() {
         let rm = RoundingMode::ToEven;
         let mut n1 = BigFloatNumber::from_word(1,32000).unwrap();
         n1.set_exponent(0);
@@ -160,7 +163,7 @@ mod tests {
 
     #[ignore]
     #[test]
-    fn trigh_perf() {
+    fn sinh_perf() {
         let mut n = vec![];
         for _ in 0..100 {
             n.push(BigFloatNumber::random_normal(32000, -0, -0).unwrap());

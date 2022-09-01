@@ -2,7 +2,6 @@
 
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
-use crate::common::util::log2_ceil;
 use crate::common::util::log2_floor;
 use crate::common::util::sqrt_int;
 use crate::common::util::nroot_int;
@@ -47,17 +46,23 @@ pub trait ArgReductionEstimator {
 /// m is the negative exponent of the number.
 /// pwr_step - increment of power of x in each iteration
 pub fn series_cost_optimize<T: PolycoeffGen, S: ArgReductionEstimator>(p: usize, polycoeff_gen: &T, m: usize, pwr_step: usize) -> (usize, usize) {
+
     let reduction_num_step = log2_floor(p)/2;
+
     let mut reduction_times = if reduction_num_step > m {
         reduction_num_step - m
     } else {
         0
     };
+
     let mut cost1 = usize::MAX;
+
     loop {
+
         let m_eff = S::reduction_effect(reduction_times, m);
         let niter = series_niter(p, m_eff) / pwr_step;
         let cost2 = series_cost(niter, p, polycoeff_gen) + S::get_reduction_cost(reduction_times, p);
+
         if cost2 < cost1 {
             cost1 = cost2;
             reduction_times += reduction_num_step;
@@ -68,6 +73,7 @@ pub fn series_cost_optimize<T: PolycoeffGen, S: ArgReductionEstimator>(p: usize,
 }
 
 pub fn series_run<T: PolycoeffGen>(acc: BigFloatNumber, x_first: BigFloatNumber, x_step: BigFloatNumber, niter: usize, polycoeff_gen: &mut T, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
+
     if niter >= RECT_ITER_THRESHOLD {
         series_rectangular(niter, acc, x_first, x_step, polycoeff_gen, rm)
     } else {
@@ -96,9 +102,12 @@ fn series_niter(p: usize, m: usize) -> usize {
 /// p is the numbers precision
 /// polycoeff_gen is the coefficient generator
 fn series_cost<T: PolycoeffGen>(niter: usize, p: usize, polycoeff_gen: &T) -> usize {
+
     let cost_mul = get_mul_cost(p);
     let cost_add = get_add_cost(p);
+
     let cost = niter*(cost_mul + cost_add + polycoeff_gen.get_iter_cost());
+
     if niter >= RECT_ITER_THRESHOLD {
         // niter * (cost(mul) + cost(add) + cost(polcoeff_gen.next)) + sqrt(niter) * cost(mul)
         // + niter / 10 * (2 * cost(mul) + cost(add) + cost(polcoeff_gen.next))
@@ -118,7 +127,9 @@ fn series_cost<T: PolycoeffGen>(niter: usize, p: usize, polycoeff_gen: &T) -> us
 // rm is the rounding mode.
 // cost: niter * (O(mul) + O(add) + cost(polcoeff_gen.next)) + sqrt(niter) * O(mul) + cost(series_line(remainder))
 fn series_rectangular<T: PolycoeffGen>(mut niter: usize, add: BigFloatNumber, x_first: BigFloatNumber, x_step: BigFloatNumber, polycoeff_gen: &mut T, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
+
     debug_assert!(niter >= 4);
+
     let mut acc = BigFloatNumber::new(add.get_mantissa_max_bit_len())?;
     // build cache
     
@@ -127,21 +138,26 @@ fn series_rectangular<T: PolycoeffGen>(mut niter: usize, add: BigFloatNumber, x_
     let cache_sz = MAX_CACHE.min(sqrt_iter);
     cache.try_reserve_exact(cache_sz).map_err(Error::MemoryAllocation)?;
     let mut x_pow = x_step.clone()?;
+
     for _ in 0..cache_sz {
         cache.push(x_pow.clone()?);
         x_pow = x_pow.mul(&x_step, rm)?;
     }
+
     // run computation
     let poly_val = compute_row(acc.get_mantissa_max_bit_len(), &cache, polycoeff_gen, rm)?;
     acc = acc.add(&poly_val, rm)?;
     let mut terminal_pow = x_pow.clone()?;
     niter -= cache_sz;
+
     loop {
+
         let poly_val = compute_row(acc.get_mantissa_max_bit_len(), &cache, polycoeff_gen, rm)?;
         let part = poly_val.mul(&terminal_pow, rm)?;
         acc = acc.add(&part, rm)?;
         terminal_pow = terminal_pow.mul(&x_pow, rm)?;
         niter -= cache_sz;
+
         if niter < cache_sz {
             break;
         }
@@ -151,40 +167,51 @@ fn series_rectangular<T: PolycoeffGen>(mut niter: usize, add: BigFloatNumber, x_
     acc = acc.mul(&x_first, rm)?;
     terminal_pow = terminal_pow.mul(&x_first, rm)?;
     acc = acc.add(&add, rm)?;
+
     acc = if niter < MAX_CACHE * 10 { // probably not too many iterations left
         series_horner(acc, terminal_pow, x_step, polycoeff_gen, rm)
     } else {
         series_linear(acc, terminal_pow, x_step, polycoeff_gen, rm)
     }?;
+
     Ok(acc)
 }
 
 // Linear series
 // cost: niter * (2 * O(mul) + O(add) + cost(polcoeff_gen.next))
 fn series_linear<T: PolycoeffGen>(mut acc: BigFloatNumber, x_first: BigFloatNumber, x_step: BigFloatNumber, polycoeff_gen: &mut T, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
+
     let mut x_pow = x_first;
+
     loop {
+
         let coeff = polycoeff_gen.next(rm)?;
         let part = x_pow.mul(coeff, rm)?;
+
         if part.get_exponent() as isize <= acc.get_exponent() as isize - acc.get_mantissa_max_bit_len() as isize {
             break;
         }
+
         acc = acc.add(&part, rm)?;
         x_pow = x_pow.mul(&x_step, rm)?;
     }
+
     Ok(acc)
 }
 
 // compute row of rectangle series.
 fn compute_row<T: PolycoeffGen>(p: usize, cache: &[BigFloatNumber], polycoeff_gen: &mut T, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
+
     let mut acc = BigFloatNumber::new(p)?;
     let coeff = polycoeff_gen.next(rm)?;
     acc = acc.add(coeff, rm)?;
+
     for x_pow in cache {
         let coeff = polycoeff_gen.next(rm)?;
         let add = x_pow.mul(coeff, rm)?;
         acc = acc.add(&add, rm)?;
     }
+
     Ok(acc)
 }
 
@@ -200,6 +227,7 @@ fn series_horner<T: PolycoeffGen>(add: BigFloatNumber, x_first: BigFloatNumber, 
     let mut cache = SmallVec::<[BigFloatNumber; MAX_CACHE]>::new();
     let mut x_p = (-x_first.e) as isize + (-x_step.e) as isize;
     let mut coef_p = 0;
+
     while x_p + coef_p < add.get_mantissa_max_bit_len() as isize {
         let coeff = polycoeff_gen.next(rm)?;
         coef_p = (-coeff.e) as isize;
@@ -209,10 +237,12 @@ fn series_horner<T: PolycoeffGen>(add: BigFloatNumber, x_first: BigFloatNumber, 
 
     let last_coeff = polycoeff_gen.next(rm)?;
     let mut acc = last_coeff.clone()?;
+
     for coeff in cache.iter().rev() {
         acc = acc.mul(&x_step, rm)?;
         acc = acc.add(coeff, rm)?;
     }
+
     acc = acc.mul(&x_first, rm)?;
     acc = acc.add(&add, rm)?;
 
@@ -239,8 +269,11 @@ fn ndim_series<T: PolycoeffGen>(n: usize, niter: usize, add: BigFloatNumber, x_f
     let cache_dim_sz = nroot_int(niter as u32, n) as usize - 1;
     let cache_dim_sz = cache_dim_sz.min(MAX_CACHE / (n - 1));
     let mut x_pow = x_step.clone()?;
+    
     for _ in 0..n-1 {
+
         let cache_step = x_pow.clone()?;
+
         for _ in 0..cache_dim_sz {
             cache.push(x_pow.clone()?);
             x_pow = x_pow.mul(&cache_step, rm)?;
@@ -251,6 +284,7 @@ fn ndim_series<T: PolycoeffGen>(n: usize, niter: usize, add: BigFloatNumber, x_f
     let poly_val = compute_cube(acc.get_mantissa_max_bit_len(), n - 1, rm, &cache, cache_dim_sz, polycoeff_gen)?;
     acc = acc.add(&poly_val, rm)?;
     let mut terminal_pow = x_pow.clone()?;
+
     for _ in 1..cache_dim_sz {
         let poly_val = compute_cube(acc.get_mantissa_max_bit_len(), n - 1, rm, &cache, cache_dim_sz, polycoeff_gen)?;
         let part = poly_val.mul(&terminal_pow, rm)?;
@@ -268,20 +302,26 @@ fn ndim_series<T: PolycoeffGen>(n: usize, niter: usize, add: BigFloatNumber, x_f
 
 #[allow(dead_code)]
 fn compute_cube<T: PolycoeffGen>(p: usize, n: usize, rm: RoundingMode, cache: &[BigFloatNumber], cache_dim_sz: usize, polycoeff_gen: &mut T) -> Result<BigFloatNumber, Error> {
+
     if n > 1 {
+        
         let mut acc = BigFloatNumber::new(p)?;
         let cache_dim_sz = cache_dim_sz;
         // no need to multityply the returned coefficient of the first cube by 1.
         let poly_val = compute_cube(p, n - 1, rm, cache, cache_dim_sz, polycoeff_gen)?;
         acc = acc.add(&poly_val, rm)?;
+
         // the remaining require multiplication
         for x_pow in &cache[cache_dim_sz*(n-1)..cache_dim_sz*n] {
             let poly_val =  compute_cube(p, n - 1, rm, cache, cache_dim_sz, polycoeff_gen)?;
             let add = x_pow.mul(&poly_val, rm)?;
             acc = acc.add(&add, rm)?;
         }
+
         Ok(acc)
+        
     } else {
+
         compute_row(p, &cache[..cache_dim_sz], polycoeff_gen, rm)
     }
 } 

@@ -11,6 +11,7 @@ impl BigFloatNumber {
 
     /// Compute square root of a number.
     pub fn sqrt(&self, rm: RoundingMode) -> Result<Self, Error> {
+
         if self.is_negative() {
             return Err(Error::InvalidArgument);
         }
@@ -25,6 +26,7 @@ impl BigFloatNumber {
             p /= 3;
             err += 6;
         }
+
         let e = self.get_exponent();
         let mut e_shift = 0;
         if e & 1 == 1 {
@@ -54,9 +56,11 @@ impl BigFloatNumber {
                 return Self::new(self.get_mantissa_max_bit_len());
             }
         }
+
         if e_corr > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(ret.get_sign()));
         }
+        
         ret.set_exponent(ret.get_exponent() + e / 2 - e_shift);
 
         Ok(ret)
@@ -64,20 +68,30 @@ impl BigFloatNumber {
 
     // Computation iteration.
     fn sqrt_iter(&self, three: &Self, ten: &Self, fifteen: &Self) -> Result<Self, Error> {
+
         let mut prec = self.get_mantissa_max_bit_len();
         let mut x = self.clone()?;
+
         if prec <= 128 {
+
             prec *= 3;
             x = Self::from_word(1, 1)?.div(&x, RoundingMode::None)?;
+
             while prec > 0 {
                 x = self.sqrt_step(x, three, ten, fifteen)?;
                 prec /= 3;
             }
+
             Ok(x)
+
         } else {
+
             x.set_precision((prec + 2) / 3, RoundingMode::None)?;
+
             let mut xn= x.sqrt_iter(three, ten, fifteen)?;
+
             xn.set_precision(prec, RoundingMode::None)?;
+
             self.sqrt_step(xn, three, ten, fifteen)
         }
     }

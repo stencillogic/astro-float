@@ -648,6 +648,10 @@ impl BigFloatNumber {
     pub fn set_precision(&mut self, p: usize, rm: RoundingMode) -> Result<(), Error> {
         if self.get_mantissa_max_bit_len() > p {
             self.m.round_mantissa(self.get_mantissa_max_bit_len() - p, rm, self.is_positive());
+            if self.m.is_all_zero() {
+                self.m.set_zero();
+                self.e = 0;
+            }
         }
         self.m.set_length(p)
     }
@@ -735,7 +739,7 @@ mod tests {
     #[test]
     fn test_number() {
 
-        let p = 160; // 10 of "Digit"
+        let p = 160; // 10 of words
         let rm = RoundingMode::ToEven;
 
         let mut d1;

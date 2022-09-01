@@ -87,3 +87,11 @@ pub fn get_mul_cost(p: usize) -> usize {
 pub fn get_add_cost(p: usize) -> usize {
     p
 }
+
+
+// Estimate of sqrt op cost.
+#[inline]
+pub fn get_sqrt_cost(p: usize, cost_mul: usize, cost_add: usize) -> usize {
+    let log3_estimate = (log2_floor(p) * 41349) >> 16;
+    log3_estimate * (5 * cost_mul + 2 * cost_add) / 2
+}

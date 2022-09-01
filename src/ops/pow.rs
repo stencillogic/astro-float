@@ -3,7 +3,7 @@
 use crate::{
     num::BigFloatNumber, 
     RoundingMode, 
-    defs::{Error, EXPONENT_MIN, EXPONENT_MAX, Word, WORD_SIGNIFICANT_BIT, WORD_BIT_SIZE},
+    defs::{Error, WORD_SIGNIFICANT_BIT, WORD_BIT_SIZE},
 };
 
 

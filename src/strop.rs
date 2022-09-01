@@ -93,41 +93,58 @@ impl BigFloatNumber {
 
     // TODO: remove pub when printing is implemented.
     pub(super) fn fp3(&self, rdx: Radix, rm: RoundingMode) -> Result<Vec<u8>, Error> {
+
+        debug_assert!(self.is_positive());
+
         let mut ret = Vec::new();
         ret.push(0);
+        
         if !self.is_zero() {
+
             let mut r = self.clone()?;
             let one = Self::from_word(1, 1)?;
             let mut m = one.clone()?;
             m.set_exponent(-(self.get_mantissa_max_bit_len() as Exponent + 1));
             let rdx_num = Self::number_for_radix(rdx)?;
             let mut word;
+
             loop {
+
                 let d = r.mul(&rdx_num, rm).unwrap();
                 r = d.fract()?;
                 word = d.get_int_as_word();
                 m = m.mul(&rdx_num, rm).unwrap();
+                
                 ret.push(word as u8);
+
                 if r.cmp(&m) < 0 || r.cmp(&one.sub(&m, rm).unwrap()) > 0 {
                     break;
                 }
             }
+
             if !r.round(0, RoundingMode::ToEven).unwrap().is_zero() {
+
                 word += 1;
                 let rdx_word = Self::word_for_radix(rdx);
+
                 if word == rdx_word {
+
                     ret.push(0);
+                    
                     let mut i = ret.len() - 2;
                     while i > 0 && ret[i] + 1 == rdx_word as u8 {
                         ret[i] = 0;
                         i -= 1;
                     }
                     ret[i] += 1;
+
                 } else {
+
                     ret.push(word as u8);
                 }
             }
         }
+
         Ok(ret)
     }
 
@@ -157,7 +174,7 @@ mod tests {
     #[test]
     fn test_format() {
 
-        let n = BigFloatNumber::from_f64(160, 0.03125f64).unwrap();
-        //println!("{:?}", n.fp3(Radix::Dec, RoundingMode::ToEven).unwrap());
+        let n = BigFloatNumber::from_f64(160, 0.031256789f64).unwrap();
+        println!("{:?}", n.fp3(Radix::Dec, RoundingMode::ToEven).unwrap());
     }
 }

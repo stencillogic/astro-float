@@ -43,11 +43,6 @@ impl WordBuf {
         self.inner.len()
     }
 
-    #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut Word {
-        self.inner.as_mut_ptr()
-    }
-
     /// Decrease length of mantissa to l bits.
     pub fn trunc_to(&mut self, l: usize) {
         let n = (l + WORD_BIT_SIZE - 1)/WORD_BIT_SIZE;

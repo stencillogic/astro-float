@@ -98,6 +98,11 @@ impl Mantissa {
         self.n == 0
     }
 
+    #[inline]
+    pub fn set_zero(&mut self) {
+        self.n = 0;
+    }
+
     /// Shift right by n bits.
     pub fn shift_right(&mut self, n: usize) {
         shift_slice_right(&mut self.m, n)
