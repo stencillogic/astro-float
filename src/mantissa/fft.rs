@@ -7,11 +7,11 @@ use crate::defs::WORD_MAX;
 use crate::defs::Error;
 use crate::defs::Word;
 use crate::mantissa::Mantissa;
-use crate::mantissa::buf::WordBuf;
-use crate::mantissa::util::SliceWithSign;
-use crate::mantissa::util::add_carry;
-use crate::mantissa::util::shift_slice_left_copy;
-use crate::mantissa::util::sub_borrow;
+use crate::common::buf::WordBuf;
+use crate::common::int::SliceWithSign;
+use crate::common::util::add_carry;
+use crate::common::util::shift_slice_left_copy;
+use crate::common::util::sub_borrow;
 use itertools::izip;
 use smallvec::SmallVec;
 

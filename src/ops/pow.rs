@@ -3,7 +3,8 @@
 use crate::{
     num::BigFloatNumber, 
     RoundingMode, 
-    defs::{Error, WORD_SIGNIFICANT_BIT, WORD_BIT_SIZE},
+    defs::{Error, WORD_SIGNIFICANT_BIT, WORD_BIT_SIZE}, 
+    common::consts::ONE,
 };
 
 
@@ -13,7 +14,7 @@ impl BigFloatNumber {
     pub fn exp(&self, rm: RoundingMode) -> Result<Self, Error> {
 
         if self.is_zero() {
-            return Self::from_word(1, 1);
+            return Self::from_word(1, self.get_mantissa_max_bit_len());
         }
 
         // compute separately for int and fract parts, then combine the results.
@@ -38,7 +39,7 @@ impl BigFloatNumber {
         }
 
         if i == 0 {
-            return Self::from_word(1, 1);
+            return Self::from_word(1, self.get_mantissa_max_bit_len());
         }
 
         let mut bit_pos = WORD_BIT_SIZE;
@@ -70,9 +71,8 @@ impl BigFloatNumber {
     fn expf(&self, rm: RoundingMode) -> Result<Self, Error> {
         let sh = Self::sinh(self, rm)?; // faster convergence than direct series
         // e = sh + sqrt(sh^2 + 1)
-        let one = Self::from_word(1, 1)?;
         let sq = sh.mul(&sh, rm)?;
-        let sq2 = sq.add(&one, rm)?;
+        let sq2 = sq.add(&ONE, rm)?;
         let sq3 = sq2.sqrt(rm)?;
         sq3.add(&sh, rm)
     }

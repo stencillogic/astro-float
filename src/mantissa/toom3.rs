@@ -3,9 +3,9 @@
 use crate::defs::Error;
 use crate::defs::Word;
 use crate::mantissa::Mantissa;
-use crate::mantissa::buf::WordBuf;
-use crate::mantissa::util::SliceWithSign;
-use crate::mantissa::util::shift_slice_left_copy;
+use crate::common::buf::WordBuf;
+use crate::common::int::SliceWithSign;
+use crate::common::util::shift_slice_left_copy;
 
 
 impl Mantissa {

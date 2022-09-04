@@ -5,8 +5,8 @@ use crate::defs::Error;
 use crate::defs::Word;
 use crate::defs::DoubleWord;
 use crate::mantissa::Mantissa;
-use crate::mantissa::buf::WordBuf;
-use crate::mantissa::util::SliceWithSign;
+use crate::common::buf::WordBuf;
+use crate::common::int::SliceWithSign;
 
 
 impl Mantissa {

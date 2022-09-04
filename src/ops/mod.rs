@@ -5,3 +5,4 @@ mod ln;
 mod pow;
 mod sinh;
 mod series;
+mod consts;

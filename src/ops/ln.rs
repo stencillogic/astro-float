@@ -1,6 +1,8 @@
 //! Natural logarithm.
 
 use crate::Exponent;
+use crate::common::consts::ONE;
+use crate::common::consts::TWO;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
 use crate::common::util::get_sqrt_cost;
@@ -14,10 +16,8 @@ use crate::ops::series::series_run;
 use crate::ops::series::series_cost_optimize;
 
 
-
 // Polynomial coefficient generator.
 struct AtanhPolycoeffGen {
-    two: BigFloatNumber,
     acc: BigFloatNumber,
     one_full_p: BigFloatNumber,
     val: BigFloatNumber,
@@ -28,7 +28,6 @@ impl AtanhPolycoeffGen {
 
     fn new(p: usize) -> Result<Self, Error> {
 
-        let two = BigFloatNumber::from_word(2, 1)?;
         let acc = BigFloatNumber::from_word(1, 1)?;
         let one_full_p = BigFloatNumber::from_word(1, p)?;
         let val = BigFloatNumber::from_word(1, p)?;
@@ -36,7 +35,6 @@ impl AtanhPolycoeffGen {
         let iter_cost = get_add_cost(p) + get_add_cost(1); // div is linear, since add is O(1)
 
         Ok(AtanhPolycoeffGen {
-            two,
             acc,
             one_full_p,
             val,
@@ -48,7 +46,7 @@ impl AtanhPolycoeffGen {
 impl PolycoeffGen for AtanhPolycoeffGen {
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
 
-        self.acc = self.acc.add(&self.two, rm)?;
+        self.acc = self.acc.add(&TWO, rm)?;
         self.val = self.one_full_p.div(&self.acc, rm)?;
 
         Ok(&self.val)
@@ -147,9 +145,8 @@ impl BigFloatNumber {
         };
 
         // x-1 / x+1
-        let one = Self::from_word(1, 1)?;
-        let x1 = arg.sub(&one, rm)?;
-        let x2 = arg.add(&one, rm)?;
+        let x1 = arg.sub(&ONE, rm)?;
+        let x2 = arg.add(&ONE, rm)?;
         let z = x1.div(&x2, rm)?;
 
         let x_step = z.mul(&z, rm)?;   // x^2
@@ -162,15 +159,19 @@ impl BigFloatNumber {
 
     // reduce argument n times.
     fn ln_arg_reduce(mut x: Self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+
         for _ in 0..n {
             x = x.sqrt(rm)?;
         }
+
         Ok(x)
     }
 
     // restore value for the argument reduced n times.
     fn ln_arg_restore(mut x: Self, n: usize) -> Result<Self, Error> {
+
         x.set_exponent(x.get_exponent() + n as Exponent);
+
         Ok(x)
     }
 }
@@ -197,8 +198,8 @@ mod tests {
     #[test]
     fn ln_perf() {
         let mut n = vec![];
-        for _ in 0..100 {
-            let mut nn = BigFloatNumber::random_normal(3200, -3200, 3200).unwrap();
+        for _ in 0..10000 {
+            let mut nn = BigFloatNumber::random_normal(133, -100, 100).unwrap();
             nn.set_sign(Sign::Pos);
             n.push(nn);
         }

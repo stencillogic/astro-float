@@ -1,5 +1,8 @@
 //! Hyperbolic sine.
 
+use crate::common::consts::FOUR;
+use crate::common::consts::ONE;
+use crate::common::consts::THREE;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
 use crate::num::BigFloatNumber;
@@ -11,10 +14,8 @@ use crate::ops::series::series_run;
 use crate::ops::series::series_cost_optimize;
 
 
-
 // Polynomial coefficient generator.
 struct SinhPolycoeffGen {
-    one: BigFloatNumber,
     one_full_p: BigFloatNumber,
     inc: BigFloatNumber,
     fct: BigFloatNumber,
@@ -24,7 +25,6 @@ struct SinhPolycoeffGen {
 impl SinhPolycoeffGen {
 
     fn new(p: usize) -> Result<Self, Error> {
-        let one = BigFloatNumber::from_word(1, 1)?;
         let inc = BigFloatNumber::from_word(1, 1)?;
         let fct = BigFloatNumber::from_word(1, p)?;
         let one_full_p = BigFloatNumber::from_word(1, p)?;
@@ -32,7 +32,6 @@ impl SinhPolycoeffGen {
         let iter_cost = (get_mul_cost(p) + get_add_cost(p)) << 1; // 2 * (cost(mul) + cost(add))
 
         Ok(SinhPolycoeffGen {
-            one,
             one_full_p,
             inc,
             fct,
@@ -42,13 +41,17 @@ impl SinhPolycoeffGen {
 }
 
 impl PolycoeffGen for SinhPolycoeffGen {
+
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-        self.inc = self.inc.add(&self.one, rm)?;
+
+        self.inc = self.inc.add(&ONE, rm)?;
         let inv_inc = self.one_full_p.div(&self.inc, rm)?;
         self.fct = self.fct.mul(&inv_inc, rm)?;
-        self.inc = self.inc.add(&self.one, rm)?;
+
+        self.inc = self.inc.add(&ONE, rm)?;
         let inv_inc = self.one_full_p.div(&self.inc, rm)?;
         self.fct = self.fct.mul(&inv_inc, rm)?;
+
         Ok(&self.fct)
     }
 
@@ -121,9 +124,8 @@ impl BigFloatNumber {
     fn sinh_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // sinh(3*x) = 3*sinh(x) + 4*sinh(x)^3
         let mut ret = self.clone()?;
-        let three = Self::from_word(3, 1)?;
         for _ in 0..n {
-            ret = ret.div(&three, rm)?;
+            ret = ret.div(&THREE, rm)?;
         }
         Ok(ret)
     }
@@ -133,15 +135,15 @@ impl BigFloatNumber {
     fn sinh_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // sinh(3*x) = 3*sinh(x) + 4*sinh(x)^3
         let mut sinh = self.clone()?;
-        let three = Self::from_word(3, 1)?;
-        let four = Self::from_word(4, 1)?;
+
         for _ in 0..n {
             let mut sinh_cub = sinh.mul(&sinh, rm)?;
             sinh_cub = sinh_cub.mul(&sinh, rm)?;
-            let p1 = sinh.mul(&three, rm)?;
-            let p2 = sinh_cub.mul(&four, rm)?;
+            let p1 = sinh.mul(&THREE, rm)?;
+            let p2 = sinh_cub.mul(&FOUR, rm)?;
             sinh = p1.add(&p2, rm)?;
         }
+        
         Ok(sinh)
     }
 }

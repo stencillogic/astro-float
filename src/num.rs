@@ -11,6 +11,8 @@ use crate::defs::WORD_SIGNIFICANT_BIT;
 use crate::defs::RoundingMode;
 use crate::defs::WORD_BIT_SIZE;
 use crate::mantissa::Mantissa;
+use crate::common::consts::ONE;
+
 
 /// BigFloatNumber represents floating point number with mantissa of a fixed size, and exponent.
 #[derive(Debug)]
@@ -91,12 +93,6 @@ impl BigFloatNumber {
         }
     }
 
-    /// Summation operation.
-    #[inline]
-    pub fn add(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
-        self.add_sub(d2, 1, rm)
-    }
-
     /// Negation operation.
     pub fn neg(&self) -> Result<Self, Error> {
         let mut ret = self.clone()?;
@@ -104,16 +100,45 @@ impl BigFloatNumber {
         Ok(ret)
     }
 
+    /// Summation operation.
+    #[inline]
+    pub fn add(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
+        self.add_sub(d2, 1, rm, false)
+    }
+
     /// Subtraction operation.
     #[inline]
     pub fn sub(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
-        self.add_sub(d2, -1, rm)
+        self.add_sub(d2, -1, rm, false)
+    }
+
+    /// Summation operation with full precision.
+    #[inline]
+    pub fn add_full_prec(&self, d2: &Self) -> Result<Self, Error> {
+        self.add_sub(d2, 1, RoundingMode::None, true)
+    }
+
+    /// Subtraction operation with full precision.
+    #[inline]
+    pub fn sub_full_prec(&self, d2: &Self) -> Result<Self, Error> {
+        self.add_sub(d2, -1, RoundingMode::None, true)
     }
 
     /// Multiplication operation.
+    #[inline]
     pub fn mul(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
+        self.mul_general_case(d2, rm, false)
+    }
 
-        // TODO: consider short multiplication.
+    /// Multiplication with no rounding, and keeping full precision of the result (essentially emulates integer operation).
+    #[inline]
+    pub fn mul_full_prec(&self, d2: &Self) -> Result<Self, Error> {
+        self.mul_general_case(d2, RoundingMode::None, true)
+    }
+
+    pub fn mul_general_case(&self, d2: &Self, rm: RoundingMode, full_prec: bool) -> Result<Self, Error> {
+
+        // TODO: consider short multiplication for full_prec = false.
 
         if self.m.is_zero() || d2.m.is_zero() {
             return Self::new(self.m.max_bit_len())
@@ -126,7 +151,7 @@ impl BigFloatNumber {
         let (e2, m2_opt) = d2.normalize()?;
         let m2_normalized = m2_opt.as_ref().unwrap_or(&d2.m);
 
-        let (e_shift, mut m3) = m1_normalized.mul(m2_normalized, rm, s == Sign::Pos)?;
+        let (e_shift, mut m3) = m1_normalized.mul(m2_normalized, rm, s == Sign::Pos, full_prec)?;
 
         let mut e = e1 + e2 - e_shift as isize;
         if e > EXPONENT_MAX as isize {
@@ -202,7 +227,8 @@ impl BigFloatNumber {
 
 
     /// Combined add and sub operations.
-    fn add_sub(&self, d2: &Self, op: i8, rm: RoundingMode) -> Result<Self, Error> {
+    fn add_sub(&self, d2: &Self, op: i8, rm: RoundingMode, full_prec: bool) -> Result<Self, Error> {
+
         let mut d3 = Self::new(0)?;
 
         // one of the numbers is zero
@@ -229,11 +255,11 @@ impl BigFloatNumber {
             let (shift, mut m3) = if cmp > 0 {
                 d3.s = self.s;
                 e = e1;
-                m1.abs_sub(m2, (e1 - e2) as usize, rm, self.is_positive())?
+                m1.abs_sub(m2, (e1 - e2) as usize, rm, self.is_positive(), full_prec)?
             } else if cmp < 0 {
                 d3.s = if op >= 0 { d2.s } else { d2.s.invert() };
                 e = e2;
-                m2.abs_sub(m1, (e2 - e1) as usize, rm, self.is_positive())?
+                m2.abs_sub(m1, (e2 - e1) as usize, rm, self.is_positive(), full_prec)?
             } else {
                 return Self::new(self.m.max_bit_len());
             };
@@ -253,10 +279,10 @@ impl BigFloatNumber {
             d3.s = self.s;
             let (c, mut m3) = if e1 >= e2 {
                 e = e1;
-                m1.abs_add(m2, (e1 - e2) as usize, rm, d3.is_positive())
+                m1.abs_add(m2, (e1 - e2) as usize, rm, d3.is_positive(), full_prec)
             } else {
                 e = e2;
-                m2.abs_add(m1, (e2 - e1) as usize, rm, d3.is_positive())
+                m2.abs_add(m1, (e2 - e1) as usize, rm, d3.is_positive(), full_prec)
             }?;
             if c {
                 if e == EXPONENT_MAX as isize {
@@ -507,8 +533,7 @@ impl BigFloatNumber {
         let int = self.int()?;
         if self.is_negative() {
             if !self.fract()?.m.is_zero() {
-                let one = Self::from_word(1, 1)?;
-                return int.sub(&one, RoundingMode::ToZero);
+                return int.sub(&ONE, RoundingMode::ToZero);
             }
         }
         Ok(int)
@@ -519,8 +544,7 @@ impl BigFloatNumber {
         let int = self.int()?;
         if self.is_positive() {
             if !self.fract()?.m.is_zero() {
-                let one = Self::from_word(1, 1)?;
-                return int.add(&one, RoundingMode::ToZero);
+                return int.add(&ONE, RoundingMode::ToZero);
             }
         }
         Ok(int)
@@ -682,10 +706,13 @@ impl BigFloatNumber {
 
     // reciprocal computation.
     fn recip_iter(&self) -> Result<Self, Error> {
+
         if self.m.len() <= 500 {
-            let one = Self::from_word(1, 1)?;
-            one.div(self, RoundingMode::None)
+
+            ONE.div(self, RoundingMode::None)
+
         } else {
+            
             //  Newton's method: x(n+1) = 2*x(n) - self*x(n)*x(n)
             let prec = self.get_mantissa_max_bit_len();
             let mut x = self.clone()?;
@@ -746,8 +773,7 @@ mod tests {
         let mut d2;
         let mut d3;
         let mut ref_num;
-        let one = BigFloatNumber::from_word(1, 1).unwrap();
-        let mut eps = one.clone().unwrap();
+        let mut eps = ONE.clone().unwrap();
 
         //let n1 = BigFloatNumber::from_raw_parts(&[4165624164, 2129500405, 2551748857, 998953334, 3485534795, 1427512576, 426727679, 2298894833, 2107497530, 385370716, 2626967463, 2694802314, 2373730166], 416, Sign::Neg, 301499356).unwrap();
 
@@ -838,8 +864,8 @@ mod tests {
             d2 = BigFloatNumber::random_normal(160, -80, 80).unwrap();
             let d3 = d1.sub(&d2, RoundingMode::ToEven).unwrap();
             let d4 = d3.add(&d2, RoundingMode::ToEven).unwrap();
-            eps.set_exponent(d1.get_exponent().max(d2.get_exponent()) - 157);
-//            println!("\n=== res \n{:?} \n{:?} \n{:?} \n{:?} \n{:?} \n{:?}", d1, d2, d3, d4, d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap(), eps);
+            eps.set_exponent(d1.get_exponent().max(d2.get_exponent()) - 158);
+            //println!("\n=== res \n{:?} \n{:?} \n{:?} \n{:?} \n{:?} \n{:?}", d1, d2, d3, d4, d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap(), eps);
             assert!(d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
         }
 
@@ -876,7 +902,7 @@ mod tests {
             d1 = BigFloatNumber::random_normal(3200, EXPONENT_MIN/2+3200, EXPONENT_MAX/2).unwrap();
             if !d1.is_zero() {
                 let d3 = d1.reciprocal(rm).unwrap();
-                let d4 = one.div(&d3, rm).unwrap();
+                let d4 = ONE.div(&d3, rm).unwrap();
                 eps.set_exponent(d1.get_exponent() - 3200 + 2);
                 //println!("{:?} {:?} {:?}", d1, d3, d4);
                 assert!(d1.sub(&d4, rm).unwrap().abs().unwrap().cmp(&eps) < 0);
@@ -1036,8 +1062,6 @@ mod tests {
     #[test]
     fn recip_perf() {
 
-        let one = BigFloatNumber::from_word(1, 1).unwrap();
-
         for _ in 0..5 {    
 
             let mut n = vec![];
@@ -1047,7 +1071,7 @@ mod tests {
 
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let _f = one.div(ni, RoundingMode::ToEven).unwrap();
+                let _f = ONE.div(ni, RoundingMode::ToEven).unwrap();
             }
             let time = start_time.elapsed();
             println!("div {}", time.as_millis());

@@ -15,6 +15,7 @@ rand = "0.8.5"
 
 [dependencies]
 rand = { version = "0.8.5", optional = true }
+lazy_static = { version = "1.4.0" }
 itertools = { version = "0.10.3", features = [] }
 smallvec = { version = "1.9.0", features = [] }
 

@@ -1,3 +1,4 @@
+
 use crate::defs::WORD_BIT_SIZE;
 use crate::defs::WORD_MAX;
 use crate::defs::WORD_SIGNIFICANT_BIT;
@@ -10,6 +11,11 @@ use crate::defs::Word;
 use crate::defs::RoundingMode;
 use crate::parser::parse;
 use crate::num::BigFloatNumber;
+use crate::common::consts::ONE;
+use crate::common::consts::TWO;
+use crate::common::consts::EIGHT;
+use crate::common::consts::TEN;
+use crate::common::consts::SIXTEEN;
 
 
 impl BigFloatNumber {
@@ -98,26 +104,25 @@ impl BigFloatNumber {
 
         let mut ret = Vec::new();
         ret.push(0);
-        
+
         if !self.is_zero() {
 
             let mut r = self.clone()?;
-            let one = Self::from_word(1, 1)?;
-            let mut m = one.clone()?;
+            let mut m = ONE.clone()?;
             m.set_exponent(-(self.get_mantissa_max_bit_len() as Exponent + 1));
             let rdx_num = Self::number_for_radix(rdx)?;
             let mut word;
 
             loop {
 
-                let d = r.mul(&rdx_num, rm).unwrap();
+                let d = r.mul(rdx_num, rm).unwrap();
                 r = d.fract()?;
                 word = d.get_int_as_word();
-                m = m.mul(&rdx_num, rm).unwrap();
-                
+                m = m.mul(rdx_num, rm).unwrap();
+
                 ret.push(word as u8);
 
-                if r.cmp(&m) < 0 || r.cmp(&one.sub(&m, rm).unwrap()) > 0 {
+                if r.cmp(&m) < 0 || r.cmp(&ONE.sub(&m, rm).unwrap()) > 0 {
                     break;
                 }
             }
@@ -130,7 +135,7 @@ impl BigFloatNumber {
                 if word == rdx_word {
 
                     ret.push(0);
-                    
+
                     let mut i = ret.len() - 2;
                     while i > 0 && ret[i] + 1 == rdx_word as u8 {
                         ret[i] = 0;
@@ -157,9 +162,13 @@ impl BigFloatNumber {
         }
     }
 
-    fn number_for_radix(rdx: Radix) -> Result<Self, Error> {
-        let rdx_num = Self::word_for_radix(rdx);
-        Self::from_word(rdx_num, 1)
+    fn number_for_radix(rdx: Radix) -> Result<&'static Self, Error> {
+        Ok(match rdx {
+            Radix::Bin => &TWO,
+            Radix::Oct => &EIGHT,
+            Radix::Dec => &TEN,
+            Radix::Hex => &SIXTEEN,
+        })
     }
 }
 

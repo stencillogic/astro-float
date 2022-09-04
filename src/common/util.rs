@@ -1,5 +1,7 @@
 //! Auxiliary functions.
 
+use crate::defs::{Word, WORD_BIT_SIZE};
+
 
 /// integer logarithm base 2 of a number.
 pub fn log2_ceil(mut n: usize) -> usize {
@@ -94,4 +96,169 @@ pub fn get_add_cost(p: usize) -> usize {
 pub fn get_sqrt_cost(p: usize, cost_mul: usize, cost_add: usize) -> usize {
     let log3_estimate = (log2_floor(p) * 41349) >> 16;
     log3_estimate * (5 * cost_mul + 2 * cost_add) / 2
+}
+
+
+#[inline(always)]
+pub fn add_carry(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
+
+    #[cfg(target_arch = "x86_64")] 
+    {
+        unsafe { core::arch::x86_64::_addcarry_u32(c as u8, a, b, r) as Word } 
+    }
+    
+    #[cfg(target_arch = "x86")] 
+    {
+        unsafe { core::arch::x86::_addcarry_u32(c as u8, a, b, r) as Word } 
+    }
+    
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+    {
+        let mut s = c as DoubleWord + a as DoubleWord + b as DoubleWord;
+        if s >= WORD_BASE {
+            s -= WORD_BASE;
+            *r = s as Word;
+            1
+        } else {
+            *r = s as Word;
+            0
+        }
+    }
+}
+
+#[inline(always)]
+pub fn sub_borrow(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
+
+    #[cfg(target_arch = "x86_64")] 
+    {
+        unsafe { core::arch::x86_64::_subborrow_u32(c as u8, a, b, r) as Word }
+    }
+
+    #[cfg(target_arch = "x86")] 
+    {
+        unsafe { core::arch::x86::_subborrow_u32(c as u8, a, b, r) as Word }
+    }
+    
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+    {
+        let v1 = a as DoubleWord;
+        let v2 = b as DoubleWord + c as DoubleWord;
+    
+        if v1 < v2 {
+            *r = (v1 + WORD_BASE - v2) as Word;
+            1
+        } else {
+            *r = (v1 - v2) as Word;
+            0
+        }
+    }
+}
+
+
+
+// Shift m left by n digits.
+pub fn shift_slice_left(m: &mut [Word], n: usize) {
+    let idx = n / WORD_BIT_SIZE;
+    let shift = n % WORD_BIT_SIZE;
+    if idx >= m.len() {
+        m.fill(0);
+    } else if shift > 0 {
+        let l = m.len() - 1;
+        let end = m.as_mut_ptr();
+        unsafe {    // use of slices is almost 50% slower
+            let mut dst = end.add(l);
+            let mut src = end.add(l - idx);
+            loop {
+                if src > end {
+                    let mut d = *src << shift;
+                    src = src.sub(1);
+                    d |= *src >> (WORD_BIT_SIZE - shift);
+                    *dst = d;
+                    dst = dst.sub(1);
+                } else {
+                    break;
+                }
+            }
+            *dst = *src << shift;
+        }
+        m[0..idx].fill(0);
+    } else if idx > 0 {
+        let dst = m[idx..].as_mut_ptr();
+        let src = m.as_ptr();
+        unsafe {
+            core::intrinsics::copy(src, dst, m.len()-idx);
+        };
+        m[..idx].fill(0);
+    }
+}
+
+// Shift m left by n digits and put result in m2.
+pub fn shift_slice_left_copy(m: &[Word], m2: &mut [Word], n: usize) {
+    let idx = n / WORD_BIT_SIZE;
+    let shift = n % WORD_BIT_SIZE;
+    if idx >= m2.len() {
+        m2.fill(0);
+    } else if shift > 0 {
+        m2[..idx].fill(0);
+        let mut dst = m2[idx..].iter_mut();
+        let src = m.iter();
+        let mut prev = 0;
+        for (a, b) in src.zip(dst.by_ref()) {
+            *b = (prev >> (WORD_BIT_SIZE - shift)) | (*a << shift);
+            prev = *a;
+        }
+        if let Some(b) = dst.next() {
+            *b = prev >> (WORD_BIT_SIZE - shift);
+        }
+        for b in dst {
+            *b = 0;
+        }
+    } else {
+        m2[..idx].fill(0);
+        let mut dst = m2[idx..].iter_mut();
+        for (a, b) in m.iter().zip(dst.by_ref()) {
+            *b = *a;
+        }
+        for b in dst {
+            *b = 0;
+        }
+    }
+}
+
+
+// Shift m right by n digits.
+pub fn shift_slice_right(m: &mut [Word], n: usize) {
+    let idx = n / WORD_BIT_SIZE;
+    let shift = n % WORD_BIT_SIZE;
+    if idx >= m.len() {
+        m.fill(0);
+    } else if shift > 0 {
+        let l = m.len();
+        let mut dst = m.as_mut_ptr();
+        unsafe {    // use of slices is almost 50% slower
+            let end = dst.add(l - 1);
+            let mut src = dst.add(idx);
+            loop {
+                if src < end {
+                    let mut d = *src >> shift;
+                    src = src.add(1);
+                    d |= *src << (WORD_BIT_SIZE - shift);
+                    *dst = d;
+                    dst = dst.add(1);
+                } else {
+                    break;
+                }
+            }
+            *dst = *src >> shift;
+        }
+        m[l - idx..].fill(0);
+    } else if idx > 0 {
+        let src = m[idx..].as_ptr();
+        let dst = m.as_mut_ptr();
+        let cnt = m.len() - idx;
+        unsafe {
+            core::intrinsics::copy(src, dst, cnt);
+        };
+        m[cnt..].fill(0);
+    }
 }
