@@ -93,8 +93,8 @@ impl WordBuf {
         }
 
         let sz = self.len();
-        self.inner.rotate_left(sz - n);
-        self.inner.truncate(n);
+        self.inner.rotate_left(n);
+        self.inner.truncate(sz - n);
     }
 }
 

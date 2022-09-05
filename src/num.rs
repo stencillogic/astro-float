@@ -144,7 +144,7 @@ impl BigFloatNumber {
             return Self::new(self.m.max_bit_len())
         }
 
-        let s = if self.s == d2.s { Sign::Pos } else {Sign::Neg};
+        let s = if self.s == d2.s { Sign::Pos } else { Sign::Neg };
 
         let (e1, m1_opt) = self.normalize()?;
         let m1_normalized = m1_opt.as_ref().unwrap_or(&self.m);
@@ -746,6 +746,20 @@ impl BigFloatNumber {
             self.set_sign(Sign::Neg);
         }
     }
+
+    /// Create float from usize value.
+    pub fn from_usize(u: usize) -> Result<Self, Error> {
+
+        let (shift, m) = Mantissa::from_usize(u)?;
+        let s = Sign::Pos;
+        let e = (m.max_bit_len() - shift) as Exponent;
+
+        Ok(BigFloatNumber {
+            m,
+            s,
+            e,
+        })
+    }
 }
 
 /// Radix
@@ -869,6 +883,15 @@ mod tests {
             assert!(d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
         }
 
+        for _ in 0..1000 {
+            d1 = BigFloatNumber::random_normal(160, -80, 80).unwrap();
+            d2 = BigFloatNumber::random_normal(160, -80, 80).unwrap();
+            let d3 = d1.sub_full_prec(&d2).unwrap();
+            let d4 = d3.add_full_prec(&d2).unwrap();
+            //println!("\n=== res \n{:?} \n{:?} \n{:?} \n{:?} \n{:?} \n{:?}", d1, d2, d3, d4, d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap(), eps);
+            assert!(d1.cmp(&d4) == 0);
+        }
+
         // mul & div
         for _ in 0..10000 {
             // avoid subnormal numbers
@@ -880,6 +903,20 @@ mod tests {
                 eps.set_exponent(d1.get_exponent() - 158);
                 //println!("\n{:?}\n{:?}\n{:?}\n{:?}", d1,d2,d3,d4);
                 assert!(d1.sub(&d4, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+            }
+        }
+
+        for _ in 0..10000 {
+            // avoid subnormal numbers
+            d1 = BigFloatNumber::random_normal(160, EXPONENT_MIN/2+160, EXPONENT_MAX/2).unwrap();
+            d2 = BigFloatNumber::random_normal(160, EXPONENT_MIN/2, EXPONENT_MAX/2).unwrap();
+            if !d2.is_zero() {
+                let d3 = d1.mul_full_prec(&d2).unwrap();
+                d1.set_precision(320, rm).unwrap();
+                let d4 = d1.mul(&d2, rm).unwrap();
+                eps.set_exponent(d1.get_exponent() - 158);
+                //println!("\n{:?}\n{:?}\n{:?}\n{:?}", d1,d2,d3,d4);
+                assert!(d3.cmp(&d4) == 0);
             }
         }
 

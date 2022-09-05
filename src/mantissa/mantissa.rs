@@ -422,9 +422,7 @@ impl Mantissa {
         if full_prec {
 
             m3.m.trunc_trailing_zeroes();
-            m3.n = m3.m.len() * WORD_BIT_SIZE;
-
-            debug_assert!((-1..=0).contains(&shift))    
+            m3.n = m3.m.len() * WORD_BIT_SIZE; 
 
         } else {
 
@@ -505,6 +503,34 @@ impl Mantissa {
             n: 0,
         };
         ret.n = ret.max_bit_len();
+        Ok((shift, ret))
+    }
+
+    pub fn from_usize(mut u: usize) -> Result<(usize, Self), Error> {
+
+        let mut n = 0;
+        let mut v = u;
+
+        while v & WORD_MAX as usize != 0 {
+            v >>= WORD_BIT_SIZE;
+            n += 1;
+        }
+
+        let mut m = Self::reserve_new(n)?;
+
+        for v in m.iter_mut() {
+            *v = u as Word;
+            u >>= WORD_BIT_SIZE;
+        }
+
+        let shift = Self::maximize(&mut m);
+        let mut ret = Mantissa {
+            m,
+            n: 0,
+        };
+        
+        ret.n = ret.max_bit_len();
+
         Ok((shift, ret))
     }
 
