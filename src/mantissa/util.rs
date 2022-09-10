@@ -1,16 +1,6 @@
 //! Auxiliary structures.
 
 
-use itertools::izip;
-use crate::defs::WORD_MAX;
-use crate::defs::Word;
-use crate::defs::WORD_BASE;
-use crate::defs::WORD_BIT_SIZE;
-use crate::defs::DoubleWord;
-use crate::defs::SignedWord;
-use core::ops::DerefMut;
-use core::ops::Deref;
-
 
 /// Length of the slice extended by extra size.
 pub struct ExtendedSlice<T, V> where V: Iterator<Item = T> {

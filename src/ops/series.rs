@@ -37,7 +37,7 @@ pub trait ArgReductionEstimator {
     fn get_reduction_cost(n: usize, p: usize) -> usize;
 
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
-    fn reduction_effect(n: usize, m: usize) -> usize;
+    fn reduction_effect(n: usize, m: isize) -> usize;
 }
 
 /// Compute the number of reductions required for the best performance.
@@ -45,12 +45,12 @@ pub trait ArgReductionEstimator {
 /// polycoeff_gen is the polynomial coefficient ganerator
 /// m is the negative exponent of the number.
 /// pwr_step - increment of power of x in each iteration
-pub fn series_cost_optimize<T: PolycoeffGen, S: ArgReductionEstimator>(p: usize, polycoeff_gen: &T, m: usize, pwr_step: usize) -> (usize, usize) {
+pub fn series_cost_optimize<T: PolycoeffGen, S: ArgReductionEstimator>(p: usize, polycoeff_gen: &T, m: isize, pwr_step: usize) -> (usize, usize) {
 
     let reduction_num_step = log2_floor(p)/2;
 
-    let mut reduction_times = if reduction_num_step > m {
-        reduction_num_step - m
+    let mut reduction_times = if reduction_num_step as isize > m {
+        (reduction_num_step as isize - m) as usize
     } else {
         0
     };

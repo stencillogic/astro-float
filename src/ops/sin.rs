@@ -1,5 +1,6 @@
-//! Hyperbolic sine.
+//! Sine.
 
+use crate::Sign;
 use crate::common::consts::FOUR;
 use crate::common::consts::ONE;
 use crate::common::consts::THREE;
@@ -12,35 +13,42 @@ use crate::ops::series::PolycoeffGen;
 use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::series_run;
 use crate::ops::series::series_cost_optimize;
+use crate::ops::consts::std::PI;
+
 
 
 // Polynomial coefficient generator.
-struct SinhPolycoeffGen {
+struct SinPolycoeffGen {
     one_full_p: BigFloatNumber,
     inc: BigFloatNumber,
     fct: BigFloatNumber,
+    sign: i8,
     iter_cost: usize,
 }
 
-impl SinhPolycoeffGen {
+impl SinPolycoeffGen {
 
     fn new(p: usize) -> Result<Self, Error> {
+
         let inc = BigFloatNumber::from_word(1, 1)?;
         let fct = BigFloatNumber::from_word(1, p)?;
         let one_full_p = BigFloatNumber::from_word(1, p)?;
 
         let iter_cost = (get_mul_cost(p) + get_add_cost(p)) << 1; // 2 * (cost(mul) + cost(add))
 
-        Ok(SinhPolycoeffGen {
+        let sign = 1;
+
+        Ok(SinPolycoeffGen {
             one_full_p,
             inc,
             fct,
+            sign,
             iter_cost,
         })
     }
 }
 
-impl PolycoeffGen for SinhPolycoeffGen {
+impl PolycoeffGen for SinPolycoeffGen {
 
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
 
@@ -52,6 +60,13 @@ impl PolycoeffGen for SinhPolycoeffGen {
         let inv_inc = self.one_full_p.div(&self.inc, rm)?;
         self.fct = self.fct.mul(&inv_inc, rm)?;
 
+        self.sign *= -1;
+        if self.sign > 0 {
+            self.fct.set_sign(Sign::Pos);
+        } else {
+            self.fct.set_sign(Sign::Neg);
+        }
+
         Ok(&self.fct)
     }
 
@@ -61,9 +76,9 @@ impl PolycoeffGen for SinhPolycoeffGen {
     }
 }
 
-struct SinhArgReductionEstimator {}
+struct SinArgReductionEstimator {}
 
-impl ArgReductionEstimator for SinhArgReductionEstimator {
+impl ArgReductionEstimator for SinArgReductionEstimator {
 
     /// Estimates cost of reduction n times for number with precision p.
     fn get_reduction_cost(n: usize, p: usize) -> usize {
@@ -77,30 +92,43 @@ impl ArgReductionEstimator for SinhArgReductionEstimator {
     #[inline]
     fn reduction_effect(n: usize, m: isize) -> usize {
         // n*log2(3) + m
-        (n as isize*1000/631 + m) as usize
+        ((n as isize)*1000/631 + m) as usize
     }
 }
 
 impl BigFloatNumber {
 
-    /// Computes hyperbolic sine.
-    pub fn sinh(&self, rm: RoundingMode) -> Result<Self, Error> {
-        // sinh(3*x) = 3*sinh(x) + 4*sinh(x)^3
-        Err(Error::InvalidArgument)
+    /// Sine
+    pub fn sin(&self, rm: RoundingMode) -> Result<Self, Error> {
+
+        let mut pi = PI.with(|v| -> Result<Self, Error> {
+            v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)
+        })?;
+
+        pi.set_exponent(pi.get_exponent() + 1);
+
+        // determine quadrant
+        let mut x = self.div(&pi, RoundingMode::None)?;
+        let fractional = x.fract()?;
+        x = pi.mul(&fractional, RoundingMode::None)?;
+
+        pi.set_exponent(pi.get_exponent() - 1);
+
+        x.sin_series(rm)
     }
 
-    /// sinh using series, for |x| < 1
-    pub(super) fn sinh_series(&self, rm: RoundingMode) -> Result<Self, Error> {
-        // sinh:  x + x^3/3! + x^5/5! + x^7/7! + ...
+    /// sine using series
+    pub(super) fn sin_series(&self, rm: RoundingMode) -> Result<Self, Error> {
+        // sin:  x - x^3/3! + x^5/5! - x^7/7! + ...
 
         let p = self.get_mantissa_max_bit_len();
-        let mut polycoeff_gen = SinhPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<SinhPolycoeffGen, SinhArgReductionEstimator>(
-            p, &polycoeff_gen, (-self.e) as isize, 2);
+        let mut polycoeff_gen = SinPolycoeffGen::new(p)?;
+        let (reduction_times, niter) = series_cost_optimize::<SinPolycoeffGen, SinArgReductionEstimator>(
+            p, &polycoeff_gen, -self.e as isize, 2);
 
         let arg_holder;
         let arg = if reduction_times > 0 {
-            arg_holder = self.sinh_arg_reduce(reduction_times, rm)?;
+            arg_holder = self.sin_arg_reduce(reduction_times, rm)?;
             &arg_holder
         } else {
             self
@@ -113,7 +141,7 @@ impl BigFloatNumber {
         let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
 
         if reduction_times > 0 {
-            ret.sinh_arg_restore(reduction_times, rm)
+            ret.sin_arg_restore(reduction_times, rm)
         } else {
             Ok(ret)
         }
@@ -121,8 +149,8 @@ impl BigFloatNumber {
 
     // reduce argument n times.
     // cost: n * O(add)
-    fn sinh_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
-        // sinh(3*x) = 3*sinh(x) + 4*sinh(x)^3
+    fn sin_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+        // sin(3*x) = 3*sin(x) - 4*sin(x)^3
         let mut ret = self.clone()?;
         for _ in 0..n {
             ret = ret.div(&THREE, rm)?;
@@ -132,19 +160,19 @@ impl BigFloatNumber {
 
     // restore value for the argument reduced n times.
     // cost: n * (4*O(mul) + O(add))
-    fn sinh_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
-        // sinh(3*x) = 3*sinh(x) + 4*sinh(x)^3
-        let mut sinh = self.clone()?;
+    fn sin_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+        // sin(3*x) = 3*sin(x) - 4*sin(x)^3
+        let mut sin = self.clone()?;
 
         for _ in 0..n {
-            let mut sinh_cub = sinh.mul(&sinh, rm)?;
-            sinh_cub = sinh_cub.mul(&sinh, rm)?;
-            let p1 = sinh.mul(&THREE, rm)?;
-            let p2 = sinh_cub.mul(&FOUR, rm)?;
-            sinh = p1.add(&p2, rm)?;
+            let mut sin_cub = sin.mul(&sin, rm)?;
+            sin_cub = sin_cub.mul(&sin, rm)?;
+            let p1 = sin.mul(&THREE, rm)?;
+            let p2 = sin_cub.mul(&FOUR, rm)?;
+            sin = p1.sub(&p2, rm)?;
         }
-        
-        Ok(sinh)
+
+        Ok(sin)
     }
 }
 
@@ -155,26 +183,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_sinh() {
+    fn test_sine() {
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_word(1,32000).unwrap();
+        let mut n1 = BigFloatNumber::from_word(5,320).unwrap();
         n1.set_exponent(0);
-        let n2 = n1.sinh_series(rm).unwrap();
-        //println!("{:?}", n2.fp3(crate::Radix::Dec, rm).unwrap());
+        let n2 = n1.sin(rm).unwrap();
+        //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
     }
 
     #[ignore]
     #[test]
-    fn sinh_perf() {
+    fn sine_perf() {
         let mut n = vec![];
-        for _ in 0..100 {
-            n.push(BigFloatNumber::random_normal(32000, -0, -0).unwrap());
+        for _ in 0..10000 {
+            n.push(BigFloatNumber::random_normal(133, -5, 5).unwrap());
         }
 
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let f = ni.sinh_series(RoundingMode::ToEven).unwrap();
+                let f = ni.sin(RoundingMode::ToEven).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

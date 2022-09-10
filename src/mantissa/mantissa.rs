@@ -168,67 +168,54 @@ impl Mantissa {
     /// Find the position of the first occurence of "1" starting from start_pos.
     pub fn find_one_from(&self, start_pos: usize) -> Option<usize> {
 
-        let mut d;
         let start_idx = start_pos / WORD_BIT_SIZE;
-        let mut shift = start_pos;
-
         if start_idx >= self.m.len() {
 
             None
 
         } else {
-            
-            let start_bit = start_pos % WORD_BIT_SIZE;
 
-            d = self.m[self.m.len() - 1 - start_idx];
-            d <<= start_bit;
+            let mut iter = self.m.iter().rev().skip(start_idx);
+            if let Some(v) = iter.next() {
 
-            if d != 0 {
+                let mut d = *v;
 
-                while WORD_SIGNIFICANT_BIT & d == 0 {
-                    d <<= 1;
-                    shift += 1;
-                }
+                let start_bit = start_pos % WORD_BIT_SIZE;
+                let mut shift = start_pos;
 
-                Some(shift)
+                d <<= start_bit;
 
-            } else {
-
-                shift += WORD_BIT_SIZE;
-                let start_idx = start_idx + 1;
-
-                if start_idx < self.m.len() {
-
-                    for v in self.m.iter().rev().skip(start_idx) {
-
-                        d = *v;
-
-                        if d != 0 {
-                            break;
-                        }
-
-                        shift += WORD_BIT_SIZE;
+                if d != 0 {
+    
+                    while d & WORD_SIGNIFICANT_BIT == 0 {
+                        d <<= 1;
+                        shift += 1;
                     }
 
-                    if d != 0 {
+                    return Some(shift)
+                }
 
-                        while WORD_SIGNIFICANT_BIT & d == 0 {
+                shift += WORD_BIT_SIZE - start_bit;
+
+                for v in iter {
+    
+                    d = *v;
+
+                    if d != 0 {
+    
+                        while d & WORD_SIGNIFICANT_BIT == 0 {
                             d <<= 1;
                             shift += 1;
                         }
-
-                        Some(shift)
-
-                    } else {
-
-                        None
+    
+                        return Some(shift)
                     }
-
-                } else {
-
-                    None
+    
+                    shift += WORD_BIT_SIZE;
                 }
             }
+
+            None
         }
     }
 
@@ -732,10 +719,14 @@ impl Mantissa {
         let orig_len = self.m.len();
         if sz < orig_len {
             self.m.trunc_to(p);
-            self.n -= (orig_len - sz)*WORD_BIT_SIZE;
+            if self.n != 0 {
+                self.n -= (orig_len - sz)*WORD_BIT_SIZE;
+            }
         } else if sz > orig_len {
             self.m.try_extend(p)?;
-            self.n += (sz - orig_len)*WORD_BIT_SIZE;
+            if self.n != 0 {
+                self.n += (sz - orig_len)*WORD_BIT_SIZE;
+            }
         }
         Ok(())
     }
@@ -762,7 +753,7 @@ impl Mantissa {
         if !ret.is_all_zero() {
             Self::maximize(&mut ret.m);
             ret.n = WORD_BIT_SIZE*ret.m.len();
-            ret.m[0] ^= rand::random::<Word>();
+            ret.m[0] ^= rand::random::<Word>() >> 1;
         }
         Ok(ret)
     }
@@ -775,5 +766,9 @@ impl Mantissa {
             m,
             n: self.n,
         })
+    }
+
+    pub fn get_digits(&self) -> &[Word] {
+        &self.m
     }
 }

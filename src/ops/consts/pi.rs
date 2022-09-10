@@ -64,7 +64,7 @@ fn pqr_inc(pa: &BigFloatNumber, qa: &BigFloatNumber, ra: &BigFloatNumber, m: usi
 }
 
 /// Holds value of currently computed ln(2).
-pub struct Pi_cache {
+pub struct PiCache {
     b: usize,
     pk: BigFloatNumber,
     qk: BigFloatNumber,
@@ -72,7 +72,7 @@ pub struct Pi_cache {
     val: BigFloatNumber,
 }
 
-impl Pi_cache {
+impl PiCache {
 
     fn calc_pi(p: &BigFloatNumber, q: &BigFloatNumber, k: usize) -> Result<BigFloatNumber, Error>  {
 
@@ -97,13 +97,32 @@ impl Pi_cache {
 
         let val = Self::calc_pi(&p01, &q01, 1)?;
 
-        Ok(Pi_cache {
+        Ok(PiCache {
             b: 1,
             pk: p01,
             qk: q01,
             rk: r01,
             val,
         })
+    }
+
+    /// Try to get cached value without additional calculations.
+    pub fn try_for_prec(&self, k: usize, rm: RoundingMode) -> Result<Option<BigFloatNumber>, Error> {
+
+        let kext = k + 51;
+
+        if self.b > kext {
+
+            let mut ret = self.val.clone()?;
+
+            ret.set_precision(k, rm)?;
+
+            Ok(Some(ret))
+
+        } else {
+            
+            Ok(None)
+        }
     }
 
     /// Return value of ln(2) with precision k.
@@ -158,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_pi_const() {
-        let mut pi = Pi_cache::new().unwrap();
+        let mut pi = PiCache::new().unwrap();
         let c = pi.for_prec(320, RoundingMode::ToEven).unwrap();
         //println!("{:?}", c.fp3(Radix::Dec, RoundingMode::None));
         let r = BigFloatNumber::from_raw_parts(&[2385773791, 1363806329, 991140642, 34324134, 2322058356, 688016904, 2161908945, 3301335691, 560513588, 3373259426], 320, Sign::Pos, 2).unwrap();

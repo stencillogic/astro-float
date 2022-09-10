@@ -129,7 +129,7 @@ mod tests {
 
         let mut eps = ONE.clone().unwrap();
         let prec = 3200;
-        
+
         for _ in 0..1000 {
 
             let mut d1 = BigFloatNumber::random_normal(prec, -80, 80).unwrap();

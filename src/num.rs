@@ -141,7 +141,7 @@ impl BigFloatNumber {
         // TODO: consider short multiplication for full_prec = false.
 
         if self.m.is_zero() || d2.m.is_zero() {
-            return Self::new(self.m.max_bit_len())
+            return Self::new(self.m.max_bit_len().max(d2.m.max_bit_len()));
         }
 
         let s = if self.s == d2.s { Sign::Pos } else { Sign::Neg };
@@ -180,7 +180,7 @@ impl BigFloatNumber {
         }
 
         if self.m.is_zero() {
-            return Self::new(self.m.max_bit_len()); // self / d2 = 0
+            return Self::new(self.m.max_bit_len().max(d2.m.max_bit_len())); // self / d2 = 0
         }
 
         let s = if self.s == d2.s { Sign::Pos } else { Sign::Neg };
@@ -213,14 +213,21 @@ impl BigFloatNumber {
 
     /// Return normilized mantissa and exponent with corresponding shift.
     fn normalize(&self) -> Result<(isize, Option<Mantissa>), Error> {
+
         if self.is_subnormal() {
+
             let (shift, mantissa) = self.m.normilize()?;
+
             debug_assert!(shift < (isize::MAX/2 + EXPONENT_MIN as isize) as usize);
+
             if (self.e as isize) - shift as isize <= isize::MIN/2 {
                 return Err(Error::ExponentOverflow(self.s));
             }
+
             Ok((self.e as isize - shift as isize, Some(mantissa)))
+
         } else {
+
             Ok((self.e as isize, None))
         }
     }
@@ -231,16 +238,27 @@ impl BigFloatNumber {
 
         let mut d3 = Self::new(0)?;
 
-        // one of the numbers is zero
+        // one of the args is zero
         if self.m.is_zero() {
-            if op < 0 {
-                return d2.neg();
+
+            let mut ret = if op < 0 {
+                d2.neg()
             } else {
-                return d2.clone()
-            }
+                d2.clone()
+            }?;
+
+            ret.set_precision(self.m.max_bit_len().max(d2.m.max_bit_len()), RoundingMode::None)?;
+
+            return Ok(ret);
         }
+
         if d2.m.is_zero() {
-            return self.clone();
+
+            let mut ret = self.clone()?;
+
+            ret.set_precision(self.m.max_bit_len().max(d2.m.max_bit_len()), RoundingMode::None)?;
+
+            return Ok(ret);
         }
 
         let (e1, m1_opt) = self.normalize()?;
@@ -759,6 +777,11 @@ impl BigFloatNumber {
             s,
             e,
         })
+    }
+
+    /// Return raw mantissa digits.
+    pub fn get_mantissa_digits(&self) -> &[Word] {
+        self.m.get_digits()
     }
 }
 

@@ -14,6 +14,7 @@ use crate::ops::series::PolycoeffGen;
 use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::series_run;
 use crate::ops::series::series_cost_optimize;
+use crate::ops::consts::std::LN_2;
 
 
 // Polynomial coefficient generator.
@@ -75,8 +76,8 @@ impl ArgReductionEstimator for LnArgReductionEstimator {
 
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
     #[inline]
-    fn reduction_effect(n: usize, m: usize) -> usize {
-        m + n
+    fn reduction_effect(n: usize, m: isize) -> usize {
+        (m + n as isize) as usize
     }
 }
 
@@ -110,9 +111,9 @@ impl BigFloatNumber {
 
         } else {
 
-            let two = Self::from_word(2, self.get_mantissa_max_bit_len() + 2)?;
-
-            let p2 = Self::ln_series(two, RoundingMode::None)?;
+            let mut p2 = LN_2.with(|v| -> Result<Self, Error> {
+                v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)
+            })?;
 
             let mut n = Self::from_word(e.unsigned_abs(), 1)?;
             if e < 0 {

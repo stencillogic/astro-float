@@ -45,14 +45,14 @@ fn pqr_inc(pa: &BigFloatNumber, qa: &BigFloatNumber, m: usize) -> Result<(BigFlo
 }
 
 /// Holds value of currently computed ln(2).
-pub struct E_cache {
+pub struct ECache {
     b: usize,
     pk: BigFloatNumber,
     qk: BigFloatNumber,
     val: BigFloatNumber,
 }
 
-impl E_cache {
+impl ECache {
 
     fn calc_e(p: &BigFloatNumber, q: &BigFloatNumber, k: usize) -> Result<BigFloatNumber, Error>  {
 
@@ -67,7 +67,7 @@ impl E_cache {
 
         let val = Self::calc_e(&p01, &q01, 64)?;
 
-        Ok(E_cache {
+        Ok(ECache {
             b: 64,
             pk: p01,
             qk: q01,
@@ -81,6 +81,25 @@ impl E_cache {
         let lln = log2_floor(ln);
 
         x / (ln - lln - 3)
+    }
+
+    /// Try to get cached value without additional calculations.
+    pub fn try_for_prec(&self, k: usize, rm: RoundingMode) -> Result<Option<BigFloatNumber>, Error> {
+
+        let kext = Self::b_factor(k);
+
+        if self.b > kext {
+
+            let mut ret = self.val.clone()?;
+
+            ret.set_precision(k, rm)?;
+
+            Ok(Some(ret))
+
+        } else {
+            
+            Ok(None)
+        }
     }
 
     /// Return value of ln(2) with precision k.
@@ -133,7 +152,7 @@ mod tests {
 
     #[test]
     fn test_e_const() {
-        let mut e = E_cache::new().unwrap();
+        let mut e = ECache::new().unwrap();
         let c = e.for_prec(320, RoundingMode::ToEven).unwrap();
         //println!("{:?}", c);
         let r = BigFloatNumber::from_raw_parts(&[614153977, 3432226254, 342111227, 2850108993, 3459069589, 3636053379, 658324721, 2950452768, 2730183322, 2918732888], 320, Sign::Pos, 2).unwrap();

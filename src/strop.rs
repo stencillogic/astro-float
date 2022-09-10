@@ -1,4 +1,5 @@
 
+use crate::Sign;
 use crate::defs::WORD_BIT_SIZE;
 use crate::defs::WORD_MAX;
 use crate::defs::WORD_SIGNIFICANT_BIT;
@@ -16,159 +17,39 @@ use crate::common::consts::TWO;
 use crate::common::consts::EIGHT;
 use crate::common::consts::TEN;
 use crate::common::consts::SIXTEEN;
+use std::fmt::Write;
 
+
+const DIGIT_CHARS: [char; 16] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', ];
 
 impl BigFloatNumber {
-/*
-    pub fn parse_base_10(s: &str) -> Result<Self, Error> {
-        let ps = parse(s);
-        if ps.is_valid() {
-            if ps.is_inf() {
-                Err(Error::ExponentOverflow(ps.sign()))
-            } else if ps.is_nan() {
-                Err(Error::InvalidArgument)
-            } else {
-                let (m, s, n) = ps.raw_parts();
-                // input: u = f*10^n, f, n are integers.
-                // output: v = m*2^e, where u is not precisely, but equal to v
-                // Lets consider: v = f * 2^n * 5^n
-                // 5^n is the only component that will introduce error, while f*2^n will result in precise number.
-                // 5^n always ends with 1 for positive n and is periodic for negative n, so, though the rounded value of 5^n is not precise, 
-                // we know the sticky bit is always 1 when doing rounding.
-                // let a = 5^n = (x + err1)*2^n, and let b = f*2^n.
-                // Assume |err1| <= 0.5
-                // let a*b = (z + err2)*2^q
-                // As per lemma 2 from "How to Read Floating Point Numbers Accurately", William D Clinger: 
-                // |err2| < 0.5 + 2*err1 < 1.5
-                // We want |err2| <= 0.5, so increasing precision by 2 (1.5/4 = 0.375)
-                let rdx_num = Self::number_for_radix(Radix::Dec)?;
-                let p = Self::precision_10_to_2(m.len());
-                let mut word: u32 = 0;
-                let mut f = Self::new(p + 2)?;
-                for d in m {
-                    let d = *d as u32;
-                    if word <= WORD_MAX - d {
-                        word *= 10;
-                        word += d;
-                    } else {
-                        let d2 = Self::from_u32(word)?;
-                        f = f.mul(&rdx_num)?;
-                        f = f.add(&d2)?;
-                        word = 0;
-                    }
-                }
-                if word != 0 {
-                    let d2 = Self::from_u32(word)?;
-                    f = f.mul(&rdx_num)?;
-                    f = f.add(&d2)?;
-                }
-                let n = Self::from_u32(n)?;
-                let fpn = Self::from_u8(5, p+2)?.pow(&n)?;
-                let mut ret = fpn.mul(&f).round_mantissa(p)?;
-                ret.set_exponent(ret.get_exponent() + e);
-                Ok(ret)
-            }
-        } else {
-            Err(Error::InvalidArgument)
-        }
-    }
-
-    fn precision_10_to_2(len: usize) -> usize {
-        if len == 0 {
-            return 0;
-        }
-        const LG2_10: usize = 332192809488736234787031942948939017586;
-        const DIV_FACTOR_MAX: usize = 100000000000000000000000000000000000000;
-        let mut c = DIV_FACTOR_MAX;
-        for _ in 1..len {
-            c /= 10;
-        }
-        (LG2_10/c + 1)*len
-    }
 
     /// Formats the number using radix `r`.
-    pub fn format(&self, rdx: Radix) -> Result<String, Error> {
-        // let self = m*2^e, m < 1, 
-        // then self = m*2^e * rdx^n / rdx^n, where n = floor(e*log_r(2))
-        // let f = m / rdx^n,
-        // then resulting number is: F = f * rdx^n
-        // F then will be printed with FP(3) from "How to Print Floating-Point Numbers Accurately", Guy L. Steele Jr., John L. White, 1990.
-        Ok("".to_owned())
-    }
-*/
+    pub fn format(&self, rdx: Radix, rm: RoundingMode) -> Result<String, Error> {
 
-    // TODO: remove pub when printing is implemented.
-    pub(super) fn fp3(&self, rdx: Radix, rm: RoundingMode) -> Result<Vec<u8>, Error> {
+        let (s, m, e) = self.convert_to_radix(rdx, rm)?;
 
-        debug_assert!(self.is_positive());
+        let mut mstr = if s == Sign::Neg {
+            "-".to_owned()
+        } else {
+            String::new()
+        };
 
-        let mut ret = Vec::new();
-        ret.push(0);
+        if m.is_empty() {
+            mstr.push_str("0.0");
+        } else {
+            mstr.push(DIGIT_CHARS[m[0] as usize]);
+            mstr.push('.');
+            mstr.push_str(&m.iter().skip(1).map(|d| { DIGIT_CHARS[*d as usize] }).collect::<String>());
 
-        if !self.is_zero() {
-
-            let mut r = self.clone()?;
-            let mut m = ONE.clone()?;
-            m.set_exponent(-(self.get_mantissa_max_bit_len() as Exponent + 1));
-            let rdx_num = Self::number_for_radix(rdx)?;
-            let mut word;
-
-            loop {
-
-                let d = r.mul(rdx_num, rm).unwrap();
-                r = d.fract()?;
-                word = d.get_int_as_word();
-                m = m.mul(rdx_num, rm).unwrap();
-
-                ret.push(word as u8);
-
-                if r.cmp(&m) < 0 || r.cmp(&ONE.sub(&m, rm).unwrap()) > 0 {
-                    break;
-                }
-            }
-
-            if !r.round(0, RoundingMode::ToEven).unwrap().is_zero() {
-
-                word += 1;
-                let rdx_word = Self::word_for_radix(rdx);
-
-                if word == rdx_word {
-
-                    ret.push(0);
-
-                    let mut i = ret.len() - 2;
-                    while i > 0 && ret[i] + 1 == rdx_word as u8 {
-                        ret[i] = 0;
-                        i -= 1;
-                    }
-                    ret[i] += 1;
-
-                } else {
-
-                    ret.push(word as u8);
-                }
+            if e < 1 {
+                let _ = write!(mstr, "e-{}", (e - 1).unsigned_abs());
+            } else {
+                let _ = write!(mstr, "e+{}", e - 1);
             }
         }
 
-        Ok(ret)
-    }
-
-    fn word_for_radix(rdx: Radix) -> Word {
-        match rdx {
-            Radix::Bin => 2,
-            Radix::Oct => 8,
-            Radix::Dec => 10,
-            Radix::Hex => 16,
-        }
-    }
-
-    fn number_for_radix(rdx: Radix) -> Result<&'static Self, Error> {
-        Ok(match rdx {
-            Radix::Bin => &TWO,
-            Radix::Oct => &EIGHT,
-            Radix::Dec => &TEN,
-            Radix::Hex => &SIXTEEN,
-        })
+        Ok(mstr)
     }
 }
 
@@ -183,7 +64,8 @@ mod tests {
     #[test]
     fn test_format() {
 
-        let n = BigFloatNumber::from_f64(160, 0.031256789f64).unwrap();
-        println!("{:?}", n.fp3(Radix::Dec, RoundingMode::ToEven).unwrap());
+        let n = BigFloatNumber::from_f64(160, 0.03f64).unwrap();
+        let s = n.format(Radix::Dec, RoundingMode::None).unwrap();
+        //println!("{}", s);
     }
 }
