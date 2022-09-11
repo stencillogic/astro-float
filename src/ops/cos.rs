@@ -1,6 +1,5 @@
 //! Cosine.
 
-use std::borrow::BorrowMut;
 
 use crate::Sign;
 use crate::common::consts::FOUR;

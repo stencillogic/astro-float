@@ -8,6 +8,7 @@ mod series;
 mod consts;
 mod sin;
 mod cos;
+mod tan;
 
 #[cfg(test)]
 mod tests;
