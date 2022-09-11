@@ -4,7 +4,7 @@ use crate::common::consts::ONE;
 use crate::common::consts::THREE;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
-use crate::common::util::log2_ceil;
+use crate::common::util::log2_floor;
 use crate::num::BigFloatNumber;
 use crate::defs::RoundingMode;
 use crate::defs::Error;
@@ -23,7 +23,9 @@ impl TanPolycoeffGen {
 
     fn new(p: usize) -> Result<Self, Error> {
 
-        let iter_cost = (7 * get_mul_cost(p) + 4 * get_add_cost(p)) * 3 / log2_ceil(p);
+        let l = log2_floor(p);
+        let ll = log2_floor(l) * 3 / 2;
+        let iter_cost = (7 * get_mul_cost(p) + 4 * get_add_cost(p)) * ll / l;
 
         Ok(TanPolycoeffGen {
             iter_cost,
@@ -94,7 +96,7 @@ impl BigFloatNumber {
         let p = self.get_mantissa_max_bit_len();
         let polycoeff_gen = TanPolycoeffGen::new(p)?;
         let (reduction_times, _niter) = series_cost_optimize::<TanPolycoeffGen, TanArgReductionEstimator>(
-            p, &polycoeff_gen, -self.e as isize, 2);
+            p, &polycoeff_gen, -self.e as isize, 1, true);
 
         let arg_holder;
         let arg = if reduction_times > 0 {
@@ -203,7 +205,7 @@ mod tests {
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
     }
 
-    #[ignore]
+    //#[ignore]
     #[test]
     fn tan_perf() {
         let mut n = vec![];

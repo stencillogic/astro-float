@@ -111,7 +111,7 @@ impl BigFloatNumber {
 
         } else {
 
-            let mut p2 = LN_2.with(|v| -> Result<Self, Error> {
+            let p2 = LN_2.with(|v| -> Result<Self, Error> {
                 v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)
             })?;
 
@@ -134,7 +134,7 @@ impl BigFloatNumber {
         let p = x.get_mantissa_max_bit_len();
         let mut polycoeff_gen = AtanhPolycoeffGen::new(p)?;
         let (reduction_times, niter) = series_cost_optimize::<AtanhPolycoeffGen, LnArgReductionEstimator>(
-            p, &polycoeff_gen, 0, 2);
+            p, &polycoeff_gen, 0, 2, false);
 
         let err = niter * 3 + reduction_times / 2 + 4;
         x.set_precision(x.get_mantissa_max_bit_len() + err, rm)?;

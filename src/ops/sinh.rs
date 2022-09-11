@@ -96,7 +96,7 @@ impl BigFloatNumber {
         let p = self.get_mantissa_max_bit_len();
         let mut polycoeff_gen = SinhPolycoeffGen::new(p)?;
         let (reduction_times, niter) = series_cost_optimize::<SinhPolycoeffGen, SinhArgReductionEstimator>(
-            p, &polycoeff_gen, (-self.e) as isize, 2);
+            p, &polycoeff_gen, (-self.e) as isize, 2, false);
 
         let arg_holder;
         let arg = if reduction_times > 0 {

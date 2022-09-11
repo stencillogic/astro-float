@@ -28,6 +28,11 @@ pub trait PolycoeffGen {
 
     /// Returns the cost of one call to next if numbers have precision p.
     fn get_iter_cost(&self) -> usize;
+
+    /// Returns true if coefficient is divizor.
+    fn is_div(&self) -> bool {
+        false
+    }
 }
 
 /// Estimate how argument reduction influences cost.
@@ -45,7 +50,8 @@ pub trait ArgReductionEstimator {
 /// polycoeff_gen is the polynomial coefficient ganerator
 /// m is the negative exponent of the number.
 /// pwr_step - increment of power of x in each iteration
-pub fn series_cost_optimize<T: PolycoeffGen, S: ArgReductionEstimator>(p: usize, polycoeff_gen: &T, m: isize, pwr_step: usize) -> (usize, usize) {
+/// ext - if true use series step cost directly
+pub fn series_cost_optimize<T: PolycoeffGen, S: ArgReductionEstimator>(p: usize, polycoeff_gen: &T, m: isize, pwr_step: usize, ext: bool) -> (usize, usize) {
 
     let reduction_num_step = log2_floor(p)/2;
 
@@ -61,7 +67,11 @@ pub fn series_cost_optimize<T: PolycoeffGen, S: ArgReductionEstimator>(p: usize,
 
         let m_eff = S::reduction_effect(reduction_times, m);
         let niter = series_niter(p, m_eff) / pwr_step;
-        let cost2 = series_cost(niter, p, polycoeff_gen) + S::get_reduction_cost(reduction_times, p);
+        let cost2 = if ext {
+            polycoeff_gen.get_iter_cost() * niter
+        } else {
+            series_cost(niter, p, polycoeff_gen)
+        } + S::get_reduction_cost(reduction_times, p);
 
         if cost2 < cost1 {
             cost1 = cost2;
@@ -76,6 +86,8 @@ pub fn series_run<T: PolycoeffGen>(acc: BigFloatNumber, x_first: BigFloatNumber,
 
     if niter >= RECT_ITER_THRESHOLD {
         series_rectangular(niter, acc, x_first, x_step, polycoeff_gen, rm)
+    } else if polycoeff_gen.is_div() {
+        series_linear(acc, x_first, x_step, polycoeff_gen, rm)
     } else {
         series_horner(acc, x_first, x_step, polycoeff_gen, rm)
     }
@@ -168,7 +180,7 @@ fn series_rectangular<T: PolycoeffGen>(mut niter: usize, add: BigFloatNumber, x_
     terminal_pow = terminal_pow.mul(&x_first, rm)?;
     acc = acc.add(&add, rm)?;
 
-    acc = if niter < MAX_CACHE * 10 { // probably not too many iterations left
+    acc = if niter < MAX_CACHE * 10 && !polycoeff_gen.is_div() { // probably not too many iterations left
         series_horner(acc, terminal_pow, x_step, polycoeff_gen, rm)
     } else {
         series_linear(acc, terminal_pow, x_step, polycoeff_gen, rm)
@@ -181,12 +193,17 @@ fn series_rectangular<T: PolycoeffGen>(mut niter: usize, add: BigFloatNumber, x_
 // cost: niter * (2 * O(mul) + O(add) + cost(polcoeff_gen.next))
 fn series_linear<T: PolycoeffGen>(mut acc: BigFloatNumber, x_first: BigFloatNumber, x_step: BigFloatNumber, polycoeff_gen: &mut T, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
 
+    let is_div = polycoeff_gen.is_div();
     let mut x_pow = x_first;
 
     loop {
 
         let coeff = polycoeff_gen.next(rm)?;
-        let part = x_pow.mul(coeff, rm)?;
+        let part = if is_div {
+            x_pow.div(coeff, rm)
+        } else { 
+            x_pow.mul(coeff, rm) 
+        }?;
 
         if part.get_exponent() as isize <= acc.get_exponent() as isize - acc.get_mantissa_max_bit_len() as isize {
             break;
@@ -202,13 +219,30 @@ fn series_linear<T: PolycoeffGen>(mut acc: BigFloatNumber, x_first: BigFloatNumb
 // compute row of rectangle series.
 fn compute_row<T: PolycoeffGen>(p: usize, cache: &[BigFloatNumber], polycoeff_gen: &mut T, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
 
+    let is_div = polycoeff_gen.is_div();
+
     let mut acc = BigFloatNumber::new(p)?;
     let coeff = polycoeff_gen.next(rm)?;
-    acc = acc.add(coeff, rm)?;
+    if is_div {
+        let r = if coeff.get_mantissa_max_bit_len() < p {
+            let mut c = coeff.clone()?;
+            c.set_precision(p, rm)?;
+            c.reciprocal(rm)
+        } else {
+            coeff.reciprocal(rm)
+        }?;
+        acc = acc.add(&r, rm)?;
+    } else {
+        acc = acc.add(coeff, rm)?;
+    }
 
     for x_pow in cache {
         let coeff = polycoeff_gen.next(rm)?;
-        let add = x_pow.mul(coeff, rm)?;
+        let add = if is_div {
+            x_pow.div(coeff, rm)
+        } else {
+            x_pow.mul(coeff, rm)
+        }?;
         acc = acc.add(&add, rm)?;
     }
 
@@ -222,6 +256,7 @@ fn series_horner<T: PolycoeffGen>(add: BigFloatNumber, x_first: BigFloatNumber, 
 
     debug_assert!(x_first.e <= 0);
     debug_assert!(x_step.e <= 0);
+    debug_assert!(!polycoeff_gen.is_div());
 
     // determine number of parts and cache plynomial coeffs.
     let mut cache = SmallVec::<[BigFloatNumber; MAX_CACHE]>::new();
