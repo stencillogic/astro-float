@@ -63,7 +63,7 @@ fn pqr_inc(pa: &BigFloatNumber, qa: &BigFloatNumber, ra: &BigFloatNumber, m: usi
     Ok((p, q, r, b))
 }
 
-/// Holds value of currently computed ln(2).
+/// Holds value of currently computed PI.
 pub struct PiCache {
     b: usize,
     pk: BigFloatNumber,
@@ -88,7 +88,9 @@ impl PiCache {
         let f4 = f3.sqrt(RoundingMode::None)?;
         let f5 = p0.mul(&f4, RoundingMode::None)?;
 
-        q0.div(&f5, RoundingMode::None)
+        let ret = q0.div(&f5, RoundingMode::None)?;
+
+        Ok(ret)
     }
 
     pub fn new() -> Result<Self, Error> {
@@ -120,12 +122,12 @@ impl PiCache {
             Ok(Some(ret))
 
         } else {
-            
+
             Ok(None)
         }
     }
 
-    /// Return value of ln(2) with precision k.
+    /// Return value of PI with precision k.
     pub fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
 
         let kext = k + 51;
@@ -151,8 +153,8 @@ impl PiCache {
             ret.set_precision(k, rm)?;
 
             self.pk = pk;
-            self.pk = qk;
-            self.pk = rk;
+            self.qk = qk;
+            self.rk = rk;
             self.b = bb;
 
             Ok(ret)

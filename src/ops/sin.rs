@@ -108,17 +108,21 @@ impl BigFloatNumber {
         pi.set_exponent(pi.get_exponent() + 1);
 
         // determine quadrant
-        let mut x = self.div(&pi, RoundingMode::None)?;
+        let mut x = self.clone()?;
+        x.set_precision(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
+        x = x.div(&pi, RoundingMode::None)?;
         let fractional = x.fract()?;
         x = pi.mul(&fractional, RoundingMode::None)?;
 
-        pi.set_exponent(pi.get_exponent() - 1);
+        let mut ret = x.sin_series(RoundingMode::None)?;
 
-        x.sin_series(rm)
+        ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+
+        Ok(ret)
     }
 
     /// sine using series
-    pub(super) fn sin_series(&self, rm: RoundingMode) -> Result<Self, Error> {
+    pub(super) fn sin_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
         // sin:  x - x^3/3! + x^5/5! - x^7/7! + ...
 
         let p = self.get_mantissa_max_bit_len();
@@ -126,16 +130,16 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<SinPolycoeffGen, SinArgReductionEstimator>(
             p, &polycoeff_gen, -self.e as isize, 2, false);
 
-        let arg_holder;
+        self.set_precision(self.get_mantissa_max_bit_len() + niter * 3 + reduction_times * 3, rm)?;
+
         let arg = if reduction_times > 0 {
-            arg_holder = self.sin_arg_reduce(reduction_times, rm)?;
-            &arg_holder
+            self.sin_arg_reduce(reduction_times, rm)?
         } else {
             self
         };
 
         let acc = arg.clone()?;    // x
-        let x_step = arg.mul(arg, rm)?;   // x^2
+        let x_step = arg.mul(&arg, rm)?;   // x^2
         let x_first = arg.mul(&x_step, rm)?;   // x^3
 
         let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;

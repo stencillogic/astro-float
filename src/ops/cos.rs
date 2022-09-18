@@ -103,23 +103,27 @@ impl BigFloatNumber {
     pub fn cos(&self, rm: RoundingMode) -> Result<Self, Error> {
 
         let mut pi = PI.with(|v| -> Result<Self, Error> {
-            v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)
+            v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() * 10 / 9, RoundingMode::None)
         })?;
 
         pi.set_exponent(pi.get_exponent() + 1);
 
         // determine quadrant
-        let mut x = self.div(&pi, RoundingMode::None)?;
+        let mut x = self.clone()?;
+        x.set_precision(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
+        x = x.div(&pi, RoundingMode::None)?;
         let fractional = x.fract()?;
         x = pi.mul(&fractional, RoundingMode::None)?;
 
-        pi.set_exponent(pi.get_exponent() - 1);
+        let mut ret = x.cos_series(RoundingMode::None)?;
 
-        x.cos_series(rm)
+        ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+
+        Ok(ret)
     }
 
-    /// cosine ucosg series
-    pub(super) fn cos_series(&self, rm: RoundingMode) -> Result<Self, Error> {
+    /// cosine series
+    pub(super) fn cos_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
         // cos:  x - x^2/2! + x^4/4! - x^6/6! + ...
 
         let p = self.get_mantissa_max_bit_len();
@@ -127,17 +131,17 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<CosPolycoeffGen, CosArgReductionEstimator>(
             p, &polycoeff_gen, -self.e as isize, 2, false);
 
-        let arg_holder;
+        self.set_precision(self.get_mantissa_max_bit_len() + niter * 4 + reduction_times * 3, rm)?;
+
         let arg = if reduction_times > 0 {
-            arg_holder = self.cos_arg_reduce(reduction_times, rm)?;
-            &arg_holder
+            self.cos_arg_reduce(reduction_times, rm)?
         } else {
             self
         };
 
         let acc = BigFloatNumber::from_word(1, p)?;  // 1
-        let x_step = arg.mul(arg, rm)?;             // x^2
-        let x_first = x_step.clone()?;                  // x^4
+        let x_step = arg.mul(&arg, rm)?;            // x^2
+        let x_first = x_step.clone()?;                 // x^4
 
         let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
 

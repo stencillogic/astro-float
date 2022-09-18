@@ -44,7 +44,7 @@ fn pqr_inc(pa: &BigFloatNumber, qa: &BigFloatNumber, m: usize) -> Result<(BigFlo
     Ok((p, q, b))
 }
 
-/// Holds value of currently computed ln(2).
+/// Holds value of currently computed e.
 pub struct ECache {
     b: usize,
     pk: BigFloatNumber,
@@ -102,7 +102,7 @@ impl ECache {
         }
     }
 
-    /// Return value of ln(2) with precision k.
+    /// Return value of e with precision k.
     pub fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
 
         let kext = Self::b_factor(k);
@@ -127,7 +127,7 @@ impl ECache {
             ret.set_precision(k, rm)?;
 
             self.pk = pk;
-            self.pk = qk;
+            self.qk = qk;
             self.b = bb;
 
             Ok(ret)

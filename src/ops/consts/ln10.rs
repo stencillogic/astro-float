@@ -106,7 +106,7 @@ impl Ln10Cache {
         }
     }
 
-    /// Return value of ln(2) with precision k (calculate if needed).
+    /// Return value of ln(10) with precision k (calculate if needed).
     pub fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
 
         let kext = k * 1728/1000 + 4;
@@ -132,8 +132,8 @@ impl Ln10Cache {
             ret.set_precision(k, rm)?;
 
             self.pk = pk;
-            self.pk = qk;
-            self.pk = rk;
+            self.qk = qk;
+            self.rk = rk;
             self.b = bb;
 
             Ok(ret)

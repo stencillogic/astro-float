@@ -12,15 +12,16 @@ impl BigFloatNumber {
     pub fn acos(&self, rm: RoundingMode) -> Result<Self, Error> {
 
         let mut x = self.clone()?;
-        x.set_precision(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
+        x.set_precision(self.get_mantissa_max_bit_len() + 1, RoundingMode::None)?;
 
         let mut pi = PI.with(|v| -> Result<Self, Error> {
-            v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)
+            v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 1, RoundingMode::None)
         })?;
 
         pi.set_exponent(pi.get_exponent() - 1);
 
         let mut ret = x.asin(RoundingMode::None)?;
+        
         ret = pi.sub(&ret, RoundingMode::None)?;
 
         ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
@@ -40,9 +41,9 @@ mod tests {
         let rm = RoundingMode::ToEven;
         let mut n1 = BigFloatNumber::from_word(4294967295,64).unwrap();
         n1.set_exponent(0);
-        println!("{}", n1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
+        //println!("{}", n1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
         let n2 = n1.acos(rm).unwrap();
-        println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
+        //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
     }
 
     #[ignore]

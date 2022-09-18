@@ -130,8 +130,8 @@ impl Ln2Cache {
             ret.set_precision(k, rm)?;
 
             self.pk = pk;
-            self.pk = qk;
-            self.pk = rk;
+            self.qk = qk;
+            self.rk = rk;
             self.b = bb;
 
             Ok(ret)

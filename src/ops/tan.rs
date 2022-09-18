@@ -205,7 +205,7 @@ mod tests {
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
     }
 
-    //#[ignore]
+    #[ignore]
     #[test]
     fn tan_perf() {
         let mut n = vec![];

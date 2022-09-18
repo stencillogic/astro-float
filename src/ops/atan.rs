@@ -92,15 +92,17 @@ impl BigFloatNumber {
 
         let mut ret = if x.get_exponent() > 0 {
 
-            x.set_precision(x.get_mantissa_max_bit_len() + 1, RoundingMode::None)?;
+            x.set_precision(x.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
             x = x.reciprocal(RoundingMode::None)?;
+
             let ret = x.atan_series(RoundingMode::None)?;
 
             let mut pi = PI.with(|v| -> Result<Self, Error> {
-                v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 1, RoundingMode::None)
+                v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)
             })?;
 
             pi.set_exponent(1);
+            pi.set_sign(self.get_sign());
 
             pi.sub(&ret, RoundingMode::None)
 
@@ -115,12 +117,14 @@ impl BigFloatNumber {
     }
 
     /// arctan using series
-    pub(super) fn atan_series(self, rm: RoundingMode) -> Result<Self, Error> {
+    pub(super) fn atan_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
 
         let p = self.get_mantissa_max_bit_len();
         let mut polycoeff_gen = AtanPolycoeffGen::new(p)?;
         let (reduction_times, niter) = series_cost_optimize::<AtanPolycoeffGen, AtanArgReductionEstimator>(
             p, &polycoeff_gen, -self.e as isize, 1, true);
+
+        self.set_precision(self.get_mantissa_max_bit_len() + niter * 2 + reduction_times * 3, rm)?;
 
         let arg = if reduction_times > 0 {
             self.atan_arg_reduce(reduction_times, rm)?
@@ -155,24 +159,6 @@ impl BigFloatNumber {
 
         Ok(ret)
     }
-
-    fn run_atan_series(&self, rm: RoundingMode) -> Result<Self, Error> {
-
-        let mut f = BigFloatNumber::from_word(1, 1)?;
-        let mut xx = self.mul(self, rm)?;
-        xx.inv_sign();
-        let mut x = self.clone()?;
-        let mut ret = self.clone()?;
-
-        while f.get_exponent() as isize - x.get_exponent() as isize <= self.get_mantissa_max_bit_len() as isize {
-            f = f.add(&TWO, rm)?;
-            x = x.mul(&xx, rm)?;
-            let p = x.div(&f, rm)?;
-            ret = ret.add(&p, rm)?;
-        }
-
-        Ok(ret)
-    }
 }
 
 
@@ -187,7 +173,7 @@ mod tests {
         let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
         n1.set_exponent(1);
         let n2 = n1.atan(rm).unwrap();
-        println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
+        //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
     }
 
     #[ignore]

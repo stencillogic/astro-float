@@ -83,14 +83,8 @@ impl ArgReductionEstimator for SinhArgReductionEstimator {
 
 impl BigFloatNumber {
 
-    /// Computes hyperbolic sine.
-    pub fn sinh(&self, rm: RoundingMode) -> Result<Self, Error> {
-        // sinh(3*x) = 3*sinh(x) + 4*sinh(x)^3
-        Err(Error::InvalidArgument)
-    }
-
     /// sinh using series, for |x| < 1
-    pub(super) fn sinh_series(&self, rm: RoundingMode) -> Result<Self, Error> {
+    pub(super) fn sinh_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
         // sinh:  x + x^3/3! + x^5/5! + x^7/7! + ...
 
         let p = self.get_mantissa_max_bit_len();
@@ -98,16 +92,16 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<SinhPolycoeffGen, SinhArgReductionEstimator>(
             p, &polycoeff_gen, (-self.e) as isize, 2, false);
 
-        let arg_holder;
+        self.set_precision(self.get_mantissa_max_bit_len() + niter * 2 + reduction_times * 3, rm)?;
+
         let arg = if reduction_times > 0 {
-            arg_holder = self.sinh_arg_reduce(reduction_times, rm)?;
-            &arg_holder
+            self.sinh_arg_reduce(reduction_times, rm)?
         } else {
             self
         };
 
         let acc = arg.clone()?;    // x
-        let x_step = arg.mul(arg, rm)?;   // x^2
+        let x_step = arg.mul(&arg, rm)?;   // x^2
         let x_first = arg.mul(&x_step, rm)?;   // x^3
 
         let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
@@ -173,7 +167,7 @@ mod tests {
 
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
-            for ni in n.iter() {
+            for ni in n.drain(..) {
                 let f = ni.sinh_series(RoundingMode::ToEven).unwrap();
             }
             let time = start_time.elapsed();

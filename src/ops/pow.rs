@@ -23,7 +23,7 @@ impl BigFloatNumber {
         let e_int = if int > 0 {
 
             let e_const = E.with(|v| -> Result<Self, Error> {
-                v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)
+                v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2 + 2*core::mem::size_of::<usize>(), RoundingMode::None)
             })?;
 
             e_const.powi(int, RoundingMode::None)
@@ -83,7 +83,7 @@ impl BigFloatNumber {
     }
 
     // e^self for |self| < 1.
-    fn expf(&self, rm: RoundingMode) -> Result<Self, Error> {
+    fn expf(self, rm: RoundingMode) -> Result<Self, Error> {
 
         let sh = self.sinh_series(rm)?; // faster convergence than direct series
 

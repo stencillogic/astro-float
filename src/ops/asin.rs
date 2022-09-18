@@ -22,6 +22,7 @@ impl BigFloatNumber {
         let p = ONE.sub(&xx, RoundingMode::None)?;
         let s = p.sqrt(RoundingMode::None)?;
         let d = x.div(&s, RoundingMode::None)?;
+
         let mut ret = d.atan(RoundingMode::None)?;
 
         ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
@@ -41,9 +42,9 @@ mod tests {
         let rm = RoundingMode::ToEven;
         let mut n1 = BigFloatNumber::from_word(4294967295,64).unwrap();
         n1.set_exponent(0);
-        println!("{}", n1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
+        //println!("{}", n1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
         let n2 = n1.asin(rm).unwrap();
-        println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
+        //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
     }
 
     #[ignore]
