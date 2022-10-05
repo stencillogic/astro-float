@@ -476,10 +476,15 @@ impl Mantissa {
         d3[d1.len()] = (m / WORD_BASE) as Word;
     }
 
+    #[allow(unused_mut)]
     pub fn from_u64(p: usize, mut u: u64) -> Result<(usize, Self), Error> {
         let mut m = Self::reserve_new(Self::bit_len_to_word_len(p))?;
         let nd = m.len() - size_of::<u64>()/size_of::<Word>();
         m[..nd].fill(0);
+        #[cfg(target_arch = "x86_64")] {
+            m[nd] = u;
+        }
+        #[cfg(target_arch = "x86")] 
         for v in &mut m[nd..] {
             *v = u as Word;
             u >>= WORD_BIT_SIZE;
@@ -493,21 +498,32 @@ impl Mantissa {
         Ok((shift, ret))
     }
 
+    #[allow(unused_mut)]
     pub fn from_usize(mut u: usize) -> Result<(usize, Self), Error> {
 
-        let mut n = 0;
-        let mut v = u;
+        let mut m;
 
-        while v & WORD_MAX as usize != 0 {
-            v >>= WORD_BIT_SIZE;
-            n += 1;
+        #[cfg(target_arch = "x86_64")] {
+
+            m = Self::reserve_new(1)?;
+            m[0] = u as Word;
         }
 
-        let mut m = Self::reserve_new(n)?;
-
-        for v in m.iter_mut() {
-            *v = u as Word;
-            u >>= WORD_BIT_SIZE;
+        #[cfg(target_arch = "x86")] {
+            let mut n = 0;
+            let mut v = u;
+    
+            while v & WORD_MAX as usize != 0 {
+                v >>= WORD_BIT_SIZE;
+                n += 1;
+            }
+    
+            m = Self::reserve_new(n)?;
+    
+            for v in m.iter_mut() {
+                *v = u as Word;
+                u >>= WORD_BIT_SIZE;
+            }
         }
 
         let shift = Self::maximize(&mut m);
@@ -522,14 +538,21 @@ impl Mantissa {
     }
 
     pub fn to_u64(&self) -> u64 {
-        let mut ret: u64 = 0;
-        let nd = size_of::<u64>()/size_of::<Word>();
-        ret |= self.m[self.len() - 1] as u64;
-        for i in 1..nd {
-            ret <<= WORD_BIT_SIZE;
-            ret |= if self.len() > i { self.m[self.len() - i - 1] as u64 } else { 0 };
+
+        #[cfg(target_arch = "x86_64")] {
+            self.m[self.m.len() - 1]
         }
-        ret
+
+        #[cfg(target_arch = "x86")] {
+            let mut ret: u64 = 0;
+            let nd = size_of::<u64>()/size_of::<Word>();
+            ret |= self.m[self.len() - 1] as u64;
+            for i in 1..nd {
+                ret <<= WORD_BIT_SIZE;
+                ret |= if self.len() > i { self.m[self.len() - i - 1] as u64 } else { 0 };
+            }
+            ret
+        }
     }
 
     /// Returns true if `self` is subnormal.

@@ -42,7 +42,7 @@ mod tests {
         let mut n1 = BigFloatNumber::from_word(4294967295,64).unwrap();
         n1.set_exponent(0);
         //println!("{}", n1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
-        let n2 = n1.acos(rm).unwrap();
+        //let n2 = n1.acos(rm).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
     }
 

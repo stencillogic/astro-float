@@ -457,7 +457,7 @@ impl Mantissa {
                 part3.add_assign(&modulus);
             }
 
-            /* thres[m*2 / WORD_BIT_SIZE] = 0;
+/*             thres[m*2 / WORD_BIT_SIZE] = 0;
             thres[m*2 / WORD_BIT_SIZE + 1] = 0;
             thres[0] = (j + 1) as Word;
             thres.shift_left(m*2);
@@ -504,9 +504,10 @@ mod tests {
         let s1 = [1975132958, 2865607635, 3785004856, 2329109360, 82327679, 1315874535, 144553447, 431779413];
         let s2 = [1725562336, 92718951, 4168989748, 1276933861, 3499392949, 562806663, 6667756, 549355095];
 
-        let ref_s = [2952880192u32, 1958788151, 2761307956, 531469294, 1413181254, 1343888367, 3454361913, 2408236624, 623340488, 2932102354, 1849986687, 259604987, 515123688, 3669028854, 26324828, 55227480];
-        
+        let mut ref_s = [0; 16];
         let mut ret_s = [0; 16];
+
+        mul(&s1, &s2, &mut ref_s);
         Mantissa::fft_mul(&s1, &s2, &mut ret_s).unwrap();
 
         assert!(ret_s == ref_s);
@@ -516,9 +517,10 @@ mod tests {
         let s1 = [2628292838, 2277283921, 3515294573, 3177772552, 0];
         let s2 = [1623732616, 2662366248, 1730446853, 817631908, 0];
         
-        let ref_s = [4042850352, 2189439054, 3381778450, 3266026783, 2425920717, 2277314239, 1520284461, 604951809, 0, 0];
-        
+        let mut ref_s = [0; 10];
         let mut ret_s = [0; 10];
+
+        mul(&s1, &s2, &mut ref_s);
         Mantissa::fft_mul(&s1, &s2, &mut ret_s).unwrap();
 
 
@@ -591,8 +593,8 @@ mod tests {
         // random
         for _ in 0..1000 {
 
-            let s1 = random_slice(30, 50);
-            let s2 = random_slice(30, 50);
+            let s1 = random_slice(128, 256);
+            let s2 = random_slice(128, 256);
 
             let mut ref_s = Vec::new();
             ref_s.resize(s1.len() + s2.len(), 0);
@@ -601,7 +603,7 @@ mod tests {
             let mut ret_s = Vec::new();
             ret_s.resize(s1.len() + s2.len(), 0);
             Mantissa::fft_mul(&s1, &s2, &mut ret_s).unwrap();
-            
+
             //println!("{:?}\n{:?}\n", s1, s2);
             //println!("{:?}\n{:?}\n", ret_s, ref_s);
             assert!(ret_s == ref_s);
@@ -628,7 +630,7 @@ mod tests {
                 let v = random_slice(sz, sz);
                 n.push(v);
             }
-            
+
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
                 Mantissa::fft_mul(ni, &f, &mut ret1).unwrap();

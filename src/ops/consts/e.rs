@@ -151,11 +151,22 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(target_arch = "x86")]
     fn test_e_const() {
         let mut e = ECache::new().unwrap();
         let c = e.for_prec(320, RoundingMode::ToEven).unwrap();
         //println!("{:?}", c);
         let r = BigFloatNumber::from_raw_parts(&[614153977, 3432226254, 342111227, 2850108993, 3459069589, 3636053379, 658324721, 2950452768, 2730183322, 2918732888], 320, Sign::Pos, 2).unwrap();
+        assert!(c.cmp(&r) == 0);
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_e_const() {
+        let mut e = ECache::new().unwrap();
+        let c = e.for_prec(320, RoundingMode::ToEven).unwrap();
+        //println!("{:?}", c);
+        let r = BigFloatNumber::from_raw_parts(&[14741299514016743161, 12241124915312604155, 15616730352774362773, 12672098147611000049, 12535862302449814170], 320, Sign::Pos, 2).unwrap();
         assert!(c.cmp(&r) == 0);
     }
 }

@@ -613,10 +613,10 @@ impl BigFloatNumber {
     /// Return integer part of a number as built-in integer.
     pub(super) fn get_int_as_usize(&self) -> Result<usize, Error> {
         if self.e > 0 {
-            debug_assert!(core::mem::size_of::<usize>() > core::mem::size_of::<Word>());
+            debug_assert!(core::mem::size_of::<usize>() >= core::mem::size_of::<Word>());
             if (self.e as usize) <= WORD_BIT_SIZE {
                 let shift = WORD_BIT_SIZE - self.e as usize;
-                let mut ret = self.m.get_most_significant_word() as usize;
+                let ret = self.m.get_most_significant_word() as usize;
                 Ok(ret >> shift)
             } else {
                 Err(Error::InvalidArgument)
@@ -931,13 +931,13 @@ mod tests {
 
         for _ in 0..10000 {
             // avoid subnormal numbers
-            d1 = BigFloatNumber::random_normal(160, EXPONENT_MIN/2+160, EXPONENT_MAX/2).unwrap();
-            d2 = BigFloatNumber::random_normal(160, EXPONENT_MIN/2, EXPONENT_MAX/2).unwrap();
+            d1 = BigFloatNumber::random_normal(128, EXPONENT_MIN/2+128, EXPONENT_MAX/2).unwrap();
+            d2 = BigFloatNumber::random_normal(128, EXPONENT_MIN/2, EXPONENT_MAX/2).unwrap();
             if !d2.is_zero() {
                 let d3 = d1.mul_full_prec(&d2).unwrap();
-                d1.set_precision(320, rm).unwrap();
+                d1.set_precision(256, rm).unwrap();
                 let d4 = d1.mul(&d2, rm).unwrap();
-                eps.set_exponent(d1.get_exponent() - 158);
+                eps.set_exponent(d1.get_exponent() - 126);
                 //println!("\n{:?}\n{:?}\n{:?}\n{:?}", d1,d2,d3,d4);
                 assert!(d3.cmp(&d4) == 0);
             }

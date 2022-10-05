@@ -60,7 +60,7 @@ impl BigFloatNumber {
         if e_corr > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(ret.get_sign()));
         }
-        
+
         ret.set_exponent(ret.get_exponent() + e / 2 - e_shift);
 
         Ok(ret)
@@ -71,7 +71,7 @@ impl BigFloatNumber {
 
         let mut prec = self.get_mantissa_max_bit_len();
 
-        if prec <= 32 {
+        if prec <= 64 {
 
             prec *= 3;
             let mut x = ONE.div(self, RoundingMode::None)?;

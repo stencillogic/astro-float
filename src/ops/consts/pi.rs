@@ -178,11 +178,22 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(target_arch = "x86")]
     fn test_pi_const() {
         let mut pi = PiCache::new().unwrap();
         let c = pi.for_prec(320, RoundingMode::ToEven).unwrap();
-        //println!("{:?}", c.fp3(Radix::Dec, RoundingMode::None));
+        //println!("pi {:?}", c);
         let r = BigFloatNumber::from_raw_parts(&[2385773791, 1363806329, 991140642, 34324134, 2322058356, 688016904, 2161908945, 3301335691, 560513588, 3373259426], 320, Sign::Pos, 2).unwrap();
+        assert!(c.cmp(&r) == 0);
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_pi_const() {
+        let mut pi = PiCache::new().unwrap();
+        let c = pi.for_prec(320, RoundingMode::ToEven).unwrap();
+        //println!("pi {:?}", c);
+        let r = BigFloatNumber::from_raw_parts(&[5857503583518590175, 147421033984662306, 2955010104097229940, 14179128828124470481, 14488038916154245684], 320, Sign::Pos, 2).unwrap();
         assert!(c.cmp(&r) == 0);
     }
 }

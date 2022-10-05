@@ -6,6 +6,7 @@ use crate::common::consts::TWO;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
 use crate::common::util::get_sqrt_cost;
+use crate::defs::Word;
 use crate::num::BigFloatNumber;
 use crate::defs::RoundingMode;
 use crate::defs::Error;
@@ -115,7 +116,7 @@ impl BigFloatNumber {
                 v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)
             })?;
 
-            let mut n = Self::from_word(e.unsigned_abs(), 1)?;
+            let mut n = Self::from_word(e.unsigned_abs() as Word, 1)?;
             if e < 0 {
                 n.set_sign(Sign::Neg);
             }

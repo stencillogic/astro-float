@@ -1,17 +1,32 @@
 ///! Definitions.
+/// 
 
 /// A word.
-pub type Word = u32;
-
-/// An exponent.
-pub type Exponent = i32;
+#[cfg(target_arch = "x86_64")] 
+pub type Word = u64;
 
 /// Doubled word.
+#[cfg(target_arch = "x86_64")]
+pub type DoubleWord = u128;
+
+/// Word with sign.
+#[cfg(target_arch = "x86_64")]
+pub type SignedWord = i128;
+
+/// A word.
+#[cfg(target_arch = "x86")] 
+pub type Word = u32;
+
+/// Doubled word.
+#[cfg(target_arch = "x86")] 
 pub type DoubleWord = u64;
 
 /// Word with sign.
+#[cfg(target_arch = "x86")] 
 pub type SignedWord = i64;
 
+/// An exponent.
+pub type Exponent = i32;
 
 /// Maximum exponent value.
 pub const EXPONENT_MAX: Exponent = Exponent::MAX;

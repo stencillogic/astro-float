@@ -104,7 +104,7 @@ pub fn add_carry(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
 
     #[cfg(target_arch = "x86_64")] 
     {
-        unsafe { core::arch::x86_64::_addcarry_u32(c as u8, a, b, r) as Word } 
+        unsafe { core::arch::x86_64::_addcarry_u64(c as u8, a, b, r) as Word } 
     }
     
     #[cfg(target_arch = "x86")] 
@@ -131,7 +131,7 @@ pub fn sub_borrow(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
 
     #[cfg(target_arch = "x86_64")] 
     {
-        unsafe { core::arch::x86_64::_subborrow_u32(c as u8, a, b, r) as Word }
+        unsafe { core::arch::x86_64::_subborrow_u64(c as u8, a, b, r) as Word }
     }
 
     #[cfg(target_arch = "x86")] 

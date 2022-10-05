@@ -352,6 +352,25 @@ impl<'a> SliceWithSign<'a> {
         0
     }
 
+    pub fn cmp(&self, s2: &Self) -> SignedWord {
+
+        if self.sign() != s2.sign() {
+            return self.sign() as SignedWord;
+        }
+
+        if self.is_zero() || s2.is_zero() {
+            if !s2.is_zero() {
+                return -s2.sign() as SignedWord;
+            } else if !self.is_zero() {
+                return self.sign() as SignedWord;
+            } else {
+                return 0;
+            }
+        }
+
+        Self::abs_cmp(self, s2) as SignedWord * self.sign() as SignedWord
+    }
+
     #[inline]
     pub fn set_sign(&mut self, sign: i8) {
         self.sign = sign;

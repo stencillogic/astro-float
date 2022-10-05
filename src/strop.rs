@@ -1,28 +1,30 @@
+//! BigFloatNumber formatting.
 
 use crate::Sign;
-use crate::defs::WORD_BIT_SIZE;
-use crate::defs::WORD_MAX;
-use crate::defs::WORD_SIGNIFICANT_BIT;
-/// BigFloatNumber formatting.
-
-use crate::defs::Exponent;
 use crate::defs::Radix;
 use crate::defs::Error;
-use crate::defs::Word;
 use crate::defs::RoundingMode;
-use crate::parser::parse;
+use crate::parser;
 use crate::num::BigFloatNumber;
-use crate::common::consts::ONE;
-use crate::common::consts::TWO;
-use crate::common::consts::EIGHT;
-use crate::common::consts::TEN;
-use crate::common::consts::SIXTEEN;
 use std::fmt::Write;
 
 
 const DIGIT_CHARS: [char; 16] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', ];
 
 impl BigFloatNumber {
+
+    /// Parses the number from the string `s` using radix `r`, precision `p`, and rounding mode `rm`.
+    pub fn parse(s: &str, rdx: Radix, p: usize, rm: RoundingMode) -> Result<Self, Error> {
+
+        let ps = parser::parse(s, rdx);
+
+        if ps.is_valid() {
+            let (m, s, e) = ps.raw_parts();
+            BigFloatNumber::convert_from_radix(s, m, e, rdx, p, rm)
+        } else {
+            Err(Error::InvalidArgument)
+        }
+    }
 
     /// Formats the number using radix `r`.
     pub fn format(&self, rdx: Radix, rm: RoundingMode) -> Result<String, Error> {
@@ -36,17 +38,34 @@ impl BigFloatNumber {
         };
 
         if m.is_empty() {
+
             mstr.push_str("0.0");
+
         } else {
+
             mstr.push(DIGIT_CHARS[m[0] as usize]);
             mstr.push('.');
             mstr.push_str(&m.iter().skip(1).map(|d| { DIGIT_CHARS[*d as usize] }).collect::<String>());
 
-            if e < 1 {
-                let _ = write!(mstr, "e-{}", (e - 1).unsigned_abs());
-            } else {
-                let _ = write!(mstr, "e+{}", e - 1);
+            if rdx == Radix::Hex {
+                let _ = write!(mstr, "_");
             }
+
+            if e < 1 {
+                let _ = match rdx {
+                    Radix::Bin => write!(mstr, "e-{:b}", (e - 1).unsigned_abs()),
+                    Radix::Oct => write!(mstr, "e-{:o}", (e - 1).unsigned_abs()),
+                    Radix::Dec => write!(mstr, "e-{}", (e - 1).unsigned_abs()),
+                    Radix::Hex => write!(mstr, "e-{:x}", (e - 1).unsigned_abs()),
+                };    
+            } else {
+                let _ = match rdx {
+                    Radix::Bin => write!(mstr, "e+{:b}", e - 1),
+                    Radix::Oct => write!(mstr, "e+{:o}", e - 1),
+                    Radix::Dec => write!(mstr, "e+{}", e - 1),
+                    Radix::Hex => write!(mstr, "e+{:x}", e - 1),
+                };
+            };
         }
 
         Ok(mstr)
@@ -57,15 +76,28 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
-    use crate::{defs::{EXPONENT_MIN, EXPONENT_MAX}, Sign};
-
     use super::*;
 
     #[test]
-    fn test_format() {
+    fn test_strop() {
 
-        let n = BigFloatNumber::from_f64(160, 0.03f64).unwrap();
-        let s = n.format(Radix::Dec, RoundingMode::None).unwrap();
-        //println!("{}", s);
+        let mut eps = BigFloatNumber::from_word(1, 192).unwrap();
+
+        for _ in 0..10000 {
+            for rdx in [Radix::Bin, Radix::Oct, Radix::Hex, Radix::Dec] {
+
+                let n = BigFloatNumber::random_normal(192, -2, -2).unwrap();
+                let s = n.format(rdx, RoundingMode::ToEven).unwrap();
+                let d = BigFloatNumber::parse(&s, rdx, 200, RoundingMode::ToEven).unwrap();
+        
+                if rdx == Radix::Dec {
+                    //println!("\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}", n, s, d, n.format(Radix::Hex, RoundingMode::ToEven), d.format(Radix::Hex, RoundingMode::ToEven));
+                    eps.set_exponent(n.get_exponent() - 160);
+                    assert!(d.sub(&n, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+                } else {
+                    assert!(d.cmp(&n) == 0);
+                }
+            }
+        }
     }
 }
