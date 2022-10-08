@@ -1,10 +1,17 @@
-mod util;
-pub mod other;
-pub mod add;
-pub mod mul;
-pub mod cbrt;
-pub mod sqrt;
-pub mod pow;
-pub mod log;
-pub mod trig;
-pub mod trigh;
+//! High-level operations on the numbers.
+
+mod sqrt;
+mod ln;
+mod pow;
+mod sinh;
+mod series;
+pub mod consts;
+mod sin;
+mod cos;
+mod tan;
+mod asin;
+mod acos;
+mod atan;
+
+#[cfg(test)]
+mod tests;

@@ -1,15 +1,17 @@
 //! Parser parses numbers represented in scientific format.
 
+use crate::Radix;
+use crate::defs::EXPONENT_MAX;
+use crate::defs::Sign;
+use crate::defs::Exponent;
 use std::str::Chars;
-use crate::defs::{DECIMAL_SIGN_POS, DECIMAL_SIGN_NEG, DECIMAL_POSITIONS};
 
 pub struct ParserState<'a> {
     chars: Chars<'a>,
     cur_ch: Option<char>,
-    sign: i8,
-    mantissa_bytes: [u8; DECIMAL_POSITIONS],
-    n: usize,
-    e: i32,
+    sign: Sign,
+    mantissa_bytes: Vec<u8>,
+    e: Exponent,
     inf: bool,
     nan: bool,
     valid: bool,
@@ -20,9 +22,8 @@ impl<'a> ParserState<'a> {
         ParserState {
             chars: s.chars(),
             cur_ch: None,
-            sign: DECIMAL_SIGN_POS,
-            mantissa_bytes: [0; DECIMAL_POSITIONS],
-            n: 0,
+            sign: Sign::Pos,
+            mantissa_bytes: Vec::new(),
             e: 0,
             inf: false,
             nan: false,
@@ -53,18 +54,18 @@ impl<'a> ParserState<'a> {
         self.nan
     }
 
-    pub fn sign(&self) -> i8 {
+    pub fn sign(&self) -> Sign {
         self.sign
     }
 
     /// Returns mantissa digits, mantissa length, sign, exponent.
-    pub fn raw_parts(&self) -> ([u8; DECIMAL_POSITIONS], usize, i8, i32) {
-        (self.mantissa_bytes, self.n, self.sign, self.e)
+    pub fn raw_parts(&self) -> (&[u8], Sign, Exponent) {
+        (&self.mantissa_bytes, self.sign, self.e)
     }
 }
 
 /// Parse BigFloat.
-pub fn parse(s: &str) -> ParserState<> {
+pub fn parse(s: &str, rdx: Radix) -> ParserState<> {
     let mut parser_state = ParserState::new(s);
     let mut ch = parser_state.next_char();
 
@@ -72,17 +73,23 @@ pub fn parse(s: &str) -> ParserState<> {
     if let Some(c) = ch {
         match c {
             '+' => { ch = parser_state.next_char() },
-            '-' => { parser_state.sign = DECIMAL_SIGN_NEG; ch = parser_state.next_char() },
+            '-' => { parser_state.sign = Sign::Neg; ch = parser_state.next_char() },
             _ => {},
         };
     }
 
     if let Some(c) = ch {
-        match c {
-            'i' => parse_inf(&mut parser_state),
-            'n' => parse_nan(&mut parser_state),
-            '.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => 
-                parse_num(&mut parser_state),
+        match (c, rdx) {
+            ('i', _) => parse_inf(&mut parser_state),
+            ('n', _) => parse_nan(&mut parser_state),
+            ('.' | '0' | '1' , Radix::Bin) => 
+                parse_num(&mut parser_state, rdx),
+            ('.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7', Radix::Oct) => 
+                parse_num(&mut parser_state, rdx),
+            ('.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9', Radix::Dec) => 
+                parse_num(&mut parser_state, rdx),
+            ('.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f', Radix::Hex) => 
+                parse_num(&mut parser_state, rdx),
             _ => {},
         };
     }
@@ -108,22 +115,30 @@ fn parse_nan(parser_state: &mut ParserState) {
     }
 }
 
-fn parse_num(parser_state: &mut ParserState) {
-    let (int_len, skip_cnt1) = parse_digits(parser_state, true, true);
+fn parse_num(parser_state: &mut ParserState, rdx: Radix) {
+    let (int_len, skip_cnt1) = parse_digits(parser_state, true, true, rdx);
     if Some('.') == parser_state.cur_char() {
         parser_state.next_char();
     }
-    let (frac_len, skip_cnt2) = parse_digits(parser_state, int_len == 0, false);
+    let (frac_len, skip_cnt2) = parse_digits(parser_state, int_len == 0, false, rdx);
     if frac_len > 0 || int_len > 0 {
         parser_state.valid = true;
-        if Some('e') == parser_state.cur_char() {
+        if rdx == Radix::Hex {
+            if Some('_') == parser_state.cur_char() {
+                parser_state.next_char();
+                if Some('e') == parser_state.cur_char() {
+                    parser_state.next_char();
+                    parse_exp(parser_state, rdx);
+                }
+            }
+        } else if Some('e') == parser_state.cur_char() {
             parser_state.next_char();
-            parse_exp(parser_state);
+            parse_exp(parser_state, rdx);
         }
-        if int_len == 0 {
-            parser_state.e -= DECIMAL_POSITIONS as i32 - parser_state.n as i32 + frac_len as i32;
+        if int_len != 0 {
+            parser_state.e += int_len as Exponent;
         } else {
-            parser_state.e -= DECIMAL_POSITIONS as i32 - int_len as i32;
+            parser_state.e -= skip_cnt2 as Exponent;
         }
     } else if skip_cnt1 > 0 || skip_cnt2 > 0 {
         // just zeroes
@@ -131,17 +146,17 @@ fn parse_num(parser_state: &mut ParserState) {
     }
 }
 
-fn parse_digits(parser_state: &mut ParserState, skip_zeroes: bool, int: bool) -> (usize, usize) {
+fn parse_digits(parser_state: &mut ParserState, skip_zeroes: bool, int: bool, rdx: Radix) -> (usize, usize) {
     let mut ch = parser_state.cur_char();
     let mut len = 0;
     let mut skip_cnt = 0;
     if skip_zeroes {
         // skip leading zeroes
         while let Some(c) = ch {
-            if c.is_ascii_digit() && c.to_digit(10).unwrap() == 0 {
+            if is_radix_digit(c, rdx) && c.to_digit(rdx as u32).unwrap() == 0 {
                 skip_cnt += 1;
                 if !int {
-                    len += 1;   // for fractionl part count length
+                    len += 1;   // for fractional part count length
                 }
             } else {
                 break;
@@ -150,14 +165,9 @@ fn parse_digits(parser_state: &mut ParserState, skip_zeroes: bool, int: bool) ->
         }
     }
     while let Some(c) = ch {
-        if c.is_ascii_digit() {
-            if parser_state.n < parser_state.mantissa_bytes.len() {
-                parser_state.mantissa_bytes[parser_state.n] = c.to_digit(10).unwrap() as u8;
-                parser_state.n += 1;
-                len += 1;
-            } else {
-                break;
-            }
+        if is_radix_digit(c, rdx) {
+            parser_state.mantissa_bytes.push(c.to_digit(rdx as u32).unwrap() as u8);
+            len += 1;
         } else {
             break;
         }
@@ -170,7 +180,15 @@ fn parse_digits(parser_state: &mut ParserState, skip_zeroes: bool, int: bool) ->
     (len, skip_cnt)
 }
 
-fn parse_exp(parser_state: &mut ParserState) {
+fn is_radix_digit(c: char, rdx: Radix) -> bool {
+    matches!((rdx, c), 
+        (Radix::Bin, '0' | '1') | 
+        (Radix::Oct, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7') | 
+        (Radix::Dec, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9') | 
+        (Radix::Hex, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f'))
+}
+
+fn parse_exp(parser_state: &mut ParserState, rdx: Radix) {
     let mut neg = false;
     let mut ch = parser_state.cur_char();
     if let Some(c) = ch {
@@ -181,12 +199,12 @@ fn parse_exp(parser_state: &mut ParserState) {
         };
     }
     while let Some(c) = ch {
-        if c.is_ascii_digit() {
-            if parser_state.e >= i32::MAX/10 {
+        if is_radix_digit(c, rdx) {
+            if parser_state.e >= EXPONENT_MAX/10 {
                 break;
             }
-            parser_state.e *= 10;
-            parser_state.e += c.to_digit(10).unwrap() as i32;
+            parser_state.e *= rdx as Exponent;
+            parser_state.e += c.to_digit(rdx as u32).unwrap() as Exponent;
         } else {
             break;
         }
@@ -208,21 +226,21 @@ mod tests {
         // combinations of possible valid components of a number and expected resulting characteristics.
         let mantissas = ["0.0", "0", ".000", "00.", "00123", "456.", "789.012", ".3456", "0.0078"];
         let expected_mantissas = [
-            [0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, ],
-            [0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, ],
-            [0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, ],
-            [0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, ],
-            [1,2,3,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, ],
-            [4,5,6,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, ],
-            [7,8,9,0,1,2,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, ],
-            [3,4,5,6,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, ],
-            [7,8,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0, ],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![1,2,3],
+            vec![4,5,6],
+            vec![7,8,9,0,1,2],
+            vec![3,4,5,6],
+            vec![7,8],
         ];
         let expected_mantissa_len = [0, 0, 0, 0, 3, 3, 6, 4, 2];
-        let expected_exp_shifts = [0, 0, 0, 0, -37, -37, -37, -40, -42];
+        let expected_exp_shifts = [0, 0, 0, 0, 3, 3, 3, 0, -2];
 
         let signs = ["", "+", "-"];
-        let expected_signs = [1, 1, -1];
+        let expected_signs = [Sign::Pos, Sign::Pos, Sign::Neg];
 
         let exponents = ["", "E", "e", "e123", "e+345", "e-678", "e901", "E+234", "E-567",];
         let expected_exponents = [0, 0, 0, 123, 345, -678, 901, 234, -567];
@@ -239,16 +257,16 @@ mod tests {
                     let e = exponents[k];
                     let numstr = (s.to_owned() + m).to_owned() + e;
 
-                    let ps = parse(&numstr);
+                    let ps = parse(&numstr, Radix::Dec);
 
                     assert!(!ps.is_inf());
                     assert!(!ps.is_nan());
                     assert!(ps.is_valid());
 
-                    let (m, n, s, e) = ps.raw_parts();
+                    let (m, s, e) = ps.raw_parts();
                     assert!(s == expected_signs[i]);
                     assert!(m == expected_mantissas[j]);
-                    assert!(n == expected_mantissa_len[j]);
+                    assert!(m.len() == expected_mantissa_len[j]);
                     if expected_mantissa_len[j] > 0 {
                         assert!(e == expected_exponents[k] + expected_exp_shifts[j]);
                     } else {
@@ -264,7 +282,7 @@ mod tests {
                 let s = signs[i];
                 let numstr = s.to_owned() + inf;
 
-                let ps = parse(&numstr);
+                let ps = parse(&numstr, Radix::Dec);
 
                 assert!(ps.is_inf());
                 assert!(ps.sign() == expected_signs[i]);
@@ -275,10 +293,32 @@ mod tests {
 
         // test nan
         for nan in nans {
-            let ps = parse(nan);
+            let ps = parse(nan, Radix::Dec);
             assert!(!ps.is_inf());
             assert!(ps.is_nan());
             assert!(ps.is_valid());
         }
+
+        // bin
+        let ps = parse("101.00101e+1101", Radix::Bin);
+        let (m, s, e) = ps.raw_parts();
+        assert!(m == [1, 0, 1, 0, 0, 1, 0, 1]);
+        assert!(s == Sign::Pos);
+        assert!(e == 16);
+
+        // oct
+        let ps = parse("2670.343e+703", Radix::Oct);
+        let (m, s, e) = ps.raw_parts();
+        assert!(m == [2, 6, 7, 0, 3, 4, 3]);
+        assert!(s == Sign::Pos);
+        assert!(e == 0o707);
+
+        // hex
+        let ps = parse("abc.def09123e_e-1fa", Radix::Hex);
+        let (m, s, e) = ps.raw_parts();
+        assert!(m == [10, 11, 12, 13, 14, 15, 0, 9, 1, 2, 3, 14]);
+        assert!(s == Sign::Pos);
+        assert!(e == -0x1f7);
+
     }
 }

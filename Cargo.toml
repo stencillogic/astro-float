@@ -1,18 +1,30 @@
 [package]
-name = "num-bigfloat"
-version = "1.3.1"
+name = "astro-float"
+version = "0.0.1"
 edition = "2021"
 authors = ["stencillogic <stencillogic@gmail.com>"]
 license = "MIT"
 description = "Multiple precision floating point numbers implemented purely in Rust."
 categories = ["algorithms", "data-structures", "science"]
-keywords = ["big-float", "numeric", "decimal", "mathematics", "bignum"]
+keywords = ["bigfloat", "numeric", "decimal", "mathematics", "bignum"]
 readme = "README.md"
-repository = "https://github.com/stencillogic/num-bigfloat"
+repository = "https://github.com/stencillogic/astro-float"
 
 [dev-dependencies]
 rand = "0.8.5"
 
+[dependencies]
+rand = { version = "0.8.5", optional = true }
+lazy_static = { version = "1.4.0" }
+itertools = { version = "0.10.3", features = [] }
+smallvec = { version = "1.9.0", features = [] }
+
 [features]
-default = ["std"]
+default = ["std", "random"]
 std = []
+random = ["dep:rand"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
