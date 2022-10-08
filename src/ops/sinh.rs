@@ -153,7 +153,7 @@ mod tests {
         let rm = RoundingMode::ToEven;
         let mut n1 = BigFloatNumber::from_word(1,32000).unwrap();
         n1.set_exponent(0);
-        let n2 = n1.sinh_series(rm).unwrap();
+        let _n2 = n1.sinh_series(rm).unwrap();
         //println!("{:?}", n2.fp3(crate::Radix::Dec, rm).unwrap());
     }
 
@@ -168,7 +168,7 @@ mod tests {
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.drain(..) {
-                let f = ni.sinh_series(RoundingMode::ToEven).unwrap();
+                let _f = ni.sinh_series(RoundingMode::ToEven).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

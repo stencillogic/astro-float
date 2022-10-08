@@ -2,7 +2,7 @@
 
 use crate::common::util::log2_ceil;
 use crate::ops::consts::std::PI;
-use crate::{Exponent, Sign, Radix};
+use crate::{Exponent, Sign};
 use crate::common::consts::ONE;
 use crate::defs::{RoundingMode, EXPONENT_MIN, EXPONENT_MAX};
 use crate::num::BigFloatNumber;

@@ -172,7 +172,7 @@ mod tests {
         let rm = RoundingMode::ToEven;
         let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
         n1.set_exponent(1);
-        let n2 = n1.atan(rm).unwrap();
+        let _n2 = n1.atan(rm).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
     }
 
@@ -187,7 +187,7 @@ mod tests {
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let f = ni.atan(RoundingMode::ToEven).unwrap();
+                let _f = ni.atan(RoundingMode::ToEven).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

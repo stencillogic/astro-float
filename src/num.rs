@@ -785,14 +785,6 @@ impl BigFloatNumber {
     }
 }
 
-/// Radix
-pub enum Radix {
-    Bin = 2,
-    Oct = 8,
-    Dec = 10,
-    Hex = 16,
-}
-
 
 #[cfg(test)]
 mod tests {

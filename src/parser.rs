@@ -46,14 +46,17 @@ impl<'a> ParserState<'a> {
         self.valid
     }
 
+    #[allow(dead_code)]
     pub fn is_inf(&self) -> bool {
         self.inf
     }
 
+    #[allow(dead_code)]
     pub fn is_nan(&self) -> bool {
         self.nan
     }
 
+    #[allow(dead_code)]
     pub fn sign(&self) -> Sign {
         self.sign
     }

@@ -54,7 +54,7 @@ pub struct ECache {
 
 impl ECache {
 
-    fn calc_e(p: &BigFloatNumber, q: &BigFloatNumber, k: usize) -> Result<BigFloatNumber, Error>  {
+    fn calc_e(p: &BigFloatNumber, q: &BigFloatNumber) -> Result<BigFloatNumber, Error>  {
 
         // 1 + pk / qk
         let f0 = p.div(q, RoundingMode::None)?;
@@ -65,7 +65,7 @@ impl ECache {
 
         let (p01, q01) = pq(0, 64)?;        
 
-        let val = Self::calc_e(&p01, &q01, 64)?;
+        let val = Self::calc_e(&p01, &q01)?;
 
         Ok(ECache {
             b: 64,
@@ -120,7 +120,7 @@ impl ECache {
                 (pk, qk, bb) = pqr_inc(&pk, &qk, bb)?;
             }
 
-            let mut ret = Self::calc_e(&pk, &qk, k)?;
+            let mut ret = Self::calc_e(&pk, &qk)?;
 
             self.val = ret.clone()?;
 

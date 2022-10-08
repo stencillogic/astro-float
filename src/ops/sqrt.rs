@@ -161,7 +161,7 @@ mod tests {
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let f = ni.sqrt(RoundingMode::ToEven).unwrap();
+                let _f = ni.sqrt(RoundingMode::ToEven).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

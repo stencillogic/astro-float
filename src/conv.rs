@@ -11,7 +11,6 @@ use crate::defs::Word;
 use crate::defs::RoundingMode;
 use crate::mantissa::Mantissa;
 use crate::num::BigFloatNumber;
-use crate::common::consts::ONE;
 use crate::common::consts::TWO;
 use crate::common::consts::EIGHT;
 use crate::common::consts::TEN;
@@ -425,6 +424,7 @@ mod tests {
     use rand::random;
     use crate::defs::{Sign, EXPONENT_MIN, EXPONENT_MAX};
     use super::*;
+    use crate::common::consts::ONE;
 
     #[test]
     fn test_conv() {

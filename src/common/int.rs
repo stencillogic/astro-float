@@ -1,12 +1,9 @@
 //! Lightweigh integer.
 
-
 use itertools::izip;
-use crate::num::BigFloatNumber;
-use crate::defs::{Word, DoubleWord, WORD_BIT_SIZE, WORD_BASE, WORD_MAX, SignedWord, Error, Exponent, Sign};
+use crate::defs::{Word, DoubleWord, WORD_BIT_SIZE, WORD_BASE, WORD_MAX, SignedWord};
 use crate::common::util::{shift_slice_left, sub_borrow};
 use crate::common::util::shift_slice_right;
-use super::buf::WordBuf;
 use super::util::add_carry;
 use core::ops::DerefMut;
 use core::ops::Deref;
@@ -99,6 +96,7 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
+    #[allow(dead_code)] // used intests
     pub fn mul_assign<'c>(&mut self, s2: &SliceWithSign<'c>, work_buf: &mut [Word]) {
         work_buf.fill(0);
         for (i, d1mi) in self.deref().iter().enumerate() {
@@ -120,6 +118,7 @@ impl<'a> SliceWithSign<'a> {
         self.sign *= s2.sign;
     }
 
+    #[allow(dead_code)] // used intests
     pub fn mul<'c>(&self, s2: &SliceWithSign<'c>, dst: &mut SliceWithSign<'c>) {
         dst.fill(0);
         for (i, d1mi) in self.deref().iter().enumerate() {
@@ -350,25 +349,6 @@ impl<'a> SliceWithSign<'a> {
         }
 
         0
-    }
-
-    pub fn cmp(&self, s2: &Self) -> SignedWord {
-
-        if self.sign() != s2.sign() {
-            return self.sign() as SignedWord;
-        }
-
-        if self.is_zero() || s2.is_zero() {
-            if !s2.is_zero() {
-                return -s2.sign() as SignedWord;
-            } else if !self.is_zero() {
-                return self.sign() as SignedWord;
-            } else {
-                return 0;
-            }
-        }
-
-        Self::abs_cmp(self, s2) as SignedWord * self.sign() as SignedWord
     }
 
     #[inline]
