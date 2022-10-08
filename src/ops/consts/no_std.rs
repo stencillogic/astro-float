@@ -12,10 +12,10 @@ struct consts {
     /// Euler's number.
     pub E: ECache,
 
-    /// Ln of 2.
+    /// Natural logarithm of 2.
     pub Ln2: Ln2Cache,
 
-    /// Ln of 10.
+    /// Natural logarithm of 10.
     pub Ln10: Ln10Cache,
 
     /// Pi number.

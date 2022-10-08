@@ -62,23 +62,6 @@ impl WordBuf {
         Ok(())
     }
 
-    // Remove leading digits containing zeroes.
-    pub fn trunc_leading_zeroes(&mut self) {
-
-        let mut n = 0;
-
-        for v in self.inner.iter().rev() {
-            if *v == 0 {
-                n += 1;
-            } else {
-                break;
-            }
-        }
-
-        let sz = self.len();
-        self.inner.truncate(sz - n);
-    }
-
     // Remove trailing digits containing zeroes.
     pub fn trunc_trailing_zeroes(&mut self) {
 

@@ -1,27 +1,46 @@
-![Rust](https://github.com/stencillogic/num-bigfloat/workflows/Rust/badge.svg)
+![Rust](https://github.com/stencillogic/astro-float/workflows/Rust/badge.svg)
 
-Multiple precision floating point numbers implemented purely in Rust. 
+Astro-float (astronomically large floating point numbers) is a library that implements arbitrary precision floating point numbers purely in Rust.
 
-## Rationale
+The library implements the basic operations and functions. It uses classical algorithms such as Karatsuba, Toom-3, Schönhage-Strassen algorithm, etc.
 
-There are several notable implementations of numbers with increased precision for Rust. Among the libraries, one can recall [num-bigint](https://crates.io/crates/num-bigint), [rust_decimal](https://crates.io/crates/rust_decimal).
+## Usage
 
-While these libraries are great in many ways, they don't allow you to perform operations on numbers while still providing fairly high precision.
+Compute Pi with precision of 1024 bit:
 
-There are also wrapper libraries ([rug](https://crates.io/crates/rug)) that depend on libraries written in other programming languages.
+``` rust
+use astro_float::BigFloatNumber;
+use astro_float::PI;
+use astro_float::RoundingMode;
+use astro_float::Radix;
+use astro_float::Error;
 
-This library is written in pure Rust, provides more precision than f32, f64, and some other data types with increased precision.
+// Rounding of all operations
+let rm = RoundingMode::ToEven;
 
-## Number characteristics
+// Compute pi: pi = 6*arctan(1/sqrt(3))
+let six = BigFloatNumber::from_word(6, 1).unwrap();
+let three = BigFloatNumber::parse("3.0", Radix::Dec, 1024+8, rm).unwrap();  // +8 bits of precision to cover error
+let mut pi = six.mul(&three.sqrt(rm).unwrap().reciprocal(rm).unwrap().atan(rm).unwrap(), rm).unwrap();
+pi.set_precision(1024, rm).unwrap();
+let mut epsilon = BigFloatNumber::from_word(1, 1).unwrap();
+epsilon.set_exponent(-1021);
 
-Currently, floating point numbers in this library have the following predefined characteristics:
+// Use library's constant for verifying the result
+let pi_lib = PI.with(|v| -> Result<BigFloatNumber, Error> {
+    v.borrow_mut().for_prec(1024, rm)
+}).unwrap();
 
-| Name                          | Value  |
-|:------------------------------|-------:|
-| Decimal positions in mantissa |     40 |
-| Exponent minimum value        |   -128 |
-| Exponent maximum value        |    127 |
+// Compare computed constant with library's constant
+assert!(pi.sub(&pi_lib, rm).unwrap().abs().unwrap().cmp(&epsilon) <= 0);
 
-## no_std
+// Print computed result as decimal number.
+let s = pi.format(Radix::Dec, rm).unwrap();
+println!("{}", s);
 
-Library can be used without the standard Rust library. This can be achieved by turning off `std` feature.
+// output: 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458698858e+0
+```
+
+## Contribution
+
+The library is still young and may lack some features or contain bugs. Issues for these or other cases can be opened here: https://github.com/stencillogic/astro-float/issues 

@@ -1,5 +1,5 @@
-///! Definitions.
-/// 
+//! Definitions.
+
 
 /// A word.
 #[cfg(target_arch = "x86_64")] 
@@ -50,7 +50,11 @@ pub const WORD_SIGNIFICANT_BIT: Word = WORD_MAX << (WORD_BIT_SIZE - 1);
 /// Sign.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum Sign {
+
+    /// Negative.
     Neg = -1,
+
+    /// Positive.
     Pos = 1,
 }
 
@@ -69,7 +73,8 @@ use smallvec::CollectionAllocErr;
 /// Possible errors.
 #[derive(Debug)]
 pub enum Error {
-    /// Exponent value becomes greater than the upper bound for exponent value.
+    
+    /// Exponent value becomes greater than the upper bound for exponent value or smaller than the lower bound.
     ExponentOverflow(Sign),
 
     /// Divizor is zero.
@@ -99,20 +104,28 @@ impl PartialEq for Error {
 }
 
 
-/// Radix
+/// Radix.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum Radix {
+
+    /// Binary.
     Bin = 2,
+
+    /// Octal.
     Oct = 8,
+
+    /// Decimal.
     Dec = 10,
+
+    /// Hexadecimal.
     Hex = 16,
 }
 
-/// Possible errors.
+/// Rounding modes.
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum RoundingMode {
     
-    /// None
+    /// Skip rounding operation.
     None,
 
     /// Round half toward positive infinity.

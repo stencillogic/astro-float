@@ -1,14 +1,14 @@
 [package]
-name = "num-bigfloat"
-version = "0.1.6"
+name = "astro-float"
+version = "0.0.1"
 edition = "2021"
 authors = ["stencillogic <stencillogic@gmail.com>"]
 license = "MIT"
 description = "Multiple precision floating point numbers implemented purely in Rust."
 categories = ["algorithms", "data-structures", "science"]
-keywords = ["big-float", "numeric", "decimal", "mathematics", "bignum"]
+keywords = ["bigfloat", "numeric", "decimal", "mathematics", "bignum"]
 readme = "README.md"
-repository = "https://github.com/stencillogic/num-bigfloat"
+repository = "https://github.com/stencillogic/astro-float"
 
 [dev-dependencies]
 rand = "0.8.5"

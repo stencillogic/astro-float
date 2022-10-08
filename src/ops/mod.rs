@@ -5,7 +5,7 @@ mod ln;
 mod pow;
 mod sinh;
 mod series;
-mod consts;
+pub mod consts;
 mod sin;
 mod cos;
 mod tan;

@@ -15,12 +15,12 @@ thread_local! {
         RefCell::new(ECache::new().unwrap())
     };
 
-    /// Ln of 2.
+    /// Natural logarithm of 2.
     pub static LN_2: RefCell<Ln2Cache> = {
         RefCell::new(Ln2Cache::new().unwrap())
     };
 
-    /// Ln of 10.
+    /// Natural logarithm of 10.
     pub static LN_10: RefCell<Ln10Cache> = {
         RefCell::new(Ln10Cache::new().unwrap())
     };
