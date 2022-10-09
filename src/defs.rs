@@ -74,7 +74,7 @@ use smallvec::CollectionAllocErr;
 #[derive(Debug)]
 pub enum Error {
     
-    /// Exponent value becomes greater than the upper bound for exponent value or smaller than the lower bound.
+    /// The exponent value becomes greater than the upper limit of exponent values or less than the lower limit.
     ExponentOverflow(Sign),
 
     /// Divizor is zero.
@@ -82,9 +82,6 @@ pub enum Error {
 
     /// Invalid argument.
     InvalidArgument,
-
-    /// Allocation size is incorrect.
-    IncorrectAllocationSize,
 
     /// Memory allocation error.
     MemoryAllocation(CollectionAllocErr),

@@ -737,6 +737,7 @@ impl Mantissa {
         false
     }
 
+    /// Sets the precision to `p`.
     pub fn set_length(&mut self, p: usize) -> Result<(), Error> {
         let sz = Self::bit_len_to_word_len(p);
         let orig_len = self.m.len();
