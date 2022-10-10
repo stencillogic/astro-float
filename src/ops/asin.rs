@@ -7,7 +7,12 @@ use crate::defs::Error;
 
 impl BigFloatNumber {
 
-    /// Arcsine
+    /// Computes the arcsine of a number. The result is rounded using the rounding mode `rm`.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - InvalidArgument: argument is greater than 1 or smaller than -1.
+    ///  - MemoryAllocation: failed to allocate memory.
     pub fn asin(&self, rm: RoundingMode) -> Result<Self, Error> {
 
         if self.cmp(&ONE) == 0 {

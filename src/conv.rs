@@ -20,8 +20,15 @@ use crate::common::consts::TEN_POW_9;
 
 impl BigFloatNumber {
 
-    /// Convert array of digits in radix `rdx` to BigFloat with precision p. 
-    /// The first value in `digits` must be the most significant digit.
+    /// Converts an array of digits in radix `rdx` to BigFloatNumber with precision `p`.
+    /// `digits` represents mantissa and is interpreted as a number smaller than 1 and greater or equal to 1/`rdx`. 
+    /// The first element in `digits` is the most significant digit.
+    /// `e` is the exponent part of the number, such that the number can be represented as `digits` * `rdx` ^ `e`.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
     pub fn convert_from_radix(sign: Sign, digits: &[u8], e: Exponent, rdx: Radix, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         match rdx {
             Radix::Bin => Self::conv_from_binary(sign, digits, e, p, rm),
@@ -186,8 +193,15 @@ impl BigFloatNumber {
         Ok(ret)
     }
 
-    /// Convert into radix `rdx`.
-    /// Returns sign, mantissa digits, and exponent.
+    /// Converts `self` to radix `rdx` using rounding mode `rm`.
+    /// The function returns sign, mantissa digits in radix `rdx`, and exponent such that the converted number 
+    /// can be represented as `mantissa digits` * `rdx` ^ `exponent`.
+    /// The first element in mantissa is the most significant digit.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
     pub fn convert_to_radix(&self, rdx: Radix, rm: RoundingMode) -> Result<(Sign, Vec<u8>, Exponent), Error> {
         match rdx {
             Radix::Bin => self.conv_to_binary(),

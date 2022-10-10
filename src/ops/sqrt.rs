@@ -13,7 +13,12 @@ use crate::common::consts::FIFTEEN;
 
 impl BigFloatNumber {
 
-    /// Compute square root of a number.
+    /// Computes square root of a number. The result is rounded using the rounding mode `rm`.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - InvalidArgument: argument is negative.
+    ///  - MemoryAllocation: failed to allocate memory.
     pub fn sqrt(&self, rm: RoundingMode) -> Result<Self, Error> {
 
         if self.is_negative() {

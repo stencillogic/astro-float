@@ -84,6 +84,12 @@ impl ArgReductionEstimator for LnArgReductionEstimator {
 
 impl BigFloatNumber {
 
+    /// Computes the natural logarithm of a number. The result is rounded using the rounding mode `rm`.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - InvalidArgument: the argument is zero or negative.
+    ///  - MemoryAllocation: failed to allocate memory.
     pub fn ln(&self, rm: RoundingMode) -> Result<Self, Error> {
 
         // factoring: ln(self) = ln(x * 2^n) = ln(x) + n*ln(2), 0.5 <= x < 1

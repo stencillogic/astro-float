@@ -68,7 +68,12 @@ impl ArgReductionEstimator for TanArgReductionEstimator {
 
 impl BigFloatNumber {
 
-    /// Tangent
+    /// Computes the tangent of a number. The result is rounded using the rounding mode `rm`.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - ExponentOverflow: the result is too large or too small number.
+    ///  - MemoryAllocation: failed to allocate memory.
     pub fn tan(&self, rm: RoundingMode) -> Result<Self, Error> {
 
         let mut pi = PI.with(|v| -> Result<Self, Error> {

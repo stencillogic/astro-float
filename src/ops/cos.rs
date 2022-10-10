@@ -99,7 +99,11 @@ impl ArgReductionEstimator for CosArgReductionEstimator {
 
 impl BigFloatNumber {
 
-    /// Cosine
+    /// Computes the cosine of a number. The result is rounded using the rounding mode `rm`.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - MemoryAllocation: failed to allocate memory.
     pub fn cos(&self, rm: RoundingMode) -> Result<Self, Error> {
 
         let mut pi = PI.with(|v| -> Result<Self, Error> {

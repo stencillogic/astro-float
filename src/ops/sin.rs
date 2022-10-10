@@ -98,7 +98,11 @@ impl ArgReductionEstimator for SinArgReductionEstimator {
 
 impl BigFloatNumber {
 
-    /// Sine
+    /// Computes the sine of a number. The result is rounded using the rounding mode `rm`.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - MemoryAllocation: failed to allocate memory.
     pub fn sin(&self, rm: RoundingMode) -> Result<Self, Error> {
 
         let mut pi = PI.with(|v| -> Result<Self, Error> {

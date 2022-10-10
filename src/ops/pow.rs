@@ -11,7 +11,12 @@ use crate::ops::consts::std::E;
 
 impl BigFloatNumber {
 
-    /// Compute `e` to the power of self.
+    /// Computes `e` to the power of `self`. The result is rounded using the rounding mode `rm`.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - ExponentOverflow: the result is too large or too small number.
+    ///  - MemoryAllocation: failed to allocate memory.
     pub fn exp(&self, rm: RoundingMode) -> Result<Self, Error> {
 
         if self.is_zero() {
@@ -46,7 +51,12 @@ impl BigFloatNumber {
         Ok(ret)
     }
 
-    /// Compute power of self to the integer.
+    /// Compute the power of `self` to the integer `i`. The result is rounded using the rounding mode `rm`.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - ExponentOverflow: the result is too large or too small number.
+    ///  - MemoryAllocation: failed to allocate memory.
     pub fn powi(&self, mut i: usize, rm: RoundingMode) -> Result<Self, Error> {
 
         if self.is_zero() || i == 1 {

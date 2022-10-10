@@ -8,7 +8,12 @@ use crate::ops::consts::std::PI;
 
 impl BigFloatNumber {
 
-    /// Arccosine
+    /// Computes the arccosine of a number. The result is rounded using the rounding mode `rm`.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - InvalidArgument: argument is greater than 1 or smaller than -1.
+    ///  - MemoryAllocation: failed to allocate memory.
     pub fn acos(&self, rm: RoundingMode) -> Result<Self, Error> {
 
         let mut x = self.clone()?;

@@ -13,7 +13,13 @@ const DIGIT_CHARS: [char; 16] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9
 
 impl BigFloatNumber {
 
-    /// Parses the number from the string `s` using radix `r`, precision `p`, and rounding mode `rm`.
+    /// Parses the number from the string `s` using radix `rdx`, precision `p`, and rounding mode `rm`.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - InvalidArgument: failed to parse input.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
     pub fn parse(s: &str, rdx: Radix, p: usize, rm: RoundingMode) -> Result<Self, Error> {
 
         let ps = parser::parse(s, rdx);
@@ -26,7 +32,12 @@ impl BigFloatNumber {
         }
     }
 
-    /// Formats the number using radix `r`.
+    /// Formats the number using radix `rdx` and rounding mode `rm`.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
     pub fn format(&self, rdx: Radix, rm: RoundingMode) -> Result<String, Error> {
 
         let (s, m, e) = self.convert_to_radix(rdx, rm)?;
@@ -89,7 +100,7 @@ mod tests {
                 let n = BigFloatNumber::random_normal(192, -2, -2).unwrap();
                 let s = n.format(rdx, RoundingMode::ToEven).unwrap();
                 let d = BigFloatNumber::parse(&s, rdx, 200, RoundingMode::ToEven).unwrap();
-        
+
                 if rdx == Radix::Dec {
                     //println!("\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}", n, s, d, n.format(Radix::Hex, RoundingMode::ToEven), d.format(Radix::Hex, RoundingMode::ToEven));
                     eps.set_exponent(n.get_exponent() - 160);

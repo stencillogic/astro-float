@@ -84,7 +84,11 @@ impl ArgReductionEstimator for AtanArgReductionEstimator {
 
 impl BigFloatNumber {
 
-    /// Arcsine
+    /// Computes the arctangent of a number. The result is rounded using the rounding mode `rm`.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - MemoryAllocation: failed to allocate memory.
     pub fn atan(&self, rm: RoundingMode) -> Result<Self, Error> {
 
         // if x > 1 then arctan(x) = pi/2 - arctan(1/x)

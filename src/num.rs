@@ -37,8 +37,8 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - InvalidArgument - precision is incorrect.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - InvalidArgument: precision is incorrect.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn new(p: usize) -> Result<Self, Error>  {
         Self::p_assertion(p)?;
         Ok(BigFloatNumber {
@@ -52,8 +52,8 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - InvalidArgument - precision is incorrect.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - InvalidArgument: precision is incorrect.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn max(p: usize) -> Result<Self, Error> {
         Self::p_assertion(p)?;
         Ok(BigFloatNumber {
@@ -67,8 +67,8 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - InvalidArgument - precision is incorrect.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - InvalidArgument: precision is incorrect.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn min(p: usize) -> Result<Self, Error> {
         Self::p_assertion(p)?;
         Ok(BigFloatNumber {
@@ -82,8 +82,8 @@ impl BigFloatNumber {
     ///
     /// ## Errors
     /// 
-    ///  - InvalidArgument - precision is incorrect.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - InvalidArgument: precision is incorrect.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn min_positive(p: usize) -> Result<Self, Error> {
         Self::p_assertion(p)?;
         Ok(BigFloatNumber {
@@ -97,8 +97,8 @@ impl BigFloatNumber {
     ///
     /// ## Errors
     /// 
-    ///  - InvalidArgument - precision is incorrect.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - InvalidArgument: precision is incorrect.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn from_word(mut d: Word, p: usize) -> Result<Self, Error> {
         Self::p_assertion(p)?;
         if d == 0 {
@@ -121,7 +121,7 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn neg(&self) -> Result<Self, Error> {
         let mut ret = self.clone()?;
         ret.s = ret.s.invert();
@@ -132,8 +132,8 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - ExponentOverflow - the resulting exponent becomes greater than the maximum allowed value for the exponent.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     #[inline]
     pub fn add(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
         self.add_sub(d2, 1, rm, false)
@@ -143,8 +143,8 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - ExponentOverflow - the resulting exponent becomes greater than the maximum allowed value for the exponent.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     #[inline]
     pub fn sub(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
         self.add_sub(d2, -1, rm, false)
@@ -154,8 +154,8 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - ExponentOverflow - the resulting exponent becomes greater than the maximum allowed value for the exponent.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     #[inline]
     pub fn add_full_prec(&self, d2: &Self) -> Result<Self, Error> {
         self.add_sub(d2, 1, RoundingMode::None, true)
@@ -165,8 +165,8 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - ExponentOverflow - the resulting exponent becomes greater than the maximum allowed value for the exponent.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     #[inline]
     pub fn sub_full_prec(&self, d2: &Self) -> Result<Self, Error> {
         self.add_sub(d2, -1, RoundingMode::None, true)
@@ -176,8 +176,8 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - ExponentOverflow - the resulting exponent becomes greater than the maximum allowed value for the exponent.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     #[inline]
     pub fn mul(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
         self.mul_general_case(d2, rm, false)
@@ -187,8 +187,8 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - ExponentOverflow - the resulting exponent becomes greater than the maximum allowed value for the exponent.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     #[inline]
     pub fn mul_full_prec(&self, d2: &Self) -> Result<Self, Error> {
         self.mul_general_case(d2, RoundingMode::None, true)
@@ -234,9 +234,9 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - DivisionByZero - `d2` is zero.
-    ///  - ExponentOverflow - the resulting exponent becomes greater than the maximum allowed value for the exponent.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - DivisionByZero: `d2` is zero.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn div(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
 
         if d2.m.is_zero() {
@@ -467,7 +467,7 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn abs(&self) -> Result<Self, Error> {
         let mut ret = self.clone()?;
         ret.s = Sign::Pos;
@@ -478,9 +478,9 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - InvalidArgument - precision is incorrect or `f` is NaN.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
-    ///  - ExponentOverflow - `f` is Inf.
+    ///  - InvalidArgument: precision is incorrect or `f` is NaN.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: `f` is Inf.
     pub fn from_f64(p: usize, mut f: f64) -> Result<Self, Error> {
         Self::p_assertion(p)?;
         let mut ret = BigFloatNumber::new(0)?;
@@ -562,9 +562,9 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - InvalidArgument - precision is incorrect or `f` is NaN.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
-    ///  - ExponentOverflow - `f` is Inf.
+    ///  - InvalidArgument: precision is incorrect or `f` is NaN.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: `f` is Inf.
     #[inline]
     pub fn from_f32(p: usize, f: f32) -> Result<Self, Error> {
         Self::from_f64(p, f as f64)
@@ -596,6 +596,10 @@ impl BigFloatNumber {
     ///  - `n` is the number of significant bits in mantissa.
     ///  - `s` is the sign.
     ///  - `e` is the exponent.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn from_raw_parts(m: &[Word], n: usize, s: Sign, e: Exponent) -> Result<Self, Error> {
         if m.len()*WORD_BIT_SIZE >= isize::MAX as usize/2 || n > m.len()*WORD_BIT_SIZE {
             return Err(Error::InvalidArgument);
@@ -637,7 +641,7 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn floor(&self) -> Result<Self, Error> {
         let int = self.int()?;
         if self.is_negative() {
@@ -652,7 +656,7 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn ceil(&self) -> Result<Self, Error> {
         let int = self.int()?;
         if self.is_positive() {
@@ -667,7 +671,7 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn fract(&self) -> Result<Self, Error> {
         let mut ret = self.clone()?;
         if self.e > 0 {
@@ -690,7 +694,7 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn int(&self) -> Result<Self, Error> {
         let mut ret = self.clone()?;
         if self.e > 0 {
@@ -745,8 +749,8 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
-    ///  - ExponentOverflow - rounding causes exponent overflow.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: rounding causes exponent overflow.
     pub fn round(&mut self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         let mut ret = self.clone()?;
         let e = (-self.e) as usize;
@@ -774,8 +778,8 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - InvalidArgument - precision is incorrect.
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - InvalidArgument: precision is incorrect.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn random_normal(p: usize, exp_from: Exponent, exp_to: Exponent) -> Result<Self, Error> {
         Self::p_assertion(p)?;
         let m = Mantissa::random_normal(p)?;
@@ -793,7 +797,7 @@ impl BigFloatNumber {
     ///
     /// ## Errors
     ///
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn clone(&self) -> Result<Self, Error> {
         Ok(BigFloatNumber {
             e: self.e, 
@@ -803,7 +807,11 @@ impl BigFloatNumber {
     }
 
     /// Sets the precision of `self` to `p`.
-    /// If the new precision is smaller than the existing, the number is rounded using specified rounding mode `rm`; the precision is not decreased.
+    /// If the new precision is smaller than the existing one, the number is rounded using specified rounding mode `rm`.
+    ///
+    /// ## Errors
+    ///
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn set_precision(&mut self, p: usize, rm: RoundingMode) -> Result<(), Error> {
         if self.get_mantissa_max_bit_len() > p {
             self.m.round_mantissa(self.get_mantissa_max_bit_len() - p, rm, self.is_positive());
@@ -815,12 +823,12 @@ impl BigFloatNumber {
         self.m.set_length(p)
     }
 
-    /// Computes the reciprocal of a number. The result is rounded using rounding mode `rm`.
+    /// Computes the reciprocal of a number. The result is rounded using the rounding mode `rm`.
     /// 
     /// ## Errors
     /// 
-    ///  - MemoryAllocation - failed to allocate memory for mantissa.
-    ///  - ExponentOverflow - rounding causes exponent overflow.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: rounding causes exponent overflow.
     pub fn reciprocal(&self, rm: RoundingMode) -> Result<Self, Error> {
         let mut p = self.get_mantissa_max_bit_len();
         let mut err = 1;
