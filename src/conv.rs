@@ -25,6 +25,24 @@ impl BigFloatNumber {
     /// The first element in `digits` is the most significant digit.
     /// `e` is the exponent part of the number, such that the number can be represented as `digits` * `rdx` ^ `e`.
     /// 
+    /// ## Examples
+    /// 
+    /// ``` rust
+    /// use astro_float::{BigFloatNumber, Sign, RoundingMode, Radix};
+    /// 
+    /// let g = BigFloatNumber::convert_from_radix(
+    ///     Sign::Neg, 
+    ///     &[1, 2, 3, 4, 5, 6, 7, 0], 
+    ///     3, 
+    ///     Radix::Oct, 
+    ///     64, 
+    ///     RoundingMode::None).unwrap();
+    /// 
+    /// let n = BigFloatNumber::from_f64(64, -83.591552734375).unwrap();
+    /// 
+    /// assert!(n.cmp(&g) == 0);
+    /// ```
+    /// 
     /// ## Errors
     /// 
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
@@ -197,6 +215,20 @@ impl BigFloatNumber {
     /// The function returns sign, mantissa digits in radix `rdx`, and exponent such that the converted number 
     /// can be represented as `mantissa digits` * `rdx` ^ `exponent`.
     /// The first element in mantissa is the most significant digit.
+    /// 
+    /// ## Examples
+    /// 
+    /// ``` rust
+    /// use astro_float::{BigFloatNumber, Sign, RoundingMode, Radix};
+    /// 
+    /// let n = BigFloatNumber::from_f64(64, 0.00012345678f64).unwrap();
+    ///
+    /// let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).unwrap();
+    /// 
+    /// assert_eq!(s, Sign::Pos);
+    /// assert_eq!(m, [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4, 3]);
+    /// assert_eq!(e, -3);
+    /// ```
     /// 
     /// ## Errors
     /// 
@@ -456,6 +488,18 @@ mod tests {
         let f = g.to_f64();
 
         assert!(f == 0.031256789f64);
+
+        let n = BigFloatNumber::from_f64(64, 0.00012345678f64).unwrap();
+
+        let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).unwrap();
+
+        assert_eq!(s, Sign::Pos);
+        assert_eq!(m, [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4, 3]);
+        assert_eq!(e, -3);
+
+        let g = BigFloatNumber::convert_from_radix(Sign::Neg, &[1, 2, 3, 4, 5, 6, 7, 0], 3, Radix::Oct, 64, RoundingMode::None).unwrap();
+        let n = BigFloatNumber::from_f64(64, -83.591552734375).unwrap();
+        assert!(n.cmp(&g) == 0);
 
         #[cfg(target_arch = "x86")] {
             let n = BigFloatNumber::from_raw_parts(&[2576980377, 2576980377, 2576980377], 96, Sign::Pos, -1).unwrap();
