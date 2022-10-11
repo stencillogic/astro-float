@@ -14,6 +14,9 @@ const DIGIT_CHARS: [char; 16] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9
 impl BigFloatNumber {
 
     /// Parses the number from the string `s` using radix `rdx`, precision `p`, and rounding mode `rm`.
+    /// Note, since hexadecimal digits include the character "e", the exponent part is separated 
+    /// from the mantissa by "_". 
+    /// For example, a number with mantissa `123abcdef` and exponent `123` would be formatted as `123abcdef_e+123`.
     /// 
     /// ## Errors
     /// 
@@ -33,6 +36,9 @@ impl BigFloatNumber {
     }
 
     /// Formats the number using radix `rdx` and rounding mode `rm`.
+    /// Note, since hexadecimal digits include the character "e", the exponent part is separated 
+    /// from the mantissa by "_". 
+    /// For example, a number with mantissa `123abcdef` and exponent `123` would be formatted as `123abcdef_e+123`.
     /// 
     /// ## Errors
     /// 
