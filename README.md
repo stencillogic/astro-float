@@ -2,11 +2,15 @@
 
 Astro-float (astronomically large floating point numbers) is a library that implements arbitrary precision floating point numbers purely in Rust.
 
-The library implements the basic operations and functions. It uses classical algorithms such as Karatsuba, Toom-3, Schönhage-Strassen algorithm, etc.
+The library implements the basic operations and functions. It uses classical algorithms such as Karatsuba, Toom-3, Schönhage-Strassen algorithm, and others.
 
 ## Usage
 
-Compute Pi with precision of 1024 bit:
+Below is an example of using the library.
+For more information please refer to the library documentation: https://docs.rs/astro-float/latest/astro_float/
+
+
+Calculate Pi with 1024 bit precision:
 
 ``` rust
 use astro_float::BigFloatNumber;
@@ -41,6 +45,14 @@ println!("{}", s);
 // output: 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458698858e+0
 ```
 
-## Contribution
+## Performance
+
+Benchmark can be found here: https://github.com/stencillogic/bigfloat-bench.
+
+## Roadmap
+
+Future improvements include the implementation of faster mathematical function algorithms for arguments with large precision, such as AGM implementation for calculating the logarithm, and faster trigonometric functions.
+
+## Contributing
 
 The library is still young and may lack some features or contain bugs. Issues for these or other cases can be opened here: https://github.com/stencillogic/astro-float/issues 
