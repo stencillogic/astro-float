@@ -80,7 +80,7 @@
 //! The library can work without the standard library provided there is a memory allocator. The standard library dependency is activated by feature `std`. 
 //! Feature `std` is active by default and must be excluded when specifying dependency, e.g.:
 //! 
-//! > astro-float = { version = "0.0.3", default-features = false, features = ["random"] }
+//! > astro-float = { version = "0.0.3", default-features = false }
 //! 
 
 #![deny(clippy::suspicious)]
