@@ -77,9 +77,15 @@
 //! 
 //! ## no_std
 //! 
-//! The library can work without the standard library provided there is a memory allocator.
+//! The library can work without the standard library provided there is a memory allocator. The standard library dependency is activated by feature `std`. 
+//! Feature `std` is active by default and must be excluded when specifying dependency, e.g.:
+//! 
+//! > astro-float = { version = "0.0.3", default-features = false, features = ["random"] }
+//! 
 
 #![deny(clippy::suspicious)]
+
+#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(not(feature="std"))]
 extern crate alloc;
