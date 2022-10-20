@@ -178,6 +178,8 @@ mod tests {
     use super::*;
     use rand::random;
 
+    #[cfg(not(feature="std"))]
+    use alloc::vec::Vec;
 
     #[test]
     fn test_mul_unbalanced() {
@@ -221,6 +223,7 @@ mod tests {
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn test_mul_short_perf() {
 
         for _ in 0..5 {

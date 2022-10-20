@@ -429,6 +429,9 @@ mod tests {
     use crate::defs::{WORD_SIGNIFICANT_BIT};
     use rand::random;
 
+    #[cfg(not(feature="std"))]
+    use alloc::vec::Vec;
+
     #[test]
     fn test_div_unbalanced() {
 
@@ -486,6 +489,7 @@ mod tests {
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn test_div_perf() {
 
         for _ in 0..5 {
@@ -519,6 +523,7 @@ mod tests {
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn test_div_short_perf() {
 
         for _ in 0..5 {

@@ -60,7 +60,7 @@ impl Mantissa {
             c1 = add_carry(v1, v2, c1, a);
 
             if b_gt_a {
-                std::mem::swap(&mut v1, &mut v2);
+                core::mem::swap(&mut v1, &mut v2);
             }
             
             c2 = sub_borrow(v1, v2, c2, b);
@@ -496,6 +496,8 @@ mod tests {
     use crate::defs::DoubleWord;
     use crate::defs::WORD_BIT_SIZE;
 
+    #[cfg(not(feature="std"))]
+    use alloc::vec::Vec;
     
     #[test]
     fn test_fft_mul() {
@@ -613,6 +615,7 @@ mod tests {
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn fft_mul_perf() {
 
         for _ in 0..5 {

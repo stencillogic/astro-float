@@ -87,25 +87,6 @@ impl Ln10Cache {
         val.div(&f1, crate::RoundingMode::None)
     }
 
-    /// Try to get cached value without additional calculations.
-    pub fn try_for_prec(&self, k: usize, rm: RoundingMode) -> Result<Option<BigFloatNumber>, Error> {
-
-        let kext = k*1728/1000 + 2;
-
-        if self.b > kext {
-
-            let mut ret = self.val.clone()?;
-
-            ret.set_precision(k, rm)?;
-
-            Ok(Some(ret))
-
-        } else {
-            
-            Ok(None)
-        }
-    }
-
     /// Return value of ln(10) with precision k (calculate if needed).
     pub fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
 

@@ -172,8 +172,12 @@ mod tests {
     use crate::defs::DoubleWord;
     use crate::defs::WORD_BIT_SIZE;
 
+    #[cfg(not(feature="std"))]
+    use alloc::vec::Vec;
+
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn toom3_perf() {
 
         for _ in 0..5 {

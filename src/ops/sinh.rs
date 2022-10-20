@@ -159,6 +159,7 @@ mod tests {
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn sinh_perf() {
         let mut n = vec![];
         for _ in 0..100 {

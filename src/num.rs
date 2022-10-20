@@ -25,7 +25,7 @@ pub struct BigFloatNumber {
 impl BigFloatNumber {
 
     // Check the precision so it does not cause arithmetic overflows anywhere.
-    fn p_assertion(p: usize) -> Result<(), Error> {
+    pub(super) fn p_assertion(p: usize) -> Result<(), Error> {
         if p >= (isize::MAX/2 + EXPONENT_MIN as isize) as usize {
             Err(Error::InvalidArgument)
         } else {
@@ -812,7 +812,11 @@ impl BigFloatNumber {
     /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - InvalidArgument: precision is incorrect.
     pub fn set_precision(&mut self, p: usize, rm: RoundingMode) -> Result<(), Error> {
+
+        Self::p_assertion(p)?;
+
         if self.get_mantissa_max_bit_len() > p {
             self.m.round_mantissa(self.get_mantissa_max_bit_len() - p, rm, self.is_positive());
             if self.m.is_all_zero() {
@@ -820,6 +824,7 @@ impl BigFloatNumber {
                 self.e = 0;
             }
         }
+
         self.m.set_length(p)
     }
 
@@ -1214,6 +1219,7 @@ mod tests {
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn add_sub_perf() {
         let mut n = vec![];
         for _ in 0..1000000 {
@@ -1241,6 +1247,7 @@ mod tests {
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn recip_perf() {
 
         for _ in 0..5 {    
@@ -1268,6 +1275,7 @@ mod tests {
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn recip_mul_perf() {
 
         for _ in 0..5 {

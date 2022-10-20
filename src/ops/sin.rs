@@ -13,7 +13,7 @@ use crate::ops::series::PolycoeffGen;
 use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::series_run;
 use crate::ops::series::series_cost_optimize;
-use crate::ops::consts::std::PI;
+use crate::ops::consts::Consts;
 
 
 
@@ -99,15 +99,14 @@ impl ArgReductionEstimator for SinArgReductionEstimator {
 impl BigFloatNumber {
 
     /// Computes the sine of a number. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache `cc` for computing the result.
     /// 
     /// ## Errors
     /// 
     ///  - MemoryAllocation: failed to allocate memory.
-    pub fn sin(&self, rm: RoundingMode) -> Result<Self, Error> {
+    pub fn sin(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
 
-        let mut pi = PI.with(|v| -> Result<Self, Error> {
-            v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)
-        })?;
+        let mut pi = cc.pi(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
 
         pi.set_exponent(pi.get_exponent() + 1);
 
@@ -192,16 +191,19 @@ mod tests {
 
     #[test]
     fn test_sine() {
+        let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
         let mut n1 = BigFloatNumber::from_word(5,320).unwrap();
         n1.set_exponent(0);
-        let _n2 = n1.sin(rm).unwrap();
+        let _n2 = n1.sin(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
     }
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn sine_perf() {
+        let mut cc = Consts::new().unwrap();
         let mut n = vec![];
         for _ in 0..10000 {
             n.push(BigFloatNumber::random_normal(133, -5, 5).unwrap());
@@ -210,7 +212,7 @@ mod tests {
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let _f = ni.sin(RoundingMode::ToEven).unwrap();
+                let _f = ni.sin(RoundingMode::ToEven, &mut cc).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

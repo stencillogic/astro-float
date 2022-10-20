@@ -17,6 +17,9 @@ use crate::common::consts::TEN;
 use crate::common::consts::SIXTEEN;
 use crate::common::consts::TEN_POW_9;
 
+#[cfg(not(feature="std"))]
+use alloc::vec::Vec;
+
 
 impl BigFloatNumber {
 
@@ -47,6 +50,7 @@ impl BigFloatNumber {
     /// 
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
+    ///  - InvalidArgument: precision is incorrect.
     pub fn convert_from_radix(sign: Sign, digits: &[u8], e: Exponent, rdx: Radix, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         match rdx {
             Radix::Bin => Self::conv_from_binary(sign, digits, e, p, rm),

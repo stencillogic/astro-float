@@ -15,7 +15,7 @@ use crate::ops::series::PolycoeffGen;
 use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::series_run;
 use crate::ops::series::series_cost_optimize;
-use crate::ops::consts::std::LN_2;
+use crate::ops::consts::Consts;
 
 
 // Polynomial coefficient generator.
@@ -85,12 +85,13 @@ impl ArgReductionEstimator for LnArgReductionEstimator {
 impl BigFloatNumber {
 
     /// Computes the natural logarithm of a number. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache `cc` for computing the result.
     /// 
     /// ## Errors
     /// 
     ///  - InvalidArgument: the argument is zero or negative.
     ///  - MemoryAllocation: failed to allocate memory.
-    pub fn ln(&self, rm: RoundingMode) -> Result<Self, Error> {
+    pub fn ln(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
 
         // factoring: ln(self) = ln(x * 2^n) = ln(x) + n*ln(2), 0.5 <= x < 1
         // reduction: ln(x) = 2*ln(sqrt(x))
@@ -118,9 +119,7 @@ impl BigFloatNumber {
 
         } else {
 
-            let p2 = LN_2.with(|v| -> Result<Self, Error> {
-                v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)
-            })?;
+            let p2 = cc.ln_2(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
 
             let mut n = Self::from_word(e.unsigned_abs() as Word, 1)?;
             if e < 0 {
@@ -192,11 +191,12 @@ mod tests {
 
     #[test]
     fn test_ln() {
+        let mut cc = Consts::new().unwrap();
 
         let rm = RoundingMode::ToEven;
         let n1 = BigFloatNumber::from_word(123,3200).unwrap();
 
-        let mut n2 = n1.ln(rm).unwrap();
+        let mut n2 = n1.ln(rm, &mut cc).unwrap();
         n2.set_sign(Sign::Pos);
 
         //println!("{:?}", n2.fp3(crate::Radix::Dec, rm).unwrap());
@@ -204,7 +204,9 @@ mod tests {
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn ln_perf() {
+        let mut cc = Consts::new().unwrap();
         let mut n = vec![];
         for _ in 0..10000 {
             let mut nn = BigFloatNumber::random_normal(133, -100, 100).unwrap();
@@ -215,7 +217,7 @@ mod tests {
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let _f = ni.ln(RoundingMode::ToEven).unwrap();
+                let _f = ni.ln(RoundingMode::ToEven, &mut cc).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

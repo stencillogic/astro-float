@@ -83,25 +83,6 @@ impl ECache {
         x / (ln - lln - 3)
     }
 
-    /// Try to get cached value without additional calculations.
-    pub fn try_for_prec(&self, k: usize, rm: RoundingMode) -> Result<Option<BigFloatNumber>, Error> {
-
-        let kext = Self::b_factor(k);
-
-        if self.b > kext {
-
-            let mut ret = self.val.clone()?;
-
-            ret.set_precision(k, rm)?;
-
-            Ok(Some(ret))
-
-        } else {
-            
-            Ok(None)
-        }
-    }
-
     /// Return value of e with precision k.
     pub fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
 

@@ -42,7 +42,7 @@ pub const WORD_MAX: Word = Word::MAX;
 pub const WORD_BASE: DoubleWord = WORD_MAX as DoubleWord + 1;
 
 /// Size of a word in bits.
-pub const WORD_BIT_SIZE: usize = std::mem::size_of::<Word>() * 8;
+pub const WORD_BIT_SIZE: usize = core::mem::size_of::<Word>() * 8;
 
 // word with the most significant bit set.
 pub const WORD_SIGNIFICANT_BIT: Word = WORD_MAX << (WORD_BIT_SIZE - 1);

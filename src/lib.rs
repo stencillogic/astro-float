@@ -26,7 +26,7 @@
 //! **Constants**
 //! 
 //! 
-//! Constants such as pi or the Euler number have arbitrary precision and are evaluated lazily and then cached in the thread-local cache.
+//! Constants such as pi or the Euler number have arbitrary precision and are evaluated lazily and then cached in the constants cache.
 //! 
 //! 
 //! **Performance**
@@ -37,10 +37,9 @@
 //!  
 //! ## Examples
 //! 
-//! 
 //! ``` rust
 //! use astro_float::BigFloatNumber;
-//! use astro_float::PI;
+//! use astro_float::Consts;
 //! use astro_float::RoundingMode;
 //! use astro_float::Radix;
 //! use astro_float::Error;
@@ -48,18 +47,23 @@
 //! // Rounding of all operations
 //! let rm = RoundingMode::ToEven;
 //! 
+//! // Initialize mathematical constants cache
+//! let mut cc = Consts::new().unwrap();
+//! 
 //! // Compute pi: pi = 6*arctan(1/sqrt(3))
 //! let six = BigFloatNumber::from_word(6, 1).unwrap();
 //! let three = BigFloatNumber::parse("3.0", Radix::Dec, 1024+8, rm).unwrap();  // +8 bits of precision to cover error
-//! let mut pi = six.mul(&three.sqrt(rm).unwrap().reciprocal(rm).unwrap().atan(rm).unwrap(), rm).unwrap();
+//! 
+//! let n = three.sqrt(rm).unwrap();
+//! let n = n.reciprocal(rm).unwrap();
+//! let n = n.atan(rm, &mut cc).unwrap();
+//! let mut pi = six.mul(&n, rm).unwrap();
 //! 
 //! // Reduce precision to desired
 //! pi.set_precision(1024, rm).unwrap();
 //! 
 //! // Use library's constant for verifying the result
-//! let pi_lib = PI.with(|v| -> Result<BigFloatNumber, Error> {
-//!     v.borrow_mut().for_prec(1024, rm)
-//! }).unwrap();
+//! let pi_lib = cc.pi(1024, rm).unwrap();
 //! 
 //! // Compare computed constant with library's constant
 //! assert!(pi.cmp(&pi_lib) == 0);
@@ -71,8 +75,14 @@
 //! // output: 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458698858e+0
 //! ```
 //! 
+//! ## no_std
+//! 
+//! The library can work without the standard library provided there is a memory allocator.
 
 #![deny(clippy::suspicious)]
+
+#[cfg(not(feature="std"))]
+extern crate alloc;
 
 mod defs;
 mod mantissa;
@@ -90,10 +100,7 @@ pub use crate::defs::Exponent;
 pub use crate::defs::Word;
 pub use crate::defs::Radix;
 pub use crate::defs::RoundingMode;
-pub use crate::ops::consts::std::PI;
-pub use crate::ops::consts::std::E;
-pub use crate::ops::consts::std::LN_2;
-pub use crate::ops::consts::std::LN_10;
+pub use crate::ops::consts::Consts;
 
 
 #[cfg(test)]
@@ -107,18 +114,23 @@ mod tests {
         // Rounding of all operations
         let rm = RoundingMode::ToEven;
 
+        // Initialize mathematical constants cache
+        let mut cc = Consts::new().unwrap();
+
         // Compute pi: pi = 6*arctan(1/sqrt(3))
         let six = BigFloatNumber::from_word(6, 1).unwrap();
         let three = BigFloatNumber::from_word(3, 1024 + 8).unwrap();
-        let mut pi = six.mul(&three.sqrt(rm).unwrap().reciprocal(rm).unwrap().atan(rm).unwrap(), rm).unwrap();
 
-        // Reduce precision to desired
+        let n = three.sqrt(rm).unwrap();
+        let n = n.reciprocal(rm).unwrap();
+        let n = n.atan(rm, &mut cc).unwrap();
+        let mut pi = six.mul(&n, rm).unwrap();
+
+        // Reduce precision to 1024
         pi.set_precision(1024, rm).unwrap();
 
         // Use library's constant for verifying the result
-        let pi_lib = PI.with(|v| -> Result<BigFloatNumber, Error> {
-            v.borrow_mut().for_prec(1024, rm)
-        }).unwrap();
+        let pi_lib = cc.pi(1024, rm).unwrap();
 
         //println!("{}", pi.format(Radix::Hex, RoundingMode::None).unwrap());
         //println!("{}", pi_lib.format(Radix::Hex, RoundingMode::None).unwrap());

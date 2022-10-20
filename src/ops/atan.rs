@@ -12,7 +12,7 @@ use crate::defs::Error;
 use crate::ops::series::PolycoeffGen;
 use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::series_cost_optimize;
-use crate::ops::consts::std::PI;
+use crate::ops::consts::Consts;
 use crate::ops::series::series_run;
 
 
@@ -85,11 +85,12 @@ impl ArgReductionEstimator for AtanArgReductionEstimator {
 impl BigFloatNumber {
 
     /// Computes the arctangent of a number. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache `cc` for computing the result.
     /// 
     /// ## Errors
     /// 
     ///  - MemoryAllocation: failed to allocate memory.
-    pub fn atan(&self, rm: RoundingMode) -> Result<Self, Error> {
+    pub fn atan(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
 
         // if x > 1 then arctan(x) = pi/2 - arctan(1/x)
         let mut x = self.clone()?;
@@ -101,9 +102,7 @@ impl BigFloatNumber {
 
             let ret = x.atan_series(RoundingMode::None)?;
 
-            let mut pi = PI.with(|v| -> Result<Self, Error> {
-                v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)
-            })?;
+            let mut pi = cc.pi(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
 
             pi.set_exponent(1);
             pi.set_sign(self.get_sign());
@@ -173,16 +172,21 @@ mod tests {
 
     #[test]
     fn test_arctan() {
+        let mut cc = Consts::new().unwrap();
+
         let rm = RoundingMode::ToEven;
         let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
         n1.set_exponent(1);
-        let _n2 = n1.atan(rm).unwrap();
+        let _n2 = n1.atan(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
     }
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn arctan_perf() {
+        let mut cc = Consts::new().unwrap();
+
         let mut n = vec![];
         for _ in 0..10 {
             n.push(BigFloatNumber::random_normal(16000, -5, 5).unwrap());
@@ -191,7 +195,7 @@ mod tests {
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let _f = ni.atan(RoundingMode::ToEven).unwrap();
+                let _f = ni.atan(RoundingMode::ToEven, &mut cc).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

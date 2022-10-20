@@ -6,7 +6,13 @@ use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::parser;
 use crate::num::BigFloatNumber;
+
+#[cfg(feature="std")]
 use std::fmt::Write;
+
+#[cfg(not(feature="std"))]
+use {core::fmt::Write,
+    alloc::string::String};
 
 
 const DIGIT_CHARS: [char; 16] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', ];
@@ -20,10 +26,12 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - InvalidArgument: failed to parse input.
+    ///  - InvalidArgument: failed to parse input or precision is incorrect.
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
     pub fn parse(s: &str, rdx: Radix, p: usize, rm: RoundingMode) -> Result<Self, Error> {
+
+        Self::p_assertion(p)?;
 
         let ps = parser::parse(s, rdx);
 
@@ -49,7 +57,7 @@ impl BigFloatNumber {
         let (s, m, e) = self.convert_to_radix(rdx, rm)?;
 
         let mut mstr = if s == Sign::Neg {
-            "-".to_owned()
+            String::from("-")
         } else {
             String::new()
         };

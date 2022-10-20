@@ -8,7 +8,7 @@ use crate::common::util::log2_floor;
 use crate::num::BigFloatNumber;
 use crate::defs::RoundingMode;
 use crate::defs::Error;
-use crate::ops::consts::std::PI;
+use crate::ops::consts::Consts;
 use crate::ops::series::PolycoeffGen;
 use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::series_cost_optimize;
@@ -69,16 +69,15 @@ impl ArgReductionEstimator for TanArgReductionEstimator {
 impl BigFloatNumber {
 
     /// Computes the tangent of a number. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache `cc` for computing the result.
     /// 
     /// ## Errors
     /// 
     ///  - ExponentOverflow: the result is too large or too small number.
     ///  - MemoryAllocation: failed to allocate memory.
-    pub fn tan(&self, rm: RoundingMode) -> Result<Self, Error> {
+    pub fn tan(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
 
-        let mut pi = PI.with(|v| -> Result<Self, Error> {
-            v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)
-        })?;
+        let mut pi = cc.pi(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
 
         pi.set_exponent(pi.get_exponent() + 1);
 
@@ -203,16 +202,19 @@ mod tests {
 
     #[test]
     fn test_tan() {
+        let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
         let mut n1 = BigFloatNumber::from_word(2,320).unwrap();
         n1.set_exponent(0);
-        let _n2 = n1.tan(rm).unwrap();
+        let _n2 = n1.tan(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
     }
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn tan_perf() {
+        let mut cc = Consts::new().unwrap();
         let mut n = vec![];
         for _ in 0..10000 {
             n.push(BigFloatNumber::random_normal(160, 0, 5).unwrap());
@@ -221,7 +223,7 @@ mod tests {
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let _f = ni.tan(RoundingMode::ToEven).unwrap();
+                let _f = ni.tan(RoundingMode::ToEven, &mut cc).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

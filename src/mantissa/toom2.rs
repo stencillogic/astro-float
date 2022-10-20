@@ -164,6 +164,8 @@ mod tests {
     use rand::random;
     use crate::defs::{DoubleWord, WORD_BIT_SIZE};
 
+    #[cfg(not(feature="std"))]
+    use alloc::vec::Vec;
     
     #[test]
     fn test_toom2() {
@@ -245,6 +247,7 @@ mod tests {
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn toom2_perf() {
 
         for _ in 0..5 {

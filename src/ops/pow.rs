@@ -6,18 +6,19 @@ use crate::{
     defs::{Error, WORD_SIGNIFICANT_BIT, WORD_BIT_SIZE}, 
     common::consts::ONE, Sign,
 };
-use crate::ops::consts::std::E;
+use crate::ops::consts::Consts;
 
 
 impl BigFloatNumber {
 
     /// Computes `e` to the power of `self`. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache `cc` for computing the result.
     /// 
     /// ## Errors
     /// 
     ///  - ExponentOverflow: the result is too large or too small number.
     ///  - MemoryAllocation: failed to allocate memory.
-    pub fn exp(&self, rm: RoundingMode) -> Result<Self, Error> {
+    pub fn exp(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
 
         if self.is_zero() {
             return Self::from_word(1, self.get_mantissa_max_bit_len());
@@ -27,11 +28,10 @@ impl BigFloatNumber {
         let int = self.get_int_as_usize()?;
         let e_int = if int > 0 {
 
-            let e_const = E.with(|v| -> Result<Self, Error> {
-                v.borrow_mut().for_prec(self.get_mantissa_max_bit_len() + 2 + 2*core::mem::size_of::<usize>(), RoundingMode::None)
-            })?;
+            let e_const = cc.e(self.get_mantissa_max_bit_len() + 2 + 2*core::mem::size_of::<usize>(), RoundingMode::None)?;
 
             e_const.powi(int, RoundingMode::None)
+
         } else {
             ONE.clone()
         }?;

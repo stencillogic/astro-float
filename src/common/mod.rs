@@ -1,4 +1,4 @@
-//! Everything related to mantissa.
+//! Mathematical constants.
 
 pub mod util;
 pub mod int;

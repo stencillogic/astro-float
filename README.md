@@ -4,6 +4,8 @@ Astro-float (astronomically large floating point numbers) is a library that impl
 
 The library implements the basic operations and functions. It uses classical algorithms such as Karatsuba, Toom-3, Schönhage-Strassen algorithm, and others.
 
+The library can work without the standard library provided there is a memory allocator.
+
 ## Usage
 
 Below is an example of using the library.

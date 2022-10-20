@@ -4,7 +4,13 @@ use crate::Radix;
 use crate::defs::EXPONENT_MAX;
 use crate::defs::Sign;
 use crate::defs::Exponent;
+
+#[cfg(feature="std")]
 use std::str::Chars;
+
+#[cfg(not(feature="std"))]
+use {core::str::Chars, alloc::vec::Vec};
+
 
 pub struct ParserState<'a> {
     chars: Chars<'a>,
@@ -223,6 +229,9 @@ mod tests {
 
     use super::*;
 
+    #[cfg(not(feature="std"))]
+    use {alloc::vec, alloc::string::String};
+
     #[test]
     pub fn test_parser() {
 
@@ -258,7 +267,7 @@ mod tests {
                     let s = signs[i];
                     let m = mantissas[j];
                     let e = exponents[k];
-                    let numstr = (s.to_owned() + m).to_owned() + e;
+                    let numstr = String::from(s) + m + e;
 
                     let ps = parse(&numstr, Radix::Dec);
 
@@ -283,7 +292,7 @@ mod tests {
         for i in 0..signs.len() {
             for inf in infs {
                 let s = signs[i];
-                let numstr = s.to_owned() + inf;
+                let numstr = String::from(s) + inf;
 
                 let ps = parse(&numstr, Radix::Dec);
 

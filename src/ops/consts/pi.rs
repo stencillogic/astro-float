@@ -108,26 +108,7 @@ impl PiCache {
         })
     }
 
-    /// Try to get cached value without additional calculations.
-    pub fn try_for_prec(&self, k: usize, rm: RoundingMode) -> Result<Option<BigFloatNumber>, Error> {
-
-        let kext = k + 51;
-
-        if self.b > kext {
-
-            let mut ret = self.val.clone()?;
-
-            ret.set_precision(k, rm)?;
-
-            Ok(Some(ret))
-
-        } else {
-
-            Ok(None)
-        }
-    }
-
-    /// Return value of PI with precision k.
+    /// Return value of PI with precision `k`.
     pub fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
 
         let kext = k + 51;

@@ -120,7 +120,10 @@ impl BigFloatNumber {
 mod tests {
 
     use super::*;
-    use crate::{Exponent, Sign};
+    use crate::Exponent;
+
+    #[cfg(feature="std")]
+    use crate::Sign;
 
     #[test]
     fn test_sqrt() {
@@ -154,6 +157,7 @@ mod tests {
 
     #[ignore]
     #[test]
+    #[cfg(feature="std")]
     fn sqrt_perf() {
 
         let mut n = vec![];
