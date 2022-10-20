@@ -226,7 +226,7 @@ impl BigFloatNumber {
     /// let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).unwrap();
     /// 
     /// assert_eq!(s, Sign::Pos);
-    /// assert_eq!(m, [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4, 3]);
+    /// assert_eq!(m, [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4, 2]);
     /// assert_eq!(e, -3);
     /// ```
     /// 
@@ -494,7 +494,7 @@ mod tests {
         let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).unwrap();
 
         assert_eq!(s, Sign::Pos);
-        assert_eq!(m, [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4, 3]);
+        assert_eq!(m, [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4, 2]);
         assert_eq!(e, -3);
 
         let g = BigFloatNumber::convert_from_radix(Sign::Neg, &[1, 2, 3, 4, 5, 6, 7, 0], 3, Radix::Oct, 64, RoundingMode::None).unwrap();

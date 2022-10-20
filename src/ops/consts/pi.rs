@@ -1,7 +1,7 @@
 //! π number
 
 use crate::RoundingMode;
-use crate::defs::Error;
+use crate::defs::{Error, WORD_BIT_SIZE};
 use crate::num::BigFloatNumber;
 
 
@@ -146,7 +146,7 @@ impl PiCache {
                 (pk, qk, rk, bb) = pqr_inc(&pk, &qk, &rk, bb)?;
             }
 
-            let mut ret = Self::calc_pi(&pk, &qk, k)?;
+            let mut ret = Self::calc_pi(&pk, &qk, k + WORD_BIT_SIZE)?;
 
             self.val = ret.clone()?;
 
@@ -193,7 +193,7 @@ mod tests {
         let mut pi = PiCache::new().unwrap();
         let c = pi.for_prec(320, RoundingMode::ToEven).unwrap();
         //println!("pi {:?}", c);
-        let r = BigFloatNumber::from_raw_parts(&[5857503583518590175, 147421033984662306, 2955010104097229940, 14179128828124470481, 14488038916154245684], 320, Sign::Pos, 2).unwrap();
+        let r = BigFloatNumber::from_raw_parts(&[5857503583518590174, 147421033984662306, 2955010104097229940, 14179128828124470481, 14488038916154245684], 320, Sign::Pos, 2).unwrap();
         assert!(c.cmp(&r) == 0);
     }
 }

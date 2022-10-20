@@ -52,9 +52,9 @@
 //! let six = BigFloatNumber::from_word(6, 1).unwrap();
 //! let three = BigFloatNumber::parse("3.0", Radix::Dec, 1024+8, rm).unwrap();  // +8 bits of precision to cover error
 //! let mut pi = six.mul(&three.sqrt(rm).unwrap().reciprocal(rm).unwrap().atan(rm).unwrap(), rm).unwrap();
+//! 
+//! // Reduce precision to desired
 //! pi.set_precision(1024, rm).unwrap();
-//! let mut epsilon = BigFloatNumber::from_word(1, 1).unwrap();
-//! epsilon.set_exponent(-1021);
 //! 
 //! // Use library's constant for verifying the result
 //! let pi_lib = PI.with(|v| -> Result<BigFloatNumber, Error> {
@@ -62,7 +62,7 @@
 //! }).unwrap();
 //! 
 //! // Compare computed constant with library's constant
-//! assert!(pi.sub(&pi_lib, rm).unwrap().abs().unwrap().cmp(&epsilon) <= 0);
+//! assert!(pi.cmp(&pi_lib) == 0);
 //! 
 //! // Print computed result as decimal number.
 //! let s = pi.format(Radix::Dec, rm).unwrap();
@@ -109,18 +109,21 @@ mod tests {
 
         // Compute pi: pi = 6*arctan(1/sqrt(3))
         let six = BigFloatNumber::from_word(6, 1).unwrap();
-        let three = BigFloatNumber::parse("3.0", Radix::Dec, 1024+8, rm).unwrap();
+        let three = BigFloatNumber::from_word(3, 1024 + 8).unwrap();
         let mut pi = six.mul(&three.sqrt(rm).unwrap().reciprocal(rm).unwrap().atan(rm).unwrap(), rm).unwrap();
+
+        // Reduce precision to desired
         pi.set_precision(1024, rm).unwrap();
-        let mut epsilon = BigFloatNumber::from_word(1, 1).unwrap();
-        epsilon.set_exponent(-1021);
 
         // Use library's constant for verifying the result
         let pi_lib = PI.with(|v| -> Result<BigFloatNumber, Error> {
             v.borrow_mut().for_prec(1024, rm)
         }).unwrap();
 
+        //println!("{}", pi.format(Radix::Hex, RoundingMode::None).unwrap());
+        //println!("{}", pi_lib.format(Radix::Hex, RoundingMode::None).unwrap());
+
         // Compare computed constant with library's constant
-        assert!(pi.sub(&pi_lib, rm).unwrap().abs().unwrap().cmp(&epsilon) <= 0);
+        assert!(pi.cmp(&pi_lib) == 0);
     }
 }

@@ -753,20 +753,20 @@ impl BigFloatNumber {
     ///  - ExponentOverflow: rounding causes exponent overflow.
     pub fn round(&mut self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         let mut ret = self.clone()?;
-        let e = (-self.e) as usize;
-        if self.e < 0 && e > n {
-            let m = e - n;
-            if m > self.m.max_bit_len() {
-                return Self::new(self.m.max_bit_len());
+        let e = self.get_mantissa_max_bit_len() as isize - self.e as isize;
+        if e > 0 && e as usize > n {
+            let m = e as usize - n;
+            if m == self.get_mantissa_max_bit_len() {
+                return Self::new(self.get_mantissa_max_bit_len());
             } else {
-                if self.m.round_mantissa(m, rm, self.is_positive()) {
+                if ret.m.round_mantissa(m, rm, self.is_positive()) {
                     if ret.e == EXPONENT_MAX {
                         return Err(Error::ExponentOverflow(ret.s));
                     }
                     ret.e += 1;
                 }
                 if ret.m.is_all_zero() {
-                    return Self::new(self.m.max_bit_len());
+                    return Self::new(self.get_mantissa_max_bit_len());
                 }
             }
         }
