@@ -45,7 +45,7 @@ let pi_lib = cc.pi(1024, rm).unwrap();
 // Compare computed constant with library's constant
 assert!(pi.cmp(&pi_lib) == 0);
 
-// Print computed result as decimal number.
+// Print computed result as decimal number
 let s = pi.format(Radix::Dec, rm).unwrap();
 println!("{}", s);
 ```
