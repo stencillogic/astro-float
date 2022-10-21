@@ -14,7 +14,7 @@ use crate::mantissa::Mantissa;
 use crate::common::consts::ONE;
 
 
-/// BigFloatNumber represents floating point number with mantissa of an arbitrary size, and exponent.
+/// A floating point number with mantissa of an arbitrary size, an exponent, and the sign.
 #[derive(Debug)]
 pub struct BigFloatNumber {
     pub(super) e: Exponent,

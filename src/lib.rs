@@ -27,6 +27,7 @@
 //! 
 //! 
 //! Constants such as pi or the Euler number have arbitrary precision and are evaluated lazily and then cached in the constants cache.
+//! Since global variables are not allowed in Rust, some of the functions expect constants cache as parameter.
 //! 
 //! 
 //! **Performance**
@@ -77,10 +78,13 @@
 //! 
 //! ## no_std
 //! 
-//! The library can work without the standard library provided there is a memory allocator. The standard library dependency is activated by feature `std`. 
-//! Feature `std` is active by default and must be excluded when specifying dependency, e.g.:
+//! The library can work without the standard library provided there is a memory allocator. The standard library dependency is activated by the feature `std`. 
+//! The feature `std` is active by default and must be excluded when specifying dependency, e.g.:
 //! 
-//! > astro-float = { version = "0.0.3", default-features = false }
+//! ``` toml
+//! [dependencies]
+//! astro-float = { version = "0.1.0", default-features = false }
+//! ```
 //! 
 
 #![deny(clippy::suspicious)]

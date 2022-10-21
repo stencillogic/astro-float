@@ -1,4 +1,3 @@
-/// Arbitrary precision constants.
 
 mod ln2;
 mod ln10;
@@ -14,7 +13,7 @@ use crate::ops::consts::ln2::Ln2Cache;
 use crate::ops::consts::pi::PiCache;
 
 
-/// Constants cache.
+/// Constants cache contains arbitrary-precision mathematical constants.
 pub struct Consts {
     pi: PiCache,
     e: ECache,
@@ -22,6 +21,8 @@ pub struct Consts {
     ln10: Ln10Cache,
 }
 
+/// In an ideal situation, the `Consts` structure is initialized with `Consts::new` only once,
+/// and then used where needed.
 impl Consts {
 
     /// Initializes the constants cache.
