@@ -35,11 +35,11 @@ fn test_ln_exp() {
         let d2 = d1.ln(RoundingMode::ToEven, &mut cc).unwrap();
         let d3 = d2.exp(RoundingMode::ToEven, &mut cc).unwrap();
 
-        // println!("{}", d1.format(Radix::Dec, RoundingMode::None).unwrap());
-        // println!("{}", d2.format(Radix::Dec, RoundingMode::None).unwrap());
-        // println!("{}", d3.format(Radix::Dec, RoundingMode::None).unwrap());
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent);
 
-        eps.set_exponent(d1.get_exponent() - prec as Exponent + 4 + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent);
+        //println!("{}", d1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
+        //println!("{}", d2.format(crate::Radix::Dec, RoundingMode::None).unwrap());
+        //println!("{}", d3.format(crate::Radix::Dec, RoundingMode::None).unwrap());
 
         assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
     }
@@ -97,14 +97,14 @@ fn test_sin_asin() {
         // println!("{}", d2.format(Radix::Dec, RoundingMode::None).unwrap());
         // println!("{}", d3.format(Radix::Dec, RoundingMode::None).unwrap());
 
-        eps.set_exponent(d1.get_exponent() - prec as Exponent + 4);
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
 
         assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
     }
 
     for _ in 0..1000 {
 
-        let mut d1 = BigFloatNumber::random_normal(prec, -5, 2).unwrap();
+        let mut d1 = BigFloatNumber::random_normal(prec, -10, 2).unwrap();
 
         // -pi, -pi/2 and pi/2, pi
         while d1.abs().unwrap().cmp(&half_pi) < 0 {
@@ -146,7 +146,7 @@ fn test_cos_acos() {
     let prec = 320;
     let mut eps = ONE.clone().unwrap();
     let mut thres = ONE.clone().unwrap();
-    thres.set_exponent(-4);
+    thres.set_exponent(-2);
 
     let mut cc = Consts::new().unwrap();
 
@@ -170,8 +170,6 @@ fn test_cos_acos() {
 
     return; */
 
-
-
     for _ in 0..1000 {
 
         let mut d1 = BigFloatNumber::random_normal(prec, -10, 3).unwrap();
@@ -189,14 +187,14 @@ fn test_cos_acos() {
         let d2 = d1.cos(RoundingMode::ToEven, &mut cc).unwrap();
         let d3 = d2.acos(RoundingMode::ToEven, &mut cc).unwrap();
 
-        if ONE.sub(&d2.abs().unwrap(), RoundingMode::None).unwrap().cmp(&thres) >= 0 {  // avoid values of sin close to 1
+        if ONE.sub(&d2.abs().unwrap(), RoundingMode::None).unwrap().cmp(&thres) >= 0 {  // avoid values of cos close to 1
                                                                                                   // because of limited precision 
             //println!("d1 {}", d1.format(Radix::Dec, RoundingMode::None).unwrap());
             //println!("d1 {:?}", d1);
             //println!("d2 {}", d2.format(Radix::Dec, RoundingMode::None).unwrap());
             //println!("d3 {}", d3.format(Radix::Dec, RoundingMode::None).unwrap());
 
-            eps.set_exponent(d1.get_exponent() - prec as Exponent + 4);
+            eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
 
             assert!(d1.abs().unwrap().sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
         }
@@ -240,7 +238,7 @@ fn test_tan_atan() {
         //println!("d2 {}", d2.format(Radix::Dec, RoundingMode::None).unwrap());
         //println!("d3 {}", d3.format(Radix::Dec, RoundingMode::None).unwrap());
 
-        eps.set_exponent(d1.get_exponent() - prec as Exponent + 4);
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
 
         assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
     }
