@@ -54,7 +54,7 @@ impl BigFloatNumber {
     /// 
     ///  - InvalidArgument: precision is incorrect.
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    pub fn max(p: usize) -> Result<Self, Error> {
+    pub fn max_value(p: usize) -> Result<Self, Error> {
         Self::p_assertion(p)?;
         Ok(BigFloatNumber {
             m: Mantissa::oned_mantissa(p)?,
@@ -69,7 +69,7 @@ impl BigFloatNumber {
     /// 
     ///  - InvalidArgument: precision is incorrect.
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    pub fn min(p: usize) -> Result<Self, Error> {
+    pub fn min_value(p: usize) -> Result<Self, Error> {
         Self::p_assertion(p)?;
         Ok(BigFloatNumber {
             m: Mantissa::oned_mantissa(p)?,
@@ -631,7 +631,7 @@ impl BigFloatNumber {
         self.e
     }
 
-    // Return true if `self` is zero.
+    /// Returns true if `self` is zero.
     #[inline]
     pub fn is_zero(&self) -> bool {
         self.m.is_zero()
@@ -1135,13 +1135,13 @@ mod tests {
         // overflow
         d1 = one.clone().unwrap();
         d1.e = EXPONENT_MAX - (d1.m.max_bit_len() - 1) as Exponent;
-        assert!(BigFloatNumber::max(p).unwrap().add(&d1, rm).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
-        assert!(BigFloatNumber::min(p).unwrap().sub(&d1, rm).unwrap_err() == Error::ExponentOverflow(Sign::Neg));
-        assert!(BigFloatNumber::max(p).unwrap().mul(&BigFloatNumber::max(p).unwrap(), rm)
+        assert!(BigFloatNumber::max_value(p).unwrap().add(&d1, rm).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+        assert!(BigFloatNumber::min_value(p).unwrap().sub(&d1, rm).unwrap_err() == Error::ExponentOverflow(Sign::Neg));
+        assert!(BigFloatNumber::max_value(p).unwrap().mul(&BigFloatNumber::max_value(p).unwrap(), rm)
             .unwrap_err() == Error::ExponentOverflow(Sign::Pos));
         d1 = one.clone().unwrap();
         d1.e = EXPONENT_MIN;
-        assert!(BigFloatNumber::max(p).unwrap().div(&d1, rm).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+        assert!(BigFloatNumber::max_value(p).unwrap().div(&d1, rm).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
 
         // decompose and compose
         let f1 = random_f64_exp(50, 25);
@@ -1215,6 +1215,145 @@ mod tests {
             f = -f;
         }
         f
+    }
+
+    #[test]
+    fn test_rounding() {
+
+        // trailing bits
+        // 0 0000
+        // 0 0001
+        // 0 1000
+        // 0 1001
+        // 1 1000
+        // 1 1001
+
+        let mantissas = [
+            [0x8000000000000000u64, 0x8000000000000000u64],
+            [0x8000000000000001u64, 0x8000000000000000u64],
+            [0x8000000000000008u64, 0x8000000000000000u64],
+            [0x8000000000000009u64, 0x8000000000000000u64],
+            [0x8000000000000018u64, 0x8000000000000000u64],
+            [0x8000000000000019u64, 0x8000000000000000u64],
+        ];
+
+        let rounding_results_posnum = [
+            (RoundingMode::None, mantissas),
+            (RoundingMode::Down, [
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+            ]),
+            (RoundingMode::Up, [
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+            ]),
+            (RoundingMode::FromZero, [
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+            ]),
+            (RoundingMode::ToZero, [
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+            ]),
+            (RoundingMode::ToEven, [
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+            ]),
+            (RoundingMode::ToOdd, [
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+            ]),
+        ];
+
+        let rounding_results_negnum = [
+            (RoundingMode::None, mantissas),
+            (RoundingMode::Down, [
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+            ]),
+            (RoundingMode::Up, [
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+            ]),
+            (RoundingMode::FromZero, [
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+            ]),
+            (RoundingMode::ToZero, [
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+            ]),
+            (RoundingMode::ToEven, [
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+            ]),
+            (RoundingMode::ToOdd, [
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000010u64, 0x8000000000000000u64],
+                [0x8000000000000020u64, 0x8000000000000000u64],
+            ]),
+        ];
+
+        for (sign, rr) in [(Sign::Pos, rounding_results_posnum), (Sign::Neg, rounding_results_negnum)] {
+            for (rm, expected_mantissas) in rr.iter() {
+                for (m1, m2) in mantissas.iter().zip(expected_mantissas.iter()) {
+
+                    // rounding
+                    let mut d1 = BigFloatNumber::from_raw_parts(m1, 128, sign, 64).unwrap();
+                    let d2 = d1.round(60, *rm).unwrap();
+                    let d3 = BigFloatNumber::from_raw_parts(m2, 128, sign, 64).unwrap();
+
+                    assert!(d2.cmp(&d3) == 0);
+                }
+            }
+        }
     }
 
     #[ignore]
