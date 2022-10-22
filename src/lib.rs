@@ -43,7 +43,6 @@
 //! use astro_float::Consts;
 //! use astro_float::RoundingMode;
 //! use astro_float::Radix;
-//! use astro_float::Error;
 //! 
 //! // Rounding of all operations
 //! let rm = RoundingMode::ToEven;
