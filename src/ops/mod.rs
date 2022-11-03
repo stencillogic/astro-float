@@ -1,6 +1,7 @@
 //! High-level operations on the numbers.
 
 mod sqrt;
+mod cbrt;
 mod ln;
 mod pow;
 mod sinh;
