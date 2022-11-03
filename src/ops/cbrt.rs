@@ -100,6 +100,21 @@ mod tests {
 
             assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
         }
+
+        // MAX
+        let d1 = BigFloatNumber::max_value(prec).unwrap();
+        let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
+        let d3 = d2.mul(&d2, RoundingMode::ToEven).unwrap().mul(&d2, RoundingMode::ToEven).unwrap();
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + 3);
+        assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+
+        // MIN
+        let d1 = BigFloatNumber::min_value(prec).unwrap();
+        let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
+        let d3 = d2.mul(&d2, RoundingMode::ToEven).unwrap().mul(&d2, RoundingMode::ToEven).unwrap();
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + 3);
+        assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+
     }
 
 
