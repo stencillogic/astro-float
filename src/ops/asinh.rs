@@ -1,4 +1,4 @@
-//! Hyperbolic tangent.
+//! Hyperbolic arcsine.
 
 use crate::Consts;
 use crate::common::consts::ONE;
@@ -9,26 +9,29 @@ use crate::defs::Error;
 
 impl BigFloatNumber {
 
-    /// Computes the hyperbolic tangent of a number. The result is rounded using the rounding mode `rm`.
+    /// Computes the hyperbolic arcsine of a number. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
     /// 
     /// ## Errors
     /// 
     ///  - ExponentOverflow: the result is too large or too small number.
     ///  - MemoryAllocation: failed to allocate memory.
-    pub fn tanh(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+    pub fn asinh(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
 
+        // ln(x + sqrt(x*x + 1))
         let mut x = self.clone()?;
 
         x.set_precision(x.get_mantissa_max_bit_len() + 3, RoundingMode::None)?;
-        x.set_exponent(x.get_exponent() + 1);
 
-        let x = x.exp(RoundingMode::None, cc)?;
+        let xx = x.mul(&x, RoundingMode::None)?;
 
-        let d1 = x.sub(&ONE, RoundingMode::None)?;
-        let d2 = x.add(&ONE, RoundingMode::None)?;
+        let d1 = xx.add(&ONE, RoundingMode::None)?;
 
-        let mut ret = d1.div(&d2, RoundingMode::None)?;
+        let d2 = d1.sqrt(RoundingMode::None)?;
+
+        let d3 = d2.add(&x, RoundingMode::None)?;
+
+        let mut ret = d3.ln(RoundingMode::None, cc)?;
 
         ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
 
@@ -43,19 +46,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_tanh() {
+    fn test_asinh() {
         let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
         let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
         n1.set_exponent(0);
-        let _n2 = n1.tanh(rm, &mut cc).unwrap();
+        let n2 = n1.asinh(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
     }
 
     #[ignore]
     #[test]
     #[cfg(feature="std")]
-    fn tanh_perf() {
+    fn asinh_perf() {
         let mut cc = Consts::new().unwrap();
         let mut n = vec![];
         for _ in 0..10000 {
@@ -65,7 +68,7 @@ mod tests {
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let _f = ni.tanh(RoundingMode::ToEven, &mut cc).unwrap();
+                let _f = ni.asinh(RoundingMode::ToEven, &mut cc).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());
