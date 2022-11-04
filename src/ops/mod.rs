@@ -5,6 +5,7 @@ mod cbrt;
 mod ln;
 mod pow;
 mod sinh;
+mod cosh;
 mod series;
 pub mod consts;
 mod sin;

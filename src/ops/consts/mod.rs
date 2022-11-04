@@ -39,7 +39,7 @@ impl Consts {
         })
     }
 
-    /// Returns the value of the pi number with precision `p`.
+    /// Returns the value of the pi number with precision `p` using rounding mode `rm`.
     ///
     /// ## Errors
     /// 
@@ -49,7 +49,7 @@ impl Consts {
         self.pi.for_prec(p, rm)
     }
 
-    /// Returns the value of the Euler number with precision `p`.
+    /// Returns the value of the Euler number with precision `p` using rounding mode `rm`.
     ///
     /// ## Errors
     /// 
@@ -59,7 +59,7 @@ impl Consts {
         self.e.for_prec(p, rm)
     }
 
-    /// Returns the value of the natural logarithm of 2 with precision `p`.
+    /// Returns the value of the natural logarithm of 2 with precision `p` using rounding mode `rm`.
     ///
     /// ## Errors
     /// 
