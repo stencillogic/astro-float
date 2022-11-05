@@ -12,8 +12,7 @@ use crate::ops::consts::Consts;
 use crate::ops::series::PolycoeffGen;
 use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::series_cost_optimize;
-
-use super::series::series_run;
+use crate::ops::series::series_run;
 
 
 // Polynomial coefficient generator.
@@ -90,13 +89,15 @@ impl BigFloatNumber {
     ///  - InvalidArgument: when |`self`| > 1.
     pub fn atanh(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
 
-        if self.get_exponent() >= -1 {
+        let additional_prec = self.get_mantissa_max_bit_len() / 10;
+
+        if self.get_exponent() as isize >= -(additional_prec as isize) {
 
             // 0.5 * ln((1 + x) / (1 - x))
 
             let mut x = self.clone()?;
 
-            x.set_precision(x.get_mantissa_max_bit_len() + 3, RoundingMode::None)?;
+            x.set_precision(x.get_mantissa_max_bit_len() + additional_prec + 3, RoundingMode::None)?;
 
             let d1 = ONE.add(&x, RoundingMode::None)?;
             let d2 = ONE.sub(&x, RoundingMode::None)?;
@@ -109,6 +110,8 @@ impl BigFloatNumber {
             Ok(ret)
 
         } else {
+
+            // series
 
             let x = self.clone()?;
 
@@ -177,10 +180,15 @@ mod tests {
     fn test_atanh() {
         let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_word(2,320).unwrap();
+        let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
+        n1.set_exponent(-34);
+        let _n2 = n1.atanh(rm, &mut cc).unwrap();
+        //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
+
+        let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
         n1.set_exponent(0);
         let _n2 = n1.atanh(rm, &mut cc).unwrap();
-        //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
+        //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
     }
 
     #[ignore]
