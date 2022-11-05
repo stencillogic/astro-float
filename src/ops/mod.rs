@@ -16,6 +16,8 @@ mod sinh;
 mod cosh;
 mod tanh;
 mod asinh;
+mod acosh;
+mod atanh;
 
 #[cfg(test)]
 mod tests;

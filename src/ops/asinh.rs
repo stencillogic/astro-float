@@ -51,7 +51,7 @@ mod tests {
         let rm = RoundingMode::ToEven;
         let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
         n1.set_exponent(0);
-        let n2 = n1.asinh(rm, &mut cc).unwrap();
+        let _n2 = n1.asinh(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
     }
 
