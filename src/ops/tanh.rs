@@ -23,10 +23,10 @@ impl BigFloatNumber {
         x.set_precision(x.get_mantissa_max_bit_len() + 3, RoundingMode::None)?;
         x.set_exponent(x.get_exponent() + 1);
 
-        let x = x.exp(RoundingMode::None, cc)?;
+        let xexp = x.exp(RoundingMode::None, cc)?;
 
-        let d1 = x.sub(&ONE, RoundingMode::None)?;
-        let d2 = x.add(&ONE, RoundingMode::None)?;
+        let d1 = xexp.sub(&ONE, RoundingMode::None)?;
+        let d2 = xexp.add(&ONE, RoundingMode::None)?;
 
         let mut ret = d1.div(&d2, RoundingMode::None)?;
 

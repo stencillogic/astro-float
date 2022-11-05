@@ -53,7 +53,7 @@ mod tests {
         let rm = RoundingMode::ToEven;
         let n1 = BigFloatNumber::from_word(2,320).unwrap();
         let _n2 = n1.acosh(rm, &mut cc).unwrap();
-        //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
+        //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
     }
 
     #[ignore]

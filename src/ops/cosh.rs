@@ -108,7 +108,8 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<CoshPolycoeffGen, CoshArgReductionEstimator>(
             p, &polycoeff_gen, (-self.e) as isize, 2, false);
 
-        self.set_precision(self.get_mantissa_max_bit_len() + niter * 2 + reduction_times * 3, rm)?;
+        let full_p = p + niter * 2 + reduction_times * 3;
+        self.set_precision(full_p, rm)?;
 
         let arg = if reduction_times > 0 {
             self.cosh_arg_reduce(reduction_times, rm)?
@@ -116,7 +117,7 @@ impl BigFloatNumber {
             self
         };
 
-        let acc = Self::from_word(1, p)?;    // x
+        let acc = Self::from_word(1, full_p)?;    // x
         let x_step = arg.mul(&arg, rm)?;   // x^2
         let x_first = x_step.clone()?;
 
@@ -169,7 +170,7 @@ mod tests {
         let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
         n1.set_exponent(0);
         let _n2 = n1.cosh(rm).unwrap();
-        //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
+        //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
     }
 
     #[ignore]

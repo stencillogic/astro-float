@@ -243,3 +243,83 @@ fn test_tan_atan() {
         assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
     }
 }
+
+
+#[test]
+fn test_sinh_asinh() {
+
+    let prec = 320;
+    let mut eps = ONE.clone().unwrap();
+
+    let mut cc = Consts::new().unwrap();
+
+    for _ in 0..1000 {
+
+        let d1 = BigFloatNumber::random_normal(prec, -10, 2).unwrap();
+
+        let d2 = d1.sinh(RoundingMode::ToEven).unwrap();
+        let d3 = d2.asinh(RoundingMode::ToEven, &mut cc).unwrap();
+
+        //println!("d1 {}", d1.format(Radix::Dec, RoundingMode::None).unwrap());
+        //println!("d2 {}", d2.format(Radix::Dec, RoundingMode::None).unwrap());
+        //println!("d3 {}", d3.format(Radix::Dec, RoundingMode::None).unwrap());
+
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+
+        assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+    }
+}
+
+
+#[test]
+fn test_cosh_acosh() {
+
+    let prec = 320;
+    let mut eps = ONE.clone().unwrap();
+
+    let mut cc = Consts::new().unwrap();
+
+    for _ in 0..1000 {
+
+        let d1 = BigFloatNumber::random_normal(prec, 1, 10).unwrap();
+
+        let d2 = d1.cosh(RoundingMode::ToEven).unwrap();
+        let d3 = d2.acosh(RoundingMode::ToEven, &mut cc).unwrap();
+
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+
+        // println!("d1 {}", d1.abs().unwrap().format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("e {}", eps.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+        assert!(d1.abs().unwrap().sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+    }
+}
+
+#[test]
+fn test_tanh_atanh() {
+
+    let prec = 320;
+    let mut eps = ONE.clone().unwrap();
+
+    let mut cc = Consts::new().unwrap();
+
+    for _ in 0..1000 {
+
+        let d1 = BigFloatNumber::random_normal(prec, -10, 1).unwrap();
+
+        let d2 = d1.tanh(RoundingMode::ToEven, &mut cc).unwrap();
+
+        let d3 = d2.atanh(RoundingMode::ToEven, &mut cc).unwrap();
+
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+
+        // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("e {}", eps.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+        assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+    }
+}

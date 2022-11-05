@@ -441,19 +441,19 @@ impl Mantissa {
 
         let (q, _r) = Self::div_unbalanced(&m1, &m2.m)?;
 
+        let mut e_shift = if q[q.len() - 1] > 0 {
+            1
+        } else {
+            0
+        };
+
         let n = q.len() * WORD_BIT_SIZE;
         let mut m3 = Mantissa {
             m: q,
             n,
         };
 
-        let mut e_shift = if self.m[self.len() - 1] >= m2.m[m2.len() - 1] {
-            1
-        } else {
-            0
-        };
-
-        let _ = Self::maximize(&mut m3.m) as isize;
+        let _ = Self::maximize(&mut m3.m);
         if m3.round_mantissa((extra_p + 1) * WORD_BIT_SIZE, rm, is_positive) {
             e_shift -= 1;
         }

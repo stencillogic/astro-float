@@ -84,7 +84,7 @@ impl BigFloatNumber {
     /// 
     /// ## Errors
     /// 
-    ///  - ExponentOverflow: the result is too large or too small number.
+    ///  - ExponentOverflow: the result is too large.
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: when |`self`| > 1.
     pub fn atanh(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
@@ -101,7 +101,13 @@ impl BigFloatNumber {
 
             let d1 = ONE.add(&x, RoundingMode::None)?;
             let d2 = ONE.sub(&x, RoundingMode::None)?;
+
+            if d2.is_zero() {
+                return Err(Error::ExponentOverflow(self.get_sign()));
+            }
+
             let d3 = d1.div(&d2, RoundingMode::None)?;
+            
             let mut ret = d3.ln(RoundingMode::None, cc)?;
 
             ret.set_exponent(ret.get_exponent() - 1);
