@@ -1,6 +1,6 @@
 //! Auxiliary functions.
 
-use crate::defs::{Word, WORD_BIT_SIZE};
+use crate::defs::{Word, WORD_BIT_SIZE, WORD_MAX, WORD_SIGNIFICANT_BIT};
 
 
 /// integer logarithm base 2 of a number.
@@ -261,4 +261,35 @@ pub fn shift_slice_right(m: &mut [Word], n: usize) {
         };
         m[cnt..].fill(0);
     }
+}
+
+pub fn count_leading_zeroes_skip_first(m: &[Word]) -> usize {
+        
+    let mut iter = m.iter().rev();
+    let mut w;
+    let mut ret = 0;
+
+    if let Some(v) = iter.next() {
+
+        w = *v & (WORD_MAX >> 1);
+
+        while w == 0 {
+
+            ret += WORD_BIT_SIZE;
+
+            w = match iter.next() {
+                Some(v) => *v,
+                None => break,
+            }
+        }
+
+        if w != 0 {
+            while w & WORD_SIGNIFICANT_BIT == 0 {
+                w <<= 1;
+                ret += 1;
+            }
+        }
+    }
+
+    ret
 }

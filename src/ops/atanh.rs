@@ -107,7 +107,7 @@ impl BigFloatNumber {
             }
 
             let d3 = d1.div(&d2, RoundingMode::None)?;
-            
+
             let mut ret = d3.ln(RoundingMode::None, cc)?;
 
             ret.set_exponent(ret.get_exponent() - 1);
@@ -195,6 +195,12 @@ mod tests {
         n1.set_exponent(0);
         let _n2 = n1.atanh(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
+
+        let n1 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF8EE51946EC87F86A7E6DA4D8C6ED8DFAE4D7B7FF0B8356E63EF277C97F2E2111AECCBE8F2DF4EFE48F618B1E75C7CBBDCFCE32604DE9F240_e-1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+        let n2 = n1.atanh(rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("4.34C10E83FA43CA88E0A3A0125990D4B8BC2CF39E0695A6B9F73DE8F43C00767B966992C0A98F96AAC882152114C2FE89AD58DA3BA9E2013CAD88370B80F7D9AD4D9B6494C0591D3CAA382BF6FBD88730_e+1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+
+        assert!(n2.cmp(&n3) == 0);
     }
 
     #[ignore]

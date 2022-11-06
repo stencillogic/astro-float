@@ -66,7 +66,10 @@ impl BigFloatNumber {
 
         let mut mantissa = Vec::new();
         let mut d = 0;
-        let mut shift = 0;
+        let mut shift = digits.len() % WORD_BIT_SIZE;
+        if shift != 0 {
+            shift = WORD_BIT_SIZE - shift;
+        }
 
         for v in digits.iter().rev() {
 
@@ -80,7 +83,11 @@ impl BigFloatNumber {
             }
         }
 
-        let mut ret = BigFloatNumber::from_raw_parts(&mantissa, digits.len(), sign, e)?;
+        if shift > 0 {
+            mantissa.push(d);
+        }
+
+        let mut ret = BigFloatNumber::from_raw_parts(&mantissa, mantissa.len()*WORD_BIT_SIZE, sign, e)?;
 
         ret.set_precision(p, rm)?;
 
