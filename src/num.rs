@@ -383,6 +383,16 @@ impl BigFloatNumber {
         Ok(d3)
     }
 
+    pub(crate) fn subnormalize(&mut self, mut e: isize, rm: RoundingMode) {
+
+        let is_positive = self.is_positive();
+
+        if !Self::process_subnormal(&mut self.m, &mut e, rm, is_positive) {
+            self.m.set_zero();
+            self.e = 0;
+        }
+    }
+
     /// If exponent is too small try to present number in subnormal form.
     /// If sucessful return true.
     pub(super) fn process_subnormal(m3: &mut Mantissa, e: &mut isize, rm: RoundingMode, is_positive: bool) -> bool {
@@ -408,6 +418,7 @@ impl BigFloatNumber {
             true
 
         } else {
+
             false
         }
     }
@@ -835,8 +846,10 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - ExponentOverflow: rounding causes exponent overflow.
     pub fn reciprocal(&self, rm: RoundingMode) -> Result<Self, Error> {
+
         let mut p = self.get_mantissa_max_bit_len();
         let mut err = 1;
+
         while p > 500 {
             p >>= 1;
             err += 5;
@@ -844,15 +857,21 @@ impl BigFloatNumber {
 
         let e = self.get_exponent();
         let mut x = self.clone()?;
+
         x.set_exponent(0);
         x.set_precision(x.get_mantissa_max_bit_len() + err, RoundingMode::None)?;
+
         let mut ret= x.recip_iter()?;
+
         ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+
         if ret.get_exponent() as isize - e as isize > EXPONENT_MAX as isize || 
             (ret.get_exponent() as isize - e as isize) < EXPONENT_MIN as isize {
             return Err(Error::ExponentOverflow(ret.s));
         }
+
         ret.set_exponent(ret.get_exponent()-e);
+
         Ok(ret)
     }
 
@@ -878,6 +897,7 @@ impl BigFloatNumber {
             if ret.get_exponent() == EXPONENT_MAX {
                 return Err(Error::ExponentOverflow(ret.s));
             }
+
             ret.set_exponent(ret.get_exponent() + 1);
             ret = ret.sub(&dx, RoundingMode::None)?;
 

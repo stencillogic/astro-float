@@ -5,6 +5,7 @@ use crate::common::consts::ONE;
 use crate::common::consts::TWO;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
+use crate::defs::EXPONENT_MIN;
 use crate::num::BigFloatNumber;
 use crate::defs::RoundingMode;
 use crate::defs::Error;
@@ -110,8 +111,14 @@ impl BigFloatNumber {
 
             let mut ret = d3.ln(RoundingMode::None, cc)?;
 
-            ret.set_exponent(ret.get_exponent() - 1);
             ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+
+            if ret.get_exponent() == EXPONENT_MIN {
+                ret.subnormalize(ret.get_exponent() as isize - 1, rm);
+            } else {
+                ret.set_exponent(ret.get_exponent() - 1);
+            }
+            
 
             Ok(ret)
 
@@ -152,7 +159,7 @@ impl BigFloatNumber {
         let x_first = arg.mul(&x_step, rm)?;   // x^3
 
         let mut ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
-        
+
         if reduction_times > 0 {
             ret.set_exponent(ret.get_exponent() + reduction_times as Exponent);
         }

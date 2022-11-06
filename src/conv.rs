@@ -153,6 +153,7 @@ impl BigFloatNumber {
         if let Some(norm) = m.find_one_from(0) {
             m.shift_left(norm);
         }
+
         let mut ret = BigFloatNumber {
             m,
             s: sign,

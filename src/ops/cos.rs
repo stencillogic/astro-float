@@ -126,7 +126,7 @@ impl BigFloatNumber {
 
     /// cosine series
     pub(super) fn cos_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
-        // cos:  x - x^2/2! + x^4/4! - x^6/6! + ...
+        // cos:  1 - x^2/2! + x^4/4! - x^6/6! + ...
 
         let p = self.get_mantissa_max_bit_len();
         let mut polycoeff_gen = CosPolycoeffGen::new(p)?;
