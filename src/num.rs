@@ -275,6 +275,126 @@ impl BigFloatNumber {
         Ok(ret)
     }
 
+    /// Divides `self` by `d2` and returns the remainder rounded according to `rm`.. 
+    /// The resulting precision is equal to the highest precision of the two operands.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - DivisionByZero: `d2` is zero.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    pub fn rem(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
+
+        if d2.m.is_zero() {
+            return Err(Error::DivisionByZero);
+        }
+
+        if self.m.is_zero() {
+            return self.clone();
+        }
+
+        // represent as mN * 2 ^ eNeff
+        let e1eff = self.e as isize - self.m.max_bit_len() as isize;
+        let e2eff = d2.e as isize - d2.m.max_bit_len() as isize;
+        let out_p = self.get_mantissa_max_bit_len().max(d2.get_mantissa_max_bit_len());
+
+        let finalize = |m3: Mantissa, mut e: isize| -> Result<BigFloatNumber, Error> {
+
+            let (m3, e) = if m3.bit_len() > 0 {
+
+                let (_shift, mut m3) = m3.normilize()?;
+
+                if m3.max_bit_len() > out_p {
+                    if m3.round_mantissa(m3.max_bit_len() - out_p, rm, self.is_positive()) {
+                        e -= 1;
+                    }
+                    m3.set_length(out_p)?;
+                }
+
+                if e < EXPONENT_MIN as isize {
+                    if !Self::process_subnormal(&mut m3, &mut e, rm, self.is_positive()) {
+                        return Self::new(self.m.max_bit_len());
+                    }
+                }
+
+                if e > EXPONENT_MAX as isize {
+                    return Err(Error::ExponentOverflow(self.s));
+                }
+
+                (m3, e)
+            } else {
+                (m3, 0)
+            };
+
+            let ret = BigFloatNumber {
+                m: m3,
+                s: self.s,
+                e: e as Exponent,
+            };
+
+            Ok(ret)
+        };
+
+        if e1eff > e2eff {
+
+            // (m1 * 2^(e1eff - e2eff)) mod m2 = ((m1 mod m2) * ( 2^(e1eff - e2eff) mod m2 )) mod m2
+
+            let (e, m2_opt) = d2.normalize()?;
+            let m2_normalized = m2_opt.as_ref().unwrap_or(&d2.m);
+            let e2eff = e as isize - m2_normalized.max_bit_len() as isize;
+
+            let two = Mantissa::from_raw_parts(&[2], 2)?;
+
+            let powm = two.pow_mod((e1eff - e2eff) as usize, m2_normalized)?;
+
+            let m3 = self.m.rem(m2_normalized)?;
+
+            let m3 = m3.mul_mod(&powm, m2_normalized)?;
+
+            let e = e2eff + m3.bit_len() as isize;
+
+            finalize(m3, e)
+
+        } else if (self.m.bit_len() as isize + self.e as isize) < 
+                (d2.m.bit_len() as isize + d2.e as isize) {
+
+            // self < d2, remainder = self
+            self.clone()
+
+        } else {
+
+            // since self.e >= d2.e and e1eff <= e2eff, then e2eff - e1eff < m1.len()
+            // (m1 * 2 ^ e1eff) mod (m2 * 2 ^ e2eff) = m1 mod (m2 * 2 ^ (e2eff - e1eff))
+            // additionally m2 must be normalized
+
+            let (e, m2_opt) = d2.normalize()?;
+
+            let mut m2_normalized = if let Some(m2) = m2_opt {
+                m2
+            } else {
+                d2.m.clone()?
+            };
+
+            let e2eff = e as isize - m2_normalized.max_bit_len() as isize;
+            let ediff = (e2eff - e1eff) as usize;
+
+            let m2l = m2_normalized.max_bit_len() + ediff;
+            m2_normalized.set_length(m2l)?;
+
+            let m3 = if m2_normalized.max_bit_len() > m2l {
+                let mut m = self.m.clone()?;
+                m.pow2(m2_normalized.max_bit_len() - m2l)?;
+                m.rem(&m2_normalized)
+            } else {
+                self.m.rem(&m2_normalized)
+            }?;
+
+            let e = e1eff + m3.bit_len() as isize - m2_normalized.max_bit_len() as isize + m2l as isize;
+
+            finalize(m3, e)
+        }
+    }
+
     // Return normilized mantissa and exponent with corresponding shift.
     fn normalize(&self) -> Result<(isize, Option<Mantissa>), Error> {
 
@@ -1222,6 +1342,63 @@ mod tests {
         assert!(d1.abs().unwrap().to_f64() == 12.3);
         d1 = BigFloatNumber::from_f64(p, -12.3).unwrap();
         assert!(d1.abs().unwrap().to_f64() == 12.3);
+
+        // rem
+        for (prec1, prec2) in [(128, 128), (128, 320), (320, 128)] {
+            for sign_inv in [false, true] {
+                for (s1, s2) in [("9.2", "1.2"), ("2.0", "4.0"), ("7.0", "4.0"), ("8.0", "4.0"), ("9.0", "4.0"),
+                                 ("14", "15"), ("15", "15"), ("16", "15"), ("33", "15"), ("44", "15"),
+                                 ("0.000000007", "0.000000004"), ("0.00000000000000009", "0.000000000000000004"), ] {
+
+                    d1 = BigFloatNumber::parse(s1, crate::Radix::Dec, prec1, RoundingMode::None).unwrap();
+                    d2 = BigFloatNumber::parse(s2, crate::Radix::Dec, prec2, RoundingMode::None).unwrap();
+
+                    d3 = d1.sub(&d1
+                            .div(&d2, RoundingMode::ToEven).unwrap()
+                            .floor().unwrap()
+                            .mul(&d2, RoundingMode::ToEven).unwrap(), RoundingMode::ToEven).unwrap();
+
+                    if sign_inv {
+                        d1.inv_sign();
+                        d3.inv_sign();
+                    }
+
+                    eps.set_exponent(3 - d1.get_mantissa_max_bit_len().max(d2.get_mantissa_max_bit_len()) as Exponent);
+
+                    let ret = d1.rem(&d2, RoundingMode::None).unwrap();
+
+                    //println!("\n{:?}\n{:?}\n{:?}\n{:?}", ret, d3, eps, ret.sub(&d3, RoundingMode::ToEven).unwrap());
+
+                    assert!(ret.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) <= 0);
+
+                    if !ret.is_zero() {
+                        assert!(ret.get_mantissa_max_bit_len() == prec1.max(prec2));
+                    }
+                }
+            }
+        }
+
+        for _ in 0..1000 {
+            d1 = BigFloatNumber::random_normal(320, EXPONENT_MIN / 2 - 320, EXPONENT_MAX / 2).unwrap().abs().unwrap();
+            d2 = BigFloatNumber::random_normal(320, d1.get_exponent() - 1, d1.get_exponent() + 1).unwrap().abs().unwrap();
+
+            let ret = d1.rem(&d2, RoundingMode::None).unwrap();
+
+            d3 = d1.sub(&d1
+                .div(&d2, RoundingMode::ToEven).unwrap()
+                .floor().unwrap()
+                .mul(&d2, RoundingMode::ToEven).unwrap(), RoundingMode::ToEven).unwrap();
+
+            eps.set_exponent(1 + d1.get_exponent() - d1.get_mantissa_max_bit_len().max(d2.get_mantissa_max_bit_len()) as Exponent);
+
+            // println!("\n{:?}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("{:?}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("{:?}", ret.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("{:?}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+            assert!(ret.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) <= 0);
+        }
+
     }
 
     fn random_f64() -> f64 {

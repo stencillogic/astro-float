@@ -172,6 +172,7 @@ mod tests {
         let _n2 = n1.cosh(rm).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
 
+        // asymptotic & extrema testing
         let n1 = BigFloatNumber::parse("1.0111001e-1000000", crate::Radix::Bin, 640, RoundingMode::None).unwrap();
         let n2 = n1.cosh(rm).unwrap();
         let n3 = BigFloatNumber::parse("1.000000000000000000000000000000010B6200000000000000000000000000002E8B9840AAAAAAAAAAAAAAAAAAAAAAAAADE85C5950B78E38E38E38E38E38E38E3902814A92D7C21CDB6DB6DB6DB6DB6E_e+0", crate::Radix::Hex, 640, RoundingMode::None).unwrap();

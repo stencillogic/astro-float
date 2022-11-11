@@ -18,6 +18,7 @@ mod tanh;
 mod asinh;
 mod acosh;
 mod atanh;
+mod util;
 
 #[cfg(test)]
 mod tests;

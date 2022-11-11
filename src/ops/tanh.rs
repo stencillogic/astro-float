@@ -22,7 +22,7 @@ impl BigFloatNumber {
         // (e^(2*x) - 1) / (e^(2*x) + 1)
         let mut x = self.clone()?;
 
-        x.set_precision(x.get_mantissa_max_bit_len() + 640, RoundingMode::None)?;
+        x.set_precision(x.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
 
         if x.get_exponent() == EXPONENT_MAX {
             return Err(Error::ExponentOverflow(self.get_sign()));
@@ -58,6 +58,7 @@ mod tests {
         let _n2 = n1.tanh(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
 
+        // asymptotic & extrema testing
         let n1 = BigFloatNumber::parse("8.00000000000000100000000000000010B6200000000000000000000000000002E8B9840AAAAAAAAAAAAAAAAAAAAAAAAADE85C5950B78E38E38E38E38E38E38E3902814A92D7C21CDB6DB6DB6DB6DB6E_e+1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
         let n2 = n1.tanh(rm, &mut cc).unwrap();
         let n3 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF3455354A958B21BA74F856FDC3BA2D793AEBE0E1D1ADF118BD9D0B592FF14C815D2C_e-1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();

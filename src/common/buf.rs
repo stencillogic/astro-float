@@ -51,9 +51,9 @@ impl WordBuf {
         self.inner.truncate(n);
     }
 
-    /// Try to exted the size to fit the precision p. Fill new elements with 0.
+    /// Try to exted the size to fit the precision p. Fill new elements with 0. Data is shifted to the left.
     pub fn try_extend(&mut self, p: usize) -> Result<(), Error> {
-        let n = (p + WORD_BIT_SIZE - 1)/WORD_BIT_SIZE;
+        let n = (p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         let l = self.inner.len();
         self.inner.try_grow(n).map_err(Error::MemoryAllocation)?;
         unsafe { self.inner.set_len(n); }
@@ -62,7 +62,17 @@ impl WordBuf {
         Ok(())
     }
 
-    // Remove trailing digits containing zeroes.
+    /// Try to exted the size to fit the precision p. Fill new elements with 0. Data is not moved.
+    pub fn try_extend_2(&mut self, p: usize) -> Result<(), Error> {
+        let n = (p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
+        let l = self.inner.len();
+        self.inner.try_grow(n).map_err(Error::MemoryAllocation)?;
+        unsafe { self.inner.set_len(n); }
+        self.inner[l..].fill(0);
+        Ok(())
+    }
+
+    // Remove trailing words containing zeroes.
     pub fn trunc_trailing_zeroes(&mut self) {
 
         let mut n = 0;
@@ -75,9 +85,30 @@ impl WordBuf {
             }
         }
 
-        let sz = self.len();
-        self.inner.rotate_left(n);
-        self.inner.truncate(sz - n);
+        if n > 0 {
+            let sz = self.len();
+            self.inner.rotate_left(n);
+            self.inner.truncate(sz - n);
+        }
+    }
+
+    // Remove leading words containing zeroes.
+    pub fn trunc_leading_zeroes(&mut self) {
+
+        let mut n = 0;
+
+        for v in self.inner.iter().rev() {
+            if *v == 0 {
+                n += 1;
+            } else {
+                break;
+            }
+        }
+
+        if n > 0 {
+            let sz = self.len();
+            self.inner.truncate(sz - n);
+        }
     }
 }
 

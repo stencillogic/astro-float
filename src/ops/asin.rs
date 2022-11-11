@@ -55,6 +55,13 @@ mod tests {
         //println!("{}", n1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
         let _n2 = n1.asin(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
+
+        // asymptotic & extrema testing
+        let n1 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC487_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let n2 = n1.asin(rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419EBBFC39B4BEC14AF6_e+0", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+
+        assert!(n2.cmp(&n3) == 0);
     }
 
     #[ignore]

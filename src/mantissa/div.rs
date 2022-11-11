@@ -201,8 +201,7 @@ impl Mantissa {
         }
     }
 
-    // Recursive integer division from the book of Richard P. Brent and Paul Zimmermann.
-    // Divides m1 by m2, returns quotinent and remainder.
+    // Recursive integer division divides m1 by m2, returns quotinent and remainder.
     // prereq: m <= n, m2 is normalized
     fn div_recursive(m1: &[Word], m2: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
 
@@ -308,6 +307,15 @@ impl Mantissa {
 
     // general case division
     pub(super) fn div_unbalanced(m1: &[Word], m2: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
+
+        if m1.len() < m2.len() {
+
+            let q = WordBuf::new(1)?;
+            let mut r = WordBuf::new(m1.len())?;
+            r.copy_from_slice(m1);
+
+            return Ok((q, r));
+        }
 
         let mut m = m1.len() - m2.len();
         let n = m2.len();

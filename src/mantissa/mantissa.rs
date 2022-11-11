@@ -476,6 +476,98 @@ impl Mantissa {
         d3[d1.len()] = (m / WORD_BASE) as Word;
     }
 
+    /// `self` to power of `i` mod `n`
+    pub fn pow_mod(&self, mut i: usize, n: &Self) -> Result<Self, Error> {
+
+        // first non-zero bit in i
+        let mut bit_pos = WORD_BIT_SIZE;
+
+        while bit_pos > 0 {
+            bit_pos -= 1;
+            i <<= 1;
+            if i & WORD_SIGNIFICANT_BIT as usize != 0 {
+                bit_pos -= 1;
+                i <<= 1;
+                break;
+            }
+        }
+
+        let mut x = self.clone()?;
+        while bit_pos > 0 {
+
+            bit_pos -= 1;
+
+            x = x.mul_mod(&x, n)?;
+
+            if i & WORD_SIGNIFICANT_BIT as usize != 0 {
+                x = x.mul_mod(self, n)?;
+            }
+
+            i <<= 1;
+        }
+
+        Ok(x)
+    }
+
+    /// Multiply `self` by 2 ^ i
+    pub fn pow2(&mut self, i: usize) -> Result<(), Error> {
+
+        if self.n + i > self.max_bit_len() {
+            self.m.try_extend_2(self.n + i)?;
+        }
+
+        self.shift_left(i);
+
+        Ok(())
+    }
+
+    // self * m1 mod n
+    pub fn mul_mod(&self, m1: &Self, n: &Self) -> Result<Self, Error> {
+
+        // TODO: consider other methods, e.g. Barrett's
+
+        debug_assert!(n.m[n.len() - 1] & WORD_SIGNIFICANT_BIT != 0);
+
+        let mut m = Self::reserve_new(self.len() + m1.len())?;    
+
+        Self::mul_unbalanced(&self.m, &m1.m, &mut m)?;
+
+        m.trunc_leading_zeroes();
+
+        let (_q, r) = Self::div_unbalanced(&m, &n.m)?;
+
+        let n = Self::find_bit_len(&r);
+
+        Ok(Mantissa { m: r, n, })
+    }
+
+    // Returns remainder of division of `self` by `n`.
+    pub fn rem(&self, n: &Self) -> Result<Self, Error> {
+
+        let (_q, r) = Self::div_unbalanced(&self.m, &n.m)?;
+        let n = Self::find_bit_len(&r);
+        Ok(Mantissa { m: r, n, })
+    }
+
+    fn find_bit_len(m: &[Word]) -> usize {
+
+        let mut n = 0;
+
+        for &v in m.iter().rev() {
+            if v != 0 {
+                let mut v = v;
+                while v & WORD_SIGNIFICANT_BIT == 0 {
+                    n += 1;
+                    v <<= 1;
+                }
+                break;
+            }
+            n += WORD_BIT_SIZE;
+        }
+
+        m.len()*WORD_BIT_SIZE - n
+    }
+
     #[allow(unused_mut)]
     pub fn from_u64(p: usize, mut u: u64) -> Result<(usize, Self), Error> {
         let mut m = Self::reserve_new(Self::bit_len_to_word_len(p))?;
@@ -794,5 +886,9 @@ impl Mantissa {
 
     pub fn get_digits(&self) -> &[Word] {
         &self.m
+    }
+
+    pub fn bit_len(&self) -> usize {
+        self.n
     }
 }

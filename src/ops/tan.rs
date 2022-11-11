@@ -77,30 +77,23 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn tan(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
 
-        let mut pi = cc.pi(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
+        let arg = self.reduce_trig_arg(cc, RoundingMode::None)?;
 
-        pi.set_exponent(pi.get_exponent() + 1);
-
-        // determine quadrant
-        let mut x = self.div(&pi, RoundingMode::None)?;
-        let fractional = x.fract()?;
-        x = pi.mul(&fractional, RoundingMode::None)?;
-
-        pi.set_exponent(pi.get_exponent() - 1);
-
-        let mut ret = x.tan_series(RoundingMode::None)?;
+        let mut ret = arg.tan_series(RoundingMode::None)?;
 
         ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
 
         Ok(ret)
     }
 
-    fn tan_series(self, rm: RoundingMode) -> Result<Self, Error> {
+    fn tan_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
 
         let p = self.get_mantissa_max_bit_len();
         let polycoeff_gen = TanPolycoeffGen::new(p)?;
-        let (reduction_times, _niter) = series_cost_optimize::<TanPolycoeffGen, TanArgReductionEstimator>(
+        let (reduction_times, niter) = series_cost_optimize::<TanPolycoeffGen, TanArgReductionEstimator>(
             p, &polycoeff_gen, -self.e as isize, 1, true);
+
+        self.set_precision(self.get_mantissa_max_bit_len() + niter * 7 + reduction_times * 4 + 3, rm)?;
 
         let arg_holder;
         let arg = if reduction_times > 0 {
@@ -121,6 +114,8 @@ impl BigFloatNumber {
 
     /// Tangent series
     fn tan_series_run(&self, rm: RoundingMode) -> Result<Self, Error> {
+
+        //  sin + cos series combined
 
         let mut xx = self.mul(self, rm)?;
         xx.inv_sign();
@@ -208,6 +203,23 @@ mod tests {
         n1.set_exponent(0);
         let _n2 = n1.tan(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
+
+        // asymptotic & extrema testing
+        let mut half_pi = cc.pi(128, RoundingMode::None).unwrap();
+        half_pi.set_exponent(0);
+        half_pi.set_precision(320, RoundingMode::None).unwrap();
+
+        let n2 = half_pi.tan(rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFADFB63EEEB306717FBE882B389D8C9BB6A8F6914FC1931BD_e-1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+
+        assert!(n2.cmp(&n3) == 0);
+
+        // large exponent
+        half_pi.set_exponent(256);
+        let n2 = half_pi.tan(rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("4.ECDEC5EF3A1EA5339A46BC0C490F52A86A033C56BCDD413E36C657EB7757F073500B013B9A7B43D8_e+0", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+
+        assert!(n2.cmp(&n3) == 0);
     }
 
     #[ignore]

@@ -1,6 +1,7 @@
 //! Cosine.
 
 
+use crate::Exponent;
 use crate::Sign;
 use crate::common::consts::FOUR;
 use crate::common::consts::ONE;
@@ -15,6 +16,9 @@ use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::series_run;
 use crate::ops::series::series_cost_optimize;
 use crate::ops::consts::Consts;
+
+
+const COS_EXP_THRES: Exponent = -32;
 
 
 // Polynomial coefficient generator.
@@ -106,18 +110,21 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn cos(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
 
-        let mut pi = cc.pi(self.get_mantissa_max_bit_len() * 10 / 9, RoundingMode::None)?;
+        let mut arg = self.reduce_trig_arg(cc, RoundingMode::None)?;
 
-        pi.set_exponent(pi.get_exponent() + 1);
+        let mut ret;
 
-        // determine quadrant
-        let mut x = self.clone()?;
-        x.set_precision(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
-        x = x.div(&pi, RoundingMode::None)?;
-        let fractional = x.fract()?;
-        x = pi.mul(&fractional, RoundingMode::None)?;
+        let arg1 = arg.clone()?;
 
-        let mut ret = x.cos_series(RoundingMode::None)?;
+        ret = arg1.cos_series(RoundingMode::None)?;
+
+        if ret.get_exponent() < COS_EXP_THRES {
+            
+            // argument is close to pi / 2
+            arg.set_precision(arg.get_mantissa_max_bit_len() + ret.get_exponent().unsigned_abs() as usize, RoundingMode::None)?;
+
+            ret = arg.cos_series(RoundingMode::None)?;
+        }
 
         ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
 
@@ -133,7 +140,7 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<CosPolycoeffGen, CosArgReductionEstimator>(
             p, &polycoeff_gen, -self.e as isize, 2, false);
 
-        self.set_precision(self.get_mantissa_max_bit_len() + niter * 4 + reduction_times * 3, rm)?;
+        self.set_precision(p + (-COS_EXP_THRES) as usize + niter * 4 + reduction_times * 3, rm)?;
 
         let arg = if reduction_times > 0 {
             self.cos_arg_reduce(reduction_times, rm)?
@@ -141,9 +148,9 @@ impl BigFloatNumber {
             self
         };
 
-        let acc = BigFloatNumber::from_word(1, p)?;  // 1
-        let x_step = arg.mul(&arg, rm)?;            // x^2
-        let x_first = x_step.clone()?;                 // x^4
+        let acc = BigFloatNumber::from_word(1, arg.get_mantissa_max_bit_len())?;  // 1
+        let x_step = arg.mul(&arg, rm)?;           // x^2
+        let x_first = x_step.clone()?;                 // x^2
 
         let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
 
@@ -198,6 +205,27 @@ mod tests {
         n1.set_exponent(0);
         let _n2 = n1.cos(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
+
+        // asymptotic & extrema testing
+        let mut half_pi = cc.pi(128, RoundingMode::None).unwrap();
+        half_pi.set_exponent(1);
+        half_pi.set_precision(320, RoundingMode::None).unwrap();
+
+        let n2 = half_pi.cos(rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("5.2049C1114CF98E804177D4C76273644A29410F31C6809BBDF2A33679A7486365EEEE1A43A7D13E58_e-21", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+
+        //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
+
+        assert!(n2.cmp(&n3) == 0);
+
+        // large exponent
+        half_pi.set_exponent(256);
+        let n2 = half_pi.cos(rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("3.2F00069261A9FFC022D09F662F2E2DDBEFD1AF138813F2A71D7601C58E793299EA052E4EBC59106C_e-1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+
+        //println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
+
+        assert!(n2.cmp(&n3) == 0);
     }
 
     #[ignore]

@@ -106,18 +106,9 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn sin(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
 
-        let mut pi = cc.pi(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
+        let arg = self.reduce_trig_arg(cc, RoundingMode::None)?;
 
-        pi.set_exponent(pi.get_exponent() + 1);
-
-        // determine quadrant
-        let mut x = self.clone()?;
-        x.set_precision(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
-        x = x.div(&pi, RoundingMode::None)?;
-        let fractional = x.fract()?;
-        x = pi.mul(&fractional, RoundingMode::None)?;
-
-        let mut ret = x.sin_series(RoundingMode::None)?;
+        let mut ret = arg.sin_series(RoundingMode::None)?;
 
         ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
 
@@ -197,6 +188,25 @@ mod tests {
         n1.set_exponent(0);
         let _n2 = n1.sin(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
+
+        // asymptotic & extrema testing
+        let mut half_pi = cc.pi(128, RoundingMode::None).unwrap();
+        half_pi.set_exponent(1);
+        half_pi.set_precision(320, RoundingMode::None).unwrap();
+
+        let n2 = half_pi.sin(rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC487_e-1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+
+        assert!(n2.cmp(&n3) == 0);
+
+        // large exponent
+        half_pi.set_exponent(256);
+        let n2 = half_pi.sin(rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("F.AE195882CABDC16FAF2A733AB99159AF50C47E8B9ED8BA42C5872FF88A52726061B4231170F1BE8_e-1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+
+        //println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
+
+        assert!(n2.cmp(&n3) == 0);
     }
 
     #[ignore]
