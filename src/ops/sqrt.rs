@@ -171,7 +171,7 @@ mod tests {
         let d2 = d1.sqrt(RoundingMode::ToEven).unwrap();
         let d3 = d2.mul(&d2, RoundingMode::ToEven).unwrap();
         let eps = BigFloatNumber::min_positive(prec).unwrap();
-        assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+        assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) <= 0);
 
         // random
         let mut eps = ONE.clone().unwrap();
