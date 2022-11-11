@@ -179,6 +179,25 @@ mod tests {
         n1.set_exponent(1);
         let _n2 = n1.atan(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
+
+        // small exp
+        let n1 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419EBBFC39B4BEC14AF6_e-20", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let n2 = n1.atan(rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419D71406B5262DC1F0C_e-20", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+
+        // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
+
+        assert!(n2.cmp(&n3) == 0);
+
+        // large exp
+        let n1 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419EBBFC39B4BEC14AF6_e+20", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let n2 = n1.atan(rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A1AF0B18A2C68B83BE07F0257A80F25883A5F3E060CDB82FEE_e+0", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+
+        // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
+
+        assert!(n2.cmp(&n3) == 0);
+
     }
 
     #[ignore]

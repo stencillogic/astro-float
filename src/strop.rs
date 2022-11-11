@@ -82,7 +82,7 @@ impl BigFloatNumber {
                     Radix::Oct => write!(mstr, "e-{:o}", (e - 1).unsigned_abs()),
                     Radix::Dec => write!(mstr, "e-{}", (e - 1).unsigned_abs()),
                     Radix::Hex => write!(mstr, "e-{:x}", (e - 1).unsigned_abs()),
-                };    
+                };
             } else {
                 let _ = match rdx {
                     Radix::Bin => write!(mstr, "e+{:b}", e - 1),

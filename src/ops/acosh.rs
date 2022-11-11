@@ -22,6 +22,8 @@ impl BigFloatNumber {
 
         // ln(x + sqrt(x*x - 1))
 
+        // TODO: if x much larger than 1, then acosh(x) = ln(2*x)
+
         let mut additional_prec = 0;
         if self.get_exponent() == 1 {
             additional_prec = count_leading_zeroes_skip_first(self.m.get_digits());
@@ -68,6 +70,16 @@ mod tests {
         let n3 = BigFloatNumber::parse("1.6A09E667F3BCC90951E10B153B1BB120561BB6ADA1D9FAE9B777BDA85E1967A167625CACDDAC49AEAED3E7EFBFD6FD6CFC35D50CB80E62AA8503AE9A76869CEAB806819B8816A2A9564506A0C331002E_e-8", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
 
         assert!(n2.cmp(&n3) == 0);
+
+        // large exp
+        let n1 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419EBBFC39B4BEC14AF6_e+1000", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let n2 = n1.acosh(rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("2.C5DAB0AF9025886C3364C7B6D6741EB19D4FB009D3F92CA21B77498D9F0666363C665F2F324EAEC8_e+3", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+
+        //println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
+
+        assert!(n2.cmp(&n3) == 0);
+
     }
 
     #[ignore]

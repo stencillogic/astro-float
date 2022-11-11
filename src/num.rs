@@ -1235,6 +1235,15 @@ mod tests {
             }
         }
 
+        // reciprocal near 1
+        d1 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC487_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        d2 = d1.reciprocal(RoundingMode::ToEven).unwrap();
+        d3 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000000D237A0818813B78_e+0", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+
+        // println!("{:?}", d2.format(crate::Radix::Hex, rm).unwrap());
+
+        assert!(d2.cmp(&d3) == 0);
+
         // subnormal numbers
         d1 = BigFloatNumber::min_positive(p).unwrap();
         d2 = BigFloatNumber::min_positive(p).unwrap();

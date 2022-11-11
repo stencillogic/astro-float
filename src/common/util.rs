@@ -264,7 +264,7 @@ pub fn shift_slice_right(m: &mut [Word], n: usize) {
 }
 
 pub fn count_leading_zeroes_skip_first(m: &[Word]) -> usize {
-        
+
     let mut iter = m.iter().rev();
     let mut w;
     let mut ret = 0;
@@ -286,6 +286,31 @@ pub fn count_leading_zeroes_skip_first(m: &[Word]) -> usize {
         if w != 0 {
             while w & WORD_SIGNIFICANT_BIT == 0 {
                 w <<= 1;
+                ret += 1;
+            }
+        }
+    }
+
+    ret
+}
+
+
+pub fn count_leading_ones(m: &[Word]) -> usize {
+
+    let mut ret = 0;
+
+    for &v in m.iter().rev() {
+
+        if v == WORD_MAX {
+
+            ret += WORD_BIT_SIZE;
+
+        } else {
+
+            let mut v = v;
+            
+            while v & WORD_SIGNIFICANT_BIT != 0 {
+                v <<= 1;
                 ret += 1;
             }
         }
