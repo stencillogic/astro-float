@@ -78,7 +78,10 @@ impl BigFloatNumber {
         })
     }
 
-    /// Returns the minimum positive subnormal value for the specified precision `p`: only the least significant bit of the mantissa is set to 1, the exponent has the minimum possible value, and the sign is positive. Precision is rounded upwards to the word size.
+    /// Returns the minimum positive subnormal value for the specified precision `p`: 
+    /// only the least significant bit of the mantissa is set to 1, the exponent has 
+    /// the minimum possible value, and the sign is positive. 
+    /// Precision is rounded upwards to the word size.
     ///
     /// ## Errors
     /// 
@@ -88,6 +91,24 @@ impl BigFloatNumber {
         Self::p_assertion(p)?;
         Ok(BigFloatNumber {
             m: Mantissa::min(p)?,
+            e: EXPONENT_MIN,
+            s: Sign::Pos,
+        })
+    }
+
+    /// Returns the minimum positive normal value for the specified precision `p`: 
+    /// only the most significant bit of the mantissa is set to 1, the exponent has 
+    /// the minimum possible value, and the sign is positive. 
+    /// Precision is rounded upwards to the word size.
+    ///
+    /// ## Errors
+    /// 
+    ///  - InvalidArgument: precision is incorrect.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    pub fn min_positive_normal(p: usize) -> Result<Self, Error> {
+        Self::p_assertion(p)?;
+        Ok(BigFloatNumber {
+            m: Mantissa::from_word(p, WORD_SIGNIFICANT_BIT)?,
             e: EXPONENT_MIN,
             s: Sign::Pos,
         })
@@ -416,6 +437,10 @@ impl BigFloatNumber {
         }
     }
 
+    // Normalize mantissa and return exponent shift of `self`.
+    pub(crate) fn normalize2(&mut self) -> usize {
+        self.m.normilize2()
+    }
 
     // Combined add and sub operations.
     fn add_sub(&self, d2: &Self, op: i8, rm: RoundingMode, full_prec: bool) -> Result<Self, Error> {

@@ -664,6 +664,12 @@ impl Mantissa {
         Ok((shift, m))
     }
 
+    /// Shift `self` to the left and return shift value.
+    pub fn normilize2(&mut self) -> usize {
+        self.n = self.max_bit_len();
+        Self::maximize(&mut self.m)
+    }
+
     /// Set n bits to 0 from the right.
     pub fn mask_bits(&mut self, mut n: usize) {
         for v in self.m.iter_mut() {
@@ -835,8 +841,11 @@ impl Mantissa {
         let orig_len = self.m.len();
         if sz < orig_len {
             self.m.trunc_to(p);
-            if self.n != 0 {
-                self.n -= (orig_len - sz)*WORD_BIT_SIZE;
+            let nn = (orig_len - sz)*WORD_BIT_SIZE;
+            if self.n >= nn {
+                self.n -= nn;
+            } else {
+                self.n = 0;
             }
         } else if sz > orig_len {
             self.m.try_extend(p)?;
