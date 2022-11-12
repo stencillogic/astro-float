@@ -3,10 +3,10 @@
 use crate::Exponent;
 use crate::common::consts::ONE;
 use crate::common::consts::TWO;
+use crate::common::util::count_leading_ones;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
 use crate::common::util::get_sqrt_cost;
-use crate::defs::Word;
 use crate::num::BigFloatNumber;
 use crate::defs::RoundingMode;
 use crate::defs::Error;
@@ -103,13 +103,14 @@ impl BigFloatNumber {
             return Err(Error::InvalidArgument);
         }
 
-        let e = self.get_exponent();
-
         let mut x = self.clone()?;
+        let e = x.normalize2() as isize;
+        let e = self.get_exponent() as isize - e;
+
         x.set_exponent(0);
-        if e != 0 {
-            x.set_precision(x.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
-        }
+
+        let additional_prec = count_leading_ones(x.get_mantissa_digits()) + 2;
+        x.set_precision(x.get_mantissa_max_bit_len() + additional_prec, RoundingMode::None)?;
 
         let p1 = Self::ln_series(x, RoundingMode::None)?;
 
@@ -121,7 +122,7 @@ impl BigFloatNumber {
 
             let p2 = cc.ln_2(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
 
-            let mut n = Self::from_word(e.unsigned_abs() as Word, 1)?;
+            let mut n = Self::from_usize(e.unsigned_abs())?;
             if e < 0 {
                 n.set_sign(Sign::Neg);
             }
@@ -187,6 +188,8 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
+    use crate::common::util::log2_ceil;
+
     use super::*;
 
     #[test]
@@ -200,6 +203,44 @@ mod tests {
         n2.set_sign(Sign::Pos);
 
         //println!("{:?}", n2.fp3(crate::Radix::Dec, rm).unwrap());
+
+        // near 1
+        let d1 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC4872DC85F7E77EC487_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d2 = d1.ln(RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = BigFloatNumber::parse("-D.237A0818813B78D237A0818813B7900000000000000000000564FA7B56FC57E9FBF3EE86C58F3F4_e-33", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+
+        // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
+
+        assert!(d2.cmp(&d3) == 0);
+
+        let d1 = BigFloatNumber::parse("1.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC4872DC85F7E77EC487", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d2 = d1.ln(RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = BigFloatNumber::parse("B.17217F7D1CF79ABC9E3B39803F2F6AF40F343267298B62D837B5A577F6A5C6F7E9CA5DFA9E1D0D0_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+
+        // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
+
+        assert!(d2.cmp(&d3) == 0);
+
+        // MAX
+        let prec = 3200;
+        let mut eps = ONE.clone().unwrap();
+
+        let d1 = BigFloatNumber::max_value(prec).unwrap();
+        let d2 = d1.ln(RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = d2.exp(RoundingMode::ToEven, &mut cc).unwrap();
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + 
+                        log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent);
+
+        assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+
+        // MIN
+        let mut d1 = BigFloatNumber::min_positive(prec).unwrap();
+        d1.set_exponent(d1.get_exponent() + d1.get_mantissa_max_bit_len() as Exponent + 2); // avoid exp() overflow
+        let d2 = d1.ln(RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = d2.exp(RoundingMode::ToEven, &mut cc).unwrap();
+        let eps = BigFloatNumber::min_positive_normal(prec).unwrap();
+
+        assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) <= 0);
     }
 
     #[ignore]
