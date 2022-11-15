@@ -193,9 +193,11 @@ fn test_cos_acos() {
         // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2 + count_leading_ones(d2.get_mantissa_digits()) as Exponent);
+        if d2.cmp(&ONE) != 0 {
+            eps.set_exponent(d1.get_exponent() - prec as Exponent + 2 + count_leading_ones(d2.get_mantissa_digits()) as Exponent);
 
-        assert!(d1.abs().unwrap().sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+            assert!(d1.abs().unwrap().sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+        }
     }
 }
 
