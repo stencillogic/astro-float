@@ -90,10 +90,10 @@ impl BigFloatNumber {
 
         let p = self.get_mantissa_max_bit_len();
         let polycoeff_gen = TanPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<TanPolycoeffGen, TanArgReductionEstimator>(
+        let (reduction_times, _niter) = series_cost_optimize::<TanPolycoeffGen, TanArgReductionEstimator>(
             p, &polycoeff_gen, -self.e as isize, 1, true);
 
-        self.set_precision(self.get_mantissa_max_bit_len() + niter * 7 + reduction_times * 4 + 3, rm)?;
+        self.set_precision(self.get_mantissa_max_bit_len() + reduction_times * 4 + 4, rm)?;
 
         let arg_holder;
         let arg = if reduction_times > 0 {

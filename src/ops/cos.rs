@@ -8,6 +8,7 @@ use crate::common::consts::ONE;
 use crate::common::consts::THREE;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
+use crate::defs::WORD_BIT_SIZE;
 use crate::num::BigFloatNumber;
 use crate::defs::RoundingMode;
 use crate::defs::Error;
@@ -18,7 +19,7 @@ use crate::ops::series::series_cost_optimize;
 use crate::ops::consts::Consts;
 
 
-const COS_EXP_THRES: Exponent = -32;
+const COS_EXP_THRES: Exponent = -(WORD_BIT_SIZE as Exponent);
 
 
 // Polynomial coefficient generator.
@@ -114,12 +115,14 @@ impl BigFloatNumber {
 
         let mut ret;
 
-        let arg1 = arg.clone()?;
+        let mut arg1 = arg.clone()?;
+
+        arg1.set_precision(arg1.get_mantissa_max_bit_len() + (-COS_EXP_THRES) as usize, RoundingMode::None)?;
 
         ret = arg1.cos_series(RoundingMode::None)?;
 
         if ret.get_exponent() < COS_EXP_THRES {
-            
+
             // argument is close to pi / 2
             arg.set_precision(arg.get_mantissa_max_bit_len() + ret.get_exponent().unsigned_abs() as usize, RoundingMode::None)?;
 
@@ -140,7 +143,7 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<CosPolycoeffGen, CosArgReductionEstimator>(
             p, &polycoeff_gen, -self.e as isize, 2, false);
 
-        self.set_precision(p + (-COS_EXP_THRES) as usize + niter * 4 + reduction_times * 3, rm)?;
+        self.set_precision(p + niter * 4 + reduction_times * 3, rm)?;
 
         let arg = if reduction_times > 0 {
             self.cos_arg_reduce(reduction_times, rm)?

@@ -103,17 +103,14 @@ impl BigFloatNumber {
 
             let mut x = self.clone()?;
 
-            //let mut ret = x.atanh_series(RoundingMode::None)?;
-
-            let niter = 3;
-            x.set_precision(self.get_mantissa_max_bit_len() + niter*3, rm)?;
+            x.set_precision(self.get_mantissa_max_bit_len() + 1, rm)?;
 
             let mut polycoeff_gen = AtanhPolycoeffGen::new(x.get_mantissa_max_bit_len())?;
 
             let x_step = x.mul(&x, rm)?;   // x^2
             let x_first = x.mul(&x_step, rm)?;   // x^3
 
-            let mut ret = series_run(x, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
+            let mut ret = series_run(x, x_first, x_step, 1, &mut polycoeff_gen, rm)?;
 
             ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
 

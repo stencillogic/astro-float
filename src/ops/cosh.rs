@@ -108,7 +108,7 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<CoshPolycoeffGen, CoshArgReductionEstimator>(
             p, &polycoeff_gen, (-self.e) as isize, 2, false);
 
-        let full_p = p + niter * 2 + reduction_times * 3;
+        let full_p = p + 1 + reduction_times * 3;
         self.set_precision(full_p, rm)?;
 
         let arg = if reduction_times > 0 {
@@ -117,9 +117,9 @@ impl BigFloatNumber {
             self
         };
 
-        let acc = Self::from_word(1, full_p)?;    // x
-        let x_step = arg.mul(&arg, rm)?;   // x^2
-        let x_first = x_step.clone()?;
+        let acc = Self::from_word(1, full_p)?;      // 1
+        let x_step = arg.mul(&arg, rm)?;        // x^2
+        let x_first = x_step.clone()?;              // x^2
 
         let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
 

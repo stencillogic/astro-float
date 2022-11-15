@@ -123,7 +123,7 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<SinPolycoeffGen, SinArgReductionEstimator>(
             p, &polycoeff_gen, -self.e as isize, 2, false);
 
-        self.set_precision(self.get_mantissa_max_bit_len() + niter * 3 + reduction_times * 3, rm)?;
+        self.set_precision(self.get_mantissa_max_bit_len() + 1 + reduction_times * 3, rm)?;
 
         let arg = if reduction_times > 0 {
             self.sin_arg_reduce(reduction_times, rm)?

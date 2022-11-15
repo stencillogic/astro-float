@@ -151,7 +151,7 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<AtanhPolycoeffGen, LnArgReductionEstimator>(
             p, &polycoeff_gen, 0, 2, false);
 
-        let err = niter * 3 + reduction_times + 4;
+        let err = reduction_times + 4;
         x.set_precision(x.get_mantissa_max_bit_len() + err, rm)?;
 
         let arg = if reduction_times > 0 {

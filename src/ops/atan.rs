@@ -127,7 +127,7 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<AtanPolycoeffGen, AtanArgReductionEstimator>(
             p, &polycoeff_gen, -self.e as isize, 1, true);
 
-        self.set_precision(self.get_mantissa_max_bit_len() + niter * 2 + reduction_times * 3, rm)?;
+        self.set_precision(self.get_mantissa_max_bit_len() + 1 + reduction_times * 3, rm)?;
 
         let arg = if reduction_times > 0 {
             self.atan_arg_reduce(reduction_times, rm)?

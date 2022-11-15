@@ -20,7 +20,12 @@ impl BigFloatNumber {
     pub fn asin(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
 
         if self.cmp(&ONE) == 0 {
-            return Self::new(self.get_mantissa_max_bit_len());
+            
+            let mut pi = cc.pi(self.get_mantissa_max_bit_len(), rm)?;
+
+            pi.set_exponent(pi.get_exponent() - 1);
+
+            return Ok(pi);
         }
 
         let mut additional_prec = 2;
