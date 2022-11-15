@@ -226,6 +226,16 @@ mod tests {
         //println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
+
+        // small exponent
+        let n1 = BigFloatNumber::parse("1.992EF09686C3DC782C05BFD7863A715ECBDAED45DBAEE3ADFEF1AB8F74DB393D8CD6EAF9CA8443A6C28CF59D35B7FF56_e-20", crate::Radix::Hex, 384, RoundingMode::None).unwrap();
+        let n2 = n1.cos(RoundingMode::ToEven, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEB8FC7D51D69792F9AB263F754D161F6A_e-1", crate::Radix::Hex, 384, RoundingMode::None).unwrap();
+
+        // println!("{:?}", n1.format(crate::Radix::Hex, rm).unwrap());
+
+        assert!(n2.cmp(&n3) == 0);
+
     }
 
     #[ignore]

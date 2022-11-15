@@ -263,7 +263,7 @@ fn series_horner<T: PolycoeffGen>(add: BigFloatNumber, x_first: BigFloatNumber, 
     let mut x_p = (-x_first.e) as isize + (-x_step.e) as isize;
     let mut coef_p = 0;
 
-    while x_p + coef_p < add.get_mantissa_max_bit_len() as isize {
+    while x_p + coef_p < add.get_mantissa_max_bit_len() as isize - add.get_exponent() as isize {
         let coeff = polycoeff_gen.next(rm)?;
         coef_p = (-coeff.e) as isize;
         x_p += (-x_step.e) as isize;

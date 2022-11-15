@@ -148,11 +148,11 @@ mod tests {
 
         assert!(d2.cmp(&d3) == 0);
 
-        let d1 = BigFloatNumber::parse("1.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC4872DC85F7E77EC487", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d1 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000002DC85F7E77EC487C", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
         let d2 = d1.sqrt(RoundingMode::ToEven).unwrap();
-        let d3 = BigFloatNumber::parse("1.6A09E667F3BCC908B2FB1366EA957D3E3ADEC17512775099D58A2DE289D05C62F5690B502BBFD6EE", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d3 = BigFloatNumber::parse("1.000000000000000000000000000000000000000000000000000000000000000016E42FBF3BF6243E", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
 
-        //println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
+        // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
 
         assert!(d2.cmp(&d3) == 0);
 

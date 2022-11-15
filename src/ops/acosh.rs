@@ -24,6 +24,13 @@ impl BigFloatNumber {
 
         // TODO: if x much larger than 1, then acosh(x) = ln(2*x)
 
+        let cmpone = self.cmp(&ONE);
+        if cmpone == 0 {
+            return Self::new(self.get_mantissa_max_bit_len());
+        } else if cmpone < 0 {
+            return Err(Error::InvalidArgument);
+        }
+
         let mut additional_prec = 0;
         if self.get_exponent() == 1 {
             additional_prec = count_leading_zeroes_skip_first(self.m.get_digits());
@@ -64,10 +71,13 @@ mod tests {
         let _n2 = n1.acosh(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
 
-        // asymptotic & extrema testing
-        let n1 = BigFloatNumber::parse("1.000000000000000100000000000000010B6200000000000000000000000000002E8B9840AAAAAAAAAAAAAAAAAAAAAAAAADE85C5950B78E38E38E38E38E38E38E3902814A92D7C21CDB6DB6DB6DB6DB6E_e+0", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+        // near 1
+        let n1 = BigFloatNumber::parse("1.0000000000000000000000000000000000000000000B56A0EBA6F7D47E21A7B2A7806A698BABAF2F05BC61E2F8FB50FE0B98F55B181AC9C8_e+0", crate::Radix::Hex, 448, RoundingMode::None).unwrap();
         let n2 = n1.acosh(rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("1.6A09E667F3BCC90951E10B153B1BB120561BB6ADA1D9FAE9B777BDA85E1967A167625CACDDAC49AEAED3E7EFBFD6FD6CFC35D50CB80E62AA8503AE9A76869CEAB806819B8816A2A9564506A0C331002E_e-8", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse("4.C31368910963B1A1BCFC0EDBD393FB7A5E876F9751D93A20E7E48EC0D16090ADA5F46DF2184D32A19C500088EA09CBD4F23DF713113D8A58_e-16", crate::Radix::Hex, 448, RoundingMode::None).unwrap();
+
+        // println!("{:?}", n1.format(crate::Radix::Bin, rm).unwrap());
+        // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
 

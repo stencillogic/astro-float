@@ -974,8 +974,12 @@ impl BigFloatNumber {
         Self::p_assertion(p)?;
 
         if self.get_mantissa_max_bit_len() > p {
-            self.m.round_mantissa(self.get_mantissa_max_bit_len() - p, rm, self.is_positive());
-            if self.m.is_all_zero() {
+            if self.m.round_mantissa(self.get_mantissa_max_bit_len() - p, rm, self.is_positive()) {
+                if self.e == EXPONENT_MAX {
+                    return Err(Error::ExponentOverflow(self.s));
+                }
+                self.e += 1;
+            } else if self.m.is_all_zero() {
                 self.m.set_zero();
                 self.e = 0;
             }

@@ -198,6 +198,16 @@ mod tests {
 
         assert!(n2.cmp(&n3) == 0);
 
+        // near 1
+        let n1 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000002DC85F7E77EC487C", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let n2 = n1.atan(rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("C.90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22682E3838CA2A291C_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+
+        // println!("{:?}", n1.format(crate::Radix::Bin, rm).unwrap());
+        // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
+
+        assert!(n2.cmp(&n3) == 0);
+ 
     }
 
     #[ignore]

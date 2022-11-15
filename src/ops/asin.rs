@@ -53,6 +53,7 @@ mod tests {
 
     #[test]
     fn test_arcsine() {
+        
         let mut cc = Consts::new().unwrap();
 
         let rm = RoundingMode::ToEven;

@@ -4,6 +4,7 @@ use crate::Exponent;
 use crate::common::consts::ONE;
 use crate::common::consts::TWO;
 use crate::common::util::count_leading_ones;
+use crate::common::util::count_leading_zeroes_skip_first;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
 use crate::common::util::get_sqrt_cost;
@@ -109,8 +110,15 @@ impl BigFloatNumber {
 
         x.set_exponent(0);
 
-        let additional_prec = count_leading_ones(x.get_mantissa_digits()) + 2;
-        x.set_precision(x.get_mantissa_max_bit_len() + additional_prec, RoundingMode::None)?;
+        let additional_prec = if e == 0 {
+            count_leading_ones(x.get_mantissa_digits())
+        } else if e == 1 {
+            count_leading_zeroes_skip_first(x.get_mantissa_digits())
+        } else {
+            0
+        } + 2;
+
+        x.set_precision(self.get_mantissa_max_bit_len() + additional_prec, RoundingMode::None)?;
 
         let p1 = Self::ln_series(x, RoundingMode::None)?;
 
@@ -120,7 +128,7 @@ impl BigFloatNumber {
 
         } else {
 
-            let p2 = cc.ln_2(self.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
+            let p2 = cc.ln_2(self.get_mantissa_max_bit_len() + additional_prec, RoundingMode::None)?;
 
             let mut n = Self::from_usize(e.unsigned_abs())?;
             if e < 0 {
@@ -213,9 +221,9 @@ mod tests {
 
         assert!(d2.cmp(&d3) == 0);
 
-        let d1 = BigFloatNumber::parse("1.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC4872DC85F7E77EC487", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d1 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000002DC85F7E77EC487C", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
         let d2 = d1.ln(RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = BigFloatNumber::parse("B.17217F7D1CF79ABC9E3B39803F2F6AF40F343267298B62D837B5A577F6A5C6F7E9CA5DFA9E1D0D0_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d3 = BigFloatNumber::parse("2.DC85F7E77EC487BFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBE7F8CC184E38EBC_e-41", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
 
         // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
 

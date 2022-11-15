@@ -24,6 +24,10 @@ impl BigFloatNumber {
             return Self::from_word(1, self.get_mantissa_max_bit_len());
         }
 
+        if self.e as isize > WORD_BIT_SIZE as isize {
+            return Err(Error::ExponentOverflow(self.get_sign()));
+        }
+
         // compute separately for int and fract parts, then combine the results.
         let int = self.get_int_as_usize()?;
         let e_int = if int > 0 {
@@ -105,3 +109,33 @@ impl BigFloatNumber {
     }
 }
 
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    #[test]
+    fn test_pow() {
+
+        let mut cc = Consts::new().unwrap();
+
+        // near 1
+        let d1 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC4872DC85F7E77EC487_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d2 = d1.exp(RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = BigFloatNumber::parse("2.B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A5496AF9D95160A40F47A2ECF1C6AEA0", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+
+        // println!("{:?}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
+
+        assert!(d2.cmp(&d3) == 0);
+
+        let d1 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000002DC85F7E77EC487C", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d2 = d1.exp(RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = BigFloatNumber::parse("2.B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEFAEC1BE22DDEADB48", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+
+        // println!("{:?}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
+
+        assert!(d2.cmp(&d3) == 0);
+    }
+}

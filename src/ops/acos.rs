@@ -68,7 +68,7 @@ mod tests {
         let _n2 = n1.acos(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
 
-        // asymptotic & extrema testing
+        // near 1
         let n1 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC487_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
         let n2 = n1.acos(rm, &mut cc).unwrap();
         let n3 = BigFloatNumber::parse("5.2049C1114CF98E7B6DB49CCF999F4A5E697D73E5DA6BEC6578098357460BAFFB0C25779F1C63E8D8_e-21", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
