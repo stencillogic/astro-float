@@ -27,7 +27,7 @@
 //! 
 //! 
 //! Constants such as pi or the Euler number have arbitrary precision and are evaluated lazily and then cached in the constants cache.
-//! Since global variables are not allowed in Rust, some of the functions expect constants cache as parameter.
+//! Some functions expect constants cache as parameter because the library does not maintain global state.
 //! 
 //! 
 //! **Performance**
