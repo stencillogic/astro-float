@@ -3,11 +3,11 @@
 
 use crate::Exponent;
 use crate::Sign;
-use crate::common::consts::FOUR;
 use crate::common::consts::ONE;
-use crate::common::consts::THREE;
+use crate::common::consts::TWO;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
+use crate::defs::EXPONENT_MIN;
 use crate::defs::WORD_BIT_SIZE;
 use crate::num::BigFloatNumber;
 use crate::defs::RoundingMode;
@@ -87,17 +87,17 @@ impl ArgReductionEstimator for CosArgReductionEstimator {
 
     /// Estimates cost of reduction n times for number with precision p.
     fn get_reduction_cost(n: usize, p: usize) -> usize {
-        // n * (4 * cost(mul) + 2 * cost(add))
+        // n * (cost(add) + cost(mul))
         let cost_mul = get_mul_cost(p);
         let cost_add = get_add_cost(p);
-        (n * ((cost_mul << 1) + cost_add )) << 1
+        n * (cost_mul + cost_add)
     }
 
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
     #[inline]
     fn reduction_effect(n: usize, m: isize) -> usize {
-        // n*log2(3) + m
-        ((n as isize)*1000/631 + m) as usize
+        // n + m
+        ((n as isize) + m) as usize
     }
 }
 
@@ -167,10 +167,15 @@ impl BigFloatNumber {
     // reduce argument n times.
     // cost: n * O(add)
     fn cos_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
-        // cos(3*x) = - 3*cos(x) + 4*cos(x)^3
+        // cos(2*x) = 2*cos(x)^2 - 1
         let mut ret = self.clone()?;
-        for _ in 0..n {
-            ret = ret.div(&THREE, rm)?;
+        if ret.get_exponent() < EXPONENT_MIN + n as Exponent {
+            ret.set_exponent(EXPONENT_MIN);
+            for _ in 0..n - (ret.get_exponent() - EXPONENT_MIN) as usize {
+                ret = ret.div(&TWO, rm)?;
+            }
+        } else {
+            ret.set_exponent(ret.get_exponent() - n as Exponent);
         }
         Ok(ret)
     }
@@ -178,15 +183,13 @@ impl BigFloatNumber {
     // restore value for the argument reduced n times.
     // cost: n * (4*O(mul) + O(add))
     fn cos_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
-        // cos(3*x) = - 3*cos(x) + 4*cos(x)^3
+        // cos(2*x) = 2*cos(x)^2 - 1
         let mut cos = self.clone()?;
 
         for _ in 0..n {
-            let mut cos_cub = cos.mul(&cos, rm)?;
-            cos_cub = cos_cub.mul(&cos, rm)?;
-            let p1 = cos.mul(&THREE, rm)?;
-            let p2 = cos_cub.mul(&FOUR, rm)?;
-            cos = p2.sub(&p1, rm)?;
+            let mut cos2 = cos.mul(&cos, rm)?;
+            cos2.set_exponent(cos2.get_exponent() + 1);
+            cos = cos2.sub(&ONE, rm)?;
         }
 
         Ok(cos)
@@ -249,7 +252,7 @@ mod tests {
 
         let mut n = vec![];
         for _ in 0..10000 {
-            n.push(BigFloatNumber::random_normal(133, -5, 5).unwrap());
+            n.push(BigFloatNumber::random_normal(640, -5, 5).unwrap());
         }
 
         for _ in 0..5 {
