@@ -107,6 +107,45 @@ impl BigFloatNumber {
         let sq3 = sq2.sqrt(rm)?;
         sq3.add(&sh, rm)
     }
+
+    /// Compute the power of `self` to the `n`. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache `cc` for computing the result.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - ExponentOverflow: the result is too large or too small number.
+    ///  - MemoryAllocation: failed to allocate memory.
+    ///  - InvalidArgument: `self` is negative.
+    pub fn pow(&self, n: &Self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+
+        if self.is_negative() {
+            return Err(Error::InvalidArgument);
+        }
+
+        if self.is_zero() {
+            return if n.is_negative() {
+                Err(Error::ExponentOverflow(Sign::Pos))
+            } else if n.is_zero() {
+                Self::from_word(1, self.get_mantissa_max_bit_len())
+            } else {
+                self.clone()
+            };
+        }
+
+        // self^n = e^(n * ln(self))
+
+        let mut x = self.clone()?;
+        x.set_precision(x.get_mantissa_max_bit_len() + 1, RoundingMode::None)?;
+
+        let ln = x.ln(RoundingMode::None, cc)?;
+        let m = n.mul(&ln, RoundingMode::None)?;
+        let mut ret = m.exp(RoundingMode::None, cc)?;
+
+        ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+
+        Ok(ret)
+    }
+
 }
 
 #[cfg(test)]
