@@ -190,6 +190,59 @@ impl BigFloatNumber {
 
         Ok(x)
     }
+
+    /// Computes the logarithm base 2 of a number. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache `cc` for computing the result.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - InvalidArgument: the argument is zero or negative.
+    ///  - MemoryAllocation: failed to allocate memory.
+    pub fn log2(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+
+        // factoring: log2(self) = ln(x * 2^n) / ln(2) = ln(x) / ln(2) + n, 0.5 <= x < 1
+        // reduction: ln(x) = 2 * ln(sqrt(x))
+        // replacement: ln(x) = 2*atanh((x-1)/(x+1))
+        // atanh(x) = x + x^3/3 + x^5/5 + ...
+
+        if self.is_zero() || self.is_negative() {
+
+            return Err(Error::InvalidArgument);
+        }
+
+        let mut x = self.clone()?;
+        let e = x.normalize2() as isize;
+        let e = self.get_exponent() as isize - e;
+
+        x.set_exponent(0);
+
+        let additional_prec = if e == 0 {
+            count_leading_ones(x.get_mantissa_digits())
+        } else if e == 1 {
+            count_leading_zeroes_skip_first(x.get_mantissa_digits())
+        } else {
+            0
+        } + 2;
+
+        x.set_precision(self.get_mantissa_max_bit_len() + additional_prec, RoundingMode::None)?;
+
+        let p1 = Self::ln_series(x, RoundingMode::None)?;
+
+        let p2 = cc.ln_2(self.get_mantissa_max_bit_len() + additional_prec, RoundingMode::None)?;
+
+        let p3 = p1.div(&p2, RoundingMode::None)?;
+
+        let mut n = Self::from_usize(e.unsigned_abs())?;
+        if e < 0 {
+            n.set_sign(Sign::Neg);
+        }
+
+        let mut ret = p3.add(&n, RoundingMode::None)?;
+
+        ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+
+        Ok(ret)
+    }
 }
 
 

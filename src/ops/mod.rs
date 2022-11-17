@@ -2,7 +2,7 @@
 
 mod sqrt;
 mod cbrt;
-mod ln;
+mod log;
 mod pow;
 mod series;
 pub mod consts;
