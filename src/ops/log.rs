@@ -243,6 +243,31 @@ impl BigFloatNumber {
 
         Ok(ret)
     }
+
+
+    /// Computes the logarithm base 10 of a number. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache `cc` for computing the result.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - InvalidArgument: the argument is zero or negative.
+    ///  - MemoryAllocation: failed to allocate memory.
+    pub fn log10(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+
+        // ln(self) / ln(10)
+
+        let mut x = self.clone()?;
+        x.set_precision(x.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
+
+        let p1 = x.ln(RoundingMode::None, cc)?;
+
+        let p2 = cc.ln_10(x.get_mantissa_max_bit_len(), RoundingMode::None)?;
+
+        let mut ret = p1.div(&p2, RoundingMode::None)?;
+        ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+
+        Ok(ret)
+    }
 }
 
 
