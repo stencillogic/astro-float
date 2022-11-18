@@ -45,6 +45,35 @@ fn test_ln_exp() {
     }
 }
 
+#[test]
+fn test_pow() {
+
+    let mut eps = ONE.clone().unwrap();
+
+    let mut cc = Consts::new().unwrap();
+
+    for _ in 0..1000 {
+
+        let prec = rand::random::<usize>() % 1024 + 64;
+        let mut d1 = BigFloatNumber::random_normal(prec, -5, 5).unwrap();
+        d1.set_sign(Sign::Pos);
+        let d2 = BigFloatNumber::random_normal(prec, -5, 5).unwrap();
+
+        let d3 = d1.pow(&d2,RoundingMode::ToEven, &mut cc).unwrap();
+        let d22 = d2.reciprocal(RoundingMode::ToEven).unwrap();
+        let d4 = d3.pow(&d22, RoundingMode::ToEven, &mut cc).unwrap();
+
+        eps.set_exponent(d2.get_exponent() - prec as Exponent + 15);
+
+        // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("d4 {}", d4.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+        assert!(d4.sub(&d1, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) <= 0);
+    }
+}
+
 
 #[test]
 fn test_sin_asin() {

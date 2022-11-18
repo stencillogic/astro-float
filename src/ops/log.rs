@@ -268,6 +268,35 @@ impl BigFloatNumber {
 
         Ok(ret)
     }
+
+    /// Computes the logarithm base `n` of a number. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache `cc` for computing the result.
+    /// 
+    /// ## Errors
+    /// 
+    ///  - InvalidArgument: the argument is zero or negative.
+    ///  - MemoryAllocation: failed to allocate memory.
+    pub fn log(&self, n: &Self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+
+        // ln(self) / ln(n)
+
+        let p = self.get_mantissa_max_bit_len().max(n.get_mantissa_max_bit_len());
+
+        let mut x = self.clone()?;
+        x.set_precision(p + 2, RoundingMode::None)?;
+
+        let mut n = n.clone()?;
+        n.set_precision(p + 2, RoundingMode::None)?;
+
+        let p1 = x.ln(RoundingMode::None, cc)?;
+
+        let p2 = n.ln(RoundingMode::None, cc)?;
+
+        let mut ret = p1.div(&p2, RoundingMode::None)?;
+        ret.set_precision(p, rm)?;
+
+        Ok(ret)
+    }
 }
 
 
