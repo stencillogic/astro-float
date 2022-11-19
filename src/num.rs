@@ -895,7 +895,7 @@ impl BigFloatNumber {
         self.e = e;
     }
 
-    /// Returns the maximum mantissa length of `self` in bits.
+    /// Returns the maximum mantissa length of `self` in bits regardless of whether `self` is normal or subnormal.
     #[inline]
     pub fn get_mantissa_max_bit_len(&self) -> usize {
         self.m.max_bit_len()
@@ -903,7 +903,6 @@ impl BigFloatNumber {
 
     /// Returns the number of significant bits used in the mantissa. Normal numbers use all bits of the mantissa. 
     /// Subnormal numbers use fewer bits than the mantissa can hold.
-    /// `BigFloatNumber::get_mantissa_max_bit_len` can be used to get the maximum possible precision that `self` can have.
     #[inline]
     pub fn get_precision(&self) -> usize {
         self.m.bit_len()
