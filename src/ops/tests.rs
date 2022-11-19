@@ -74,6 +74,65 @@ fn test_pow() {
     }
 }
 
+#[test]
+fn test_log2_log10() {
+
+    let mut eps = ONE.clone().unwrap();
+
+    let mut cc = Consts::new().unwrap();
+
+    for _ in 0..1000 {
+
+        let prec = rand::random::<usize>() % 1024 + 64;
+        let mut d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
+        d1.set_sign(Sign::Pos);
+
+        let d2 = d1.log2(RoundingMode::ToEven, &mut cc).unwrap();
+        let two = BigFloatNumber::from_word(2, prec).unwrap();
+        let d3 = two.pow(&d2, RoundingMode::ToEven, &mut cc).unwrap();
+
+        let d4 = d1.log10(RoundingMode::ToEven, &mut cc).unwrap();
+        let ten = BigFloatNumber::from_word(10, prec).unwrap();
+        let d5 = ten.pow(&d4, RoundingMode::ToEven, &mut cc).unwrap();
+
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2 + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent);
+
+        // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+        assert!(d3.sub(&d1, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) <= 0);
+        assert!(d5.sub(&d1, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) <= 0);
+    }
+}
+
+#[test]
+fn test_log() {
+
+    let mut eps = ONE.clone().unwrap();
+
+    let mut cc = Consts::new().unwrap();
+
+    for _ in 0..10000 {
+
+        let prec = rand::random::<usize>() % 1024 + 64;
+        let mut d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
+        let mut b = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
+        d1.set_sign(Sign::Pos);
+        b.set_sign(Sign::Pos);
+
+        let d2 = d1.log(&b, RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = b.pow(&d2, RoundingMode::ToEven, &mut cc).unwrap();
+
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2 + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent);
+
+        // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+        assert!(d3.sub(&d1, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) <= 0);
+    }
+}
 
 #[test]
 fn test_sin_asin() {

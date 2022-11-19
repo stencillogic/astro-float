@@ -308,7 +308,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_ln() {
+    fn test_log() {
+
         let mut cc = Consts::new().unwrap();
 
         let rm = RoundingMode::ToEven;
