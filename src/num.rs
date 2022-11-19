@@ -901,6 +901,12 @@ impl BigFloatNumber {
         self.m.max_bit_len()
     }
 
+    /// Returns the precision of `self`. This function is identical to `BigFloatNumber::get_mantissa_max_bit_len`.
+    #[inline]
+    pub fn get_precision(&self) -> usize {
+        self.m.max_bit_len()
+    }
+
     /// Returns the rounded number with `n` binary positions in the fractional part of the number using rounding mode `rm`.
     /// 
     /// ## Errors
