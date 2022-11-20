@@ -59,12 +59,23 @@ pub enum Sign {
 }
 
 impl Sign {
+    
     /// Changes the sign to the opposite.
     pub fn invert(&self) -> Self {
         match *self {
             Sign::Pos => Sign::Neg,
             Sign::Neg => Sign::Pos,
         }
+    }
+
+    /// Returns true if `self` is positive.
+    pub fn is_positive(&self) -> bool {
+        *self == Sign::Pos
+    }
+
+    /// Returns true if `self` is negative.
+    pub fn is_negative(&self) -> bool {
+        *self == Sign::Neg
     }
 }
 

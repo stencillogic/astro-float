@@ -497,7 +497,7 @@ mod tests {
         assert!(e == -4);
 
         let g = BigFloatNumber::convert_from_radix(s, &m, e, Radix::Bin, 160, RoundingMode::ToEven).unwrap();
-        let f = g.to_f64();
+        let f = g.as_f64();
 
         assert!(f == 0.031256789f64);
 

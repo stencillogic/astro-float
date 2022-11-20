@@ -110,6 +110,24 @@ impl Mantissa {
         })
     }
 
+
+    /// New mantissa with length of at least `p` bits prefilled with `words`.
+    pub fn from_words(p: usize, w: &[Word]) -> Result<Self, Error> {
+
+        let mut m = Self::reserve_new(Self::bit_len_to_word_len(p))?;
+
+        let b = m.len() - w.len();
+        (&mut m)[..b].fill(0);
+        (&mut m)[b..].copy_from_slice(w);
+
+        let n = Self::find_bit_len(&m);
+
+        Ok(Mantissa {
+            m,
+            n,
+        })
+    }
+
     /// Return true if mantissa represents zero.
     #[inline]
     pub fn is_zero(&self) -> bool {
@@ -568,30 +586,39 @@ impl Mantissa {
         m.len()*WORD_BIT_SIZE - n
     }
 
-    #[allow(unused_mut)]
-    pub fn from_u64(p: usize, mut u: u64) -> Result<(usize, Self), Error> {
+    pub fn from_u64(p: usize, u: u64) -> Result<(usize, Self), Error> {
         let mut m = Self::reserve_new(Self::bit_len_to_word_len(p))?;
-        let nd = m.len() - size_of::<u64>()/size_of::<Word>();
+
+        if m.len() < size_of::<u64>() / size_of::<Word>() {
+            return Err(Error::InvalidArgument);
+        }
+
+        let nd = m.len() - size_of::<u64>() / size_of::<Word>();
         m[..nd].fill(0);
+        
         #[cfg(target_arch = "x86_64")] {
             m[nd] = u;
         }
+
         #[cfg(target_arch = "x86")] 
         for v in &mut m[nd..] {
             *v = u as Word;
             u >>= WORD_BIT_SIZE;
         }
+
         let shift = Self::maximize(&mut m);
         let mut ret = Mantissa {
             m,
             n: 0,
         };
+
         ret.n = ret.max_bit_len();
+
         Ok((shift, ret))
     }
 
-    #[allow(unused_mut)]
-    pub fn from_usize(mut u: usize) -> Result<(usize, Self), Error> {
+
+    pub fn from_usize(u: usize) -> Result<(usize, Self), Error> {
 
         let mut m;
 

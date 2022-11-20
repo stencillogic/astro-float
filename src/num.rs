@@ -674,8 +674,8 @@ impl BigFloatNumber {
     }
 
     /// Converts a number to f64 value.
-    #[allow(dead_code)] // TODO: add rounding.
-    pub(crate) fn to_f64(&self) -> f64 {
+    #[allow(dead_code)] // used in tests
+    pub(crate) fn as_f64(&self) -> f64 {
         if self.m.is_zero() {
             return 0.0;
         }
@@ -726,11 +726,11 @@ impl BigFloatNumber {
         Self::from_f64(p, f as f64)
     }
 
-    /// Convert to f32.
+    /// Converts a number to f32 value.
     #[inline]
-    #[allow(dead_code)] // TODO: add rounding.
-    pub(crate) fn to_f32(&self) -> f32 {
-        self.to_f64() as f32
+    #[allow(dead_code)] // used in tests
+    pub(crate) fn as_f32(&self) -> f32 {
+        self.as_f64() as f32
     }
 
     /// Returns true if `self` is subnormal. A number is subnormal if the most significant bit of the mantissa is not equal to 1.
@@ -1096,6 +1096,91 @@ impl BigFloatNumber {
 }
 
 
+macro_rules! impl_int_conv {
+    ($s:ty, $u:ty, $from_s:ident, $from_u:ident, $from_int:ident) => {
+
+        impl BigFloatNumber {
+
+            /// Constructs BigFloatNumber with precision `p` from a signed integer value `i`.
+            /// 
+            /// # Errors
+            /// 
+            ///  - MemoryAllocation: failed to allocate memory for mantissa.
+            ///  - InvalidArgument: precision is incorrect.
+            pub fn $from_s(i: $s, p: usize) -> Result<Self, Error> {
+                let sign = if i < 0 {
+                    Sign::Neg
+                } else {
+                    Sign::Pos
+                };
+                Self::$from_int(i.abs() as $u, sign, p)
+            }
+
+            /// Constructs BigFloatNumber with precision `p` from an unsigned integer value `u`.
+            /// 
+            /// # Errors
+            /// 
+            ///  - MemoryAllocation: failed to allocate memory for mantissa.
+            ///  - InvalidArgument: precision is incorrect.
+            pub fn $from_u(u: $u, p: usize) -> Result<Self, Error> {
+                Self::$from_int(u, Sign::Pos, p)
+            }
+
+            fn $from_int(mut v: $u, sign: Sign, p: usize) -> Result<Self, Error> {
+
+                const SZ: usize = core::mem::size_of::<$u>() * 8;
+
+                if p < SZ {
+                    return Err(Error::InvalidArgument);
+                }
+
+                if SZ <= WORD_BIT_SIZE {
+
+                    let mut ret = Self::from_word(v as Word, p)?;
+                    ret.set_sign(sign);
+                    Ok(ret)
+                    
+                } else {
+                    
+                    Self::p_assertion(p)?;
+
+                    if v == 0 {
+
+                        Self::new(p)
+
+                    } else {
+
+                        let mut shift = 0;
+                        while v <= (<$u>::MAX >> 1) {
+                            v <<= 1;
+                            shift += 1;
+                        }
+
+                        let mut words = [0; (SZ + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE];
+                        for w in &mut words {
+                            *w = v as Word;
+                            v >>= WORD_BIT_SIZE;
+                        }
+
+                        Ok(BigFloatNumber {
+                            m: Mantissa::from_words(p, &words)?,
+                            e: (SZ - shift) as Exponent,
+                            s: sign,
+                        })
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl_int_conv!(i8, u8, from_i8, from_u8, from_int_u8);
+impl_int_conv!(i16, u8, from_i16, from_u16, from_int_u16);
+impl_int_conv!(i32, u8, from_i32, from_u32, from_int_u32);
+impl_int_conv!(i64, u8, from_i64, from_u64, from_int_u64);
+impl_int_conv!(i128, u8, from_i128, from_u128, from_int_u128);
+
+
 #[cfg(test)]
 mod tests {
 
@@ -1124,16 +1209,16 @@ mod tests {
         assert!(BigFloatNumber::from_f64(p, f64::NAN).unwrap_err() == Error::InvalidArgument);
 
         // 0.0
-        assert!(BigFloatNumber::from_f64(p, 0.0).unwrap().to_f64() == 0.0);
+        assert!(BigFloatNumber::from_f64(p, 0.0).unwrap().as_f64() == 0.0);
 
         // conversions
         for _ in 0..10000 {
             let f: f64 = random_f64();
             if f.is_finite() {
                 d1 = BigFloatNumber::from_f64(p, f).unwrap();
-                assert!(d1.to_f64() == f);
+                assert!(d1.as_f64() == f);
                 d1 = BigFloatNumber::from_f32(p, f as f32).unwrap();
-                assert!(d1.to_f32() == f as f32);
+                assert!(d1.as_f32() == f as f32);
             }
         }
 
@@ -1347,8 +1432,8 @@ mod tests {
         // fract & int
         let f1 = 12345.6789;
         d1 = BigFloatNumber::from_f64(p, f1).unwrap();
-        assert!(d1.fract().unwrap().to_f64() == f1.fract());
-        assert!(d1.int().unwrap().to_f64() == (f1 as u64) as f64);
+        assert!(d1.fract().unwrap().as_f64() == f1.fract());
+        assert!(d1.int().unwrap().as_f64() == (f1 as u64) as f64);
 
         let f1 = -0.006789;
         d1 = BigFloatNumber::from_f64(p, f1).unwrap();
@@ -1369,24 +1454,24 @@ mod tests {
 
         // ceil & floor
         d1 = BigFloatNumber::from_f64(p, 12.3).unwrap();
-        assert!(d1.floor().unwrap().to_f64() == 12.0);
-        assert!(d1.ceil().unwrap().to_f64() == 13.0);
+        assert!(d1.floor().unwrap().as_f64() == 12.0);
+        assert!(d1.ceil().unwrap().as_f64() == 13.0);
         d1 = BigFloatNumber::from_f64(p, 12.0).unwrap();
-        assert!(d1.floor().unwrap().to_f64() == 12.0);
-        assert!(d1.ceil().unwrap().to_f64() == 12.0);
+        assert!(d1.floor().unwrap().as_f64() == 12.0);
+        assert!(d1.ceil().unwrap().as_f64() == 12.0);
 
         d1 = BigFloatNumber::from_f64(p, -12.3).unwrap();
-        assert!(d1.floor().unwrap().to_f64() == -13.0);
-        assert!(d1.ceil().unwrap().to_f64() == -12.0);
+        assert!(d1.floor().unwrap().as_f64() == -13.0);
+        assert!(d1.ceil().unwrap().as_f64() == -12.0);
         d1 = BigFloatNumber::from_f64(p, -12.0).unwrap();
-        assert!(d1.floor().unwrap().to_f64() == -12.0);
-        assert!(d1.ceil().unwrap().to_f64() == -12.0);
+        assert!(d1.floor().unwrap().as_f64() == -12.0);
+        assert!(d1.ceil().unwrap().as_f64() == -12.0);
 
         // abs
         d1 = BigFloatNumber::from_f64(p, 12.3).unwrap();
-        assert!(d1.abs().unwrap().to_f64() == 12.3);
+        assert!(d1.abs().unwrap().as_f64() == 12.3);
         d1 = BigFloatNumber::from_f64(p, -12.3).unwrap();
-        assert!(d1.abs().unwrap().to_f64() == 12.3);
+        assert!(d1.abs().unwrap().as_f64() == 12.3);
 
         // rem
         for (prec1, prec2) in [(128, 128), (128, 320), (320, 128)] {
