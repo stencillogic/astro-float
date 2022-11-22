@@ -62,6 +62,10 @@ impl BigFloatNumber {
 
     fn conv_from_binary(sign: Sign, digits: &[u8], e: Exponent, p: usize, rm: RoundingMode) -> Result<Self, Error> {
 
+        if digits.is_empty() {
+            return Self::new(p);
+        }
+
         debug_assert!(digits[0] != 0);
 
         let mut mantissa = Vec::new();
@@ -152,6 +156,8 @@ impl BigFloatNumber {
         let mut m = Mantissa::from_raw_parts(&mantissa, mantissa.len() * WORD_BIT_SIZE)?;
         if let Some(norm) = m.find_one_from(0) {
             m.shift_left(norm);
+        } else {
+            m.set_length(p)?;
         }
 
         let mut ret = BigFloatNumber {

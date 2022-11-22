@@ -3,6 +3,7 @@
 use crate::BigFloatNumber;
 use crate::Consts;
 use crate::Error;
+use crate::Exponent;
 use crate::Radix;
 use crate::RoundingMode;
 use crate::Sign;
@@ -516,16 +517,18 @@ impl BigFloat {
     /// # Examples
     /// 
     /// ```
-    /// use num_bigfloat::BigFloat;
+    /// use astro_float::BigFloat;
+    /// use astro_float::Radix;
+    /// use astro_float::RoundingMode;
     /// 
-    /// let n = BigFloat::parse("0.0").unwrap();
-    /// assert!(n.to_f64() == 0.0);
-    /// let n = BigFloat::parse("1.123e-123").unwrap();
-    /// assert!((n.to_f64() - 1.123e-123).abs() < f64::EPSILON);
-    /// let n = BigFloat::parse("-Inf").unwrap();
-    /// assert!(n.to_f64() == f64::NEG_INFINITY);
-    /// let n = BigFloat::parse("NaN").unwrap();
-    /// assert!(n.to_f64().is_nan());
+    /// let n = BigFloat::parse("0.0", Radix::Bin, 64, RoundingMode::ToEven).unwrap();
+    /// assert!(n.is_zero());
+    /// let n = BigFloat::parse("1.124e-24", Radix::Dec, 128, RoundingMode::ToEven).unwrap();
+    /// assert!(n.sub(&BigFloat::from_f64(1.124e-24, 128), RoundingMode::ToEven).get_exponent() <= Some(-52 - 24));
+    /// let n = BigFloat::parse("-Inf", Radix::Hex, 1, RoundingMode::None).unwrap();
+    /// assert!(n.is_inf_neg());
+    /// let n = BigFloat::parse("NaN", Radix::Oct, 2, RoundingMode::None).unwrap();
+    /// assert!(n.is_nan());
     /// ```
     pub fn parse(s: &str, rdx: Radix, p: usize, rm: RoundingMode) -> Option<Self> {
 
@@ -669,6 +672,15 @@ impl BigFloat {
                 Error::InvalidArgument => NAN,
             },
             Ok(v) => BigFloat {inner: Flavor::Value(v)},
+        }
+    }
+
+    pub fn get_exponent(&self) -> Option<Exponent> {
+        match &self.inner {
+            Flavor::Value(v) => {
+                Some(v.get_exponent())
+            },
+            _ => None,
         }
     }
 }
