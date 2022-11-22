@@ -1184,7 +1184,7 @@ macro_rules! impl_int_conv {
                 } else {
                     Sign::Pos
                 };
-                let mut ret = Self::$from_u(i.abs() as $u, p)?;
+                let mut ret = Self::$from_u(i.unsigned_abs(), p)?;
                 ret.set_sign(sign);
                 Ok(ret)
             }
@@ -1254,6 +1254,33 @@ mod tests {
                 d1 = BigFloatNumber::from_f32(p, f as f32).unwrap();
                 assert!(d1.as_f32() == f as f32);
             }
+        }
+
+        for _ in 0..1000 {
+
+            let i1: i8 = rand::random::<i8>();
+            let i2: i16 = rand::random::<i16>();
+            let i3: i32 = rand::random::<i32>();
+            let i4: i64 = rand::random::<i64>();
+            let i5: i128 = rand::random::<i128>();
+
+            let n1 = BigFloatNumber::from_i8(i1, p).unwrap();
+            let n2 = BigFloatNumber::from_i16(i2, p).unwrap();
+            let n3 = BigFloatNumber::from_i32(i3, p).unwrap();
+            let n4 = BigFloatNumber::from_i64(i4, p).unwrap();
+            let n5 = BigFloatNumber::from_i128(i5, p).unwrap();
+
+            let p1 = BigFloatNumber::parse(&format!("{}", i1), crate::Radix::Dec, p, RoundingMode::None).unwrap();
+            let p2 = BigFloatNumber::parse(&format!("{}", i2), crate::Radix::Dec, p, RoundingMode::None).unwrap();
+            let p3 = BigFloatNumber::parse(&format!("{}", i3), crate::Radix::Dec, p, RoundingMode::None).unwrap();
+            let p4 = BigFloatNumber::parse(&format!("{}", i4), crate::Radix::Dec, p, RoundingMode::None).unwrap();
+            let p5 = BigFloatNumber::parse(&format!("{}", i5), crate::Radix::Dec, p, RoundingMode::None).unwrap();
+
+            assert!(p1.cmp(&n1) == 0);
+            assert!(p2.cmp(&n2) == 0);
+            assert!(p3.cmp(&n3) == 0);
+            assert!(p4.cmp(&n4) == 0);
+            assert!(p5.cmp(&n5) == 0);
         }
 
         // 0 * 0
@@ -1579,7 +1606,6 @@ mod tests {
         assert!(d1.is_odd_int());
         let d1 = BigFloatNumber::parse("10000000000000000000001.0000000000000000001", crate::Radix::Dec, 256, RoundingMode::None).unwrap();
         assert!(!d1.is_odd_int());
-
     }
 
     fn random_f64() -> f64 {
