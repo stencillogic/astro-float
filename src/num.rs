@@ -873,6 +873,19 @@ impl BigFloatNumber {
         }
     }
 
+    /// Returns true if `self` is odd integer number.
+    pub(crate) fn is_odd_int(&self) -> bool {
+        if self.e > 0 {
+            if (self.e as usize) < self.m.max_bit_len() {
+                self.m.is_odd_int(self.m.max_bit_len() - self.e as usize)
+            } else {
+                false
+            }
+        } else {
+            self.is_zero()
+        }
+    }
+
     /// Returns integer part of a number as built-in integer.
     pub(super) fn get_int_as_usize(&self) -> Result<usize, Error> {
         if self.e > 0 {
@@ -914,7 +927,7 @@ impl BigFloatNumber {
     /// 
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - ExponentOverflow: rounding causes exponent overflow.
-    pub fn round(&mut self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+    pub fn round(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         let mut ret = self.clone()?;
         let e = self.get_mantissa_max_bit_len() as isize - self.e as isize;
         if e > 0 && e as usize > n {
@@ -1093,11 +1106,69 @@ impl BigFloatNumber {
     pub fn get_mantissa_digits(&self) -> &[Word] {
         self.m.get_digits()
     }
+
+    /// Constructs BigFloatNumber with precision `p` from a signed integer value `i`.
+    /// 
+    /// # Errors
+    /// 
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - InvalidArgument: precision is incorrect.
+    pub fn from_i128(i: i128, p: usize) -> Result<Self, Error> {
+        let sign = if i < 0 {
+            Sign::Neg
+        } else {
+            Sign::Pos
+        };
+        let mut ret = Self::from_u128(i.unsigned_abs(), p)?;
+        ret.set_sign(sign);
+        Ok(ret)
+    }
+
+    /// Constructs BigFloatNumber with precision `p` from an unsigned integer value `u`.
+    /// 
+    /// # Errors
+    /// 
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - InvalidArgument: precision is incorrect.        
+    pub fn from_u128(mut v: u128, p: usize) -> Result<Self, Error> {
+
+        const SZ: usize = core::mem::size_of::<u128>() * 8;
+
+        if p < SZ {
+            return Err(Error::InvalidArgument);
+        }
+
+        Self::p_assertion(p)?;
+
+        if v == 0 {
+            Self::new(p)
+
+        } else {
+
+            let mut shift = 0;
+            while v <= (u128::MAX >> 1) {
+                v <<= 1;
+                shift += 1;
+            }
+
+            let mut words = [0; (SZ + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE];
+            for w in &mut words {
+                *w = v as Word;
+                v >>= WORD_BIT_SIZE;
+            }
+
+            Ok(BigFloatNumber {
+                m: Mantissa::from_words(p, &words)?,
+                e: (SZ - shift) as Exponent,
+                s: Sign::Pos,
+            })
+        }    
+    }
 }
 
 
 macro_rules! impl_int_conv {
-    ($s:ty, $u:ty, $from_s:ident, $from_u:ident, $from_int:ident) => {
+    ($s:ty, $u:ty, $from_s:ident, $from_u:ident) => {
 
         impl BigFloatNumber {
 
@@ -1113,7 +1184,9 @@ macro_rules! impl_int_conv {
                 } else {
                     Sign::Pos
                 };
-                Self::$from_int(i.abs() as $u, sign, p)
+                let mut ret = Self::$from_u(i.abs() as $u, p)?;
+                ret.set_sign(sign);
+                Ok(ret)
             }
 
             /// Constructs BigFloatNumber with precision `p` from an unsigned integer value `u`.
@@ -1123,10 +1196,6 @@ macro_rules! impl_int_conv {
             ///  - MemoryAllocation: failed to allocate memory for mantissa.
             ///  - InvalidArgument: precision is incorrect.
             pub fn $from_u(u: $u, p: usize) -> Result<Self, Error> {
-                Self::$from_int(u, Sign::Pos, p)
-            }
-
-            fn $from_int(mut v: $u, sign: Sign, p: usize) -> Result<Self, Error> {
 
                 const SZ: usize = core::mem::size_of::<$u>() * 8;
 
@@ -1134,51 +1203,16 @@ macro_rules! impl_int_conv {
                     return Err(Error::InvalidArgument);
                 }
 
-                if SZ <= WORD_BIT_SIZE {
-
-                    let mut ret = Self::from_word(v as Word, p)?;
-                    ret.set_sign(sign);
-                    Ok(ret)
-                    
-                } else {
-                    
-                    Self::p_assertion(p)?;
-
-                    if v == 0 {
-
-                        Self::new(p)
-
-                    } else {
-
-                        let mut shift = 0;
-                        while v <= (<$u>::MAX >> 1) {
-                            v <<= 1;
-                            shift += 1;
-                        }
-
-                        let mut words = [0; (SZ + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE];
-                        for w in &mut words {
-                            *w = v as Word;
-                            v >>= WORD_BIT_SIZE;
-                        }
-
-                        Ok(BigFloatNumber {
-                            m: Mantissa::from_words(p, &words)?,
-                            e: (SZ - shift) as Exponent,
-                            s: sign,
-                        })
-                    }
-                }
+                Self::from_word(u as Word, p)
             }
         }
     }
 }
 
-impl_int_conv!(i8, u8, from_i8, from_u8, from_int_u8);
-impl_int_conv!(i16, u8, from_i16, from_u16, from_int_u16);
-impl_int_conv!(i32, u8, from_i32, from_u32, from_int_u32);
-impl_int_conv!(i64, u8, from_i64, from_u64, from_int_u64);
-impl_int_conv!(i128, u8, from_i128, from_u128, from_int_u128);
+impl_int_conv!(i8, u8, from_i8, from_u8);
+impl_int_conv!(i16, u16, from_i16, from_u16);
+impl_int_conv!(i32, u32, from_i32, from_u32);
+impl_int_conv!(i64, u64, from_i64, from_u64);
 
 
 #[cfg(test)]
@@ -1529,6 +1563,23 @@ mod tests {
             assert!(ret.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) <= 0);
         }
 
+        let d1 = BigFloatNumber::parse("3.0", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
+        assert!(d1.is_odd_int());
+        let d1 = BigFloatNumber::parse("3.01", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
+        assert!(!d1.is_odd_int());
+        let d1 = BigFloatNumber::parse("32.0", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
+        assert!(!d1.is_odd_int());
+        let d1 = BigFloatNumber::parse("32.01", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
+        assert!(!d1.is_odd_int());
+        let d1 = BigFloatNumber::parse("0.00000000000000000000001", crate::Radix::Dec, 256, RoundingMode::None).unwrap();
+        assert!(!d1.is_odd_int());
+        let d1 = BigFloatNumber::parse("5.00000000000000000000001", crate::Radix::Dec, 256, RoundingMode::None).unwrap();
+        assert!(!d1.is_odd_int());
+        let d1 = BigFloatNumber::parse("10000000000000000000001.0", crate::Radix::Dec, 256, RoundingMode::None).unwrap();
+        assert!(d1.is_odd_int());
+        let d1 = BigFloatNumber::parse("10000000000000000000001.0000000000000000001", crate::Radix::Dec, 256, RoundingMode::None).unwrap();
+        assert!(!d1.is_odd_int());
+
     }
 
     fn random_f64() -> f64 {
@@ -1673,7 +1724,7 @@ mod tests {
                 for (m1, m2) in mantissas.iter().zip(expected_mantissas.iter()) {
 
                     // rounding
-                    let mut d1 = BigFloatNumber::from_raw_parts(m1, 128, sign, 64).unwrap();
+                    let d1 = BigFloatNumber::from_raw_parts(m1, 128, sign, 64).unwrap();
                     let d2 = d1.round(60, *rm).unwrap();
                     let d3 = BigFloatNumber::from_raw_parts(m2, 128, sign, 64).unwrap();
 

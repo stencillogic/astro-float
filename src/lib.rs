@@ -101,8 +101,10 @@ mod parser;
 mod ops;
 mod common;
 mod conv;
+mod ext;
 
 pub use crate::num::BigFloatNumber;
+pub use crate::ext::BigFloat;
 pub use crate::defs::Sign;
 pub use crate::defs::Error;
 pub use crate::defs::Exponent;

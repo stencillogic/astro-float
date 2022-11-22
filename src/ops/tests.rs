@@ -113,7 +113,7 @@ fn test_log() {
 
     let mut cc = Consts::new().unwrap();
 
-    for _ in 0..10000 {
+    for _ in 0..1000 {
 
         let prec = rand::random::<usize>() % 1024 + 64;
         let mut d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
