@@ -874,6 +874,7 @@ impl BigFloatNumber {
     }
 
     /// Returns true if `self` is odd integer number.
+    #[allow(dead_code)] // used in tests
     pub(crate) fn is_odd_int(&self) -> bool {
         if self.e > 0 {
             if (self.e as usize) < self.m.max_bit_len() {
@@ -1220,6 +1221,9 @@ mod tests {
 
     use super::*;
     use rand::random;
+
+    #[cfg(not(feature="std"))]
+    use alloc::format;
 
     #[test]
     fn test_number() {

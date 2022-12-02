@@ -18,19 +18,23 @@ pub const NAN: BigFloat = BigFloat {inner: Flavor::NaN };
 pub const INF_POS: BigFloat = BigFloat {inner: Flavor::Inf(Sign::Pos) };
 pub const INF_NEG: BigFloat = BigFloat {inner: Flavor::Inf(Sign::Neg) };
 
-/// Global context contains default parameters for all operations.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct GlobalContext {
-    pub precision: usize,
-    pub rounding_mode: RoundingMode,
+
+// Context contains default parameters for all operations.
+pub struct Context {
+    cc: Option<RefCell<Consts>>,
+    p: usize,
+    rm: RoundingMode,
 }
 
-thread_local! {
-    static CC: RefCell<Consts>  = RefCell::new(Consts::new().expect("Constant cache initialized"));
-    static GCTX: RefCell<GlobalContext> = RefCell::new(GlobalContext {
-        precision: WORD_BIT_SIZE * 2,
-        rounding_mode: RoundingMode::ToEven,
-    });
+impl Context {
+
+    pub fn new() -> Result<Self, Error> {
+        Ok(Context {
+            cc: Some(RefCell::new(Consts::new()?)),
+            p: WORD_BIT_SIZE*2,
+            rm: RoundingMode::ToEven,
+        })
+    }
 }
 
 /// Number representation.
@@ -319,14 +323,12 @@ impl BigFloat {
     }
 
     /// Returns `self` to the power of `d1`.
-    pub fn pow(&self, d1: &Self, rm: RoundingMode) -> Self {
+    pub fn pow(&self, d1: &Self, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v1) => {
                 match &d1.inner {
                     Flavor::Value(v2) => {
-                        CC.with(|cc| {
-                            Self::result_to_ext(v1.pow(&v2, rm, &mut cc.borrow_mut()), v1.is_zero(), v1.get_sign() == v2.get_sign())
-                        })
+                        Self::result_to_ext(v1.pow(&v2, rm, cc), v1.is_zero(), v1.get_sign() == v2.get_sign())
                     },
                     Flavor::Inf(s2) => {
                         // v1^inf
@@ -336,7 +338,7 @@ impl BigFloat {
                         } else if val < 0 {
                             Self::new(v1.get_mantissa_max_bit_len())
                         } else {
-                            Self::from_u8(1)
+                            Self::from_u8(1, v1.get_mantissa_max_bit_len())
                         }
                     },
                     Flavor::NaN => NAN,
@@ -347,7 +349,7 @@ impl BigFloat {
                     Flavor::Value(v2) => {
                         // inf ^ v2
                         if v2.is_zero() {
-                            Self::from_u8(1)
+                            Self::from_u8(1, v2.get_mantissa_max_bit_len())
                         } else if v2.is_positive() {
                             if s1.is_negative() && v2.is_odd_int() {
                                 // v2 is odd and has no fractional part. 
@@ -375,15 +377,12 @@ impl BigFloat {
     }
 
     /// Returns the logarithm base `b` of a number.
-    pub fn log(&self, b: &Self) -> Self {
+    pub fn log(&self, b: &Self, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v1) => {
                 match &b.inner {
                     Flavor::Value(v2) => {
-                        let rm = GCTX.with(|x| x.borrow().rounding_mode);
-                        CC.with(|cc| {
-                            Self::result_to_ext(v1.log(&v2, rm, &mut cc.borrow_mut()), false, true)
-                        })
+                        Self::result_to_ext(v1.log(v2, rm, cc), false, true)
                     },
                     Flavor::Inf(s2) => {
                         // v1.log(inf)
@@ -502,11 +501,11 @@ impl BigFloat {
         if self.is_nan() {
             NAN
         } else if self.is_negative() {
-            let mut ret = Self::from_u8(1);
+            let mut ret = Self::from_u8(1, 1);
             ret.inv_sign();
             ret
         } else {
-            Self::from_u8(1)
+            Self::from_u8(1, 1)
         }
     }
 
@@ -553,10 +552,9 @@ impl BigFloat {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn write_str<T: Write>(&self, w: &mut T, rdx: Radix) -> Result<(), core::fmt::Error> {
+    pub(crate) fn write_str<T: Write>(&self, w: &mut T, rdx: Radix, rm: RoundingMode) -> Result<(), core::fmt::Error> {
         match &self.inner {
             Flavor::Value(v) => {
-                let rm = GCTX.with(|x| x.borrow().rounding_mode);
                 let s = v.format(rdx, rm).unwrap();
                 w.write_str(&s)
             },
@@ -629,25 +627,34 @@ impl BigFloat {
     }
 
     /// Returns the arctangent of `self`. The result is an angle in radians ranging from -pi/2 to pi/2.
-    pub fn atan(&self, rm: RoundingMode, p: usize) -> Self {
+    pub fn atan(&self, rm: RoundingMode, p: usize, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v) => {
-                CC.with(|cc| {
-                    Self::result_to_ext(v.atan(rm, &mut cc.borrow_mut()), v.is_zero(), true)
-                })
+                Self::result_to_ext(v.atan(rm, cc), v.is_zero(), true)
             },
             Flavor::Inf(s) => {
-                Self::result_to_ext(Self::half_pi(*s, p, rm), false, true)
+                Self::result_to_ext(Self::half_pi(*s, p, rm, cc), false, true)
             }
             Flavor::NaN => NAN,
         }
     }
 
-    fn half_pi(s: Sign, p: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
+    /// Returns the hyperbolic tangent of `self`.
+    pub fn tanh(&self, rm: RoundingMode, p: usize, cc: &mut Consts) -> Self {
+        match &self.inner {
+            Flavor::Value(v) => {
+                Self::result_to_ext(v.atan(rm, cc), v.is_zero(), true)
+            },
+            Flavor::Inf(s) => {
+                Self::from_i8(s.as_int(), p)
+            }
+            Flavor::NaN => NAN,
+        }
+    }
 
-        let mut half_pi = CC.with(|cc| {
-            cc.borrow_mut().pi(p, rm)
-        })?;
+    fn half_pi(s: Sign, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<BigFloatNumber, Error> {
+
+        let mut half_pi = cc.pi(p, rm)?;
 
         half_pi.set_exponent(1);
         half_pi.set_sign(s);
@@ -735,12 +742,10 @@ macro_rules! gen_wrapper_arg_rm_cc {
     // unwrap error, function requires self as argument
     ($comment:literal, $fname:ident, $ret:ty, $pos_inf:block, $neg_inf:block, $($arg:ident, $arg_type:ty),*) => {
         #[doc=$comment]
-        pub fn $fname(&self$(,$arg: $arg_type)*, rm: RoundingMode) -> $ret {
+        pub fn $fname(&self$(,$arg: $arg_type)*, rm: RoundingMode, cc: &mut Consts) -> $ret {
             match &self.inner {
                 Flavor::Value(v) => {
-                    CC.with(|cc| {
-                        Self::result_to_ext(v.$fname($($arg,)* rm, &mut cc.borrow_mut()), v.is_zero(), true)
-                    })
+                    Self::result_to_ext(v.$fname($($arg,)* rm, cc), v.is_zero(), true)
                 },
                 Flavor::Inf(s) => if s.is_positive() $pos_inf else $neg_inf,
                 Flavor::NaN => NAN,
@@ -774,7 +779,6 @@ impl BigFloat {
 
     gen_wrapper_arg_rm!("Returns the hyperbolic sine of `self`.", sinh, Self, {INF_POS}, {INF_NEG},);
     gen_wrapper_arg_rm!("Returns the hyperbolic cosine of `self`.", cosh, Self, {INF_POS}, {INF_POS},);
-    gen_wrapper_arg_rm_cc!("Returns the hyperbolic tangent of `self`.", tanh, Self, {BigFloat::from_u8(1)}, {BigFloat::from_i8(-1)},);
     gen_wrapper_arg_rm_cc!("Returns the inverse hyperbolic sine of `self`.", asinh, Self, {INF_POS}, {INF_NEG},);
     gen_wrapper_arg_rm_cc!("Returns the inverse hyperbolic cosine of `self`.", acosh, Self, {BigFloat::new(1)}, {BigFloat::new(1)},);
     gen_wrapper_arg_rm_cc!("Returns the inverse hyperbolic tangent of `self`.", atanh, Self, {BigFloat::new(1)}, {BigFloat::new(1)},);
@@ -785,26 +789,19 @@ macro_rules! impl_int_conv {
     ($s:ty, $from_s:ident) => {
 
         impl BigFloat {
-            /// Construct BigFloat from integer value.
-            pub fn $from_s(i: $s) -> Self {
-                let p = GCTX.with(|x| x.borrow().precision);
+            /// Construct BigFloat from an integer value.
+            pub fn $from_s(i: $s, p: usize) -> Self {
                 Self::result_to_ext(BigFloatNumber::$from_s(i, p), false, true)
             }
         }
 
-        #[cfg(feature = "std")]
-        impl From<$s> for BigFloat {
-            fn from(i: $s) -> Self {
-                BigFloat::$from_s(i)
-            }
-        }
-
-        #[cfg(not(feature = "std"))]
-        impl core::convert::From<$s> for BigFloat {
-            fn from(i: $s) -> Self {
-                BigFloat::$from_s(i)
-            }
-        }
+        //#[cfg(feature = "std")]
+        //impl From<$s> for BigFloat {
+        //    fn from(i: $s) -> Self {
+        //        let p = GCTX.with(|x| x.borrow().precision);
+        //        BigFloat::$from_s(i, p)
+        //    }
+        //}
     };
 }
 

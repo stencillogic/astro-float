@@ -25,6 +25,7 @@ smallvec = { version = "1.9.0", default-features = false, features = [] }
 default = ["std", "random", "serde"]
 std = []
 random = ["dep:rand"]
+serde = ["dep:serde"]
 
 [profile.release]
 opt-level = 3

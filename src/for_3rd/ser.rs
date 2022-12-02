@@ -1,7 +1,13 @@
+//! Serialization of BigFloatNumber.
+//! Serialization to a string uses decimal radix.
+
 use serde::ser::Error;
 use serde::{Serialize, Serializer};
-
 use crate::{BigFloatNumber, Radix, RoundingMode};
+
+#[cfg(not(feature="std"))]
+use alloc::format;
+
 
 impl Serialize for BigFloatNumber {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {

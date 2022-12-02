@@ -77,6 +77,11 @@ impl Sign {
     pub fn is_negative(&self) -> bool {
         *self == Sign::Neg
     }
+
+    /// Returns 1 for the positive sign and -1 for the negative sign.
+    pub fn as_int(&self) -> i8 {
+        *self as i8
+    }
 }
 
 use smallvec::CollectionAllocErr;
