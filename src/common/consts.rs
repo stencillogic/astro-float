@@ -3,7 +3,6 @@
 use crate::num::BigFloatNumber;
 use lazy_static::lazy_static;
 
-
 lazy_static! {
 
     /// 1

@@ -1,23 +1,18 @@
 //! ln(10)
 
-use crate::RoundingMode;
 use crate::common::consts::ONE;
 use crate::defs::Error;
 use crate::num::BigFloatNumber;
-
+use crate::RoundingMode;
 
 fn pqr(a: usize, b: usize) -> Result<(BigFloatNumber, BigFloatNumber, BigFloatNumber), Error> {
-
     if a == b - 1 {
-
         let p = BigFloatNumber::from_word(81, 1)?;
-        let q = BigFloatNumber::from_usize((2*b + 1) * 121)?;
-        let r = BigFloatNumber::from_usize((2*b + 1) * 81)?;
+        let q = BigFloatNumber::from_usize((2 * b + 1) * 121)?;
+        let r = BigFloatNumber::from_usize((2 * b + 1) * 81)?;
 
         Ok((p, q, r))
-
     } else {
-
         let m = (a + b) / 2;
 
         let (pa, qa, ra) = pqr(a, m)?;
@@ -34,9 +29,13 @@ fn pqr(a: usize, b: usize) -> Result<(BigFloatNumber, BigFloatNumber, BigFloatNu
     }
 }
 
-fn pqr_inc(pa: &BigFloatNumber, qa: &BigFloatNumber, ra: &BigFloatNumber, m: usize) -> Result<(BigFloatNumber, BigFloatNumber, BigFloatNumber, usize), Error> {
-
-    let b = m*2;
+fn pqr_inc(
+    pa: &BigFloatNumber,
+    qa: &BigFloatNumber,
+    ra: &BigFloatNumber,
+    m: usize,
+) -> Result<(BigFloatNumber, BigFloatNumber, BigFloatNumber, usize), Error> {
+    let b = m * 2;
 
     let (pb, qb, rb) = pqr(m, b)?;
 
@@ -60,9 +59,7 @@ pub struct Ln10Cache {
 }
 
 impl Ln10Cache {
-
     pub fn new() -> Result<Self, Error> {
-
         let (p01, q01, r01) = pqr(0, 1)?;
 
         let val = Self::calc_ln10(&p01, &q01)?;
@@ -76,8 +73,7 @@ impl Ln10Cache {
         })
     }
 
-    fn calc_ln10(p: &BigFloatNumber, q: &BigFloatNumber) -> Result<BigFloatNumber, Error>  {
-
+    fn calc_ln10(p: &BigFloatNumber, q: &BigFloatNumber) -> Result<BigFloatNumber, Error> {
         // 18 * (1 + p / q) / 11
         let mut val = p.div(q, crate::RoundingMode::None)?;
         val = val.add(&ONE, crate::RoundingMode::None)?;
@@ -89,11 +85,9 @@ impl Ln10Cache {
 
     /// Return value of ln(10) with precision k (calculate if needed).
     pub fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
-
-        let kext = k * 1728/1000 + 4;
+        let kext = k * 1728 / 1000 + 4;
 
         if self.b <= kext {
-
             let mut pk;
             let mut qk;
             let mut rk;
@@ -102,7 +96,6 @@ impl Ln10Cache {
             (pk, qk, rk, bb) = pqr_inc(&self.pk, &self.qk, &self.rk, self.b)?;
 
             while bb <= kext {
-
                 (pk, qk, rk, bb) = pqr_inc(&pk, &qk, &rk, bb)?;
             }
 
@@ -118,9 +111,7 @@ impl Ln10Cache {
             self.b = bb;
 
             Ok(ret)
-
         } else {
-
             let mut ret = self.val.clone()?;
 
             ret.set_precision(k, rm)?;
@@ -130,12 +121,11 @@ impl Ln10Cache {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
-    use crate::{RoundingMode, Sign};
     use super::*;
+    use crate::{RoundingMode, Sign};
 
     #[test]
     #[cfg(target_arch = "x86")]
@@ -143,7 +133,16 @@ mod tests {
         let mut ln10 = Ln10Cache::new().unwrap();
         let c = ln10.for_prec(320, RoundingMode::ToEven).unwrap();
         //println!("{:?}", c.fp3(crate::Radix::Dec, RoundingMode::None));
-        let r = BigFloatNumber::from_raw_parts(&[2980581469, 2519663319, 32517490, 2210799234, 3663591694, 3801083129, 2194868776, 3931559467, 2863180822, 2472381917], 320, Sign::Pos, 2).unwrap();
+        let r = BigFloatNumber::from_raw_parts(
+            &[
+                2980581469, 2519663319, 32517490, 2210799234, 3663591694, 3801083129, 2194868776,
+                3931559467, 2863180822, 2472381917,
+            ],
+            320,
+            Sign::Pos,
+            2,
+        )
+        .unwrap();
         assert!(c.cmp(&r) == 0);
     }
 
@@ -153,7 +152,19 @@ mod tests {
         let mut ln10 = Ln10Cache::new().unwrap();
         let c = ln10.for_prec(320, RoundingMode::ToEven).unwrap();
         //println!("{:?}", c);
-        let r = BigFloatNumber::from_raw_parts(&[10821871555016396893, 9495310408084368754, 16325527732095940878, 16885919335239060008, 10618799479599967254], 320, Sign::Pos, 2).unwrap();
+        let r = BigFloatNumber::from_raw_parts(
+            &[
+                10821871555016396893,
+                9495310408084368754,
+                16325527732095940878,
+                16885919335239060008,
+                10618799479599967254,
+            ],
+            320,
+            Sign::Pos,
+            2,
+        )
+        .unwrap();
         assert!(c.cmp(&r) == 0);
     }
 }

@@ -1,11 +1,11 @@
 //! Everything related to mantissa.
 
-mod mantissa;
 mod div;
 mod fft;
+mod mantissa;
 mod mul;
-mod util;
 mod toom2;
 mod toom3;
+mod util;
 
 pub use mantissa::Mantissa;

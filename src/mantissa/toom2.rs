@@ -1,19 +1,16 @@
 //! Karatsuba multiplication.
 
-use crate::defs::Error;
-use crate::defs::Word;
-use crate::defs::DoubleWord;
-use crate::defs::WORD_BASE;
-use crate::mantissa::Mantissa;
 use crate::common::buf::WordBuf;
 use crate::common::util::add_carry;
+use crate::defs::DoubleWord;
+use crate::defs::Error;
+use crate::defs::Word;
+use crate::defs::WORD_BASE;
+use crate::mantissa::Mantissa;
 use itertools::izip;
 
-
 impl Mantissa {
-
     fn add_slices(s1: &[Word], s2: &[Word], s3: &mut [Word]) {
-
         let mut c = 0;
 
         let (mut iter1, mut iter2) = if s1.len() > s2.len() {
@@ -35,7 +32,6 @@ impl Mantissa {
     }
 
     fn paired_sub(s1: &[Word], s2: &[Word], s3: &mut [Word]) {
-
         let mut c = 0;
         let mut iter3 = s3.iter_mut();
 
@@ -46,7 +42,6 @@ impl Mantissa {
         };
 
         for (a, b, x) in izip!(iter2, iter1.by_ref(), iter3.by_ref()) {
-
             let v = *x as DoubleWord;
             let s = *a as DoubleWord + *b as DoubleWord + c;
 
@@ -57,13 +52,12 @@ impl Mantissa {
                 *x = (v + WORD_BASE - s) as Word;
                 c = 1;
             } else {
-                *x = (v + WORD_BASE*2 - s) as Word;
+                *x = (v + WORD_BASE * 2 - s) as Word;
                 c = 2;
             }
         }
 
         for (a, x) in iter1.zip(iter3.by_ref()) {
-
             let v = *x as DoubleWord;
             let s = *a as DoubleWord + c;
 
@@ -74,17 +68,16 @@ impl Mantissa {
                 *x = (v + WORD_BASE - s) as Word;
                 c = 1;
             } else {
-                *x = (v + WORD_BASE*2 - s) as Word;
+                *x = (v + WORD_BASE * 2 - s) as Word;
                 c = 2;
             }
         }
 
         if c > 0 {
             for x in iter3 {
-
                 let v = *x as DoubleWord;
                 let s = c;
-    
+
                 if v >= s {
                     *x = (v - s) as Word;
                     c = 0;
@@ -92,7 +85,7 @@ impl Mantissa {
                     *x = (v + WORD_BASE - s) as Word;
                     c = 1;
                 } else {
-                    *x = (v + WORD_BASE*2 - s) as Word;
+                    *x = (v + WORD_BASE * 2 - s) as Word;
                     c = 2;
                 }
             }
@@ -100,7 +93,6 @@ impl Mantissa {
     }
 
     fn add_assign_slices(s1: &mut [Word], s2: &[Word]) {
-
         let mut c = 0;
 
         let mut s3iter = s1.iter_mut();
@@ -116,7 +108,6 @@ impl Mantissa {
     }
 
     pub(super) fn toom2(m1: &[Word], m2: &[Word], m3: &mut [Word]) -> Result<(), Error> {
-
         let n = (m1.len().min(m2.len()) + 1) >> 1;
         let n2 = n << 1;
 
@@ -126,7 +117,7 @@ impl Mantissa {
 
         let x1l = m11.len().max(m12.len()) + 1;
         let x2l = m21.len().max(m22.len()) + 1;
-        let buf_sz = (x1l + x2l)*2;
+        let buf_sz = (x1l + x2l) * 2;
 
         let mut buf_holder1;
         let mut buf_holder2;
@@ -137,7 +128,7 @@ impl Mantissa {
             buf_holder1 = WordBuf::new(buf_sz)?;
             &mut buf_holder1
         };
-        
+
         let (x1, rest) = buf.split_at_mut(x1l);
         let (x2, rest) = rest.split_at_mut(x2l);
         let z2buf = rest;
@@ -156,20 +147,18 @@ impl Mantissa {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
     use super::*;
-    use rand::random;
     use crate::defs::{DoubleWord, WORD_BIT_SIZE};
+    use rand::random;
 
-    #[cfg(not(feature="std"))]
+    #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
-    
+
     #[test]
     fn test_toom2() {
-
         // d1*d2
         let s1 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
         let s2 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
@@ -247,9 +236,8 @@ mod tests {
 
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn toom2_perf() {
-
         for _ in 0..5 {
             let sz = 34;
             let f = random_slice(sz, sz);
@@ -261,7 +249,7 @@ mod tests {
                 let v = random_slice(sz, sz);
                 n.push(v);
             }
-            
+
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
                 Mantissa::toom2(ni, &f, &mut ret).unwrap();

@@ -1,18 +1,17 @@
 //! Lightweigh integer.
 
-use itertools::izip;
-use crate::defs::{Word, DoubleWord, WORD_BIT_SIZE, WORD_BASE, WORD_MAX, SignedWord};
-use crate::common::util::{shift_slice_left, sub_borrow};
-use crate::common::util::shift_slice_right;
 use super::util::add_carry;
-use core::ops::DerefMut;
+use crate::common::util::shift_slice_right;
+use crate::common::util::{shift_slice_left, sub_borrow};
+use crate::defs::{DoubleWord, SignedWord, Word, WORD_BASE, WORD_BIT_SIZE, WORD_MAX};
 use core::ops::Deref;
-
+use core::ops::DerefMut;
+use itertools::izip;
 
 // Internal repr of SliceWithSign.
 enum SliceWithSignType<'a> {
     Mut(&'a mut [Word]),
-    Immut(&'a [Word])
+    Immut(&'a [Word]),
 }
 
 // Slice of words with sign is a lightweight integer number representation.
@@ -22,7 +21,6 @@ pub struct SliceWithSign<'a> {
 }
 
 impl<'a> SliceWithSign<'a> {
-    
     pub fn new_mut(m: &'a mut [Word], sign: i8) -> Self {
         SliceWithSign {
             m: SliceWithSignType::Mut(m),
@@ -30,7 +28,7 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
-    pub fn new(m: &'a[Word], sign: i8) -> Self {
+    pub fn new(m: &'a [Word], sign: i8) -> Self {
         SliceWithSign {
             m: SliceWithSignType::Immut(m),
             sign,
@@ -59,7 +57,6 @@ impl<'a> SliceWithSign<'a> {
 
     fn add_sub<'b, 'c>(&self, s2: &SliceWithSign<'b>, dst: &mut SliceWithSign<'c>, op: i8) {
         if (self.sign != s2.sign && op > 0) || (op < 0 && self.sign == s2.sign) {
-
             // subtract
             let cmp = Self::abs_cmp(self, s2);
 
@@ -67,12 +64,11 @@ impl<'a> SliceWithSign<'a> {
                 dst.sign = self.sign;
                 Self::abs_sub(self, s2, dst);
             } else if cmp < 0 {
-                dst.sign = s2.sign*op;
+                dst.sign = s2.sign * op;
                 Self::abs_sub(s2, self, dst);
             } else {
                 dst.fill(0);
             };
-
         } else {
             dst.sign = self.sign;
             Self::abs_add(self, s2, dst);
@@ -87,7 +83,7 @@ impl<'a> SliceWithSign<'a> {
                 Self::abs_sub_assign_1(self, s2);
             } else if cmp < 0 {
                 Self::abs_sub_assign_2(self, s2);
-                self.sign = s2.sign*op;
+                self.sign = s2.sign * op;
             } else {
                 self.fill(0);
             };
@@ -150,7 +146,6 @@ impl<'a> SliceWithSign<'a> {
     }
 
     pub fn div_by_word(&mut self, d: Word) {
-
         debug_assert!(d != 0);
 
         let d = d as DoubleWord;
@@ -197,13 +192,12 @@ impl<'a> SliceWithSign<'a> {
                     SliceWithSignType::Mut(s) => m[..s.len()].copy_from_slice(s),
                     SliceWithSignType::Immut(s) => m[..s.len()].copy_from_slice(s),
                 };
-            },
+            }
             _ => panic!(),
         }
     }
 
     fn abs_add(s1: &[Word], s2: &[Word], dst: &mut [Word]) {
-
         let mut c = 0;
 
         let (iter1, mut iter2) = if s1.len() < s2.len() {
@@ -232,7 +226,6 @@ impl<'a> SliceWithSign<'a> {
     }
 
     fn abs_add_assign(s1: &mut [Word], s2: &[Word]) {
-
         let mut c = 0;
         let mut iter1 = s1.iter_mut();
         let iter2 = s2.iter();
@@ -248,7 +241,6 @@ impl<'a> SliceWithSign<'a> {
 
     // prereq: val of s1 >= val of s2
     fn abs_sub_assign_1(s1: &mut [Word], s2: &[Word]) {
-
         let mut c = 0;
         let mut iter1 = s1.iter_mut();
         let iter2 = s2.iter();
@@ -266,7 +258,6 @@ impl<'a> SliceWithSign<'a> {
 
     // prereq: val of s2 > val of s1
     fn abs_sub_assign_2(s1: &mut [Word], s2: &[Word]) {
-
         let mut c = 0;
 
         for (a, b) in s2.iter().zip(s1.iter_mut()) {
@@ -277,7 +268,6 @@ impl<'a> SliceWithSign<'a> {
     }
 
     fn abs_sub(s1: &[Word], s2: &[Word], dst: &mut [Word]) {
-
         let mut c = 0;
 
         let mut iter1 = s1.iter();
@@ -326,7 +316,6 @@ impl<'a> SliceWithSign<'a> {
     }
 
     fn abs_cmp(s1: &[Word], s2: &[Word]) -> SignedWord {
-
         let len = s1.len().min(s2.len());
 
         for v in &s1[len..] {
@@ -363,7 +352,6 @@ impl<'a> SliceWithSign<'a> {
 }
 
 impl<'a> Deref for SliceWithSign<'a> {
-
     type Target = [Word];
 
     #[inline]
@@ -376,7 +364,6 @@ impl<'a> Deref for SliceWithSign<'a> {
 }
 
 impl<'a> DerefMut for SliceWithSign<'a> {
-
     #[inline]
     fn deref_mut(&mut self) -> &mut [Word] {
         match &mut self.m {

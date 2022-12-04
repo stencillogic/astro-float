@@ -1,21 +1,19 @@
 //! Cube root computation.
 
 use crate::{
-    num::BigFloatNumber, 
-    RoundingMode, 
-    defs::{Error, EXPONENT_MIN, EXPONENT_MAX}, Exponent, common::util::log2_ceil
+    common::util::log2_ceil,
+    defs::{Error, EXPONENT_MAX, EXPONENT_MIN},
+    num::BigFloatNumber,
+    Exponent, RoundingMode,
 };
 
-
 impl BigFloatNumber {
-
     /// Computes cube root of a number. The result is rounded using the rounding mode `rm`.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn cbrt(&self, rm: RoundingMode) -> Result<Self, Error> {
-
         if self.is_zero() {
             return self.clone();
         }
@@ -58,7 +56,6 @@ impl BigFloatNumber {
     }
 
     fn cbrt_step(&self, mut xn: Self) -> Result<Self, Error> {
-
         // x(n+1) = 2 * x(n) * (x(n)^3 / 2 + self) / (2 * x(n)^3 + self)
 
         let xxn = xn.mul(&xn, RoundingMode::None)?;
@@ -83,14 +80,17 @@ impl BigFloatNumber {
 mod tests {
 
     use super::*;
-    use crate::{Exponent, common::consts::ONE, defs::{EXPONENT_MIN, EXPONENT_MAX}};
+    use crate::{
+        common::consts::ONE,
+        defs::{EXPONENT_MAX, EXPONENT_MIN},
+        Exponent,
+    };
 
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     use crate::Sign;
 
     #[test]
     fn test_cbrt() {
-
         /* let n1 = BigFloatNumber::from_raw_parts(
             &[10240209581698738563, 18115871017240605025],
             128, Sign::Pos, 0).unwrap();
@@ -103,10 +103,13 @@ mod tests {
         let prec = 320;
 
         for _ in 0..1000 {
-
             let d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
             let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
-            let d3 = d2.mul(&d2, RoundingMode::ToEven).unwrap().mul(&d2, RoundingMode::ToEven).unwrap();
+            let d3 = d2
+                .mul(&d2, RoundingMode::ToEven)
+                .unwrap()
+                .mul(&d2, RoundingMode::ToEven)
+                .unwrap();
 
             eps.set_exponent(d1.get_exponent() - prec as Exponent + 3);
 
@@ -114,55 +117,116 @@ mod tests {
             // println!("d2 {:?}", d2.format(crate::Radix::Dec, RoundingMode::None).unwrap());
             // println!("d3 {:?}", d3.format(crate::Radix::Dec, RoundingMode::None).unwrap());
 
-            assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+            assert!(
+                d1.sub(&d3, RoundingMode::ToEven)
+                    .unwrap()
+                    .abs()
+                    .unwrap()
+                    .cmp(&eps)
+                    < 0
+            );
         }
 
         // MAX
         let d1 = BigFloatNumber::max_value(prec).unwrap();
         let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
-        let d3 = d2.mul(&d2, RoundingMode::ToEven).unwrap().mul(&d2, RoundingMode::ToEven).unwrap();
+        let d3 = d2
+            .mul(&d2, RoundingMode::ToEven)
+            .unwrap()
+            .mul(&d2, RoundingMode::ToEven)
+            .unwrap();
         eps.set_exponent(d1.get_exponent() - prec as Exponent + 3);
-        assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+        assert!(
+            d1.sub(&d3, RoundingMode::ToEven)
+                .unwrap()
+                .abs()
+                .unwrap()
+                .cmp(&eps)
+                < 0
+        );
 
         // MIN
         let d1 = BigFloatNumber::min_value(prec).unwrap();
         let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
-        let d3 = d2.mul(&d2, RoundingMode::ToEven).unwrap().mul(&d2, RoundingMode::ToEven).unwrap();
+        let d3 = d2
+            .mul(&d2, RoundingMode::ToEven)
+            .unwrap()
+            .mul(&d2, RoundingMode::ToEven)
+            .unwrap();
         eps.set_exponent(d1.get_exponent() - prec as Exponent + 3);
-        assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+        assert!(
+            d1.sub(&d3, RoundingMode::ToEven)
+                .unwrap()
+                .abs()
+                .unwrap()
+                .cmp(&eps)
+                < 0
+        );
 
         // MIN POSITIVE
         let d1 = BigFloatNumber::min_positive(prec).unwrap();
         let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
-        let d3 = d2.mul(&d2, RoundingMode::ToEven).unwrap().mul(&d2, RoundingMode::ToEven).unwrap();
+        let d3 = d2
+            .mul(&d2, RoundingMode::ToEven)
+            .unwrap()
+            .mul(&d2, RoundingMode::ToEven)
+            .unwrap();
         let eps = BigFloatNumber::min_positive(prec).unwrap();
-        assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) <= 0);
-
+        assert!(
+            d1.sub(&d3, RoundingMode::ToEven)
+                .unwrap()
+                .abs()
+                .unwrap()
+                .cmp(&eps)
+                <= 0
+        );
 
         // near 1
-        let d1 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC4872DC85F7E77EC487_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d1 = BigFloatNumber::parse(
+            "F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC4872DC85F7E77EC487_e-1",
+            crate::Radix::Hex,
+            320,
+            RoundingMode::None,
+        )
+        .unwrap();
         let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
-        let d3 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFB9ED752A27F96D7B9ED752A27F96D8_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d3 = BigFloatNumber::parse(
+            "F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFB9ED752A27F96D7B9ED752A27F96D8_e-1",
+            crate::Radix::Hex,
+            320,
+            RoundingMode::None,
+        )
+        .unwrap();
 
         //println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
 
         assert!(d2.cmp(&d3) == 0);
 
-        let d1 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000002DC85F7E77EC487C", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d1 = BigFloatNumber::parse(
+            "1.00000000000000000000000000000000000000000000000000000000000000002DC85F7E77EC487C",
+            crate::Radix::Hex,
+            320,
+            RoundingMode::None,
+        )
+        .unwrap();
         let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
-        let d3 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000000F42CA7F7D4EC2D4", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d3 = BigFloatNumber::parse(
+            "1.00000000000000000000000000000000000000000000000000000000000000000F42CA7F7D4EC2D4",
+            crate::Radix::Hex,
+            320,
+            RoundingMode::None,
+        )
+        .unwrap();
 
         // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
 
         assert!(d2.cmp(&d3) == 0);
     }
 
-
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn cbrt_perf() {
-
         let mut n = vec![];
         for _ in 0..100000 {
             let mut n0 = BigFloatNumber::random_normal(132, -0, 0).unwrap();

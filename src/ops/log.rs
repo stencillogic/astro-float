@@ -1,6 +1,5 @@
 //! Natural logarithm.
 
-use crate::Exponent;
 use crate::common::consts::ONE;
 use crate::common::consts::TWO;
 use crate::common::util::count_leading_ones;
@@ -8,16 +7,16 @@ use crate::common::util::count_leading_zeroes_skip_first;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
 use crate::common::util::get_sqrt_cost;
-use crate::num::BigFloatNumber;
-use crate::defs::RoundingMode;
 use crate::defs::Error;
+use crate::defs::RoundingMode;
 use crate::defs::Sign;
-use crate::ops::series::PolycoeffGen;
-use crate::ops::series::ArgReductionEstimator;
-use crate::ops::series::series_run;
-use crate::ops::series::series_cost_optimize;
+use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
-
+use crate::ops::series::series_cost_optimize;
+use crate::ops::series::series_run;
+use crate::ops::series::ArgReductionEstimator;
+use crate::ops::series::PolycoeffGen;
+use crate::Exponent;
 
 // Polynomial coefficient generator.
 struct AtanhPolycoeffGen {
@@ -28,9 +27,7 @@ struct AtanhPolycoeffGen {
 }
 
 impl AtanhPolycoeffGen {
-
     fn new(p: usize) -> Result<Self, Error> {
-
         let acc = BigFloatNumber::from_word(1, 1)?;
         let one_full_p = BigFloatNumber::from_word(1, p)?;
         let val = BigFloatNumber::from_word(1, p)?;
@@ -48,7 +45,6 @@ impl AtanhPolycoeffGen {
 
 impl PolycoeffGen for AtanhPolycoeffGen {
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-
         self.acc = self.acc.add(&TWO, rm)?;
         self.val = self.one_full_p.div(&self.acc, rm)?;
 
@@ -64,10 +60,8 @@ impl PolycoeffGen for AtanhPolycoeffGen {
 struct LnArgReductionEstimator {}
 
 impl ArgReductionEstimator for LnArgReductionEstimator {
-
     /// Estimates cost of reduction n times for number with precision p.
     fn get_reduction_cost(n: usize, p: usize) -> usize {
-
         // cost(shift) + n*cost(sqrt)
         let cost_mul = get_mul_cost(p);
         let cost_add = get_add_cost(p);
@@ -84,23 +78,20 @@ impl ArgReductionEstimator for LnArgReductionEstimator {
 }
 
 impl BigFloatNumber {
-
     /// Computes the natural logarithm of a number. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - InvalidArgument: the argument is zero or negative.
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn ln(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         // factoring: ln(self) = ln(x * 2^n) = ln(x) + n*ln(2), 0.5 <= x < 1
         // reduction: ln(x) = 2*ln(sqrt(x))
         // replacement: ln(x) = 2*atanh((x-1)/(x+1))
         // atanh(x) = x + x^3/3 + x^5/5 + ...
 
         if self.is_zero() || self.is_negative() {
-
             return Err(Error::InvalidArgument);
         }
 
@@ -118,17 +109,20 @@ impl BigFloatNumber {
             0
         } + 2;
 
-        x.set_precision(self.get_mantissa_max_bit_len() + additional_prec, RoundingMode::None)?;
+        x.set_precision(
+            self.get_mantissa_max_bit_len() + additional_prec,
+            RoundingMode::None,
+        )?;
 
         let p1 = Self::ln_series(x, RoundingMode::None)?;
 
         let mut ret = if e == 0 {
-
             p1
-
         } else {
-
-            let p2 = cc.ln_2(self.get_mantissa_max_bit_len() + additional_prec, RoundingMode::None)?;
+            let p2 = cc.ln_2(
+                self.get_mantissa_max_bit_len() + additional_prec,
+                RoundingMode::None,
+            )?;
 
             let mut n = Self::from_usize(e.unsigned_abs())?;
             if e < 0 {
@@ -145,11 +139,12 @@ impl BigFloatNumber {
     }
 
     fn ln_series(mut x: Self, rm: RoundingMode) -> Result<Self, Error> {
-
         let p = x.get_mantissa_max_bit_len();
         let mut polycoeff_gen = AtanhPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<AtanhPolycoeffGen, LnArgReductionEstimator>(
-            p, &polycoeff_gen, 0, 2, false);
+        let (reduction_times, niter) = series_cost_optimize::<
+            AtanhPolycoeffGen,
+            LnArgReductionEstimator,
+        >(p, &polycoeff_gen, 0, 2, false);
 
         let err = reduction_times + 4;
         x.set_precision(x.get_mantissa_max_bit_len() + err, rm)?;
@@ -165,8 +160,8 @@ impl BigFloatNumber {
         let x2 = arg.add(&ONE, rm)?;
         let z = x1.div(&x2, rm)?;
 
-        let x_step = z.mul(&z, rm)?;   // x^2
-        let x_first = z.mul(&x_step, rm)?;   // x^3
+        let x_step = z.mul(&z, rm)?; // x^2
+        let x_first = z.mul(&x_step, rm)?; // x^3
 
         let ret = series_run(z, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
 
@@ -175,7 +170,6 @@ impl BigFloatNumber {
 
     // reduce argument n times.
     fn ln_arg_reduce(mut x: Self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
-
         for _ in 0..n {
             x = x.sqrt(rm)?;
         }
@@ -185,7 +179,6 @@ impl BigFloatNumber {
 
     // restore value for the argument reduced n times.
     fn ln_arg_restore(mut x: Self, n: usize) -> Result<Self, Error> {
-
         x.set_exponent(x.get_exponent() + n as Exponent);
 
         Ok(x)
@@ -193,20 +186,18 @@ impl BigFloatNumber {
 
     /// Computes the logarithm base 2 of a number. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - InvalidArgument: the argument is zero or negative.
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn log2(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         // factoring: log2(self) = ln(x * 2^n) / ln(2) = ln(x) / ln(2) + n, 0.5 <= x < 1
         // reduction: ln(x) = 2 * ln(sqrt(x))
         // replacement: ln(x) = 2*atanh((x-1)/(x+1))
         // atanh(x) = x + x^3/3 + x^5/5 + ...
 
         if self.is_zero() || self.is_negative() {
-
             return Err(Error::InvalidArgument);
         }
 
@@ -224,11 +215,17 @@ impl BigFloatNumber {
             0
         } + 2;
 
-        x.set_precision(self.get_mantissa_max_bit_len() + additional_prec, RoundingMode::None)?;
+        x.set_precision(
+            self.get_mantissa_max_bit_len() + additional_prec,
+            RoundingMode::None,
+        )?;
 
         let p1 = Self::ln_series(x, RoundingMode::None)?;
 
-        let p2 = cc.ln_2(self.get_mantissa_max_bit_len() + additional_prec, RoundingMode::None)?;
+        let p2 = cc.ln_2(
+            self.get_mantissa_max_bit_len() + additional_prec,
+            RoundingMode::None,
+        )?;
 
         let p3 = p1.div(&p2, RoundingMode::None)?;
 
@@ -244,16 +241,14 @@ impl BigFloatNumber {
         Ok(ret)
     }
 
-
     /// Computes the logarithm base 10 of a number. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - InvalidArgument: the argument is zero or negative.
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn log10(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         // ln(self) / ln(10)
 
         let mut x = self.clone()?;
@@ -271,16 +266,17 @@ impl BigFloatNumber {
 
     /// Computes the logarithm base `n` of a number. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - InvalidArgument: the argument is zero or negative.
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn log(&self, n: &Self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         // ln(self) / ln(n)
 
-        let p = self.get_mantissa_max_bit_len().max(n.get_mantissa_max_bit_len());
+        let p = self
+            .get_mantissa_max_bit_len()
+            .max(n.get_mantissa_max_bit_len());
 
         let mut x = self.clone()?;
         x.set_precision(p + 2, RoundingMode::None)?;
@@ -299,7 +295,6 @@ impl BigFloatNumber {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -309,11 +304,10 @@ mod tests {
 
     #[test]
     fn test_log() {
-
         let mut cc = Consts::new().unwrap();
 
         let rm = RoundingMode::ToEven;
-        let n1 = BigFloatNumber::from_word(123,3200).unwrap();
+        let n1 = BigFloatNumber::from_word(123, 3200).unwrap();
 
         let mut n2 = n1.ln(rm, &mut cc).unwrap();
         n2.set_sign(Sign::Pos);
@@ -321,7 +315,13 @@ mod tests {
         //println!("{:?}", n2.fp3(crate::Radix::Dec, rm).unwrap());
 
         // near 1
-        let d1 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC4872DC85F7E77EC487_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d1 = BigFloatNumber::parse(
+            "F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC4872DC85F7E77EC487_e-1",
+            crate::Radix::Hex,
+            320,
+            RoundingMode::None,
+        )
+        .unwrap();
         let d2 = d1.ln(RoundingMode::ToEven, &mut cc).unwrap();
         let d3 = BigFloatNumber::parse("-D.237A0818813B78D237A0818813B7900000000000000000000564FA7B56FC57E9FBF3EE86C58F3F4_e-33", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
 
@@ -329,7 +329,13 @@ mod tests {
 
         assert!(d2.cmp(&d3) == 0);
 
-        let d1 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000002DC85F7E77EC487C", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d1 = BigFloatNumber::parse(
+            "1.00000000000000000000000000000000000000000000000000000000000000002DC85F7E77EC487C",
+            crate::Radix::Hex,
+            320,
+            RoundingMode::None,
+        )
+        .unwrap();
         let d2 = d1.ln(RoundingMode::ToEven, &mut cc).unwrap();
         let d3 = BigFloatNumber::parse("2.DC85F7E77EC487BFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBE7F8CC184E38EBC_e-41", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
 
@@ -344,10 +350,19 @@ mod tests {
         let d1 = BigFloatNumber::max_value(prec).unwrap();
         let d2 = d1.ln(RoundingMode::ToEven, &mut cc).unwrap();
         let d3 = d2.exp(RoundingMode::ToEven, &mut cc).unwrap();
-        eps.set_exponent(d1.get_exponent() - prec as Exponent + 
-                        log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent);
+        eps.set_exponent(
+            d1.get_exponent() - prec as Exponent
+                + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent,
+        );
 
-        assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+        assert!(
+            d1.sub(&d3, RoundingMode::ToEven)
+                .unwrap()
+                .abs()
+                .unwrap()
+                .cmp(&eps)
+                < 0
+        );
 
         // MIN
         let mut d1 = BigFloatNumber::min_positive(prec).unwrap();
@@ -356,12 +371,19 @@ mod tests {
         let d3 = d2.exp(RoundingMode::ToEven, &mut cc).unwrap();
         let eps = BigFloatNumber::min_positive_normal(prec).unwrap();
 
-        assert!(d1.sub(&d3, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) <= 0);
+        assert!(
+            d1.sub(&d3, RoundingMode::ToEven)
+                .unwrap()
+                .abs()
+                .unwrap()
+                .cmp(&eps)
+                <= 0
+        );
     }
 
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn ln_perf() {
         let mut cc = Consts::new().unwrap();
         let mut n = vec![];
@@ -380,5 +402,4 @@ mod tests {
             println!("{}", time.as_millis());
         }
     }
-
 }

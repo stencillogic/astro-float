@@ -2,14 +2,13 @@
 
 use crate::common::consts::ONE;
 use crate::common::consts::TWO;
+use crate::defs::Error;
+use crate::defs::RoundingMode;
 use crate::defs::EXPONENT_MIN;
 use crate::num::BigFloatNumber;
-use crate::defs::RoundingMode;
-use crate::defs::Error;
 use crate::ops::consts::Consts;
-use crate::ops::series::PolycoeffGen;
 use crate::ops::series::series_run;
-
+use crate::ops::series::PolycoeffGen;
 
 // Polynomial coefficient generator.
 struct AtanhPolycoeffGen {
@@ -18,24 +17,17 @@ struct AtanhPolycoeffGen {
 }
 
 impl AtanhPolycoeffGen {
-
     fn new(_p: usize) -> Result<Self, Error> {
-
         let acc = BigFloatNumber::from_word(1, 1)?;
 
         let iter_cost = 1;
 
-        Ok(AtanhPolycoeffGen {
-            acc,
-            iter_cost,
-        })
+        Ok(AtanhPolycoeffGen { acc, iter_cost })
     }
 }
 
 impl PolycoeffGen for AtanhPolycoeffGen {
-
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-
         self.acc = self.acc.add(&TWO, rm)?;
 
         Ok(&self.acc)
@@ -52,29 +44,28 @@ impl PolycoeffGen for AtanhPolycoeffGen {
     }
 }
 
-
 impl BigFloatNumber {
-
     /// Computes the hyperbolic arctangent of a number. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - ExponentOverflow: the result is too large.
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: when |`self`| > 1.
     pub fn atanh(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         let additional_prec = self.get_mantissa_max_bit_len() / 6;
 
         // TODO: tune threshold for choosing between series computation and computation using ln
         if self.get_exponent() as isize >= -(additional_prec as isize) {
-
             // 0.5 * ln((1 + x) / (1 - x))
 
             let mut x = self.clone()?;
 
-            x.set_precision(x.get_mantissa_max_bit_len() + additional_prec + 3, RoundingMode::None)?;
+            x.set_precision(
+                x.get_mantissa_max_bit_len() + additional_prec + 3,
+                RoundingMode::None,
+            )?;
 
             let d1 = ONE.add(&x, RoundingMode::None)?;
             let d2 = ONE.sub(&x, RoundingMode::None)?;
@@ -96,9 +87,7 @@ impl BigFloatNumber {
             }
 
             Ok(ret)
-
         } else {
-
             // series
 
             let mut x = self.clone()?;
@@ -107,8 +96,8 @@ impl BigFloatNumber {
 
             let mut polycoeff_gen = AtanhPolycoeffGen::new(x.get_mantissa_max_bit_len())?;
 
-            let x_step = x.mul(&x, rm)?;   // x^2
-            let x_first = x.mul(&x_step, rm)?;   // x^3
+            let x_step = x.mul(&x, rm)?; // x^2
+            let x_first = x.mul(&x_step, rm)?; // x^3
 
             let mut ret = series_run(x, x_first, x_step, 1, &mut polycoeff_gen, rm)?;
 
@@ -117,9 +106,7 @@ impl BigFloatNumber {
             Ok(ret)
         }
     }
-
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -130,12 +117,12 @@ mod tests {
     fn test_atanh() {
         let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
+        let mut n1 = BigFloatNumber::from_word(1, 320).unwrap();
         n1.set_exponent(-34);
         let _n2 = n1.atanh(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
 
-        let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
+        let mut n1 = BigFloatNumber::from_word(1, 320).unwrap();
         n1.set_exponent(0);
         let _n2 = n1.atanh(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
@@ -160,7 +147,7 @@ mod tests {
 
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn atanh_perf() {
         let mut cc = Consts::new().unwrap();
         let mut n = vec![];
@@ -177,5 +164,4 @@ mod tests {
             println!("{}", time.as_millis());
         }
     }
-
 }

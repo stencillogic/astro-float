@@ -1,5 +1,8 @@
-//! BigFloat including finite numbers, `NaN`, and `Inf`. 
+//! BigFloat including finite numbers, `NaN`, and `Inf`.
 
+use crate::common::consts::ONE;
+use crate::defs::SignedWord;
+use crate::defs::WORD_BIT_SIZE;
 use crate::BigFloatNumber;
 use crate::Consts;
 use crate::Error;
@@ -7,17 +10,17 @@ use crate::Exponent;
 use crate::Radix;
 use crate::RoundingMode;
 use crate::Sign;
-use crate::common::consts::ONE;
-use crate::defs::SignedWord;
-use crate::defs::WORD_BIT_SIZE;
-use core::num::FpCategory;
-use core::fmt::Write;
 use core::cell::RefCell;
+use core::fmt::Write;
+use core::num::FpCategory;
 
-pub const NAN: BigFloat = BigFloat {inner: Flavor::NaN };
-pub const INF_POS: BigFloat = BigFloat {inner: Flavor::Inf(Sign::Pos) };
-pub const INF_NEG: BigFloat = BigFloat {inner: Flavor::Inf(Sign::Neg) };
-
+pub const NAN: BigFloat = BigFloat { inner: Flavor::NaN };
+pub const INF_POS: BigFloat = BigFloat {
+    inner: Flavor::Inf(Sign::Pos),
+};
+pub const INF_NEG: BigFloat = BigFloat {
+    inner: Flavor::Inf(Sign::Neg),
+};
 
 // Context contains default parameters for all operations.
 pub struct Context {
@@ -27,11 +30,10 @@ pub struct Context {
 }
 
 impl Context {
-
     pub fn new() -> Result<Self, Error> {
         Ok(Context {
             cc: Some(RefCell::new(Consts::new()?)),
-            p: WORD_BIT_SIZE*2,
+            p: WORD_BIT_SIZE * 2,
             rm: RoundingMode::ToEven,
         })
     }
@@ -47,16 +49,15 @@ pub struct BigFloat {
 enum Flavor {
     Value(BigFloatNumber),
     NaN,
-    Inf(Sign)         // signed Inf
+    Inf(Sign), // signed Inf
 }
 
 impl BigFloat {
-
     /// Returns a new BigFloat with the value of zero and precision `p`.
     pub fn new(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::new(p), false, true)
     }
- 
+
     /// Creates a BigFloat from f64.
     /// The conversion is not guaranteed to be lossless since BigFloat and f64 have different bases.
     pub fn from_f64(f: f64, p: usize) -> Self {
@@ -92,31 +93,31 @@ impl BigFloat {
     /// Adds `d2` to `self` and returns the result of the addition.
     pub fn add(&self, d2: &Self, rm: RoundingMode) -> Self {
         match &self.inner {
-            Flavor::Value(v1) => {
-                match &d2.inner {
-                    Flavor::Value(v2) => {
-                        Self::result_to_ext(v1.add(v2, rm), v1.is_zero(), v1.get_sign() == v2.get_sign())
-                    },
-                    Flavor::Inf(s2) => {
-                        BigFloat { inner: Flavor::Inf(*s2) }
-                    },
-                    Flavor::NaN => NAN,
-                }
+            Flavor::Value(v1) => match &d2.inner {
+                Flavor::Value(v2) => Self::result_to_ext(
+                    v1.add(v2, rm),
+                    v1.is_zero(),
+                    v1.get_sign() == v2.get_sign(),
+                ),
+                Flavor::Inf(s2) => BigFloat {
+                    inner: Flavor::Inf(*s2),
+                },
+                Flavor::NaN => NAN,
             },
-            Flavor::Inf(s1) => {
-                match &d2.inner {
-                    Flavor::Value(_) => {
-                        BigFloat { inner: Flavor::Inf(*s1) }
-                    },
-                    Flavor::Inf(s2) => {
-                        if *s1 != *s2 {
-                            NAN
-                        } else {
-                            BigFloat { inner: Flavor::Inf(*s2) }
+            Flavor::Inf(s1) => match &d2.inner {
+                Flavor::Value(_) => BigFloat {
+                    inner: Flavor::Inf(*s1),
+                },
+                Flavor::Inf(s2) => {
+                    if *s1 != *s2 {
+                        NAN
+                    } else {
+                        BigFloat {
+                            inner: Flavor::Inf(*s2),
                         }
-                    },
-                    Flavor::NaN => NAN,
+                    }
                 }
+                Flavor::NaN => NAN,
             },
             Flavor::NaN => NAN,
         }
@@ -125,35 +126,35 @@ impl BigFloat {
     /// Subtracts `d2` from `self` and return the result of the subtraction.
     pub fn sub(&self, d2: &Self, rm: RoundingMode) -> Self {
         match &self.inner {
-            Flavor::Value(v1) => {
-                match &d2.inner {
-                    Flavor::Value(v2) => {
-                        Self::result_to_ext(v1.sub(&v2, rm), v1.is_zero(), v1.get_sign() == v2.get_sign())
-                    },
-                    Flavor::Inf(s2) => {
-                        if s2.is_positive() {
-                            INF_NEG
-                        } else {
-                            INF_POS
-                        }
-                    },
-                    Flavor::NaN => NAN,
+            Flavor::Value(v1) => match &d2.inner {
+                Flavor::Value(v2) => Self::result_to_ext(
+                    v1.sub(&v2, rm),
+                    v1.is_zero(),
+                    v1.get_sign() == v2.get_sign(),
+                ),
+                Flavor::Inf(s2) => {
+                    if s2.is_positive() {
+                        INF_NEG
+                    } else {
+                        INF_POS
+                    }
                 }
+                Flavor::NaN => NAN,
             },
-            Flavor::Inf(s1) => {
-                match &d2.inner {
-                    Flavor::Value(_) => {
-                        BigFloat { inner: Flavor::Inf(*s1) }
-                    },
-                    Flavor::Inf(s2) => {
-                        if *s1 == *s2 {
-                            NAN
-                        } else {
-                            BigFloat { inner: Flavor::Inf(*s1) }
+            Flavor::Inf(s1) => match &d2.inner {
+                Flavor::Value(_) => BigFloat {
+                    inner: Flavor::Inf(*s1),
+                },
+                Flavor::Inf(s2) => {
+                    if *s1 == *s2 {
+                        NAN
+                    } else {
+                        BigFloat {
+                            inner: Flavor::Inf(*s1),
                         }
-                    },
-                    Flavor::NaN => NAN,
+                    }
                 }
+                Flavor::NaN => NAN,
             },
             Flavor::NaN => NAN,
         }
@@ -164,49 +165,47 @@ impl BigFloat {
         match &self.inner {
             Flavor::Value(v1) => {
                 match &d2.inner {
-                    Flavor::Value(v2) => {
-                        Self::result_to_ext(v1.mul(&v2, rm), v1.is_zero(), v1.get_sign() == v2.get_sign())
-                    },
+                    Flavor::Value(v2) => Self::result_to_ext(
+                        v1.mul(&v2, rm),
+                        v1.is_zero(),
+                        v1.get_sign() == v2.get_sign(),
+                    ),
                     Flavor::Inf(s2) => {
-                        if v1.is_zero() { // 0*inf
+                        if v1.is_zero() {
+                            // 0*inf
                             NAN
                         } else {
-                            let s = if v1.get_sign() == *s2 {
-                                Sign::Pos
-                            } else {
-                                Sign::Neg
-                            };
-                            BigFloat { inner: Flavor::Inf(s) }
+                            let s = if v1.get_sign() == *s2 { Sign::Pos } else { Sign::Neg };
+                            BigFloat {
+                                inner: Flavor::Inf(s),
+                            }
                         }
-                    },
+                    }
                     Flavor::NaN => NAN,
                 }
-            },
+            }
             Flavor::Inf(s1) => {
                 match &d2.inner {
                     Flavor::Value(v2) => {
-                        if v2.is_zero() { // inf*0
+                        if v2.is_zero() {
+                            // inf*0
                             NAN
                         } else {
-                            let s = if v2.get_sign() == *s1 {
-                                Sign::Pos
-                            } else {
-                                Sign::Neg
-                            };
-                            BigFloat { inner: Flavor::Inf(s) }
+                            let s = if v2.get_sign() == *s1 { Sign::Pos } else { Sign::Neg };
+                            BigFloat {
+                                inner: Flavor::Inf(s),
+                            }
                         }
-                    },
+                    }
                     Flavor::Inf(s2) => {
-                        let s = if s1 == s2 {
-                            Sign::Pos
-                        } else {
-                            Sign::Neg
-                        };
-                        BigFloat { inner: Flavor::Inf(s) }
-                    },
+                        let s = if s1 == s2 { Sign::Pos } else { Sign::Neg };
+                        BigFloat {
+                            inner: Flavor::Inf(s),
+                        }
+                    }
                     Flavor::NaN => NAN,
                 }
-            },
+            }
             Flavor::NaN => NAN,
         }
     }
@@ -214,31 +213,25 @@ impl BigFloat {
     /// Divides `self` by `d2` and returns the result of the division.
     pub fn div(&self, d2: &Self, rm: RoundingMode) -> Self {
         match &self.inner {
-            Flavor::Value(v1) => {
-                match &d2.inner {
-                    Flavor::Value(v2) => {
-                        Self::result_to_ext(v1.div(&v2, rm), v1.is_zero(), v1.get_sign() == v2.get_sign())
-                    },
-                    Flavor::Inf(_) => {
-                        Self::new(v1.get_mantissa_max_bit_len())
-                    },
-                    Flavor::NaN => NAN,
-                }
+            Flavor::Value(v1) => match &d2.inner {
+                Flavor::Value(v2) => Self::result_to_ext(
+                    v1.div(&v2, rm),
+                    v1.is_zero(),
+                    v1.get_sign() == v2.get_sign(),
+                ),
+                Flavor::Inf(_) => Self::new(v1.get_mantissa_max_bit_len()),
+                Flavor::NaN => NAN,
             },
-            Flavor::Inf(s1) => {
-                match &d2.inner {
-                    Flavor::Value(v) => {
-                        if *s1 == v.get_sign() {
-                            INF_POS
-                        } else {
-                            INF_NEG
-                        }
-                    },
-                    Flavor::Inf(_) => {
-                        NAN
-                    },
-                    Flavor::NaN => NAN,
+            Flavor::Inf(s1) => match &d2.inner {
+                Flavor::Value(v) => {
+                    if *s1 == v.get_sign() {
+                        INF_POS
+                    } else {
+                        INF_NEG
+                    }
                 }
+                Flavor::Inf(_) => NAN,
+                Flavor::NaN => NAN,
             },
             Flavor::NaN => NAN,
         }
@@ -247,31 +240,25 @@ impl BigFloat {
     /// Returns the remainder of division of `self` by `d1`.
     pub fn rem(&self, d2: &Self, rm: RoundingMode) -> Self {
         match &self.inner {
-            Flavor::Value(v1) => {
-                match &d2.inner {
-                    Flavor::Value(v2) => {
-                        Self::result_to_ext(v1.rem(&v2, rm), v1.is_zero(), v1.get_sign() == v2.get_sign())
-                    },
-                    Flavor::Inf(_) => {
-                        Self::new(v1.get_mantissa_max_bit_len())
-                    },
-                    Flavor::NaN => NAN,
-                }
+            Flavor::Value(v1) => match &d2.inner {
+                Flavor::Value(v2) => Self::result_to_ext(
+                    v1.rem(&v2, rm),
+                    v1.is_zero(),
+                    v1.get_sign() == v2.get_sign(),
+                ),
+                Flavor::Inf(_) => Self::new(v1.get_mantissa_max_bit_len()),
+                Flavor::NaN => NAN,
             },
-            Flavor::Inf(s1) => {
-                match &d2.inner {
-                    Flavor::Value(v) => {
-                        if *s1 == v.get_sign() {
-                            INF_POS
-                        } else {
-                            INF_NEG
-                        }
-                    },
-                    Flavor::Inf(_) => {
-                        NAN
-                    },
-                    Flavor::NaN => NAN,
+            Flavor::Inf(s1) => match &d2.inner {
+                Flavor::Value(v) => {
+                    if *s1 == v.get_sign() {
+                        INF_POS
+                    } else {
+                        INF_NEG
+                    }
                 }
+                Flavor::Inf(_) => NAN,
+                Flavor::NaN => NAN,
             },
             Flavor::NaN => NAN,
         }
@@ -281,31 +268,21 @@ impl BigFloat {
     /// Returns positive if `self` > `d2`, negative if `self` < `d2`, zero if `self` == `d2`, None if `self` or `d2` is NaN.
     pub fn cmp(&self, d2: &BigFloat) -> Option<SignedWord> {
         match &self.inner {
-            Flavor::Value(v1) => {
-                match &d2.inner {
-                    Flavor::Value(v2) => {
-                        Some(v1.cmp(&v2))
+            Flavor::Value(v1) => match &d2.inner {
+                Flavor::Value(v2) => Some(v1.cmp(&v2)),
+                Flavor::Inf(s2) => {
+                    if *s2 == Sign::Pos {
+                        Some(-1)
+                    } else {
+                        Some(1)
                     }
-                    Flavor::Inf(s2) => {
-                        if *s2 == Sign::Pos {
-                            Some(-1)
-                        } else {
-                            Some(1)
-                        }
-                    },
-                    Flavor::NaN => None,
                 }
+                Flavor::NaN => None,
             },
-            Flavor::Inf(s1) => {
-                match &d2.inner {
-                    Flavor::Value(_) => {
-                        Some(*s1 as SignedWord)
-                    }
-                    Flavor::Inf(s2) => {
-                        Some(*s1 as SignedWord - *s2 as SignedWord)
-                    },
-                    Flavor::NaN => None,
-                }
+            Flavor::Inf(s1) => match &d2.inner {
+                Flavor::Value(_) => Some(*s1 as SignedWord),
+                Flavor::Inf(s2) => Some(*s1 as SignedWord - *s2 as SignedWord),
+                Flavor::NaN => None,
             },
             Flavor::NaN => None,
         }
@@ -314,11 +291,9 @@ impl BigFloat {
     /// Reverses the sign of `self`.
     pub fn inv_sign(&mut self) {
         match &mut self.inner {
-            Flavor::Value(v1) => {
-                v1.inv_sign()
-            },
+            Flavor::Value(v1) => v1.inv_sign(),
             Flavor::Inf(s) => self.inner = Flavor::Inf(s.invert()),
-            Flavor::NaN => {},
+            Flavor::NaN => {}
         }
     }
 
@@ -327,23 +302,27 @@ impl BigFloat {
         match &self.inner {
             Flavor::Value(v1) => {
                 match &d1.inner {
-                    Flavor::Value(v2) => {
-                        Self::result_to_ext(v1.pow(&v2, rm, cc), v1.is_zero(), v1.get_sign() == v2.get_sign())
-                    },
+                    Flavor::Value(v2) => Self::result_to_ext(
+                        v1.pow(&v2, rm, cc),
+                        v1.is_zero(),
+                        v1.get_sign() == v2.get_sign(),
+                    ),
                     Flavor::Inf(s2) => {
                         // v1^inf
                         let val = v1.cmp(&ONE);
                         if val > 0 {
-                            BigFloat { inner: Flavor::Inf(*s2) }
+                            BigFloat {
+                                inner: Flavor::Inf(*s2),
+                            }
                         } else if val < 0 {
                             Self::new(v1.get_mantissa_max_bit_len())
                         } else {
                             Self::from_u8(1, v1.get_mantissa_max_bit_len())
                         }
-                    },
+                    }
                     Flavor::NaN => NAN,
                 }
-            },
+            }
             Flavor::Inf(s1) => {
                 match &d1.inner {
                     Flavor::Value(v2) => {
@@ -352,7 +331,7 @@ impl BigFloat {
                             Self::from_u8(1, v2.get_mantissa_max_bit_len())
                         } else if v2.is_positive() {
                             if s1.is_negative() && v2.is_odd_int() {
-                                // v2 is odd and has no fractional part. 
+                                // v2 is odd and has no fractional part.
                                 INF_NEG
                             } else {
                                 INF_POS
@@ -360,7 +339,7 @@ impl BigFloat {
                         } else {
                             Self::new(v2.get_mantissa_max_bit_len())
                         }
-                    },
+                    }
                     Flavor::Inf(s2) => {
                         // inf^inf
                         if s2.is_positive() {
@@ -368,10 +347,10 @@ impl BigFloat {
                         } else {
                             Self::new(1)
                         }
-                    },
+                    }
                     Flavor::NaN => NAN,
                 }
-            },
+            }
             Flavor::NaN => NAN,
         }
     }
@@ -381,9 +360,7 @@ impl BigFloat {
         match &self.inner {
             Flavor::Value(v1) => {
                 match &b.inner {
-                    Flavor::Value(v2) => {
-                        Self::result_to_ext(v1.log(v2, rm, cc), false, true)
-                    },
+                    Flavor::Value(v2) => Self::result_to_ext(v1.log(v2, rm, cc), false, true),
                     Flavor::Inf(s2) => {
                         // v1.log(inf)
                         if s2.is_positive() {
@@ -391,10 +368,10 @@ impl BigFloat {
                         } else {
                             NAN
                         }
-                    },
+                    }
                     Flavor::NaN => NAN,
                 }
-            },
+            }
             Flavor::Inf(s1) => {
                 if *s1 == Sign::Neg {
                     // -inf.log(any)
@@ -408,18 +385,18 @@ impl BigFloat {
                             } else {
                                 INF_POS
                             }
-                        },
+                        }
                         Flavor::Inf(_) => NAN, // +inf.log(inf)
                         Flavor::NaN => NAN,
                     }
                 }
-            },
+            }
             Flavor::NaN => NAN,
         }
     }
 
-    /// Returns true if `self` is positive. 
-    /// The function returns false if `self` is NaN. 
+    /// Returns true if `self` is positive.
+    /// The function returns false if `self` is NaN.
     pub fn is_positive(&self) -> bool {
         match &self.inner {
             Flavor::Value(v) => v.is_positive(),
@@ -429,7 +406,7 @@ impl BigFloat {
     }
 
     /// Returns true if `self` is negative.
-    /// The function returns false if `self` is NaN. 
+    /// The function returns false if `self` is NaN.
     pub fn is_negative(&self) -> bool {
         match &self.inner {
             Flavor::Value(v) => v.is_negative(),
@@ -442,7 +419,7 @@ impl BigFloat {
     /// A number is considered subnormal if not all digits of the mantissa are used, and the exponent has the minimum possible value.
     pub fn is_subnormal(&self) -> bool {
         if let Flavor::Value(v) = &self.inner {
-            return v.is_subnormal()
+            return v.is_subnormal();
         }
         false
     }
@@ -509,17 +486,16 @@ impl BigFloat {
         }
     }
 
-
     /// Parses a number from the string `s`.
     /// The function expects `s` to be a number in scientific format in base 10, or +-Inf, or NaN.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use astro_float::BigFloat;
     /// use astro_float::Radix;
     /// use astro_float::RoundingMode;
-    /// 
+    ///
     /// let n = BigFloat::parse("0.0", Radix::Bin, 64, RoundingMode::ToEven).unwrap();
     /// assert!(n.is_zero());
     /// let n = BigFloat::parse("1.124e-24", Radix::Dec, 128, RoundingMode::ToEven).unwrap();
@@ -530,7 +506,6 @@ impl BigFloat {
     /// assert!(n.is_nan());
     /// ```
     pub fn parse(s: &str, rdx: Radix, p: usize, rm: RoundingMode) -> Option<Self> {
-
         let ps = crate::parser::parse(s, rdx);
 
         if ps.is_valid() {
@@ -544,7 +519,11 @@ impl BigFloat {
                 Some(NAN)
             } else {
                 let (m, s, e) = ps.raw_parts();
-                Some(Self::result_to_ext(BigFloatNumber::convert_from_radix(s, m, e, rdx, p, rm), false, true))
+                Some(Self::result_to_ext(
+                    BigFloatNumber::convert_from_radix(s, m, e, rdx, p, rm),
+                    false,
+                    true,
+                ))
             }
         } else {
             None
@@ -552,38 +531,35 @@ impl BigFloat {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn write_str<T: Write>(&self, w: &mut T, rdx: Radix, rm: RoundingMode) -> Result<(), core::fmt::Error> {
+    pub(crate) fn write_str<T: Write>(
+        &self,
+        w: &mut T,
+        rdx: Radix,
+        rm: RoundingMode,
+    ) -> Result<(), core::fmt::Error> {
         match &self.inner {
             Flavor::Value(v) => {
                 let s = v.format(rdx, rm).unwrap();
                 w.write_str(&s)
-            },
+            }
             Flavor::Inf(sign) => {
-                let s = if sign.is_negative() {
-                    "-Inf"
-                } else {
-                    "Inf"
-                };
+                let s = if sign.is_negative() { "-Inf" } else { "Inf" };
                 w.write_str(s)
-            },
-            crate::ext::Flavor::NaN => {
-                w.write_str("NaN")
-            },
+            }
+            crate::ext::Flavor::NaN => w.write_str("NaN"),
         }
     }
-
 
     /// Returns a random normalized (not subnormal) BigFloat number with exponent in the range
     /// from `exp_from` to `exp_to` inclusive. The sign can be positive and negative. Zero is excluded.
     /// Function does not follow any specific distribution law.
     /// The intended use of this function is for testing.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// InvalidArgument - when `exp_from` is greater than `exp_to`.
     #[cfg(feature = "rand")]
     pub fn random_normal(exp_from: i8, exp_to: i8) -> Result<Self, Error> {
-
         if exp_from > exp_to {
             return Err(Error::InvalidArgument);
         }
@@ -604,10 +580,16 @@ impl BigFloat {
 
         // sign & exponent
         let sign = if random::<i8>() & 1 == 0 { Sign::Pos } else { Sign::Neg };
-        let exp_range = exp_to as i32 - exp_from  as i32;
-        let exp = (if exp_range != 0 { random::<i32>().abs() % exp_range } else { 0 } + exp_from as i32) as i8;
+        let exp_range = exp_to as i32 - exp_from as i32;
+        let exp = (if exp_range != 0 { random::<i32>().abs() % exp_range } else { 0 }
+            + exp_from as i32) as i8;
 
-        Ok(BigFloat::from_raw_parts(mantissa, DECIMAL_POSITIONS as i16, sign, exp))
+        Ok(BigFloat::from_raw_parts(
+            mantissa,
+            DECIMAL_POSITIONS as i16,
+            sign,
+            exp,
+        ))
     }
 
     pub fn classify(&self) -> FpCategory {
@@ -620,7 +602,7 @@ impl BigFloat {
                 } else {
                     FpCategory::Normal
                 }
-            },
+            }
             Flavor::Inf(_) => FpCategory::Infinite,
             Flavor::NaN => FpCategory::Nan,
         }
@@ -629,12 +611,8 @@ impl BigFloat {
     /// Returns the arctangent of `self`. The result is an angle in radians ranging from -pi/2 to pi/2.
     pub fn atan(&self, rm: RoundingMode, p: usize, cc: &mut Consts) -> Self {
         match &self.inner {
-            Flavor::Value(v) => {
-                Self::result_to_ext(v.atan(rm, cc), v.is_zero(), true)
-            },
-            Flavor::Inf(s) => {
-                Self::result_to_ext(Self::half_pi(*s, p, rm, cc), false, true)
-            }
+            Flavor::Value(v) => Self::result_to_ext(v.atan(rm, cc), v.is_zero(), true),
+            Flavor::Inf(s) => Self::result_to_ext(Self::half_pi(*s, p, rm, cc), false, true),
             Flavor::NaN => NAN,
         }
     }
@@ -642,18 +620,18 @@ impl BigFloat {
     /// Returns the hyperbolic tangent of `self`.
     pub fn tanh(&self, rm: RoundingMode, p: usize, cc: &mut Consts) -> Self {
         match &self.inner {
-            Flavor::Value(v) => {
-                Self::result_to_ext(v.atan(rm, cc), v.is_zero(), true)
-            },
-            Flavor::Inf(s) => {
-                Self::from_i8(s.as_int(), p)
-            }
+            Flavor::Value(v) => Self::result_to_ext(v.atan(rm, cc), v.is_zero(), true),
+            Flavor::Inf(s) => Self::from_i8(s.as_int(), p),
             Flavor::NaN => NAN,
         }
     }
 
-    fn half_pi(s: Sign, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<BigFloatNumber, Error> {
-
+    fn half_pi(
+        s: Sign,
+        p: usize,
+        rm: RoundingMode,
+        cc: &mut Consts,
+    ) -> Result<BigFloatNumber, Error> {
         let mut half_pi = cc.pi(p, rm)?;
 
         half_pi.set_exponent(1);
@@ -662,10 +640,20 @@ impl BigFloat {
         Ok(half_pi)
     }
 
-    fn result_to_ext(res: Result<BigFloatNumber, Error>, is_dividend_zero: bool, is_same_sign: bool) -> BigFloat {
+    fn result_to_ext(
+        res: Result<BigFloatNumber, Error>,
+        is_dividend_zero: bool,
+        is_same_sign: bool,
+    ) -> BigFloat {
         match res {
             Err(e) => match e {
-                Error::ExponentOverflow(s) => if s.is_positive() { INF_POS } else { INF_NEG },
+                Error::ExponentOverflow(s) => {
+                    if s.is_positive() {
+                        INF_POS
+                    } else {
+                        INF_NEG
+                    }
+                }
                 Error::DivisionByZero => {
                     if is_dividend_zero {
                         NAN
@@ -674,39 +662,39 @@ impl BigFloat {
                     } else {
                         INF_NEG
                     }
-                },
+                }
                 Error::MemoryAllocation(_) => panic!("Memory allocation for BigFloat failed"),
                 Error::InvalidArgument => NAN,
             },
-            Ok(v) => BigFloat {inner: Flavor::Value(v)},
+            Ok(v) => BigFloat {
+                inner: Flavor::Value(v),
+            },
         }
     }
 
     pub fn get_exponent(&self) -> Option<Exponent> {
         match &self.inner {
-            Flavor::Value(v) => {
-                Some(v.get_exponent())
-            },
+            Flavor::Value(v) => Some(v.get_exponent()),
             _ => None,
         }
     }
 }
 
 impl Clone for BigFloat {
-
     fn clone(&self) -> Self {
         match &self.inner {
-            Flavor::Value(v) => {
-                Self::result_to_ext(v.clone(), false, true)
-            },
+            Flavor::Value(v) => Self::result_to_ext(v.clone(), false, true),
             Flavor::Inf(s) => {
-                if s.is_positive() { INF_POS } else { INF_NEG }
+                if s.is_positive() {
+                    INF_POS
+                } else {
+                    INF_NEG
+                }
             }
             Flavor::NaN => NAN,
         }
     }
 }
-
 
 macro_rules! gen_wrapper_arg {
     // function requires self as argument
@@ -754,40 +742,152 @@ macro_rules! gen_wrapper_arg_rm_cc {
     };
 }
 
-
 impl BigFloat {
-
-    gen_wrapper_arg!("Returns the absolute value of `self`.", abs, Self, {INF_POS}, {INF_NEG},);
-    gen_wrapper_arg!("Returns the integer part of `self`.", int, Self, {NAN}, {NAN},);
-    gen_wrapper_arg!("Returns the fractional part of `self`.", fract, Self, {NAN}, {NAN},);
-    gen_wrapper_arg!("Returns the smallest integer greater than or equal to `self`.", ceil, Self, {INF_POS}, {INF_NEG},);
-    gen_wrapper_arg!("Returns the largest integer less than or equal to `self`.", floor, Self, {INF_POS}, {INF_NEG},);
+    gen_wrapper_arg!(
+        "Returns the absolute value of `self`.",
+        abs,
+        Self,
+        { INF_POS },
+        { INF_NEG },
+    );
+    gen_wrapper_arg!("Returns the integer part of `self`.", int, Self, { NAN }, {
+        NAN
+    },);
+    gen_wrapper_arg!(
+        "Returns the fractional part of `self`.",
+        fract,
+        Self,
+        { NAN },
+        { NAN },
+    );
+    gen_wrapper_arg!(
+        "Returns the smallest integer greater than or equal to `self`.",
+        ceil,
+        Self,
+        { INF_POS },
+        { INF_NEG },
+    );
+    gen_wrapper_arg!(
+        "Returns the largest integer less than or equal to `self`.",
+        floor,
+        Self,
+        { INF_POS },
+        { INF_NEG },
+    );
     gen_wrapper_arg_rm!("Returns a rounded number with `n` decimal positions in the fractional part of the number using the rounding mode `rm`.", round, Self, {INF_POS}, {INF_NEG}, n, usize);
 
-    gen_wrapper_arg_rm!("Returns the square root of `self`.", sqrt, Self, {INF_POS}, {NAN},);
-    gen_wrapper_arg_rm!("Returns the cube root of `self`.", cbrt, Self, {INF_POS}, {INF_NEG},);
-    gen_wrapper_arg_rm_cc!("Returns the natural logarithm of `self`.", ln, Self, {INF_POS}, {NAN},);
-    gen_wrapper_arg_rm_cc!("Returns the logarithm base 2 of `self`.", log2, Self, {INF_POS}, {NAN},);
-    gen_wrapper_arg_rm_cc!("Returns the logarithm base 10 of `self`.", log10, Self, {INF_POS}, {NAN},);
-    gen_wrapper_arg_rm_cc!("Returns `e` to the power of `self`.", exp, Self, {INF_POS}, {INF_NEG},);
+    gen_wrapper_arg_rm!(
+        "Returns the square root of `self`.",
+        sqrt,
+        Self,
+        { INF_POS },
+        { NAN },
+    );
+    gen_wrapper_arg_rm!(
+        "Returns the cube root of `self`.",
+        cbrt,
+        Self,
+        { INF_POS },
+        { INF_NEG },
+    );
+    gen_wrapper_arg_rm_cc!(
+        "Returns the natural logarithm of `self`.",
+        ln,
+        Self,
+        { INF_POS },
+        { NAN },
+    );
+    gen_wrapper_arg_rm_cc!(
+        "Returns the logarithm base 2 of `self`.",
+        log2,
+        Self,
+        { INF_POS },
+        { NAN },
+    );
+    gen_wrapper_arg_rm_cc!(
+        "Returns the logarithm base 10 of `self`.",
+        log10,
+        Self,
+        { INF_POS },
+        { NAN },
+    );
+    gen_wrapper_arg_rm_cc!(
+        "Returns `e` to the power of `self`.",
+        exp,
+        Self,
+        { INF_POS },
+        { INF_NEG },
+    );
 
-    gen_wrapper_arg_rm_cc!("Returns the sine of `self`. The function takes an angle in radians as an argument.", sin, Self, {NAN}, {NAN},);
-    gen_wrapper_arg_rm_cc!("Returns the cosine of `self`. The function takes an angle in radians as an argument.", cos, Self, {NAN}, {NAN},);
-    gen_wrapper_arg_rm_cc!("Returns the tangent of `self`. The function takes an angle in radians as an argument.", tan, Self, {NAN}, {NAN},);
+    gen_wrapper_arg_rm_cc!(
+        "Returns the sine of `self`. The function takes an angle in radians as an argument.",
+        sin,
+        Self,
+        { NAN },
+        { NAN },
+    );
+    gen_wrapper_arg_rm_cc!(
+        "Returns the cosine of `self`. The function takes an angle in radians as an argument.",
+        cos,
+        Self,
+        { NAN },
+        { NAN },
+    );
+    gen_wrapper_arg_rm_cc!(
+        "Returns the tangent of `self`. The function takes an angle in radians as an argument.",
+        tan,
+        Self,
+        { NAN },
+        { NAN },
+    );
     gen_wrapper_arg_rm_cc!("Returns the arcsine of `self`. The result is an angle in radians ranging from -pi/2 to pi/2.", asin, Self, {NAN}, {NAN},);
-    gen_wrapper_arg_rm_cc!("Returns the arccosine of `self`. The result is an angle in radians ranging from 0 to pi.", acos, Self, {NAN}, {NAN},);
+    gen_wrapper_arg_rm_cc!(
+        "Returns the arccosine of `self`. The result is an angle in radians ranging from 0 to pi.",
+        acos,
+        Self,
+        { NAN },
+        { NAN },
+    );
 
-    gen_wrapper_arg_rm!("Returns the hyperbolic sine of `self`.", sinh, Self, {INF_POS}, {INF_NEG},);
-    gen_wrapper_arg_rm!("Returns the hyperbolic cosine of `self`.", cosh, Self, {INF_POS}, {INF_POS},);
-    gen_wrapper_arg_rm_cc!("Returns the inverse hyperbolic sine of `self`.", asinh, Self, {INF_POS}, {INF_NEG},);
-    gen_wrapper_arg_rm_cc!("Returns the inverse hyperbolic cosine of `self`.", acosh, Self, {BigFloat::new(1)}, {BigFloat::new(1)},);
-    gen_wrapper_arg_rm_cc!("Returns the inverse hyperbolic tangent of `self`.", atanh, Self, {BigFloat::new(1)}, {BigFloat::new(1)},);
+    gen_wrapper_arg_rm!(
+        "Returns the hyperbolic sine of `self`.",
+        sinh,
+        Self,
+        { INF_POS },
+        { INF_NEG },
+    );
+    gen_wrapper_arg_rm!(
+        "Returns the hyperbolic cosine of `self`.",
+        cosh,
+        Self,
+        { INF_POS },
+        { INF_POS },
+    );
+    gen_wrapper_arg_rm_cc!(
+        "Returns the inverse hyperbolic sine of `self`.",
+        asinh,
+        Self,
+        { INF_POS },
+        { INF_NEG },
+    );
+    gen_wrapper_arg_rm_cc!(
+        "Returns the inverse hyperbolic cosine of `self`.",
+        acosh,
+        Self,
+        { BigFloat::new(1) },
+        { BigFloat::new(1) },
+    );
+    gen_wrapper_arg_rm_cc!(
+        "Returns the inverse hyperbolic tangent of `self`.",
+        atanh,
+        Self,
+        { BigFloat::new(1) },
+        { BigFloat::new(1) },
+    );
 }
-
 
 macro_rules! impl_int_conv {
     ($s:ty, $from_s:ident) => {
-
         impl BigFloat {
             /// Construct BigFloat from an integer value.
             pub fn $from_s(i: $s, p: usize) -> Self {
@@ -817,8 +917,7 @@ impl_int_conv!(u32, from_u32);
 impl_int_conv!(u64, from_u64);
 impl_int_conv!(u128, from_u128);
 
-
-/* 
+/*
 /// Standard library features
 pub mod ops {
 
@@ -884,7 +983,7 @@ pub mod ops {
             BigFloat::add(&self, &rhs)
         }
     }
-    
+
     impl AddAssign for BigFloat {
         fn add_assign(&mut self, rhs: Self) {
             *self = BigFloat::add(self, &rhs)
@@ -897,7 +996,7 @@ pub mod ops {
             BigFloat::div(&self, &rhs)
         }
     }
-    
+
     impl DivAssign for BigFloat {
         fn div_assign(&mut self, rhs: Self) {
             *self = BigFloat::div(self, &rhs)
@@ -910,14 +1009,14 @@ pub mod ops {
             BigFloat::rem(&self, &rhs)
         }
     }
-    
+
     impl Mul for BigFloat {
         type Output = Self;
         fn mul(self, rhs: Self) -> Self::Output {
             BigFloat::mul(&self, &rhs)
         }
     }
-    
+
     impl MulAssign for BigFloat {
         fn mul_assign(&mut self, rhs: Self) {
             *self = BigFloat::mul(self, &rhs)
@@ -944,7 +1043,7 @@ pub mod ops {
             BigFloat::sub(&self, &rhs)
         }
     }
-    
+
     impl SubAssign for BigFloat {
         fn sub_assign(&mut self, rhs: Self) {
             *self = BigFloat::sub(self, &rhs)
@@ -957,33 +1056,33 @@ pub mod ops {
             BigFloat::add(&self, rhs)
         }
     }
-    
+
     impl AddAssign<&BigFloat> for BigFloat {
         fn add_assign(&mut self, rhs: &BigFloat) {
             *self = BigFloat::add(self, &rhs)
         }
     }
-    
+
     impl Div<&BigFloat> for BigFloat {
         type Output = Self;
         fn div(self, rhs: &BigFloat) -> Self::Output {
             BigFloat::div(&self, &rhs)
         }
     }
-    
+
     impl DivAssign<&BigFloat> for BigFloat {
         fn div_assign(&mut self, rhs: &BigFloat) {
             *self = BigFloat::div(self, &rhs)
         }
     }
-    
+
     impl Mul<&BigFloat> for BigFloat {
         type Output = Self;
         fn mul(self, rhs: &BigFloat) -> Self::Output {
             BigFloat::mul(&self, &rhs)
         }
     }
-    
+
     impl MulAssign<&BigFloat> for BigFloat {
         fn mul_assign(&mut self, rhs: &BigFloat) {
             *self = BigFloat::mul(self, &rhs)
@@ -996,26 +1095,26 @@ pub mod ops {
             BigFloat::sub(&self, &rhs)
         }
     }
-    
+
     impl SubAssign<&BigFloat> for BigFloat {
         fn sub_assign(&mut self, rhs: &BigFloat) {
             *self = BigFloat::sub(self, &rhs)
         }
     }
-    
+
     //
     // ordering traits
     //
-    
+
     impl PartialEq for BigFloat {
         fn eq(&self, other: &Self) -> bool {
             let cmp_result = BigFloat::cmp(self, other);
             matches!(cmp_result, Some(0))
         }
     }
-    
+
     impl Eq for BigFloat {}
-    
+
     impl PartialOrd for BigFloat {
         fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
             let cmp_result = BigFloat::cmp(self, other);
@@ -1255,7 +1354,7 @@ mod tests {
         assert!(INF_POS.get_exponent() == 0);
         assert!(INF_NEG.get_exponent() == 0);
         assert!(NAN.get_exponent() == 0);
-    
+
         assert!(ONE.to_raw_parts().is_some());
         assert!(INF_POS.to_raw_parts().is_none());
         assert!(INF_NEG.to_raw_parts().is_none());
@@ -1317,9 +1416,9 @@ mod tests {
         assert!(BigFloat::new().div(&INF_POS).is_zero());
         assert!(BigFloat::new().div(&INF_NEG).is_zero());
 
-        for op in [BigFloat::add, 
-            BigFloat::sub, 
-            BigFloat::mul, 
+        for op in [BigFloat::add,
+            BigFloat::sub,
+            BigFloat::mul,
             BigFloat::div, ] {
             assert!(op(&NAN, &ONE).is_nan());
             assert!(op(&ONE, &NAN).is_nan());
@@ -1443,7 +1542,7 @@ mod tests {
         assert!(INF_POS.floor().is_inf_pos());
         assert!(NAN.floor().is_nan());
 
-        for rm in [RoundingMode::Up, RoundingMode::Down, RoundingMode::ToZero, 
+        for rm in [RoundingMode::Up, RoundingMode::Down, RoundingMode::ToZero,
                 RoundingMode::FromZero, RoundingMode::ToEven, RoundingMode::ToOdd] {
             assert!(INF_NEG.round(0, rm).is_inf_neg());
             assert!(INF_POS.round(0, rm).is_inf_pos());
@@ -1458,8 +1557,8 @@ mod tests {
         assert!(INF_POS.cbrt().is_inf_pos());
         assert!(NAN.cbrt().is_nan());
 
-        for op in [BigFloat::ln, 
-            BigFloat::log2, 
+        for op in [BigFloat::ln,
+            BigFloat::log2,
             BigFloat::log10,] {
             assert!(op(&INF_NEG).is_nan());
             assert!(op(&INF_POS).is_inf_pos());
@@ -1497,7 +1596,7 @@ mod tests {
         assert!(INF_NEG.sinh().is_inf_neg());
         assert!(INF_POS.sinh().is_inf_pos());
         assert!(NAN.sinh().is_nan());
-        
+
         assert!(INF_NEG.cosh().is_inf_pos());
         assert!(INF_POS.cosh().is_inf_pos());
         assert!(NAN.cosh().is_nan());
@@ -1505,15 +1604,15 @@ mod tests {
         assert!(INF_NEG.tanh().cmp(&ONE.inv_sign()) == Some(0));
         assert!(INF_POS.tanh().cmp(&ONE) == Some(0));
         assert!(NAN.tanh().is_nan());
-        
+
         assert!(INF_NEG.asinh().is_inf_neg());
         assert!(INF_POS.asinh().is_inf_pos());
         assert!(NAN.asinh().is_nan());
-        
+
         assert!(INF_NEG.acosh().is_zero());
         assert!(INF_POS.acosh().is_zero());
         assert!(NAN.acosh().is_nan());
-        
+
         assert!(INF_NEG.atanh().is_zero());
         assert!(INF_POS.atanh().is_zero());
         assert!(NAN.atanh().is_nan());

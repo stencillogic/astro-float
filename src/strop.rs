@@ -1,36 +1,33 @@
 //! BigFloatNumber formatting.
 
-use crate::Sign;
-use crate::defs::Radix;
 use crate::defs::Error;
+use crate::defs::Radix;
 use crate::defs::RoundingMode;
-use crate::parser;
 use crate::num::BigFloatNumber;
+use crate::parser;
+use crate::Sign;
 
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 use std::fmt::Write;
 
-#[cfg(not(feature="std"))]
-use {core::fmt::Write,
-    alloc::string::String};
+#[cfg(not(feature = "std"))]
+use {alloc::string::String, core::fmt::Write};
 
-
-const DIGIT_CHARS: [char; 16] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', ];
+const DIGIT_CHARS: [char; 16] =
+    ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
 
 impl BigFloatNumber {
-
     /// Parses the number from the string `s` using radix `rdx`, precision `p`, and rounding mode `rm`.
-    /// Note, since hexadecimal digits include the character "e", the exponent part is separated 
-    /// from the mantissa by "_". 
+    /// Note, since hexadecimal digits include the character "e", the exponent part is separated
+    /// from the mantissa by "_".
     /// For example, a number with mantissa `123abcdef` and exponent `123` would be formatted as `123abcdef_e+123`.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - InvalidArgument: failed to parse input or precision is incorrect.
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
     pub fn parse(s: &str, rdx: Radix, p: usize, rm: RoundingMode) -> Result<Self, Error> {
-
         Self::p_assertion(p)?;
 
         let ps = parser::parse(s, rdx);
@@ -44,33 +41,30 @@ impl BigFloatNumber {
     }
 
     /// Formats the number using radix `rdx` and rounding mode `rm`.
-    /// Note, since hexadecimal digits include the character "e", the exponent part is separated 
-    /// from the mantissa by "_". 
+    /// Note, since hexadecimal digits include the character "e", the exponent part is separated
+    /// from the mantissa by "_".
     /// For example, a number with mantissa `123abcdef` and exponent `123` would be formatted as `123abcdef_e+123`.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
     pub fn format(&self, rdx: Radix, rm: RoundingMode) -> Result<String, Error> {
-
         let (s, m, e) = self.convert_to_radix(rdx, rm)?;
 
-        let mut mstr = if s == Sign::Neg {
-            String::from("-")
-        } else {
-            String::new()
-        };
+        let mut mstr = if s == Sign::Neg { String::from("-") } else { String::new() };
 
         if m.is_empty() {
-
             mstr.push_str("0.0");
-
         } else {
-
             mstr.push(DIGIT_CHARS[m[0] as usize]);
             mstr.push('.');
-            mstr.push_str(&m.iter().skip(1).map(|d| { DIGIT_CHARS[*d as usize] }).collect::<String>());
+            mstr.push_str(
+                &m.iter()
+                    .skip(1)
+                    .map(|d| DIGIT_CHARS[*d as usize])
+                    .collect::<String>(),
+            );
 
             if rdx == Radix::Hex {
                 let _ = write!(mstr, "_");
@@ -97,7 +91,6 @@ impl BigFloatNumber {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -105,12 +98,10 @@ mod tests {
 
     #[test]
     fn test_strop() {
-
         let mut eps = BigFloatNumber::from_word(1, 192).unwrap();
 
         for _ in 0..10000 {
             for rdx in [Radix::Bin, Radix::Oct, Radix::Hex, Radix::Dec] {
-
                 let n = BigFloatNumber::random_normal(192, -2, -2).unwrap();
                 let s = n.format(rdx, RoundingMode::ToEven).unwrap();
                 let d = BigFloatNumber::parse(&s, rdx, 200, RoundingMode::ToEven).unwrap();
@@ -118,7 +109,14 @@ mod tests {
                 if rdx == Radix::Dec {
                     //println!("\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}", n, s, d, n.format(Radix::Hex, RoundingMode::ToEven), d.format(Radix::Hex, RoundingMode::ToEven));
                     eps.set_exponent(n.get_exponent() - 160);
-                    assert!(d.sub(&n, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) < 0);
+                    assert!(
+                        d.sub(&n, RoundingMode::ToEven)
+                            .unwrap()
+                            .abs()
+                            .unwrap()
+                            .cmp(&eps)
+                            < 0
+                    );
                 } else {
                     assert!(d.cmp(&n) == 0);
                 }

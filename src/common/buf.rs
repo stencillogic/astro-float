@@ -1,19 +1,16 @@
 //! Buffer for holding mantissa gidits.
 
-
-use smallvec::SmallVec;
-use crate::defs::Word;
 use crate::defs::Error;
+use crate::defs::Word;
 use crate::defs::WORD_BIT_SIZE;
-use core::ops::Index;
-use core::ops::IndexMut;
 use core::ops::Deref;
 use core::ops::DerefMut;
+use core::ops::Index;
+use core::ops::IndexMut;
 use core::slice::SliceIndex;
-
+use smallvec::SmallVec;
 
 const STATIC_ALLOCATION: usize = 5;
-
 
 /// Buffer for holding mantissa gidits.
 #[derive(Debug)]
@@ -22,15 +19,16 @@ pub struct WordBuf {
 }
 
 impl WordBuf {
-
     #[inline]
     pub fn new(sz: usize) -> Result<Self, Error> {
         let mut inner = SmallVec::new();
-        inner.try_reserve_exact(sz).map_err(Error::MemoryAllocation)?;
-        unsafe { inner.set_len(sz); }
-        Ok(WordBuf {
-            inner,
-        })
+        inner
+            .try_reserve_exact(sz)
+            .map_err(Error::MemoryAllocation)?;
+        unsafe {
+            inner.set_len(sz);
+        }
+        Ok(WordBuf { inner })
     }
 
     #[inline]
@@ -45,7 +43,7 @@ impl WordBuf {
 
     /// Decrease length of mantissa to l bits.
     pub fn trunc_to(&mut self, l: usize) {
-        let n = (l + WORD_BIT_SIZE - 1)/WORD_BIT_SIZE;
+        let n = (l + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         let sz = self.len();
         self.inner.rotate_left(sz - n);
         self.inner.truncate(n);
@@ -56,9 +54,11 @@ impl WordBuf {
         let n = (p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         let l = self.inner.len();
         self.inner.try_grow(n).map_err(Error::MemoryAllocation)?;
-        unsafe { self.inner.set_len(n); }
+        unsafe {
+            self.inner.set_len(n);
+        }
         self.inner.rotate_right(n - l);
-        self.inner[..n-l].fill(0);
+        self.inner[..n - l].fill(0);
         Ok(())
     }
 
@@ -67,14 +67,15 @@ impl WordBuf {
         let n = (p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         let l = self.inner.len();
         self.inner.try_grow(n).map_err(Error::MemoryAllocation)?;
-        unsafe { self.inner.set_len(n); }
+        unsafe {
+            self.inner.set_len(n);
+        }
         self.inner[l..].fill(0);
         Ok(())
     }
 
     // Remove trailing words containing zeroes.
     pub fn trunc_trailing_zeroes(&mut self) {
-
         let mut n = 0;
 
         for v in self.inner.iter() {
@@ -94,7 +95,6 @@ impl WordBuf {
 
     // Remove leading words containing zeroes.
     pub fn trunc_leading_zeroes(&mut self) {
-
         let mut n = 0;
 
         for v in self.inner.iter().rev() {
@@ -112,9 +112,7 @@ impl WordBuf {
     }
 }
 
-
 impl<I: SliceIndex<[Word]>> IndexMut<I> for WordBuf {
-
     #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         self.inner.index_mut(index)
@@ -140,7 +138,6 @@ impl Deref for WordBuf {
 }
 
 impl DerefMut for WordBuf {
-
     #[inline]
     fn deref_mut(&mut self) -> &mut [Word] {
         self.inner.deref_mut()

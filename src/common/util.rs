@@ -2,7 +2,6 @@
 
 use crate::defs::{Word, WORD_BIT_SIZE, WORD_MAX, WORD_SIGNIFICANT_BIT};
 
-
 /// integer logarithm base 2 of a number.
 pub fn log2_ceil(mut n: usize) -> usize {
     let mut ret = 0;
@@ -27,7 +26,6 @@ pub fn log2_floor(mut n: usize) -> usize {
     ret
 }
 
-
 /// square root integer approximation.
 pub fn sqrt_int(a: u32) -> u32 {
     let a = a as u64;
@@ -40,14 +38,14 @@ pub fn sqrt_int(a: u32) -> u32 {
     }
     x as u32
 }
- 
+
 /// n-root integer approximation.
 #[allow(dead_code)]
 pub fn nroot_int(a: u32, n: usize) -> u32 {
     let a = a as u64;
     let mut x = a;
     let n = n as u64;
-    for _ in 0..5*(n-1) {
+    for _ in 0..5 * (n - 1) {
         if x == 0 {
             break;
         }
@@ -62,7 +60,7 @@ pub fn nroot_int(a: u32, n: usize) -> u32 {
 #[inline]
 fn nroot_step(x: u64, n: u64, a: u64) -> u64 {
     let mut xx = a;
-    for _ in 0..n-1 {
+    for _ in 0..n - 1 {
         xx /= x;
     }
     ((n - 1) * x + xx) / n
@@ -71,25 +69,23 @@ fn nroot_step(x: u64, n: u64, a: u64) -> u64 {
 // cost of multiplication of two numbers with precision p.
 pub fn get_mul_cost(p: usize) -> usize {
     if p < 70 {
-        p*p
+        p * p
     } else {
         // toom-3
         if p < 1625 {
-            sqrt_int((p*p*p) as u32) as usize
+            sqrt_int((p * p * p) as u32) as usize
         } else {
             let q = sqrt_int(p as u32) as usize;
-            q*q*q
+            q * q * q
         }
     }
 }
-
 
 // cost of addition/subtraction of two numbers with precision p.
 #[inline]
 pub fn get_add_cost(p: usize) -> usize {
     p
 }
-
 
 // Estimate of sqrt op cost.
 #[inline]
@@ -98,20 +94,18 @@ pub fn get_sqrt_cost(p: usize, cost_mul: usize, cost_add: usize) -> usize {
     log3_estimate * (5 * cost_mul + 2 * cost_add) / 2
 }
 
-
 #[inline(always)]
 pub fn add_carry(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
+    #[cfg(target_arch = "x86_64")]
+    {
+        unsafe { core::arch::x86_64::_addcarry_u64(c as u8, a, b, r) as Word }
+    }
 
-    #[cfg(target_arch = "x86_64")] 
+    #[cfg(target_arch = "x86")]
     {
-        unsafe { core::arch::x86_64::_addcarry_u64(c as u8, a, b, r) as Word } 
+        unsafe { core::arch::x86::_addcarry_u32(c as u8, a, b, r) as Word }
     }
-    
-    #[cfg(target_arch = "x86")] 
-    {
-        unsafe { core::arch::x86::_addcarry_u32(c as u8, a, b, r) as Word } 
-    }
-    
+
     #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
     {
         let mut s = c as DoubleWord + a as DoubleWord + b as DoubleWord;
@@ -128,22 +122,21 @@ pub fn add_carry(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
 
 #[inline(always)]
 pub fn sub_borrow(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
-
-    #[cfg(target_arch = "x86_64")] 
+    #[cfg(target_arch = "x86_64")]
     {
         unsafe { core::arch::x86_64::_subborrow_u64(c as u8, a, b, r) as Word }
     }
 
-    #[cfg(target_arch = "x86")] 
+    #[cfg(target_arch = "x86")]
     {
         unsafe { core::arch::x86::_subborrow_u32(c as u8, a, b, r) as Word }
     }
-    
+
     #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
     {
         let v1 = a as DoubleWord;
         let v2 = b as DoubleWord + c as DoubleWord;
-    
+
         if v1 < v2 {
             *r = (v1 + WORD_BASE - v2) as Word;
             1
@@ -154,8 +147,6 @@ pub fn sub_borrow(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
     }
 }
 
-
-
 // Shift m left by n digits.
 pub fn shift_slice_left(m: &mut [Word], n: usize) {
     let idx = n / WORD_BIT_SIZE;
@@ -165,7 +156,8 @@ pub fn shift_slice_left(m: &mut [Word], n: usize) {
     } else if shift > 0 {
         let l = m.len() - 1;
         let end = m.as_mut_ptr();
-        unsafe {    // use of slices is almost 50% slower
+        unsafe {
+            // use of slices is almost 50% slower
             let mut dst = end.add(l);
             let mut src = end.add(l - idx);
             loop {
@@ -186,7 +178,7 @@ pub fn shift_slice_left(m: &mut [Word], n: usize) {
         let dst = m[idx..].as_mut_ptr();
         let src = m.as_ptr();
         unsafe {
-            core::intrinsics::copy(src, dst, m.len()-idx);
+            core::intrinsics::copy(src, dst, m.len() - idx);
         };
         m[..idx].fill(0);
     }
@@ -225,7 +217,6 @@ pub fn shift_slice_left_copy(m: &[Word], m2: &mut [Word], n: usize) {
     }
 }
 
-
 // Shift m right by n digits.
 pub fn shift_slice_right(m: &mut [Word], n: usize) {
     let idx = n / WORD_BIT_SIZE;
@@ -235,7 +226,8 @@ pub fn shift_slice_right(m: &mut [Word], n: usize) {
     } else if shift > 0 {
         let l = m.len();
         let mut dst = m.as_mut_ptr();
-        unsafe {    // use of slices is almost 50% slower
+        unsafe {
+            // use of slices is almost 50% slower
             let end = dst.add(l - 1);
             let mut src = dst.add(idx);
             loop {
@@ -264,17 +256,14 @@ pub fn shift_slice_right(m: &mut [Word], n: usize) {
 }
 
 pub fn count_leading_zeroes_skip_first(m: &[Word]) -> usize {
-
     let mut iter = m.iter().rev();
     let mut w;
     let mut ret = 0;
 
     if let Some(v) = iter.next() {
-
         w = *v & (WORD_MAX >> 1);
 
         while w == 0 {
-
             ret += WORD_BIT_SIZE;
 
             w = match iter.next() {
@@ -294,21 +283,15 @@ pub fn count_leading_zeroes_skip_first(m: &[Word]) -> usize {
     ret
 }
 
-
 pub fn count_leading_ones(m: &[Word]) -> usize {
-
     let mut ret = 0;
 
     for &v in m.iter().rev() {
-
         if v == WORD_MAX {
-
             ret += WORD_BIT_SIZE;
-
         } else {
-
             let mut v = v;
-            
+
             while v & WORD_SIGNIFICANT_BIT != 0 {
                 v <<= 1;
                 ret += 1;

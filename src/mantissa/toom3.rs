@@ -1,17 +1,14 @@
 //! Toom-3 multiplication.
 
-use crate::defs::Error;
-use crate::defs::Word;
-use crate::mantissa::Mantissa;
 use crate::common::buf::WordBuf;
 use crate::common::int::SliceWithSign;
 use crate::common::util::shift_slice_left_copy;
-
+use crate::defs::Error;
+use crate::defs::Word;
+use crate::mantissa::Mantissa;
 
 impl Mantissa {
-
     fn toom3_get_splits(m: &[Word], l: usize) -> (SliceWithSign, SliceWithSign, SliceWithSign) {
-
         let b11 = l.min(m.len());
         let b12 = l.min(m.len() - b11) + b11;
         let b13 = l.min(m.len() - b12) + b12;
@@ -20,14 +17,26 @@ impl Mantissa {
         let m1 = &m[b11..b12];
         let m2 = &m[b12..b13];
 
-        (SliceWithSign::new(m0, 1), SliceWithSign::new(m1, 1), SliceWithSign::new(m2, 1))
+        (
+            SliceWithSign::new(m0, 1),
+            SliceWithSign::new(m1, 1),
+            SliceWithSign::new(m2, 1),
+        )
     }
 
-    fn toom3_factors<'a, 'b>(params: (SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>), 
-                    x1: &mut SliceWithSign<'b>,
-                    buf1: &'a mut [Word], buf2: &'a mut [Word], buf3: &'a mut [Word]) 
-                    -> (SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>) {
-
+    fn toom3_factors<'a, 'b>(
+        params: (SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>),
+        x1: &mut SliceWithSign<'b>,
+        buf1: &'a mut [Word],
+        buf2: &'a mut [Word],
+        buf3: &'a mut [Word],
+    ) -> (
+        SliceWithSign<'a>,
+        SliceWithSign<'a>,
+        SliceWithSign<'a>,
+        SliceWithSign<'a>,
+        SliceWithSign<'a>,
+    ) {
         let (m0, m1, m2) = params;
 
         let mut p1 = SliceWithSign::new_mut(buf1, 1);
@@ -49,30 +58,29 @@ impl Mantissa {
     // d1 must contain input number + have reserve of d2.len() positions in addition for the output.
     // The result is placed in d1, and the sign is returned.
     pub(super) fn toom3(d1: &[Word], d2: &[Word], d3: &mut [Word]) -> Result<(), Error> {
-
         let l = (d1.len().max(d2.len()) + 2) / 3;
 
-        let mut buf = WordBuf::new(25*(l+1))?;
+        let mut buf = WordBuf::new(25 * (l + 1))?;
 
-        let (x1buf, rest) = buf.split_at_mut(l+1);
-        let (x3buf, rest) = rest.split_at_mut(2*(l+1));
+        let (x1buf, rest) = buf.split_at_mut(l + 1);
+        let (x3buf, rest) = rest.split_at_mut(2 * (l + 1));
 
-        let (p1buf, rest) = rest.split_at_mut(l+1);
-        let (p2buf, rest) = rest.split_at_mut(l+1);
-        let (p3buf, rest) = rest.split_at_mut(l+1);
+        let (p1buf, rest) = rest.split_at_mut(l + 1);
+        let (p2buf, rest) = rest.split_at_mut(l + 1);
+        let (p3buf, rest) = rest.split_at_mut(l + 1);
 
-        let (q1buf, rest) = rest.split_at_mut(l+1);
-        let (q2buf, rest) = rest.split_at_mut(l+1);
-        let (q3buf, rest) = rest.split_at_mut(l+1);
+        let (q1buf, rest) = rest.split_at_mut(l + 1);
+        let (q2buf, rest) = rest.split_at_mut(l + 1);
+        let (q3buf, rest) = rest.split_at_mut(l + 1);
 
-        let (w1buf, rest) = rest.split_at_mut((l+1)*2);
-        let (w2buf, rest) = rest.split_at_mut((l+1)*2);
-        let (w3buf, rest) = rest.split_at_mut((l+1)*2);
+        let (w1buf, rest) = rest.split_at_mut((l + 1) * 2);
+        let (w2buf, rest) = rest.split_at_mut((l + 1) * 2);
+        let (w3buf, rest) = rest.split_at_mut((l + 1) * 2);
 
-        let (s0buf, rest) = rest.split_at_mut((l+1)*2);
-        let (s1buf, rest) = rest.split_at_mut((l+1)*2);
-        let (s2buf, rest) = rest.split_at_mut((l+1)*2);
-        let (s3buf, rest) = rest.split_at_mut((l+1)*2);
+        let (s0buf, rest) = rest.split_at_mut((l + 1) * 2);
+        let (s1buf, rest) = rest.split_at_mut((l + 1) * 2);
+        let (s2buf, rest) = rest.split_at_mut((l + 1) * 2);
+        let (s3buf, rest) = rest.split_at_mut((l + 1) * 2);
         let s4buf = rest; // (l+1)*2
 
         let mut x1 = SliceWithSign::new_mut(x1buf, 1);
@@ -85,11 +93,11 @@ impl Mantissa {
         let params0 = Self::toom3_get_splits(d1, l);
         let params1 = Self::toom3_get_splits(d2, l);
 
-        let mut s0 = SliceWithSign::new_mut(&mut s0buf[..params0.0.len()+params1.0.len()], 1);
+        let mut s0 = SliceWithSign::new_mut(&mut s0buf[..params0.0.len() + params1.0.len()], 1);
         let mut s1 = SliceWithSign::new_mut(s1buf, 1);
         let mut s2 = SliceWithSign::new_mut(s2buf, 1);
         let mut s3 = SliceWithSign::new_mut(s3buf, 1);
-        let mut s4 = SliceWithSign::new_mut(&mut s4buf[..params0.2.len()+params1.2.len()], 1);
+        let mut s4 = SliceWithSign::new_mut(&mut s4buf[..params0.2.len() + params1.2.len()], 1);
 
         let (p0, p1, p2, p3, p4) = Self::toom3_factors(params0, &mut x1, p1buf, p2buf, p3buf);
 
@@ -123,7 +131,7 @@ impl Mantissa {
         w2.sub_assign(&s4);
         w1.sub_assign(&w3);
 
-        let l4 = 4*l;
+        let l4 = 4 * l;
 
         d3[..s0.len()].copy_from_slice(&s0);
         if l4 < d3.len() {
@@ -131,7 +139,7 @@ impl Mantissa {
 
             if d3.len() < l4 + s4.len() {
                 let ll = d3.len();
-                d3[l4..].copy_from_slice(&s4[..ll-l4]);
+                d3[l4..].copy_from_slice(&s4[..ll - l4]);
             } else {
                 d3[l4..l4 + s4.len()].copy_from_slice(&s4);
                 d3[l4 + s4.len()..].fill(0);
@@ -143,7 +151,7 @@ impl Mantissa {
         let w1s = w1.sign();
         let w2s = w1.sign();
 
-        let mut parts = [(l, w1), (l*2, w2), (l*3, w3)];
+        let mut parts = [(l, w1), (l * 2, w2), (l * 3, w3)];
 
         if w1s < 0 {
             parts.swap(0, 2);
@@ -163,25 +171,22 @@ impl Mantissa {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
     use super::*;
-    use rand::random;
     use crate::defs::DoubleWord;
     use crate::defs::WORD_BIT_SIZE;
+    use rand::random;
 
-    #[cfg(not(feature="std"))]
+    #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
 
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn toom3_perf() {
-
         for _ in 0..5 {
-
             let sz = 220;
             let f = random_slice(sz, sz);
             let mut n = vec![];
@@ -193,7 +198,7 @@ mod tests {
                 let v = random_slice(sz, sz);
                 n.push(v);
             }
-            
+
             let start_time = std::time::Instant::now();
             for ni in &n {
                 Mantissa::toom3(ni, &f, &mut ret).unwrap();
@@ -212,7 +217,6 @@ mod tests {
 
     #[test]
     fn test_toom3() {
-
         // d1*d2
         let s1 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
         let s2 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
@@ -223,7 +227,6 @@ mod tests {
         Mantissa::toom3(&s1, &s2, &mut ret_s).unwrap();
 
         assert!(ret_s == ref_s);
-
 
         // 999..99 * 999..99
         let s1 = [Word::MAX; 8];
@@ -299,7 +302,7 @@ mod tests {
             let mut ref_s = Vec::new();
             ref_s.resize(s1.len() + s2.len(), 0);
             mul(&s1, &s2, ref_s.as_mut_slice());
-    
+
             let mut ret_s = Vec::new();
             ret_s.resize(s1.len() + s2.len(), 0);
             Mantissa::toom3(&s1, &s2, &mut ret_s).unwrap();

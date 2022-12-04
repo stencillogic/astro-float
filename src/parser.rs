@@ -1,16 +1,15 @@
 //! Parser parses numbers represented in scientific format.
 
-use crate::Radix;
-use crate::defs::EXPONENT_MAX;
-use crate::defs::Sign;
 use crate::defs::Exponent;
+use crate::defs::Sign;
+use crate::defs::EXPONENT_MAX;
+use crate::Radix;
 
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 use std::str::Chars;
 
-#[cfg(not(feature="std"))]
-use {core::str::Chars, alloc::vec::Vec};
-
+#[cfg(not(feature = "std"))]
+use {alloc::vec::Vec, core::str::Chars};
 
 pub struct ParserState<'a> {
     chars: Chars<'a>,
@@ -37,7 +36,7 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    /// Returns next character of a string in lower case, 
+    /// Returns next character of a string in lower case,
     /// or None if string end reached.
     fn next_char(&mut self) -> Option<char> {
         self.cur_ch = self.chars.next().map(|c| c.to_ascii_lowercase());
@@ -74,16 +73,19 @@ impl<'a> ParserState<'a> {
 }
 
 /// Parse BigFloat.
-pub fn parse(s: &str, rdx: Radix) -> ParserState<> {
+pub fn parse(s: &str, rdx: Radix) -> ParserState {
     let mut parser_state = ParserState::new(s);
     let mut ch = parser_state.next_char();
 
     // sign
     if let Some(c) = ch {
         match c {
-            '+' => { ch = parser_state.next_char() },
-            '-' => { parser_state.sign = Sign::Neg; ch = parser_state.next_char() },
-            _ => {},
+            '+' => ch = parser_state.next_char(),
+            '-' => {
+                parser_state.sign = Sign::Neg;
+                ch = parser_state.next_char()
+            }
+            _ => {}
         };
     }
 
@@ -91,19 +93,22 @@ pub fn parse(s: &str, rdx: Radix) -> ParserState<> {
         match (c, rdx) {
             ('i', _) => parse_inf(&mut parser_state),
             ('n', _) => parse_nan(&mut parser_state),
-            ('.' | '0' | '1' , Radix::Bin) => 
-                parse_num(&mut parser_state, rdx),
-            ('.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7', Radix::Oct) => 
-                parse_num(&mut parser_state, rdx),
-            ('.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9', Radix::Dec) => 
-                parse_num(&mut parser_state, rdx),
-            ('.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f', Radix::Hex) => 
-                parse_num(&mut parser_state, rdx),
-            _ => {},
+            ('.' | '0' | '1', Radix::Bin) => parse_num(&mut parser_state, rdx),
+            ('.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7', Radix::Oct) => {
+                parse_num(&mut parser_state, rdx)
+            }
+            ('.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9', Radix::Dec) => {
+                parse_num(&mut parser_state, rdx)
+            }
+            (
+                '.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'a' | 'b' | 'c'
+                | 'd' | 'e' | 'f',
+                Radix::Hex,
+            ) => parse_num(&mut parser_state, rdx),
+            _ => {}
         };
     }
     parser_state
-
 }
 
 fn parse_inf(parser_state: &mut ParserState) {
@@ -155,7 +160,12 @@ fn parse_num(parser_state: &mut ParserState, rdx: Radix) {
     }
 }
 
-fn parse_digits(parser_state: &mut ParserState, skip_zeroes: bool, int: bool, rdx: Radix) -> (usize, usize) {
+fn parse_digits(
+    parser_state: &mut ParserState,
+    skip_zeroes: bool,
+    int: bool,
+    rdx: Radix,
+) -> (usize, usize) {
     let mut ch = parser_state.cur_char();
     let mut len = 0;
     let mut skip_cnt = 0;
@@ -165,7 +175,7 @@ fn parse_digits(parser_state: &mut ParserState, skip_zeroes: bool, int: bool, rd
             if is_radix_digit(c, rdx) && c.to_digit(rdx as u32).unwrap() == 0 {
                 skip_cnt += 1;
                 if !int {
-                    len += 1;   // for fractional part count length
+                    len += 1; // for fractional part count length
                 }
             } else {
                 break;
@@ -175,7 +185,9 @@ fn parse_digits(parser_state: &mut ParserState, skip_zeroes: bool, int: bool, rd
     }
     while let Some(c) = ch {
         if is_radix_digit(c, rdx) {
-            parser_state.mantissa_bytes.push(c.to_digit(rdx as u32).unwrap() as u8);
+            parser_state
+                .mantissa_bytes
+                .push(c.to_digit(rdx as u32).unwrap() as u8);
             len += 1;
         } else {
             break;
@@ -190,11 +202,33 @@ fn parse_digits(parser_state: &mut ParserState, skip_zeroes: bool, int: bool, rd
 }
 
 fn is_radix_digit(c: char, rdx: Radix) -> bool {
-    matches!((rdx, c), 
-        (Radix::Bin, '0' | '1') | 
-        (Radix::Oct, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7') | 
-        (Radix::Dec, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9') | 
-        (Radix::Hex, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f'))
+    matches!(
+        (rdx, c),
+        (Radix::Bin, '0' | '1')
+            | (Radix::Oct, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7')
+            | (
+                Radix::Dec,
+                '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+            )
+            | (
+                Radix::Hex,
+                '0' | '1'
+                    | '2'
+                    | '3'
+                    | '4'
+                    | '5'
+                    | '6'
+                    | '7'
+                    | '8'
+                    | '9'
+                    | 'a'
+                    | 'b'
+                    | 'c'
+                    | 'd'
+                    | 'e'
+                    | 'f'
+            )
+    )
 }
 
 fn parse_exp(parser_state: &mut ParserState, rdx: Radix) {
@@ -202,14 +236,19 @@ fn parse_exp(parser_state: &mut ParserState, rdx: Radix) {
     let mut ch = parser_state.cur_char();
     if let Some(c) = ch {
         match c {
-            '+' => { ch = parser_state.next_char(); },
-            '-' => { neg = true; ch = parser_state.next_char(); },
-            _ => { },
+            '+' => {
+                ch = parser_state.next_char();
+            }
+            '-' => {
+                neg = true;
+                ch = parser_state.next_char();
+            }
+            _ => {}
         };
     }
     while let Some(c) = ch {
         if is_radix_digit(c, rdx) {
-            if parser_state.e >= EXPONENT_MAX/10 {
+            if parser_state.e >= EXPONENT_MAX / 10 {
                 break;
             }
             parser_state.e *= rdx as Exponent;
@@ -229,12 +268,11 @@ mod tests {
 
     use super::*;
 
-    #[cfg(not(feature="std"))]
-    use {alloc::vec, alloc::string::String};
+    #[cfg(not(feature = "std"))]
+    use {alloc::string::String, alloc::vec};
 
     #[test]
     pub fn test_parser() {
-
         // combinations of possible valid components of a number and expected resulting characteristics.
         let mantissas = ["0.0", "0", ".000", "00.", "00123", "456.", "789.012", ".3456", "0.0078"];
         let expected_mantissas = [
@@ -242,11 +280,11 @@ mod tests {
             vec![],
             vec![],
             vec![],
-            vec![1,2,3],
-            vec![4,5,6],
-            vec![7,8,9,0,1,2],
-            vec![3,4,5,6],
-            vec![7,8],
+            vec![1, 2, 3],
+            vec![4, 5, 6],
+            vec![7, 8, 9, 0, 1, 2],
+            vec![3, 4, 5, 6],
+            vec![7, 8],
         ];
         let expected_mantissa_len = [0, 0, 0, 0, 3, 3, 6, 4, 2];
         let expected_exp_shifts = [0, 0, 0, 0, 3, 3, 3, 0, -2];
@@ -254,7 +292,7 @@ mod tests {
         let signs = ["", "+", "-"];
         let expected_signs = [Sign::Pos, Sign::Pos, Sign::Neg];
 
-        let exponents = ["", "E", "e", "e123", "e+345", "e-678", "e901", "E+234", "E-567",];
+        let exponents = ["", "E", "e", "e123", "e+345", "e-678", "e901", "E+234", "E-567"];
         let expected_exponents = [0, 0, 0, 123, 345, -678, 901, 234, -567];
 
         let infs = ["inf", "INF", "Inf"];
@@ -331,6 +369,5 @@ mod tests {
         assert!(m == [10, 11, 12, 13, 14, 15, 0, 9, 1, 2, 3, 14]);
         assert!(s == Sign::Pos);
         assert!(e == -0x1f7);
-
     }
 }

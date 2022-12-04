@@ -1,25 +1,22 @@
 //! Exponentiation.
 
-use crate::{
-    num::BigFloatNumber, 
-    RoundingMode, 
-    defs::{Error, WORD_SIGNIFICANT_BIT, WORD_BIT_SIZE}, 
-    common::consts::ONE, Sign,
-};
 use crate::ops::consts::Consts;
-
+use crate::{
+    common::consts::ONE,
+    defs::{Error, WORD_BIT_SIZE, WORD_SIGNIFICANT_BIT},
+    num::BigFloatNumber,
+    RoundingMode, Sign,
+};
 
 impl BigFloatNumber {
-
     /// Computes `e` to the power of `self`. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - ExponentOverflow: the result is too large or too small number.
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn exp(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         if self.is_zero() {
             return Self::from_word(1, self.get_mantissa_max_bit_len());
         }
@@ -31,11 +28,12 @@ impl BigFloatNumber {
         // compute separately for int and fract parts, then combine the results.
         let int = self.get_int_as_usize()?;
         let e_int = if int > 0 {
-
-            let e_const = cc.e(self.get_mantissa_max_bit_len() + 2 + 2*core::mem::size_of::<usize>(), RoundingMode::None)?;
+            let e_const = cc.e(
+                self.get_mantissa_max_bit_len() + 2 + 2 * core::mem::size_of::<usize>(),
+                RoundingMode::None,
+            )?;
 
             e_const.powi(int, RoundingMode::None)
-
         } else {
             ONE.clone()
         }?;
@@ -56,13 +54,12 @@ impl BigFloatNumber {
     }
 
     /// Compute the power of `self` to the integer `i`. The result is rounded using the rounding mode `rm`.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - ExponentOverflow: the result is too large or too small number.
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn powi(&self, mut i: usize, rm: RoundingMode) -> Result<Self, Error> {
-
         if self.is_zero() || i == 1 {
             return self.clone();
         }
@@ -98,7 +95,6 @@ impl BigFloatNumber {
 
     // e^self for |self| < 1.
     fn expf(self, rm: RoundingMode) -> Result<Self, Error> {
-
         let sh = self.sinh_series(rm)?; // faster convergence than direct series
 
         // e = sh + sqrt(sh^2 + 1)
@@ -110,14 +106,13 @@ impl BigFloatNumber {
 
     /// Compute the power of `self` to the `n`. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - ExponentOverflow: the result is too large or too small number.
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: `self` is negative.
     pub fn pow(&self, n: &Self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         if self.is_negative() {
             return Err(Error::InvalidArgument);
         }
@@ -145,7 +140,6 @@ impl BigFloatNumber {
 
         Ok(ret)
     }
-
 }
 
 #[cfg(test)]
@@ -155,22 +149,45 @@ mod test {
 
     #[test]
     fn test_power() {
-
         let mut cc = Consts::new().unwrap();
 
         // near 1
-        let d1 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC4872DC85F7E77EC487_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d1 = BigFloatNumber::parse(
+            "F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC4872DC85F7E77EC487_e-1",
+            crate::Radix::Hex,
+            320,
+            RoundingMode::None,
+        )
+        .unwrap();
         let d2 = d1.exp(RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = BigFloatNumber::parse("2.B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A5496AF9D95160A40F47A2ECF1C6AEA0", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d3 = BigFloatNumber::parse(
+            "2.B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A5496AF9D95160A40F47A2ECF1C6AEA0",
+            crate::Radix::Hex,
+            320,
+            RoundingMode::None,
+        )
+        .unwrap();
 
         // println!("{:?}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
 
         assert!(d2.cmp(&d3) == 0);
 
-        let d1 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000002DC85F7E77EC487C", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d1 = BigFloatNumber::parse(
+            "1.00000000000000000000000000000000000000000000000000000000000000002DC85F7E77EC487C",
+            crate::Radix::Hex,
+            320,
+            RoundingMode::None,
+        )
+        .unwrap();
         let d2 = d1.exp(RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = BigFloatNumber::parse("2.B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEFAEC1BE22DDEADB48", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let d3 = BigFloatNumber::parse(
+            "2.B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEFAEC1BE22DDEADB48",
+            crate::Radix::Hex,
+            320,
+            RoundingMode::None,
+        )
+        .unwrap();
 
         // println!("{:?}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
@@ -218,6 +235,5 @@ mod test {
         // println!("{:?}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
         assert!(d4.cmp(&d3) == 0);
-
     }
 }

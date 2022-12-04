@@ -1,23 +1,20 @@
 //! Division algos.
 
-use crate::common::util::log2_ceil;
-use crate::defs::WORD_BIT_SIZE;
-use crate::defs::WORD_BASE;
-use crate::defs::WORD_SIGNIFICANT_BIT;
-use crate::defs::Error;
-use crate::defs::Word;
-use crate::defs::DoubleWord;
-use crate::mantissa::Mantissa;
 use crate::common::buf::WordBuf;
 use crate::common::int::SliceWithSign;
 use crate::common::util::add_carry;
-
+use crate::common::util::log2_ceil;
+use crate::defs::DoubleWord;
+use crate::defs::Error;
+use crate::defs::Word;
+use crate::defs::WORD_BASE;
+use crate::defs::WORD_BIT_SIZE;
+use crate::defs::WORD_SIGNIFICANT_BIT;
+use crate::mantissa::Mantissa;
 
 impl Mantissa {
-
     // Basic integer division.
     fn div_basic(m1: &[Word], m2: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
-
         debug_assert!(m1.len() >= m2.len());
 
         let l1 = m1.len();
@@ -49,12 +46,12 @@ impl Mantissa {
                 rem[0] = rh as Word;
                 j -= 1;
             }
-        
+
             if j > 0 {
                 loop {
                     qh = rh * WORD_BASE as DoubleWord + val;
                     rh = qh % d;
-                
+
                     if let Some(v) = m3iter.next() {
                         *v = (qh / d) as Word;
                         rem[0] = rh as Word;
@@ -103,16 +100,15 @@ impl Mantissa {
                 if qh >= WORD_BASE || (qh * v2 > WORD_BASE * rh + buf10) {
                     qh -= 1;
                     rh += v1;
-                    if rh < WORD_BASE && 
-                        (qh >= WORD_BASE || (qh * v2 > WORD_BASE * rh + buf10)) {
-                            qh -= 1;
+                    if rh < WORD_BASE && (qh >= WORD_BASE || (qh * v2 > WORD_BASE * rh + buf10)) {
+                        qh -= 1;
                     }
                 }
 
                 // n1_j = n1_j - n2 * qh
                 c = 0;
                 k = 0;
-                for (a, b) in buf2[..n+2].iter().zip(buf1[j..j+n+2].iter_mut()) {
+                for (a, b) in buf2[..n + 2].iter().zip(buf1[j..j + n + 2].iter_mut()) {
                     k = *a as DoubleWord * qh + k / WORD_BASE;
                     let val = k % WORD_BASE + c;
                     if (*b as DoubleWord) < val {
@@ -128,7 +124,7 @@ impl Mantissa {
                     // compensate
                     qh -= 1;
                     c = 0;
-                    for (a, b) in buf2[..n+2].iter().zip(buf1[j..j+n+2].iter_mut()) {
+                    for (a, b) in buf2[..n + 2].iter().zip(buf1[j..j + n + 2].iter_mut()) {
                         c = add_carry(*a, *b, c as Word, b) as DoubleWord;
                     }
                     debug_assert!(c > 0);
@@ -143,7 +139,7 @@ impl Mantissa {
                 } else {
                     break;
                 }
-        
+
                 if j == 0 {
                     break;
                 }
@@ -168,12 +164,12 @@ impl Mantissa {
                     *remiter.next().unwrap() = 0;
                     j -= 1;
                 }
-            
+
                 if j > 0 {
                     loop {
                         qh = rh * WORD_BASE as DoubleWord + val;
                         rh = qh % d;
-    
+
                         if let Some(v) = remiter.next() {
                             *v = (qh / d) as Word;
                         } else {
@@ -188,7 +184,7 @@ impl Mantissa {
                 }
             } else {
                 rem.copy_from_slice(&buf1[..l2]);
-            } 
+            }
         }
         Ok((m3, rem))
     }
@@ -204,37 +200,33 @@ impl Mantissa {
     // Recursive integer division divides m1 by m2, returns quotinent and remainder.
     // prereq: m <= n, m2 is normalized
     fn div_recursive(m1: &[Word], m2: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
-
-        debug_assert!(m2[m2.len()-1] & WORD_SIGNIFICANT_BIT != 0);
+        debug_assert!(m2[m2.len() - 1] & WORD_SIGNIFICANT_BIT != 0);
 
         let m = m1.len() - m2.len();
 
         if m < 70 {
-            
             Self::div_basic(m1, m2)
-
         } else {
-            
             let k = m / 2;
             let k2 = k << 1;
 
             let mut rembuf = WordBuf::new(m1.len())?;
             let mut tmpbuf = WordBuf::new(m1.len())?;
 
-            let a1 = SliceWithSign::new(&m1[k2..], 1);  // m1 div 2^(2*k)
-            let a0 = SliceWithSign::new(&m1[..k2], 1);  // m1 mod 2^(2*k)
+            let a1 = SliceWithSign::new(&m1[k2..], 1); // m1 div 2^(2*k)
+            let a0 = SliceWithSign::new(&m1[..k2], 1); // m1 mod 2^(2*k)
 
             let b = SliceWithSign::new(m2, 1);
-            let b1 = SliceWithSign::new(&m2[k..], 1);   // m2 div 2^k
-            let b0 = SliceWithSign::new(&m2[..k], 1);   // m2 mod 2^k
+            let b1 = SliceWithSign::new(&m2[k..], 1); // m2 div 2^k
+            let b0 = SliceWithSign::new(&m2[..k], 1); // m2 mod 2^k
 
             let (mut q1buf, r1) = Self::div_recursive(&a1, &b1)?;
             let mut q1 = SliceWithSign::new_mut(&mut q1buf, 1);
 
             // a3 = a0 + r1*2^(2*k) - q1*b0*2^k
             rembuf[..k2].copy_from_slice(&a0);
-            rembuf[k2..k2+r1.len()].copy_from_slice(&r1);
-            rembuf[k2+r1.len()..].fill(0);
+            rembuf[k2..k2 + r1.len()].copy_from_slice(&r1);
+            rembuf[k2 + r1.len()..].fill(0);
 
             tmpbuf[..k].fill(0);
 
@@ -247,8 +239,8 @@ impl Mantissa {
             if a3.sign() < 0 {
                 // correction
                 tmpbuf[..k].fill(0);
-                tmpbuf[k+m2.len()..].fill(0);
-                tmpbuf[k..k+m2.len()].copy_from_slice(m2);
+                tmpbuf[k + m2.len()..].fill(0);
+                tmpbuf[k..k + m2.len()].copy_from_slice(m2);
                 let b = SliceWithSign::new(&tmpbuf, 1);
                 Self::div_correction(&mut a3, &mut q1, b);
             }
@@ -262,17 +254,17 @@ impl Mantissa {
                 }
             }
 
-            q1buf.try_extend((m + 1)*WORD_BIT_SIZE)?;
+            q1buf.try_extend((m + 1) * WORD_BIT_SIZE)?;
             let mut q1 = SliceWithSign::new_mut(&mut q1buf, 1);
 
             if ub > k {
-                let a31 = SliceWithSign::new(&rembuf[k..ub], 1);  // a3 div 2^(k)
+                let a31 = SliceWithSign::new(&rembuf[k..ub], 1); // a3 div 2^(k)
                 let (mut q0, r0) = Self::div_recursive(&a31, &b1)?;
                 let mut q0 = SliceWithSign::new_mut(&mut q0, 1);
 
                 // a4 = r0*2^k + (a3 mod 2^k) - q0*b0
-                rembuf[k..k+r0.len()].copy_from_slice(&r0);
-                rembuf[k+r0.len()..].fill(0);
+                rembuf[k..k + r0.len()].copy_from_slice(&r0);
+                rembuf[k + r0.len()..].fill(0);
                 let mut a4 = SliceWithSign::new_mut(&mut rembuf, 1);
 
                 Self::mul_unbalanced(&q0, &b0, &mut tmpbuf)?;
@@ -299,17 +291,13 @@ impl Mantissa {
     fn div_basic_prefer(n: usize, m: usize) -> bool {
         n < 160 || {
             let lm = log2_ceil(m);
-            lm >= 13 && (
-                n < 50*(lm - 13) + 200
-            )
+            lm >= 13 && (n < 50 * (lm - 13) + 200)
         }
     }
 
     // general case division
     pub(super) fn div_unbalanced(m1: &[Word], m2: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
-
         if m1.len() < m2.len() {
-
             let q = WordBuf::new(1)?;
             let mut r = WordBuf::new(m1.len())?;
             r.copy_from_slice(m1);
@@ -321,15 +309,10 @@ impl Mantissa {
         let n = m2.len();
 
         if m <= n {
-
             Self::div_recursive(m1, m2)
-
         } else if Self::div_basic_prefer(n, m) {
-
             Self::div_basic(m1, m2)
-
         } else {
-
             let mut buf1 = WordBuf::new(m + 1)?;
             buf1[m] = 0;
 
@@ -338,7 +321,6 @@ impl Mantissa {
 
             let mut ub = m1.len();
             while m > n {
-
                 let mn = m - n;
 
                 let (q, r) = Self::div_recursive(&buf3[mn..ub], m2)?;
@@ -350,7 +332,7 @@ impl Mantissa {
 
                 let prev_ub = ub;
                 ub = mn + r.len().min(n);
-                buf3[mn..ub].copy_from_slice(&r[..ub-mn]);
+                buf3[mn..ub].copy_from_slice(&r[..ub - mn]);
                 buf3[ub..prev_ub].fill(0);
 
                 m -= n;
@@ -362,7 +344,7 @@ impl Mantissa {
             let mut q1 = SliceWithSign::new_mut(&mut buf1[m..], 1);
             let q2 = SliceWithSign::new(&q[m..], 1);
             q1.add_assign(&q2);
-    
+
             Ok((buf1, r))
         }
     }
@@ -371,20 +353,20 @@ impl Mantissa {
     // prepreq: m1.len() = 2*m2.len()
     #[allow(dead_code)] // TODO: consider performance improvement
     fn div_short(m1: &[Word], m2: &[Word]) -> Result<WordBuf, Error> {
-        debug_assert!(m1.len() == 2*m2.len());
-        debug_assert!(m2[m2.len()-1] & WORD_SIGNIFICANT_BIT != 0);
+        debug_assert!(m1.len() == 2 * m2.len());
+        debug_assert!(m2[m2.len() - 1] & WORD_SIGNIFICANT_BIT != 0);
         if m2.len() <= 20 {
             let (q1, _r1) = Self::div_basic(m1, m2)?;
             Ok(q1)
         } else {
-            let m2l = (m2.len()+1)/2;
+            let m2l = (m2.len() + 1) / 2;
             let k = m2.len() - m2l;
 
-            let a1 = SliceWithSign::new(&m1[2*k..], 1);  // m1 div 2^(2*k)
-            let a0 = SliceWithSign::new(&m1[..2*k], 1);  // m1 mod 2^(2*k)
+            let a1 = SliceWithSign::new(&m1[2 * k..], 1); // m1 div 2^(2*k)
+            let a0 = SliceWithSign::new(&m1[..2 * k], 1); // m1 mod 2^(2*k)
 
-            let b1 = SliceWithSign::new(&m2[k..], 1);  // m2 div 2^k
-            let b0 = SliceWithSign::new(&m2[..k], 1);  // m2 mod 2^k
+            let b1 = SliceWithSign::new(&m2[k..], 1); // m2 div 2^k
+            let b0 = SliceWithSign::new(&m2[..k], 1); // m2 mod 2^k
 
             let (mut q1, mut r1) = Self::div_basic(&a1, &b1)?;
 
@@ -399,7 +381,7 @@ impl Mantissa {
             let mut bqk = SliceWithSign::new_mut(&mut tmp_buf, -1);
             bqk.add_assign(&a0);
 
-            r1.try_extend((r1.len() + k*2)*WORD_BIT_SIZE)?;
+            r1.try_extend((r1.len() + k * 2) * WORD_BIT_SIZE)?;
             let r1 = SliceWithSign::new(&r1, 1);
             bqk.add_assign(&r1);
 
@@ -412,15 +394,15 @@ impl Mantissa {
                 Self::div_correction(&mut bqk, &mut q1, b);
             }
 
-            let a21 = SliceWithSign::new(&tmp_buf[m2l..], 1);   // a2 div 2^m2l
-            let b21 = SliceWithSign::new(&m2[m2l..], 1);  // m1 div 2^m2l
-            let q0 = Self::div_short(&a21[..b21.len()*2], &b21)?;
+            let a21 = SliceWithSign::new(&tmp_buf[m2l..], 1); // a2 div 2^m2l
+            let b21 = SliceWithSign::new(&m2[m2l..], 1); // m1 div 2^m2l
+            let q0 = Self::div_short(&a21[..b21.len() * 2], &b21)?;
             let q0 = SliceWithSign::new(&q0, 1);
 
             let mut full_q_buf = WordBuf::new(m2.len() + 1)?;
             full_q_buf[..k].fill(0);
-            full_q_buf[q1.len()+k..].fill(0);
-            full_q_buf[k..q1.len()+k].copy_from_slice(&q1);
+            full_q_buf[q1.len() + k..].fill(0);
+            full_q_buf[k..q1.len() + k].copy_from_slice(&q1);
             let mut full_q = SliceWithSign::new_mut(&mut full_q_buf, 1);
             full_q.add_assign(&q0);
 
@@ -429,20 +411,18 @@ impl Mantissa {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
     use super::*;
-    use crate::defs::{WORD_SIGNIFICANT_BIT};
+    use crate::defs::WORD_SIGNIFICANT_BIT;
     use rand::random;
 
-    #[cfg(not(feature="std"))]
+    #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
 
     #[test]
     fn test_div_unbalanced() {
-
         const MAX_BUF: usize = 300;
         let mut wb = [0; MAX_BUF];
         let mut buf = [0; MAX_BUF];
@@ -468,14 +448,13 @@ mod tests {
 
     #[test]
     fn test_div_short() {
-
         const MAX_BUF: usize = 100;
-        let mut wb = [0; MAX_BUF*3+1];
-        let mut buf = [0; MAX_BUF*3+1];
+        let mut wb = [0; MAX_BUF * 3 + 1];
+        let mut buf = [0; MAX_BUF * 3 + 1];
 
         for _ in 0..1000 {
             let s1 = random_normalized_slice(MAX_BUF, MAX_BUF);
-            let mut s2 = random_normalized_slice(s1.len()*2, s1.len()*2);
+            let mut s2 = random_normalized_slice(s1.len() * 2, s1.len() * 2);
             s2[..s1.len()].fill(0);
 
             //println!("s1{:?}\ns2{:?}", s1, &s2[s1.len()..]);
@@ -487,7 +466,7 @@ mod tests {
             let mut d1 = SliceWithSign::new_mut(&mut buf, 1);
             let d2 = SliceWithSign::new(&q, 1);
             d1.mul_assign(&d2, &mut wb);
-            s2[s1.len()] = 0;   // q can be grater than floor(s2/s1) by at most 2*log2(n)
+            s2[s1.len()] = 0; // q can be grater than floor(s2/s1) by at most 2*log2(n)
             d1[s1.len()] = 0;
             //println!("{:?}\n{:?}\n", &s2[s1.len()..], &d1[s1.len()..s2.len()]);
             assert!(s2[s1.len()..] == d1[s1.len()..s2.len()]);
@@ -497,9 +476,8 @@ mod tests {
 
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn test_div_perf() {
-
         for _ in 0..5 {
             let sz1 = 16384;
             let sz2 = 800;
@@ -510,7 +488,7 @@ mod tests {
                 let v = random_normalized_slice(sz2, sz2);
                 n.push(v);
             }
-            
+
             // basic
             let start_time = std::time::Instant::now();
             for ni in &n {
@@ -518,7 +496,7 @@ mod tests {
             }
             let time = start_time.elapsed();
             println!("div_basic {}", time.as_millis());
-            
+
             // unbalanced
             let start_time = std::time::Instant::now();
             for ni in &n {
@@ -531,9 +509,8 @@ mod tests {
 
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn test_div_short_perf() {
-
         for _ in 0..5 {
             let sz1 = 1000;
             let sz2 = 500;
@@ -544,7 +521,7 @@ mod tests {
                 let v = random_normalized_slice(sz2, sz2);
                 n.push(v);
             }
-            
+
             // basic
             let start_time = std::time::Instant::now();
             for ni in &n {
@@ -552,7 +529,7 @@ mod tests {
             }
             let time = start_time.elapsed();
             println!("div_basic {}", time.as_millis());
-            
+
             // unbalanced
             let start_time = std::time::Instant::now();
             for ni in &n {
@@ -574,7 +551,7 @@ mod tests {
             s1.push(random());
         }
         let l = s1.len();
-        s1[l-1] |= WORD_SIGNIFICANT_BIT;
+        s1[l - 1] |= WORD_SIGNIFICANT_BIT;
         s1
     }
 }

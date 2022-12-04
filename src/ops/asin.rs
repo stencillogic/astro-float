@@ -2,25 +2,21 @@
 
 use crate::common::consts::ONE;
 use crate::common::util::count_leading_ones;
-use crate::num::BigFloatNumber;
-use crate::defs::RoundingMode;
 use crate::defs::Error;
+use crate::defs::RoundingMode;
+use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
 
-
 impl BigFloatNumber {
-
     /// Computes the arcsine of a number. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - InvalidArgument: argument is greater than 1 or smaller than -1.
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn asin(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         if self.cmp(&ONE) == 0 {
-            
             let mut pi = cc.pi(self.get_mantissa_max_bit_len(), rm)?;
 
             pi.set_exponent(pi.get_exponent() - 1);
@@ -34,7 +30,10 @@ impl BigFloatNumber {
         }
 
         let mut x = self.clone()?;
-        x.set_precision(self.get_mantissa_max_bit_len() + additional_prec, RoundingMode::None)?;
+        x.set_precision(
+            self.get_mantissa_max_bit_len() + additional_prec,
+            RoundingMode::None,
+        )?;
 
         // arcsin(x) = arctan(x / sqrt(1 - x^2))
         let xx = x.mul(&x, RoundingMode::None)?;
@@ -50,7 +49,6 @@ impl BigFloatNumber {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -58,18 +56,23 @@ mod tests {
 
     #[test]
     fn test_arcsine() {
-        
         let mut cc = Consts::new().unwrap();
 
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_word(4294967295,64).unwrap();
+        let mut n1 = BigFloatNumber::from_word(4294967295, 64).unwrap();
         n1.set_exponent(0);
         //println!("{}", n1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
         let _n2 = n1.asin(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
 
         // asymptotic & extrema testing
-        let n1 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC487_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let n1 = BigFloatNumber::parse(
+            "F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC487_e-1",
+            crate::Radix::Hex,
+            320,
+            RoundingMode::None,
+        )
+        .unwrap();
         let n2 = n1.asin(rm, &mut cc).unwrap();
         let n3 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419EBBFC39B4BEC14AF6_e+0", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
 
@@ -83,12 +86,11 @@ mod tests {
         //println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
-        
     }
 
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn arcsine_perf() {
         let mut cc = Consts::new().unwrap();
 
@@ -106,5 +108,4 @@ mod tests {
             println!("{}", time.as_millis());
         }
     }
-
 }

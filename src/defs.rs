@@ -1,8 +1,7 @@
 //! Definitions.
 
-
 /// A word.
-#[cfg(target_arch = "x86_64")] 
+#[cfg(target_arch = "x86_64")]
 pub type Word = u64;
 
 /// Doubled word.
@@ -14,15 +13,15 @@ pub type DoubleWord = u128;
 pub type SignedWord = i128;
 
 /// A word.
-#[cfg(target_arch = "x86")] 
+#[cfg(target_arch = "x86")]
 pub type Word = u32;
 
 /// Doubled word.
-#[cfg(target_arch = "x86")] 
+#[cfg(target_arch = "x86")]
 pub type DoubleWord = u64;
 
 /// Word with sign.
-#[cfg(target_arch = "x86")] 
+#[cfg(target_arch = "x86")]
 pub type SignedWord = i64;
 
 /// An exponent.
@@ -33,7 +32,6 @@ pub const EXPONENT_MAX: Exponent = Exponent::MAX;
 
 /// Minimum exponent value.
 pub const EXPONENT_MIN: Exponent = Exponent::MIN;
-
 
 /// Maximum value of a word.
 pub const WORD_MAX: Word = Word::MAX;
@@ -50,7 +48,6 @@ pub const WORD_SIGNIFICANT_BIT: Word = WORD_MAX << (WORD_BIT_SIZE - 1);
 /// Sign.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum Sign {
-
     /// Negative.
     Neg = -1,
 
@@ -59,7 +56,6 @@ pub enum Sign {
 }
 
 impl Sign {
-    
     /// Changes the sign to the opposite.
     pub fn invert(&self) -> Self {
         match *self {
@@ -89,7 +85,6 @@ use smallvec::CollectionAllocErr;
 /// Possible errors.
 #[derive(Debug)]
 pub enum Error {
-    
     /// The exponent value becomes greater than the upper limit of exponent values or less than the lower limit.
     ExponentOverflow(Sign),
 
@@ -103,24 +98,21 @@ pub enum Error {
     MemoryAllocation(CollectionAllocErr),
 }
 
-
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::ExponentOverflow(l0), Self::ExponentOverflow(r0)) => l0 == r0,
             (Self::MemoryAllocation(l0), Self::MemoryAllocation(r0)) => {
                 core::mem::discriminant(l0) == core::mem::discriminant(r0)
-            },
+            }
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
 }
 
-
 /// Radix.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum Radix {
-
     /// Binary.
     Bin = 2,
 
@@ -137,7 +129,6 @@ pub enum Radix {
 /// Rounding modes.
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum RoundingMode {
-    
     /// Skip rounding operation.
     None,
 

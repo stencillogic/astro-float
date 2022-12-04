@@ -1,25 +1,29 @@
 //! Auxiliary structures.
 
-
-
 /// Length of the slice extended by extra size.
-pub struct ExtendedSlice<T, V> where V: Iterator<Item = T> {
+pub struct ExtendedSlice<T, V>
+where
+    V: Iterator<Item = T>,
+{
     s: V,
     extra: usize,
     default: T,
 }
 
-impl<T, V> ExtendedSlice<T, V> where V: Iterator<Item = T> {
+impl<T, V> ExtendedSlice<T, V>
+where
+    V: Iterator<Item = T>,
+{
     pub fn new(s: V, extra: usize, default: T) -> Self {
-        ExtendedSlice {
-            s,
-            extra,
-            default,
-        }
+        ExtendedSlice { s, extra, default }
     }
 }
 
-impl<T, V> Iterator for ExtendedSlice<T, V> where V: Iterator<Item = T>, T: Copy + Clone {
+impl<T, V> Iterator for ExtendedSlice<T, V>
+where
+    V: Iterator<Item = T>,
+    T: Copy + Clone,
+{
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -41,11 +45,12 @@ pub struct RightShiftedSlice<'a, T> {
     extend_sz: usize,
 }
 
-impl<'a, T> RightShiftedSlice<'a, T> where T: Copy + Clone {
-
+impl<'a, T> RightShiftedSlice<'a, T>
+where
+    T: Copy + Clone,
+{
     pub fn new(s: &'a [T], shift: usize, default: T, mut extend_sz: usize) -> Self {
-
-        let elsz = core::mem::size_of::<T>()*8;
+        let elsz = core::mem::size_of::<T>() * 8;
         let mut idx = shift / elsz;
         let bits = shift % elsz;
 
@@ -55,7 +60,7 @@ impl<'a, T> RightShiftedSlice<'a, T> where T: Copy + Clone {
         } else {
             idx -= extend_sz;
             extend_sz = 0;
-        } 
+        }
 
         let mut prev = None;
         let iter = if idx < s.len() {
@@ -76,23 +81,22 @@ impl<'a, T> RightShiftedSlice<'a, T> where T: Copy + Clone {
     }
 }
 
-
-impl<'a, T> Iterator for RightShiftedSlice<'a, T> 
-    where T: core::ops::Shl<usize, Output = T> 
-        + core::ops::Shr<usize, Output = T> 
-        + core::ops::BitOr<T, Output = T> 
+impl<'a, T> Iterator for RightShiftedSlice<'a, T>
+where
+    T: core::ops::Shl<usize, Output = T>
+        + core::ops::Shr<usize, Output = T>
+        + core::ops::BitOr<T, Output = T>
         + Copy
-        + Clone
+        + Clone,
 {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        
         if self.extend_sz > 0 {
             self.extend_sz -= 1;
             if self.extend_sz == 0 && self.bits > 0 {
                 if let Some(hi) = self.prev {
-                    Some(hi << (core::mem::size_of::<T>()*8 - self.bits))
+                    Some(hi << (core::mem::size_of::<T>() * 8 - self.bits))
                 } else {
                     Some(self.default)
                 }
@@ -104,7 +108,7 @@ impl<'a, T> Iterator for RightShiftedSlice<'a, T>
             if self.bits == 0 {
                 Some(lo)
             } else if let Some(hi) = self.prev {
-                Some((hi << (core::mem::size_of::<T>()*8 - self.bits)) | (lo >> self.bits))
+                Some((hi << (core::mem::size_of::<T>() * 8 - self.bits)) | (lo >> self.bits))
             } else {
                 Some(lo >> self.bits)
             }
@@ -113,4 +117,3 @@ impl<'a, T> Iterator for RightShiftedSlice<'a, T>
         }
     }
 }
-

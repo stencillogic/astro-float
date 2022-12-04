@@ -2,14 +2,13 @@
 
 use core::fmt::Formatter;
 
+use crate::{BigFloatNumber, Radix, RoundingMode};
 use serde::de::Error;
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer};
-use crate::{BigFloatNumber, Radix, RoundingMode};
 
-#[cfg(not(feature="std"))]
-use {alloc::format,
-    alloc::string::String};
+#[cfg(not(feature = "std"))]
+use {alloc::format, alloc::string::String};
 
 pub struct BigFloatVisitor {}
 
@@ -20,7 +19,6 @@ impl<'de> Deserialize<'de> for BigFloatNumber {
 }
 
 impl<'de> Visitor<'de> for BigFloatVisitor {
-
     type Value = BigFloatNumber;
 
     fn expecting(&self, formatter: &mut Formatter) -> core::fmt::Result {
@@ -65,7 +63,6 @@ impl<'de> Visitor<'de> for BigFloatVisitor {
     // fn visit_bytes<E: Error>(self, _: &[u8]) -> Result<Self::Value, E> {
     //     todo!()
     // }
-
 }
 
 #[cfg(test)]

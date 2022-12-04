@@ -1,42 +1,43 @@
 //! Multiplication with FFT.
 
-use crate::common::util::log2_ceil;
-use crate::common::util::sqrt_int;
-use crate::defs::WORD_BIT_SIZE;
-use crate::defs::WORD_MAX;
-use crate::defs::Error;
-use crate::defs::Word;
-use crate::mantissa::Mantissa;
 use crate::common::buf::WordBuf;
 use crate::common::int::SliceWithSign;
 use crate::common::util::add_carry;
+use crate::common::util::log2_ceil;
 use crate::common::util::shift_slice_left_copy;
+use crate::common::util::sqrt_int;
 use crate::common::util::sub_borrow;
+use crate::defs::Error;
+use crate::defs::Word;
+use crate::defs::WORD_BIT_SIZE;
+use crate::defs::WORD_MAX;
+use crate::mantissa::Mantissa;
 use itertools::izip;
 use smallvec::SmallVec;
 
-
 impl Mantissa {
-
     fn fft_w_shift(j: usize, k: usize) -> usize {
-
         let mut j = j as u64;
 
-        j = ((j >> 1 ) & 0x5555555555555555) | ((j & 0x5555555555555555) << 1 );
-        j = ((j >> 2 ) & 0x3333333333333333) | ((j & 0x3333333333333333) << 2 );
-        j = ((j >> 4 ) & 0x0F0F0F0F0F0F0F0F) | ((j & 0x0F0F0F0F0F0F0F0F) << 4 );
-        j = ((j >> 8 ) & 0x00FF00FF00FF00FF) | ((j & 0x00FF00FF00FF00FF) << 8 );
+        j = ((j >> 1) & 0x5555555555555555) | ((j & 0x5555555555555555) << 1);
+        j = ((j >> 2) & 0x3333333333333333) | ((j & 0x3333333333333333) << 2);
+        j = ((j >> 4) & 0x0F0F0F0F0F0F0F0F) | ((j & 0x0F0F0F0F0F0F0F0F) << 4);
+        j = ((j >> 8) & 0x00FF00FF00FF00FF) | ((j & 0x00FF00FF00FF00FF) << 8);
         j = ((j >> 16) & 0x0000FFFF0000FFFF) | ((j & 0x0000FFFF0000FFFF) << 16);
-        j = ( j >> 32                      ) | ( j                       << 32);
+        j = (j >> 32) | (j << 32);
 
-        j >>= core::mem::size_of::<u64>()*8 - k;
+        j >>= core::mem::size_of::<u64>() * 8 - k;
 
         j as usize
     }
 
     #[inline]
-    fn fft_butterfly(a: &mut SliceWithSign, b: &mut SliceWithSign, n1: usize, modulus: &SliceWithSign) {
-
+    fn fft_butterfly(
+        a: &mut SliceWithSign,
+        b: &mut SliceWithSign,
+        n1: usize,
+        modulus: &SliceWithSign,
+    ) {
         debug_assert!(a.sign() > 0 && b.sign() > 0);
 
         // cmp
@@ -53,7 +54,6 @@ impl Mantissa {
         let iter1 = a.iter_mut();
         let iter2 = b.iter_mut();
         for (a, b) in iter1.zip(iter2) {
-
             let mut v1 = *a;
             let mut v2 = *b;
 
@@ -62,7 +62,7 @@ impl Mantissa {
             if b_gt_a {
                 core::mem::swap(&mut v1, &mut v2);
             }
-            
+
             c2 = sub_borrow(v1, v2, c2, b);
         }
         debug_assert!(c1 == 0 && c2 == 0);
@@ -77,15 +77,18 @@ impl Mantissa {
 
     // diagnostic with plain fft
     #[allow(dead_code)]
-    fn fft3(parts: &mut [SliceWithSign], dst: &mut [SliceWithSign], w: usize, k1: usize, rev: bool) {
-
+    fn fft3(
+        parts: &mut [SliceWithSign],
+        dst: &mut [SliceWithSign],
+        w: usize,
+        k1: usize,
+        rev: bool,
+    ) {
         let mut b = WordBuf::new(parts[0].len() + k1).unwrap();
 
         for (i, dst_i) in dst.iter_mut().enumerate() {
-
             for (j, part_j) in parts.iter().enumerate() {
-
-                let mut ww = (i*j) % k1;
+                let mut ww = (i * j) % k1;
                 if rev {
                     ww = k1 - ww;
                 }
@@ -93,28 +96,33 @@ impl Mantissa {
                 b.fill(0);
                 let mut bb = SliceWithSign::new_mut(&mut b, part_j.sign());
                 bb.copy_from(part_j);
-                bb.shift_left(w*ww);
+                bb.shift_left(w * ww);
 
                 dst_i.add_assign(&bb);
             }
         }
     }
 
-    fn fft_forward(parts: &mut [SliceWithSign], w: usize, k1: usize, k: usize, s: usize, n1: usize, modulus: &SliceWithSign, tmp_buf: &mut [Word]) {
-
+    fn fft_forward(
+        parts: &mut [SliceWithSign],
+        w: usize,
+        k1: usize,
+        k: usize,
+        s: usize,
+        n1: usize,
+        modulus: &SliceWithSign,
+        tmp_buf: &mut [Word],
+    ) {
         if k1 == 2 {
-
             let (a, b) = parts.split_at_mut(s);
             Self::fft_butterfly(a.first_mut().unwrap(), b.first_mut().unwrap(), n1, modulus);
-
         } else {
-
             let k2 = k1 / 2;
             let kk = k - 1;
             let s2 = s * 2;
 
-            Self::fft_forward(parts, w*2, k2, kk, s2, n1, modulus, tmp_buf);
-            Self::fft_forward(&mut parts[s..], w*2, k2, kk, s2, n1, modulus, tmp_buf);
+            Self::fft_forward(parts, w * 2, k2, kk, s2, n1, modulus, tmp_buf);
+            Self::fft_forward(&mut parts[s..], w * 2, k2, kk, s2, n1, modulus, tmp_buf);
 
             let mut chunks = parts.chunks_mut(s2);
 
@@ -134,33 +142,34 @@ impl Mantissa {
         }
     }
 
-    fn fft_reverse(parts: &mut [SliceWithSign], w: usize, k1: usize, n1: usize, modulus: &SliceWithSign, tmp_buf: &mut [Word]) {
-
+    fn fft_reverse(
+        parts: &mut [SliceWithSign],
+        w: usize,
+        k1: usize,
+        n1: usize,
+        modulus: &SliceWithSign,
+        tmp_buf: &mut [Word],
+    ) {
         if k1 == 2 {
-
             let (a, b) = parts.split_at_mut(1);
             Self::fft_butterfly(&mut a[0], &mut b[0], n1, modulus);
-
         } else {
+            let k2 = k1 / 2;
 
-            let k2 = k1/2;
-
-            Self::fft_reverse(&mut parts[..k2], w*2, k2, n1, modulus, tmp_buf);
-            Self::fft_reverse(&mut parts[k2..], w*2, k2, n1, modulus, tmp_buf);
+            Self::fft_reverse(&mut parts[..k2], w * 2, k2, n1, modulus, tmp_buf);
+            Self::fft_reverse(&mut parts[k2..], w * 2, k2, n1, modulus, tmp_buf);
 
             let (p1, p2) = parts.split_at_mut(k2);
             let mut iter = p1.iter_mut().zip(p2.iter_mut());
 
             if let Some((a, b)) = iter.next() {
-
                 Self::fft_butterfly(a, b, n1, modulus);
 
                 for (j, (a, b)) in iter.enumerate() {
-
                     let w_shift = w * (k1 - j - 1);
 
                     Self::fft_mul_mod(b, w_shift, n1, modulus, tmp_buf);
-    
+
                     Self::fft_butterfly(a, b, n1, modulus);
                 }
             }
@@ -176,7 +185,7 @@ impl Mantissa {
         let k1 = 1 << k;
         let m = (n + k1 - 1) / k1;
         let n = m * k1;
-        let n1 = (2*n + k1 - 1) / k1 + k;
+        let n1 = (2 * n + k1 - 1) / k1 + k;
         let n1 = ((n1 + k1 - 1) / k1) * k1;
         let t = n1 / k1;
         (n, k1, k, m, n1, t)
@@ -184,18 +193,14 @@ impl Mantissa {
 
     // decompose in parts.len() = k1 parts, each of size m
     fn fft_decompose(d: &[Word], m: usize, parts: &mut [SliceWithSign]) {
-
         let mut parts_iter = parts.iter_mut();
 
         if m % WORD_BIT_SIZE == 0 {
-
             for (chunk, part) in d.chunks(m / WORD_BIT_SIZE).zip(parts_iter.by_ref()) {
                 part[..chunk.len()].copy_from_slice(chunk);
                 part[chunk.len()..].fill(0);
             }
-
         } else {
-
             let chunk_sz = (m + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE + 1;
             let mask = WORD_MAX >> (WORD_BIT_SIZE - (m % WORD_BIT_SIZE));
             let mut s = 0;
@@ -203,7 +208,6 @@ impl Mantissa {
             let mut shift;
 
             loop {
-
                 idx = s / WORD_BIT_SIZE;
                 shift = s % WORD_BIT_SIZE;
                 if idx + chunk_sz > d.len() {
@@ -213,20 +217,19 @@ impl Mantissa {
                 let part = parts_iter.next().unwrap();
 
                 part[chunk_sz..].fill(0);
-                part[..chunk_sz].copy_from_slice(&d[idx..idx+chunk_sz]);
+                part[..chunk_sz].copy_from_slice(&d[idx..idx + chunk_sz]);
                 part.shift_right(shift);
-                part[chunk_sz-1] = 0;
-                part[chunk_sz-2] &= mask;
+                part[chunk_sz - 1] = 0;
+                part[chunk_sz - 2] &= mask;
 
                 s += m;
             }
 
             if idx < d.len() {
-                
                 let part = parts_iter.next().unwrap();
 
-                part[d.len()-idx..].fill(0);
-                part[..d.len()-idx].copy_from_slice(&d[idx..]);
+                part[d.len() - idx..].fill(0);
+                part[..d.len() - idx].copy_from_slice(&d[idx..]);
                 part.shift_right(shift);
             }
         }
@@ -236,12 +239,15 @@ impl Mantissa {
         }
     }
 
-    fn fft_compute_chunks<'a>(num: &[Word], n: usize, tmp_buf: &'a mut [Word], s: i8) -> SliceWithSign<'a> {
-
+    fn fft_compute_chunks<'a>(
+        num: &[Word],
+        n: usize,
+        tmp_buf: &'a mut [Word],
+        s: i8,
+    ) -> SliceWithSign<'a> {
         let mut chunks = num.chunks(n / WORD_BIT_SIZE);
 
         if let Some(first_chunk) = chunks.next() {
-
             tmp_buf[first_chunk.len()..].fill(0);
 
             let mut acc = SliceWithSign::new_mut(tmp_buf, s);
@@ -251,17 +257,14 @@ impl Mantissa {
             let mut sign = -s;
 
             for chunk in chunks {
-
                 let nn = SliceWithSign::new(chunk, sign);
                 acc.add_assign(&nn);
 
                 sign = -sign;
             }
-    
+
             acc
-
         } else {
-
             tmp_buf.fill(0);
 
             SliceWithSign::new_mut(tmp_buf, 1)
@@ -269,44 +272,34 @@ impl Mantissa {
     }
 
     // results in  0 <= num < modulus, assuming abs(num) not much greater than modulus
-    fn fft_normalize(num: &mut SliceWithSign, n: usize, modulus: &SliceWithSign) {       
-
-        if num.sign() < 0 && !num.is_zero() { 
-
+    fn fft_normalize(num: &mut SliceWithSign, n: usize, modulus: &SliceWithSign) {
+        if num.sign() < 0 && !num.is_zero() {
             let last = n / WORD_BIT_SIZE;
 
             while num.sign() < 0 {
-
                 if num[last] > 0 && num[0] > 0 {
-
                     // simplified add
                     num[0] -= 1;
                     num[last] -= 1;
-
                 } else {
-
                     num.add_assign(modulus);
                 }
             }
-
         } else {
-
             let last = n / WORD_BIT_SIZE;
 
             while num[last] > 0 {
-
                 if num[0] > 0 {
-
                     // simplified sub
                     num[0] -= 1;
                     num[last] -= 1;
-                    
                 } else {
                     num.sub_assign(modulus);
                 }
             }
 
-            if num.sign() < 0 && !num.is_zero() {     // unlikely
+            if num.sign() < 0 && !num.is_zero() {
+                // unlikely
                 num.add_assign(modulus);
             }
         }
@@ -315,18 +308,20 @@ impl Mantissa {
     // compute num*2^j mod (2^n+1) inplace
     // num and modulus should have up to n bits of additional free space for shifting.
     // tmp_buf is a reusable buffer of size == num.len().
-    fn fft_mul_mod(num: &mut SliceWithSign, j: usize, n: usize, modulus: &SliceWithSign, tmp_buf: &mut [Word]) {
-
+    fn fft_mul_mod(
+        num: &mut SliceWithSign,
+        j: usize,
+        n: usize,
+        modulus: &SliceWithSign,
+        tmp_buf: &mut [Word],
+    ) {
         debug_assert!(n % WORD_BIT_SIZE == 0);
 
         let (work_buf, ext_buf) = tmp_buf.split_at_mut(num.len());
 
         let mut acc = if j == 0 {
-
             Self::fft_compute_chunks(num, n, work_buf, 1)
-
         } else {
-
             let shift = j % n;
             let q = j / n;
 
@@ -349,11 +344,16 @@ impl Mantissa {
     // compute num / 2^j mod (2^n+1) inplace
     // num should have up to n bits of additional free space for shifting.
     // tmp_buf is a reusable buffer of size == num.len().
-    fn fft_div_mod(num: &mut SliceWithSign, j: usize, n: usize, modulus: &SliceWithSign, tmp_buf: &mut [Word]) {
-
+    fn fft_div_mod(
+        num: &mut SliceWithSign,
+        j: usize,
+        n: usize,
+        modulus: &SliceWithSign,
+        tmp_buf: &mut [Word],
+    ) {
         debug_assert!(n % WORD_BIT_SIZE == 0);
 
-        let n2 = n*2;
+        let n2 = n * 2;
         let mut shift = ((j + n2 - 1) / n2) * n2 - j;
 
         let mut s = 1;
@@ -373,15 +373,19 @@ impl Mantissa {
         num.copy_from(&acc);
     }
 
-    fn fft_prepare_parts(buf: &mut [Word], k1: usize, part_len: usize) -> Result<SmallVec<[SliceWithSign; 0]>, Error> {
-
+    fn fft_prepare_parts(
+        buf: &mut [Word],
+        k1: usize,
+        part_len: usize,
+    ) -> Result<SmallVec<[SliceWithSign; 0]>, Error> {
         let mut parts = SmallVec::<[SliceWithSign; 0]>::new();
-        parts.try_reserve_exact(k1).map_err(Error::MemoryAllocation)?;
+        parts
+            .try_reserve_exact(k1)
+            .map_err(Error::MemoryAllocation)?;
 
         let mut rest = buf;
 
         for _ in 0..k1 {
-
             let (p1, p2) = rest.split_at_mut(part_len);
 
             let s = SliceWithSign::new_mut(p1, 1);
@@ -394,22 +398,21 @@ impl Mantissa {
 
     // multiply two integer numbers.
     pub(super) fn fft_mul(d1: &[Word], d2: &[Word], d3: &mut [Word]) -> Result<(), Error> {
-
         let l: usize = (d1.len() + d2.len()) * WORD_BIT_SIZE;
 
         let (_n, k1, k, m, n1, t) = Self::fft_params(l);
 
-        let w = t*2;
+        let w = t * 2;
         let part_len = n1 / WORD_BIT_SIZE + 1;
 
-        let mut buf = WordBuf::new(3*k1*part_len + 6*part_len)?;
+        let mut buf = WordBuf::new(3 * k1 * part_len + 6 * part_len)?;
 
-        let (parts1_buf, rest) = buf.split_at_mut(k1*part_len);
-        let (parts2_buf, rest) = rest.split_at_mut(k1*part_len);
-        let (parts3_buf, rest) = rest.split_at_mut(k1*part_len);
+        let (parts1_buf, rest) = buf.split_at_mut(k1 * part_len);
+        let (parts2_buf, rest) = rest.split_at_mut(k1 * part_len);
+        let (parts3_buf, rest) = rest.split_at_mut(k1 * part_len);
         //let (thres_buf, rest) = rest.split_at_mut(2*part_len);
         let (modulus_buf, rest) = rest.split_at_mut(part_len);
-        let (tmp_buf, tmp_buf2) = rest.split_at_mut(part_len*3);
+        let (tmp_buf, tmp_buf2) = rest.split_at_mut(part_len * 3);
 
         let mut parts1 = Self::fft_prepare_parts(parts1_buf, k1, part_len)?;
         let mut parts2 = Self::fft_prepare_parts(parts2_buf, k1, part_len)?;
@@ -426,15 +429,14 @@ impl Mantissa {
         //let mut thres = SliceWithSign::new_mut(thres_buf, 1);
 
         for (j, (part1, part2)) in parts1.iter_mut().zip(parts2.iter_mut()).enumerate() {
-            Self::fft_mul_mod(part1, t*j, n1, &modulus, tmp_buf);
-            Self::fft_mul_mod(part2, t*j, n1, &modulus, tmp_buf);
+            Self::fft_mul_mod(part1, t * j, n1, &modulus, tmp_buf);
+            Self::fft_mul_mod(part2, t * j, n1, &modulus, tmp_buf);
         }
 
         Self::fft_forward(&mut parts1, w, k1, k, 1, n1, &modulus, tmp_buf);
         Self::fft_forward(&mut parts2, w, k1, k, 1, n1, &modulus, tmp_buf);
 
         for (part1, part2, part3) in izip!(parts1.iter(), parts2.iter(), parts3.iter_mut()) {
-
             Self::mul_unbalanced(part1, part2, tmp_buf2)?;
 
             part3.set_sign(part1.sign() * part2.sign());
@@ -450,14 +452,13 @@ impl Mantissa {
         d3.fill(0);
 
         for (j, part3) in parts3.iter_mut().enumerate() {
-
-            Self::fft_div_mod(part3, k + t*j, n1, &modulus, tmp_buf);
+            Self::fft_div_mod(part3, k + t * j, n1, &modulus, tmp_buf);
 
             while part3.sign() < 0 && !part3.is_zero() {
                 part3.add_assign(&modulus);
             }
 
-/*             thres[m*2 / WORD_BIT_SIZE] = 0;
+            /*             thres[m*2 / WORD_BIT_SIZE] = 0;
             thres[m*2 / WORD_BIT_SIZE + 1] = 0;
             thres[0] = (j + 1) as Word;
             thres.shift_left(m*2);
@@ -487,24 +488,27 @@ impl Mantissa {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
     use super::*;
-    use rand::random;
     use crate::defs::DoubleWord;
     use crate::defs::WORD_BIT_SIZE;
+    use rand::random;
 
-    #[cfg(not(feature="std"))]
+    #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
-    
+
     #[test]
     fn test_fft_mul() {
-
         // d1*d2
-        let s1 = [1975132958, 2865607635, 3785004856, 2329109360, 82327679, 1315874535, 144553447, 431779413];
-        let s2 = [1725562336, 92718951, 4168989748, 1276933861, 3499392949, 562806663, 6667756, 549355095];
+        let s1 = [
+            1975132958, 2865607635, 3785004856, 2329109360, 82327679, 1315874535, 144553447,
+            431779413,
+        ];
+        let s2 = [
+            1725562336, 92718951, 4168989748, 1276933861, 3499392949, 562806663, 6667756, 549355095,
+        ];
 
         let mut ref_s = [0; 16];
         let mut ret_s = [0; 16];
@@ -514,17 +518,15 @@ mod tests {
 
         assert!(ret_s == ref_s);
 
-
         // d1*d2
         let s1 = [2628292838, 2277283921, 3515294573, 3177772552, 0];
         let s2 = [1623732616, 2662366248, 1730446853, 817631908, 0];
-        
+
         let mut ref_s = [0; 10];
         let mut ret_s = [0; 10];
 
         mul(&s1, &s2, &mut ref_s);
         Mantissa::fft_mul(&s1, &s2, &mut ret_s).unwrap();
-
 
         assert!(ret_s == ref_s);
 
@@ -533,7 +535,7 @@ mod tests {
         let s2 = [21, 22, 23, 24, 25, 26, 27, 28];
         let mut ret_s = [0; 16];
         let mut ref_s = [0; 16];
-        
+
         mul(&s1, &s2, &mut ref_s);
         Mantissa::fft_mul(&s1, &s2, &mut ret_s).unwrap();
 
@@ -591,10 +593,8 @@ mod tests {
 
         assert!(ret_s == ref_s);
 
-
         // random
         for _ in 0..1000 {
-
             let s1 = random_slice(128, 256);
             let s2 = random_slice(128, 256);
 
@@ -612,14 +612,11 @@ mod tests {
         }
     }
 
-
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn fft_mul_perf() {
-
         for _ in 0..5 {
-
             let sz = 5400;
 
             let f = random_slice(sz, sz);

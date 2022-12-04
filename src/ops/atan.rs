@@ -1,20 +1,19 @@
 //! Arctangent.
 
-use crate::Exponent;
 use crate::common::consts::ONE;
 use crate::common::consts::TWO;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
 use crate::common::util::get_sqrt_cost;
-use crate::num::BigFloatNumber;
-use crate::defs::RoundingMode;
 use crate::defs::Error;
-use crate::ops::series::PolycoeffGen;
-use crate::ops::series::ArgReductionEstimator;
-use crate::ops::series::series_cost_optimize;
+use crate::defs::RoundingMode;
+use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
+use crate::ops::series::series_cost_optimize;
 use crate::ops::series::series_run;
-
+use crate::ops::series::ArgReductionEstimator;
+use crate::ops::series::PolycoeffGen;
+use crate::Exponent;
 
 // Polynomial coefficient generator.
 struct AtanPolycoeffGen {
@@ -23,24 +22,17 @@ struct AtanPolycoeffGen {
 }
 
 impl AtanPolycoeffGen {
-
     fn new(p: usize) -> Result<Self, Error> {
-
         let f = BigFloatNumber::from_word(1, 1)?;
 
-        let iter_cost = (2*get_add_cost(p) + get_mul_cost(p)) * 2;
+        let iter_cost = (2 * get_add_cost(p) + get_mul_cost(p)) * 2;
 
-        Ok(AtanPolycoeffGen {
-            f,
-            iter_cost,
-        })
+        Ok(AtanPolycoeffGen { f, iter_cost })
     }
 }
 
 impl PolycoeffGen for AtanPolycoeffGen {
-
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-
         if self.f.is_positive() {
             self.f = self.f.add(&TWO, rm)?;
         } else {
@@ -66,13 +58,12 @@ impl PolycoeffGen for AtanPolycoeffGen {
 struct AtanArgReductionEstimator {}
 
 impl ArgReductionEstimator for AtanArgReductionEstimator {
-
     /// Estimates cost of reduction n times for number with precision p.
     fn get_reduction_cost(n: usize, p: usize) -> usize {
         let cost_mul = get_mul_cost(p);
         let cost_add = get_add_cost(p);
         let sqrt_cost = get_sqrt_cost(p, cost_mul, cost_add);
-        n * (2*cost_mul + sqrt_cost)
+        n * (2 * cost_mul + sqrt_cost)
     }
 
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
@@ -83,20 +74,17 @@ impl ArgReductionEstimator for AtanArgReductionEstimator {
 }
 
 impl BigFloatNumber {
-
     /// Computes the arctangent of a number. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn atan(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         // if x > 1 then arctan(x) = pi/2 - arctan(1/x)
         let mut x = self.clone()?;
 
         let mut ret = if x.get_exponent() > 0 {
-
             x.set_precision(x.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
             x = x.reciprocal(RoundingMode::None)?;
 
@@ -108,9 +96,7 @@ impl BigFloatNumber {
             pi.set_sign(self.get_sign());
 
             pi.sub(&ret, RoundingMode::None)
-
         } else {
-
             x.atan_series(RoundingMode::None)
         }?;
 
@@ -121,13 +107,17 @@ impl BigFloatNumber {
 
     /// arctan using series
     pub(super) fn atan_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
-
         let p = self.get_mantissa_max_bit_len();
         let mut polycoeff_gen = AtanPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<AtanPolycoeffGen, AtanArgReductionEstimator>(
-            p, &polycoeff_gen, -self.e as isize, 1, true);
+        let (reduction_times, niter) = series_cost_optimize::<
+            AtanPolycoeffGen,
+            AtanArgReductionEstimator,
+        >(p, &polycoeff_gen, -self.e as isize, 1, true);
 
-        self.set_precision(self.get_mantissa_max_bit_len() + 1 + reduction_times * 3, rm)?;
+        self.set_precision(
+            self.get_mantissa_max_bit_len() + 1 + reduction_times * 3,
+            rm,
+        )?;
 
         let arg = if reduction_times > 0 {
             self.atan_arg_reduce(reduction_times, rm)?
@@ -135,9 +125,9 @@ impl BigFloatNumber {
             self
         };
 
-        let acc = arg.clone()?;    // x
-        let x_step = arg.mul(&arg, rm)?;   // x^2
-        let x_first = arg.mul(&x_step, rm)?;   // x^3
+        let acc = arg.clone()?; // x
+        let x_step = arg.mul(&arg, rm)?; // x^2
+        let x_first = arg.mul(&x_step, rm)?; // x^3
 
         let mut ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
 
@@ -164,7 +154,6 @@ impl BigFloatNumber {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -175,7 +164,7 @@ mod tests {
         let mut cc = Consts::new().unwrap();
 
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
+        let mut n1 = BigFloatNumber::from_word(1, 320).unwrap();
         n1.set_exponent(1);
         let _n2 = n1.atan(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
@@ -199,20 +188,31 @@ mod tests {
         assert!(n2.cmp(&n3) == 0);
 
         // near 1
-        let n1 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000002DC85F7E77EC487C", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let n1 = BigFloatNumber::parse(
+            "1.00000000000000000000000000000000000000000000000000000000000000002DC85F7E77EC487C",
+            crate::Radix::Hex,
+            320,
+            RoundingMode::None,
+        )
+        .unwrap();
         let n2 = n1.atan(rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("C.90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22682E3838CA2A291C_e-1", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse(
+            "C.90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22682E3838CA2A291C_e-1",
+            crate::Radix::Hex,
+            320,
+            RoundingMode::None,
+        )
+        .unwrap();
 
         // println!("{:?}", n1.format(crate::Radix::Bin, rm).unwrap());
         // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
- 
     }
 
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn arctan_perf() {
         let mut cc = Consts::new().unwrap();
 
@@ -230,5 +230,4 @@ mod tests {
             println!("{}", time.as_millis());
         }
     }
-
 }

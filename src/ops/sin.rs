@@ -1,20 +1,19 @@
 //! Sine.
 
-use crate::Sign;
 use crate::common::consts::FOUR;
 use crate::common::consts::ONE;
 use crate::common::consts::THREE;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
-use crate::num::BigFloatNumber;
-use crate::defs::RoundingMode;
 use crate::defs::Error;
-use crate::ops::series::PolycoeffGen;
-use crate::ops::series::ArgReductionEstimator;
-use crate::ops::series::series_run;
-use crate::ops::series::series_cost_optimize;
+use crate::defs::RoundingMode;
+use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
-
+use crate::ops::series::series_cost_optimize;
+use crate::ops::series::series_run;
+use crate::ops::series::ArgReductionEstimator;
+use crate::ops::series::PolycoeffGen;
+use crate::Sign;
 
 // Polynomial coefficient generator.
 struct SinPolycoeffGen {
@@ -26,9 +25,7 @@ struct SinPolycoeffGen {
 }
 
 impl SinPolycoeffGen {
-
     fn new(p: usize) -> Result<Self, Error> {
-
         let inc = BigFloatNumber::from_word(1, 1)?;
         let fct = BigFloatNumber::from_word(1, p)?;
         let one_full_p = BigFloatNumber::from_word(1, p)?;
@@ -48,9 +45,7 @@ impl SinPolycoeffGen {
 }
 
 impl PolycoeffGen for SinPolycoeffGen {
-
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-
         self.inc = self.inc.add(&ONE, rm)?;
         let inv_inc = self.one_full_p.div(&self.inc, rm)?;
         self.fct = self.fct.mul(&inv_inc, rm)?;
@@ -78,33 +73,30 @@ impl PolycoeffGen for SinPolycoeffGen {
 struct SinArgReductionEstimator {}
 
 impl ArgReductionEstimator for SinArgReductionEstimator {
-
     /// Estimates cost of reduction n times for number with precision p.
     fn get_reduction_cost(n: usize, p: usize) -> usize {
         // n * (4 * cost(mul) + 2 * cost(add))
         let cost_mul = get_mul_cost(p);
         let cost_add = get_add_cost(p);
-        (n * ((cost_mul << 1) + cost_add )) << 1
+        (n * ((cost_mul << 1) + cost_add)) << 1
     }
 
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
     #[inline]
     fn reduction_effect(n: usize, m: isize) -> usize {
         // n*log2(3) + m
-        ((n as isize)*1000/631 + m) as usize
+        ((n as isize) * 1000 / 631 + m) as usize
     }
 }
 
 impl BigFloatNumber {
-
     /// Computes the sine of a number. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn sin(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         let arg = self.reduce_trig_arg(cc, RoundingMode::None)?;
 
         let mut ret = arg.sin_series(RoundingMode::None)?;
@@ -120,10 +112,15 @@ impl BigFloatNumber {
 
         let p = self.get_mantissa_max_bit_len();
         let mut polycoeff_gen = SinPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<SinPolycoeffGen, SinArgReductionEstimator>(
-            p, &polycoeff_gen, -self.e as isize, 2, false);
+        let (reduction_times, niter) = series_cost_optimize::<
+            SinPolycoeffGen,
+            SinArgReductionEstimator,
+        >(p, &polycoeff_gen, -self.e as isize, 2, false);
 
-        self.set_precision(self.get_mantissa_max_bit_len() + 1 + reduction_times * 3, rm)?;
+        self.set_precision(
+            self.get_mantissa_max_bit_len() + 1 + reduction_times * 3,
+            rm,
+        )?;
 
         let arg = if reduction_times > 0 {
             self.sin_arg_reduce(reduction_times, rm)?
@@ -131,9 +128,9 @@ impl BigFloatNumber {
             self
         };
 
-        let acc = arg.clone()?;    // x
-        let x_step = arg.mul(&arg, rm)?;   // x^2
-        let x_first = arg.mul(&x_step, rm)?;   // x^3
+        let acc = arg.clone()?; // x
+        let x_step = arg.mul(&arg, rm)?; // x^2
+        let x_first = arg.mul(&x_step, rm)?; // x^3
 
         let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
 
@@ -173,7 +170,6 @@ impl BigFloatNumber {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -183,7 +179,7 @@ mod tests {
     fn test_sine() {
         let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_word(5,320).unwrap();
+        let mut n1 = BigFloatNumber::from_word(5, 320).unwrap();
         n1.set_exponent(0);
         let _n2 = n1.sin(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
@@ -194,14 +190,26 @@ mod tests {
         half_pi.set_precision(320, RoundingMode::None).unwrap();
 
         let n2 = half_pi.sin(rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC487_e-1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse(
+            "F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC487_e-1",
+            crate::Radix::Hex,
+            640,
+            RoundingMode::None,
+        )
+        .unwrap();
 
         assert!(n2.cmp(&n3) == 0);
 
         // large exponent
         half_pi.set_exponent(256);
         let n2 = half_pi.sin(rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("F.AE195882CABDC16FAF2A733AB99159AF50C47E8B9ED8BA42C5872FF88A52726061B4231170F1BE8_e-1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse(
+            "F.AE195882CABDC16FAF2A733AB99159AF50C47E8B9ED8BA42C5872FF88A52726061B4231170F1BE8_e-1",
+            crate::Radix::Hex,
+            640,
+            RoundingMode::None,
+        )
+        .unwrap();
 
         //println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
@@ -216,13 +224,11 @@ mod tests {
         // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
 
         assert!(d2.cmp(&d3) == 0);
-
-        
     }
 
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn sine_perf() {
         let mut cc = Consts::new().unwrap();
         let mut n = vec![];
@@ -239,5 +245,4 @@ mod tests {
             println!("{}", time.as_millis());
         }
     }
-
 }

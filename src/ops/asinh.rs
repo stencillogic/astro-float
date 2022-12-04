@@ -1,35 +1,34 @@
 //! Hyperbolic arcsine.
 
-use crate::Consts;
 use crate::common::consts::FOURTY;
 use crate::common::consts::ONE;
 use crate::common::consts::SIX;
 use crate::common::consts::THREE;
-use crate::num::BigFloatNumber;
-use crate::defs::RoundingMode;
 use crate::defs::Error;
-
+use crate::defs::RoundingMode;
+use crate::num::BigFloatNumber;
+use crate::Consts;
 
 impl BigFloatNumber {
-
     /// Computes the hyperbolic arcsine of a number. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - ExponentOverflow: the result is too large or too small number.
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn asinh(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         let mut x = self.clone()?;
 
         if self.get_exponent() as isize >= -(self.get_mantissa_max_bit_len() as isize) / 6 {
-
             // ln(x + sqrt(x*x + 1))
 
             // TODO: if x much larger than 1, then acosh(x) = ln(2*x)
 
-            x.set_precision(x.get_mantissa_max_bit_len() + self.get_exponent().unsigned_abs() as usize + 3, RoundingMode::None)?;
+            x.set_precision(
+                x.get_mantissa_max_bit_len() + self.get_exponent().unsigned_abs() as usize + 3,
+                RoundingMode::None,
+            )?;
 
             let xx = x.mul(&x, RoundingMode::None)?;
 
@@ -44,9 +43,7 @@ impl BigFloatNumber {
             ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
 
             Ok(ret)
-
         } else {
-
             // short series: x - x^3/6 + 3*x^5/40 - 5*x^7/112
 
             x.set_precision(x.get_mantissa_max_bit_len() + 4, RoundingMode::None)?;
@@ -68,7 +65,6 @@ impl BigFloatNumber {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -78,7 +74,7 @@ mod tests {
     fn test_asinh() {
         let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
+        let mut n1 = BigFloatNumber::from_word(1, 320).unwrap();
         n1.set_exponent(0);
         let _n2 = n1.asinh(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
@@ -106,7 +102,7 @@ mod tests {
 
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn asinh_perf() {
         let mut cc = Consts::new().unwrap();
         let mut n = vec![];
@@ -123,5 +119,4 @@ mod tests {
             println!("{}", time.as_millis());
         }
     }
-
 }

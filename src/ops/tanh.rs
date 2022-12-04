@@ -1,38 +1,37 @@
 //! Hyperbolic tangent.
 
-use crate::Consts;
 use crate::common::consts::FIFTEEN;
 use crate::common::consts::ONE;
 use crate::common::consts::THREE;
+use crate::defs::Error;
+use crate::defs::RoundingMode;
 use crate::defs::EXPONENT_MAX;
 use crate::num::BigFloatNumber;
-use crate::defs::RoundingMode;
-use crate::defs::Error;
-
+use crate::Consts;
 
 impl BigFloatNumber {
-
     /// Computes the hyperbolic tangent of a number. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - ExponentOverflow: the result is too large or too small number.
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn tanh(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         let mut x = self.clone()?;
 
         if self.get_exponent() as isize >= -(self.get_mantissa_max_bit_len() as isize) / 6 {
-
             // (e^(2*x) - 1) / (e^(2*x) + 1)
 
             let mut additional_prec = 2;
             if self.get_exponent() < 0 {
-                additional_prec  += self.get_exponent().unsigned_abs() as usize;
+                additional_prec += self.get_exponent().unsigned_abs() as usize;
             }
 
-            x.set_precision(x.get_mantissa_max_bit_len() + additional_prec, RoundingMode::None)?;
+            x.set_precision(
+                x.get_mantissa_max_bit_len() + additional_prec,
+                RoundingMode::None,
+            )?;
 
             if x.get_exponent() == EXPONENT_MAX {
                 return Err(Error::ExponentOverflow(self.get_sign()));
@@ -48,11 +47,9 @@ impl BigFloatNumber {
             let mut ret = d1.div(&d2, RoundingMode::None)?;
 
             ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
-    
-            Ok(ret)
-    
-        } else {
 
+            Ok(ret)
+        } else {
             // short series: x - x^3/3 + 2*x^5/15
 
             x.set_precision(x.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
@@ -74,9 +71,7 @@ impl BigFloatNumber {
             Ok(ret)
         }
     }
-
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -87,7 +82,7 @@ mod tests {
     fn test_tanh() {
         let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
+        let mut n1 = BigFloatNumber::from_word(1, 320).unwrap();
         n1.set_exponent(0);
         let _n2 = n1.tanh(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
@@ -108,12 +103,11 @@ mod tests {
         // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
-
     }
 
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn tanh_perf() {
         let mut cc = Consts::new().unwrap();
         let mut n = vec![];
@@ -130,5 +124,4 @@ mod tests {
             println!("{}", time.as_millis());
         }
     }
-
 }

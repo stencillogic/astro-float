@@ -5,14 +5,13 @@ use crate::common::consts::THREE;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
 use crate::common::util::log2_floor;
-use crate::num::BigFloatNumber;
-use crate::defs::RoundingMode;
 use crate::defs::Error;
+use crate::defs::RoundingMode;
+use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
-use crate::ops::series::PolycoeffGen;
-use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::series_cost_optimize;
-
+use crate::ops::series::ArgReductionEstimator;
+use crate::ops::series::PolycoeffGen;
 
 // Polynomial coefficient generator (for tan it only used for cost estmation).
 struct TanPolycoeffGen {
@@ -20,23 +19,17 @@ struct TanPolycoeffGen {
 }
 
 impl TanPolycoeffGen {
-
     fn new(p: usize) -> Result<Self, Error> {
-
         let l = log2_floor(p);
         let ll = log2_floor(l) * 3 / 2;
         let iter_cost = (7 * get_mul_cost(p) + 4 * get_add_cost(p)) * ll / l;
 
-        Ok(TanPolycoeffGen {
-            iter_cost,
-        })
+        Ok(TanPolycoeffGen { iter_cost })
     }
 }
 
 impl PolycoeffGen for TanPolycoeffGen {
-
     fn next(&mut self, _rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-
         Ok(&ONE)
     }
 
@@ -49,7 +42,6 @@ impl PolycoeffGen for TanPolycoeffGen {
 struct TanArgReductionEstimator {}
 
 impl ArgReductionEstimator for TanArgReductionEstimator {
-
     /// Estimates cost of reduction n times for number with precision p.
     fn get_reduction_cost(n: usize, p: usize) -> usize {
         let cost_mul = get_mul_cost(p);
@@ -61,22 +53,19 @@ impl ArgReductionEstimator for TanArgReductionEstimator {
     #[inline]
     fn reduction_effect(n: usize, m: isize) -> usize {
         // n*log2(3) + m
-        ((n as isize)*1000/631 + m) as usize
+        ((n as isize) * 1000 / 631 + m) as usize
     }
 }
 
-
 impl BigFloatNumber {
-
     /// Computes the tangent of a number. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - ExponentOverflow: the result is too large or too small number.
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn tan(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         let arg = self.reduce_trig_arg(cc, RoundingMode::None)?;
 
         let mut ret = arg.tan_series(RoundingMode::None)?;
@@ -87,13 +76,17 @@ impl BigFloatNumber {
     }
 
     fn tan_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
-
         let p = self.get_mantissa_max_bit_len();
         let polycoeff_gen = TanPolycoeffGen::new(p)?;
-        let (reduction_times, _niter) = series_cost_optimize::<TanPolycoeffGen, TanArgReductionEstimator>(
-            p, &polycoeff_gen, -self.e as isize, 1, true);
+        let (reduction_times, _niter) = series_cost_optimize::<
+            TanPolycoeffGen,
+            TanArgReductionEstimator,
+        >(p, &polycoeff_gen, -self.e as isize, 1, true);
 
-        self.set_precision(self.get_mantissa_max_bit_len() + reduction_times * 4 + 4, rm)?;
+        self.set_precision(
+            self.get_mantissa_max_bit_len() + reduction_times * 4 + 4,
+            rm,
+        )?;
 
         let arg_holder;
         let arg = if reduction_times > 0 {
@@ -114,7 +107,6 @@ impl BigFloatNumber {
 
     /// Tangent series
     fn tan_series_run(&self, rm: RoundingMode) -> Result<Self, Error> {
-
         //  sin + cos series combined
 
         let mut xx = self.mul(self, rm)?;
@@ -127,8 +119,9 @@ impl BigFloatNumber {
         let mut q2 = BigFloatNumber::from_word(1, 1)?;
         let mut p2 = BigFloatNumber::from_word(1, 1)?;
 
-        while fct.get_exponent() as isize - (xxacc.get_exponent() as isize) <= self.get_mantissa_max_bit_len() as isize {
-
+        while fct.get_exponent() as isize - (xxacc.get_exponent() as isize)
+            <= self.get_mantissa_max_bit_len() as isize
+        {
             xxacc = xxacc.mul(&xx, rm)?;
 
             p1 = p1.mul(&fct, rm)?;
@@ -173,7 +166,6 @@ impl BigFloatNumber {
         let mut val = self.clone()?;
 
         for _ in 0..n {
-
             let val_sq = val.mul(&val, rm)?;
             let val_cub = val_sq.mul(&val, rm)?;
 
@@ -189,7 +181,6 @@ impl BigFloatNumber {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -199,7 +190,7 @@ mod tests {
     fn test_tan() {
         let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_word(2,320).unwrap();
+        let mut n1 = BigFloatNumber::from_word(2, 320).unwrap();
         n1.set_exponent(0);
         let _n2 = n1.tan(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
@@ -210,7 +201,13 @@ mod tests {
         half_pi.set_precision(320, RoundingMode::None).unwrap();
 
         let n2 = half_pi.tan(rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFADFB63EEEB306717FBE882B389D8C9BB6A8F6914FC1931BD_e-1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse(
+            "F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFADFB63EEEB306717FBE882B389D8C9BB6A8F6914FC1931BD_e-1",
+            crate::Radix::Hex,
+            640,
+            RoundingMode::None,
+        )
+        .unwrap();
 
         assert!(n2.cmp(&n3) == 0);
 
@@ -224,7 +221,7 @@ mod tests {
 
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn tan_perf() {
         let mut cc = Consts::new().unwrap();
         let mut n = vec![];
@@ -241,5 +238,4 @@ mod tests {
             println!("{}", time.as_millis());
         }
     }
-
 }

@@ -1,26 +1,23 @@
 //! Cosine.
 
-
-use crate::Exponent;
-use crate::Sign;
 use crate::common::consts::ONE;
 use crate::common::consts::TWO;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
+use crate::defs::Error;
+use crate::defs::RoundingMode;
 use crate::defs::EXPONENT_MIN;
 use crate::defs::WORD_BIT_SIZE;
 use crate::num::BigFloatNumber;
-use crate::defs::RoundingMode;
-use crate::defs::Error;
-use crate::ops::series::PolycoeffGen;
-use crate::ops::series::ArgReductionEstimator;
-use crate::ops::series::series_run;
-use crate::ops::series::series_cost_optimize;
 use crate::ops::consts::Consts;
-
+use crate::ops::series::series_cost_optimize;
+use crate::ops::series::series_run;
+use crate::ops::series::ArgReductionEstimator;
+use crate::ops::series::PolycoeffGen;
+use crate::Exponent;
+use crate::Sign;
 
 const COS_EXP_THRES: Exponent = -(WORD_BIT_SIZE as Exponent);
-
 
 // Polynomial coefficient generator.
 struct CosPolycoeffGen {
@@ -32,9 +29,7 @@ struct CosPolycoeffGen {
 }
 
 impl CosPolycoeffGen {
-
     fn new(p: usize) -> Result<Self, Error> {
-
         let inc = BigFloatNumber::new(1)?;
         let fct = BigFloatNumber::from_word(1, p)?;
         let one_full_p = BigFloatNumber::from_word(1, p)?;
@@ -54,9 +49,7 @@ impl CosPolycoeffGen {
 }
 
 impl PolycoeffGen for CosPolycoeffGen {
-
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-
         self.inc = self.inc.add(&ONE, rm)?;
         let inv_inc = self.one_full_p.div(&self.inc, rm)?;
         self.fct = self.fct.mul(&inv_inc, rm)?;
@@ -84,7 +77,6 @@ impl PolycoeffGen for CosPolycoeffGen {
 struct CosArgReductionEstimator {}
 
 impl ArgReductionEstimator for CosArgReductionEstimator {
-
     /// Estimates cost of reduction n times for number with precision p.
     fn get_reduction_cost(n: usize, p: usize) -> usize {
         // n * (cost(add) + cost(mul))
@@ -102,29 +94,32 @@ impl ArgReductionEstimator for CosArgReductionEstimator {
 }
 
 impl BigFloatNumber {
-
     /// Computes the cosine of a number. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
-    /// 
+    ///
     /// ## Errors
-    /// 
+    ///
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn cos(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         let mut arg = self.reduce_trig_arg(cc, RoundingMode::None)?;
 
         let mut ret;
 
         let mut arg1 = arg.clone()?;
 
-        arg1.set_precision(arg1.get_mantissa_max_bit_len() + (-COS_EXP_THRES) as usize, RoundingMode::None)?;
+        arg1.set_precision(
+            arg1.get_mantissa_max_bit_len() + (-COS_EXP_THRES) as usize,
+            RoundingMode::None,
+        )?;
 
         ret = arg1.cos_series(RoundingMode::None)?;
 
         if ret.get_exponent() < COS_EXP_THRES {
-
             // argument is close to pi / 2
-            arg.set_precision(arg.get_mantissa_max_bit_len() + ret.get_exponent().unsigned_abs() as usize, RoundingMode::None)?;
+            arg.set_precision(
+                arg.get_mantissa_max_bit_len() + ret.get_exponent().unsigned_abs() as usize,
+                RoundingMode::None,
+            )?;
 
             ret = arg.cos_series(RoundingMode::None)?;
         }
@@ -140,8 +135,10 @@ impl BigFloatNumber {
 
         let p = self.get_mantissa_max_bit_len();
         let mut polycoeff_gen = CosPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<CosPolycoeffGen, CosArgReductionEstimator>(
-            p, &polycoeff_gen, -self.e as isize, 2, false);
+        let (reduction_times, niter) = series_cost_optimize::<
+            CosPolycoeffGen,
+            CosArgReductionEstimator,
+        >(p, &polycoeff_gen, -self.e as isize, 2, false);
 
         self.set_precision(p + niter * 4 + reduction_times * 3, rm)?;
 
@@ -151,9 +148,9 @@ impl BigFloatNumber {
             self
         };
 
-        let acc = BigFloatNumber::from_word(1, arg.get_mantissa_max_bit_len())?;  // 1
-        let x_step = arg.mul(&arg, rm)?;           // x^2
-        let x_first = x_step.clone()?;                 // x^2
+        let acc = BigFloatNumber::from_word(1, arg.get_mantissa_max_bit_len())?; // 1
+        let x_step = arg.mul(&arg, rm)?; // x^2
+        let x_first = x_step.clone()?; // x^2
 
         let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
 
@@ -196,7 +193,6 @@ impl BigFloatNumber {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -207,7 +203,7 @@ mod tests {
         let mut cc = Consts::new().unwrap();
 
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_word(1,320).unwrap();
+        let mut n1 = BigFloatNumber::from_word(1, 320).unwrap();
         n1.set_exponent(0);
         let _n2 = n1.cos(rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
@@ -241,12 +237,11 @@ mod tests {
         // println!("{:?}", n1.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
-
     }
 
     #[ignore]
     #[test]
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     fn cosine_perf() {
         let mut cc = Consts::new().unwrap();
 
@@ -264,5 +259,4 @@ mod tests {
             println!("{}", time.as_millis());
         }
     }
-
 }

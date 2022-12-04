@@ -1,23 +1,23 @@
 //! High-level operations on the numbers.
 
-mod sqrt;
+mod acos;
+mod acosh;
+mod asin;
+mod asinh;
+mod atan;
+mod atanh;
 mod cbrt;
+pub mod consts;
+mod cos;
+mod cosh;
 mod log;
 mod pow;
 mod series;
-pub mod consts;
 mod sin;
-mod cos;
-mod tan;
-mod asin;
-mod acos;
-mod atan;
 mod sinh;
-mod cosh;
+mod sqrt;
+mod tan;
 mod tanh;
-mod asinh;
-mod acosh;
-mod atanh;
 mod util;
 
 #[cfg(test)]
