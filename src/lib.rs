@@ -86,6 +86,7 @@
 //! ```
 //!
 
+#![deny(missing_docs)]
 #![deny(clippy::suspicious)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
