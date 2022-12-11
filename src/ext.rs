@@ -39,7 +39,6 @@ enum Flavor {
 }
 
 impl BigFloat {
-
     /// Returns a new BigFloat with the value of zero and precision `p`.
     pub fn new(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::new(p), false, true)
@@ -345,9 +344,7 @@ impl BigFloat {
     /// Returns `self` to the power of `i`.
     pub fn powi(&self, i: usize, p: usize, rm: RoundingMode) -> Self {
         match &self.inner {
-            Flavor::Value(v1) => {
-                Self::result_to_ext(v1.powi(i, rm), false, true)
-            }
+            Flavor::Value(v1) => Self::result_to_ext(v1.powi(i, rm), false, true),
             Flavor::Inf(s1) => {
                 // inf ^ v2
                 if i == 0 {
@@ -938,60 +935,21 @@ impl_int_conv!(u32, from_u32);
 impl_int_conv!(u64, from_u64);
 impl_int_conv!(u128, from_u128);
 
-/*
 /// Standard library features
 pub mod ops {
 
-    use crate::ONE;
-    use crate::ZERO;
-    use crate::NAN;
+    use crate::ctx::with_value;
+    use crate::ctx::Context;
+    use crate::defs::DEFAULT_P;
+    use crate::defs::DEFAULT_RM;
     use crate::BigFloat;
+    use crate::Radix;
+    use crate::NAN;
 
-    #[cfg(feature = "std")]
-    use std::{
-        iter::Product,
-        iter::Sum,
-        ops::Add,
-        ops::AddAssign,
-        ops::Div,
-        ops::DivAssign,
-        ops::Mul,
-        ops::MulAssign,
-        ops::Neg,
-        ops::Sub,
-        ops::SubAssign,
-        cmp::PartialEq,
-        cmp::Eq,
-        cmp::PartialOrd,
-        cmp::Ordering,
-        fmt::Display,
-        fmt::Formatter,
-        str::FromStr,
-        ops::Rem
-    };
-
-
-    #[cfg(not(feature = "std"))]
     use core::{
-        iter::Product,
-        iter::Sum,
-        ops::Add,
-        ops::AddAssign,
-        ops::Div,
-        ops::DivAssign,
-        ops::Mul,
-        ops::MulAssign,
-        ops::Neg,
-        ops::Sub,
-        ops::SubAssign,
-        cmp::PartialEq,
-        cmp::Eq,
-        cmp::PartialOrd,
-        cmp::Ordering,
-        fmt::Display,
-        fmt::Formatter,
+        cmp::Eq, cmp::Ordering, cmp::PartialEq, cmp::PartialOrd, fmt::Display, fmt::Formatter,
+        iter::Product, iter::Sum, ops::Add, ops::Div, ops::Mul, ops::Neg, ops::Rem, ops::Sub,
         str::FromStr,
-        ops::Rem
     };
 
     //
@@ -999,127 +957,81 @@ pub mod ops {
     //
 
     impl Add for BigFloat {
-        type Output = Self;
+        type Output = Context;
         fn add(self, rhs: Self) -> Self::Output {
-            BigFloat::add(&self, &rhs)
-        }
-    }
-
-    impl AddAssign for BigFloat {
-        fn add_assign(&mut self, rhs: Self) {
-            *self = BigFloat::add(self, &rhs)
+            with_value(BigFloat::add(&self, &rhs, DEFAULT_RM))
         }
     }
 
     impl Div for BigFloat {
-        type Output = Self;
+        type Output = Context;
         fn div(self, rhs: Self) -> Self::Output {
-            BigFloat::div(&self, &rhs)
-        }
-    }
-
-    impl DivAssign for BigFloat {
-        fn div_assign(&mut self, rhs: Self) {
-            *self = BigFloat::div(self, &rhs)
+            with_value(BigFloat::div(&self, &rhs, DEFAULT_RM))
         }
     }
 
     impl Rem for BigFloat {
-        type Output = Self;
+        type Output = Context;
         fn rem(self, rhs: Self) -> Self::Output {
-            BigFloat::rem(&self, &rhs)
+            with_value(BigFloat::div(&self, &rhs, DEFAULT_RM))
         }
     }
 
     impl Mul for BigFloat {
-        type Output = Self;
+        type Output = Context;
         fn mul(self, rhs: Self) -> Self::Output {
-            BigFloat::mul(&self, &rhs)
-        }
-    }
-
-    impl MulAssign for BigFloat {
-        fn mul_assign(&mut self, rhs: Self) {
-            *self = BigFloat::mul(self, &rhs)
+            with_value(BigFloat::mul(&self, &rhs, DEFAULT_RM))
         }
     }
 
     impl Neg for BigFloat {
-        type Output = Self;
-        fn neg(self) -> Self::Output {
-            self.inv_sign()
+        type Output = BigFloat;
+        fn neg(mut self) -> Self::Output {
+            self.inv_sign();
+            self
         }
     }
 
-    impl Neg for &BigFloat {
-        type Output = BigFloat;
+    impl<'a> Neg for &'a mut BigFloat {
+        type Output = &'a BigFloat;
         fn neg(self) -> Self::Output {
-            (*self).inv_sign()
+            self.inv_sign();
+            self
         }
     }
 
     impl Sub for BigFloat {
-        type Output = Self;
+        type Output = Context;
         fn sub(self, rhs: Self) -> Self::Output {
-            BigFloat::sub(&self, &rhs)
-        }
-    }
-
-    impl SubAssign for BigFloat {
-        fn sub_assign(&mut self, rhs: Self) {
-            *self = BigFloat::sub(self, &rhs)
+            with_value(BigFloat::sub(&self, &rhs, DEFAULT_RM))
         }
     }
 
     impl Add<&BigFloat> for BigFloat {
-        type Output = Self;
+        type Output = Context;
         fn add(self, rhs: &BigFloat) -> Self::Output {
-            BigFloat::add(&self, rhs)
-        }
-    }
-
-    impl AddAssign<&BigFloat> for BigFloat {
-        fn add_assign(&mut self, rhs: &BigFloat) {
-            *self = BigFloat::add(self, &rhs)
+            with_value(BigFloat::add(&self, rhs, DEFAULT_RM))
         }
     }
 
     impl Div<&BigFloat> for BigFloat {
-        type Output = Self;
+        type Output = Context;
         fn div(self, rhs: &BigFloat) -> Self::Output {
-            BigFloat::div(&self, &rhs)
-        }
-    }
-
-    impl DivAssign<&BigFloat> for BigFloat {
-        fn div_assign(&mut self, rhs: &BigFloat) {
-            *self = BigFloat::div(self, &rhs)
+            with_value(BigFloat::div(&self, rhs, DEFAULT_RM))
         }
     }
 
     impl Mul<&BigFloat> for BigFloat {
-        type Output = Self;
+        type Output = Context;
         fn mul(self, rhs: &BigFloat) -> Self::Output {
-            BigFloat::mul(&self, &rhs)
-        }
-    }
-
-    impl MulAssign<&BigFloat> for BigFloat {
-        fn mul_assign(&mut self, rhs: &BigFloat) {
-            *self = BigFloat::mul(self, &rhs)
+            with_value(BigFloat::mul(&self, rhs, DEFAULT_RM))
         }
     }
 
     impl Sub<&BigFloat> for BigFloat {
-        type Output = Self;
+        type Output = Context;
         fn sub(self, rhs: &BigFloat) -> Self::Output {
-            BigFloat::sub(&self, &rhs)
-        }
-    }
-
-    impl SubAssign<&BigFloat> for BigFloat {
-        fn sub_assign(&mut self, rhs: &BigFloat) {
-            *self = BigFloat::sub(self, &rhs)
+            with_value(BigFloat::sub(&self, rhs, DEFAULT_RM))
         }
     }
 
@@ -1148,7 +1060,7 @@ pub mod ops {
                     } else {
                         Some(Ordering::Equal)
                     }
-                },
+                }
                 None => None,
             }
         }
@@ -1156,32 +1068,31 @@ pub mod ops {
 
     impl From<f64> for BigFloat {
         fn from(f: f64) -> Self {
-            BigFloat::from_f64(f)
+            BigFloat::from_f64(f, DEFAULT_P)
         }
     }
 
     impl From<f32> for BigFloat {
         fn from(f: f32) -> Self {
-            BigFloat::from_f32(f)
+            BigFloat::from_f32(f, DEFAULT_P)
         }
     }
 
     impl Display for BigFloat {
-
-        #[cfg(feature="std")]
+        #[cfg(feature = "std")]
         fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-            self.write_str(f)
+            self.write_str(f, Radix::Dec, DEFAULT_RM)
         }
 
-        #[cfg(not(feature="std"))]
+        #[cfg(not(feature = "std"))]
         fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-            self.write_str(f)
+            self.write_str(f, Radix::Dec, DEFAULT_RM)
         }
     }
 
     impl Default for BigFloat {
         fn default() -> BigFloat {
-            BigFloat::new()
+            BigFloat::new(DEFAULT_P)
         }
     }
 
@@ -1190,52 +1101,36 @@ pub mod ops {
 
         /// Returns parsed number or NAN in case of error.
         fn from_str(src: &str) -> Result<BigFloat, Self::Err> {
-            BigFloat::parse(src).ok_or(NAN)
+            BigFloat::parse(src, Radix::Dec, DEFAULT_P, DEFAULT_RM).ok_or(NAN)
         }
     }
 
     impl Product for BigFloat {
         fn product<I: Iterator<Item = BigFloat>>(iter: I) -> Self {
-            let mut acc = ONE;
-            for v in iter {
-                acc *= v;
-            }
-            acc
+            Context::product(iter).get_value()
         }
     }
 
     impl Sum for BigFloat {
         fn sum<I: Iterator<Item = BigFloat>>(iter: I) -> Self {
-            let mut acc = ZERO;
-            for v in iter {
-                acc += v;
-            }
-            acc
+            Context::sum(iter).get_value()
         }
     }
 
-
     impl<'a> Product<&'a BigFloat> for BigFloat {
         fn product<I: Iterator<Item = &'a BigFloat>>(iter: I) -> Self {
-            let mut acc = ONE;
-            for v in iter {
-                acc *= v;
-            }
-            acc
+            Context::product(iter).get_value()
         }
     }
 
     impl<'a> Sum<&'a BigFloat> for BigFloat {
         fn sum<I: Iterator<Item = &'a BigFloat>>(iter: I) -> Self {
-            let mut acc = ZERO;
-            for v in iter {
-                acc += v;
-            }
-            acc
+            Context::sum(iter).get_value()
         }
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
 

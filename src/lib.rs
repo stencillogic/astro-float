@@ -95,9 +95,9 @@ extern crate alloc;
 
 mod common;
 mod conv;
+mod ctx;
 mod defs;
 mod ext;
-mod ctx;
 mod for_3rd;
 mod mantissa;
 mod num;
@@ -105,6 +105,7 @@ mod ops;
 mod parser;
 mod strop;
 
+pub use crate::ctx::Context;
 pub use crate::defs::Error;
 pub use crate::defs::Exponent;
 pub use crate::defs::Radix;
@@ -112,9 +113,9 @@ pub use crate::defs::RoundingMode;
 pub use crate::defs::Sign;
 pub use crate::defs::Word;
 pub use crate::ext::BigFloat;
-pub use crate::ext::NAN;
-pub use crate::ext::INF_POS;
 pub use crate::ext::INF_NEG;
+pub use crate::ext::INF_POS;
+pub use crate::ext::NAN;
 pub use crate::num::BigFloatNumber;
 pub use crate::ops::consts::Consts;
 

@@ -1,18 +1,20 @@
 //! All operations on numbers are performed in some context.
 
-use std::rc::Rc;
+use crate::defs::DEFAULT_P;
+use crate::defs::DEFAULT_RM;
 use crate::BigFloat;
-use crate::defs::WORD_BIT_SIZE;
 use crate::Consts;
 use crate::RoundingMode;
 use core::cell::RefCell;
 
+#[cfg(not(feature = "std"))]
+use alloc::rc::Rc;
 
-const DEFAULT_RM: RoundingMode = RoundingMode::ToEven;
-const DEFAULT_P: usize = WORD_BIT_SIZE * 2;
-
+#[cfg(feature = "std")]
+use std::rc::Rc;
 
 /// Context contains default parameters for all operations.
+#[derive(Clone)]
 pub struct Context {
     cc: Rc<RefCell<Consts>>,
     p: usize,
@@ -21,11 +23,10 @@ pub struct Context {
 }
 
 impl Context {
-
     /// Create a new context with default parameters.
-    /// 
+    ///
     /// ## panics
-    /// 
+    ///
     /// The function call panics if memory allocation failed.
     pub fn new() -> Self {
         Context {
@@ -88,7 +89,6 @@ impl Context {
     }
 }
 
-
 macro_rules! impl_fun_rm {
     // unwrap error, function requires self as argument
     ($comment:literal, $fname:ident) => {
@@ -130,7 +130,9 @@ macro_rules! impl_fun_rm_p_cc {
     ($comment:literal, $fname:ident) => {
         #[doc=$comment]
         pub fn $fname(&mut self) -> &mut Self {
-            let val = self.value.$fname(self.rm, self.p, &mut self.cc.borrow_mut());
+            let val = self
+                .value
+                .$fname(self.rm, self.p, &mut self.cc.borrow_mut());
             self.value(val);
             self
         }
@@ -138,7 +140,6 @@ macro_rules! impl_fun_rm_p_cc {
 }
 
 impl Context {
-
     impl_fun_rm!("Returns the cosine of a number.", sqrt);
     impl_fun_rm!("Returns the cosine of a number.", cbrt);
     impl_fun_rm_cc!("Returns the cosine of a number.", ln);
@@ -161,28 +162,27 @@ impl Context {
     impl_fun_rm_cc!("Returns the cosine of a number.", asinh);
     impl_fun_rm_p_cc!("Returns the cosine of a number.", tanh);
     impl_fun_rm_cc!("Returns the cosine of a number.", atanh);
-
 }
 
 /// Create a new context with precision `p`.
 ///
 /// ## panics
-/// 
-/// The function call panics if memory allocation failed. 
+///
+/// The function call panics if memory allocation failed.
 pub fn with_precision(p: usize) -> Context {
     Context {
         cc: Rc::new(RefCell::new(Consts::new().expect("Memory allocation"))),
         p,
         rm: DEFAULT_RM,
-        value: BigFloat::new(p)
+        value: BigFloat::new(p),
     }
 }
 
 /// Create a new context with rounding mode `rm`.
 ///
 /// ## panics
-/// 
-/// The function call panics if memory allocation failed. 
+///
+/// The function call panics if memory allocation failed.
 pub fn with_rounding_mode(rm: RoundingMode) -> Context {
     Context {
         cc: Rc::new(RefCell::new(Consts::new().expect("Memory allocation"))),
@@ -214,28 +214,13 @@ pub fn with_value(value: BigFloat) -> Context {
 
 pub mod ops {
 
-    use super::{Context, DEFAULT_P, DEFAULT_RM, with_value};
+    use super::{with_value, Context, DEFAULT_P, DEFAULT_RM};
     use crate::{BigFloat, Radix, NAN};
 
     use core::{
-        iter::Product,
-        iter::Sum,
-        ops::Add,
-        ops::AddAssign,
-        ops::Div,
-        ops::DivAssign,
-        ops::Mul,
-        ops::MulAssign,
-        ops::Neg,
-        ops::Sub,
-        ops::SubAssign,
-        cmp::PartialEq,
-        cmp::PartialOrd,
-        cmp::Ordering,
-        fmt::Display,
-        fmt::Formatter,
-        str::FromStr,
-        ops::Rem
+        cmp::Ordering, cmp::PartialEq, cmp::PartialOrd, fmt::Display, fmt::Formatter,
+        iter::Product, iter::Sum, ops::Add, ops::AddAssign, ops::Div, ops::DivAssign, ops::Mul,
+        ops::MulAssign, ops::Neg, ops::Rem, ops::Sub, ops::SubAssign, str::FromStr,
     };
 
     //
@@ -245,46 +230,46 @@ pub mod ops {
     impl Add<BigFloat> for Context {
         type Output = Self;
         fn add(self, rhs: BigFloat) -> Self::Output {
-            with_value(self.value.add(&rhs, self.rm))
+            with_value(BigFloat::add(&self.value, &rhs, self.rm))
         }
     }
 
     impl AddAssign<BigFloat> for Context {
         fn add_assign(&mut self, rhs: BigFloat) {
-            self.value(self.value.add(&rhs, self.rm));
+            self.value(BigFloat::add(&self.value, &rhs, self.rm));
         }
     }
 
     impl Div<BigFloat> for Context {
         type Output = Self;
         fn div(self, rhs: BigFloat) -> Self::Output {
-            with_value(self.value.div(&rhs, self.rm))
+            with_value(BigFloat::div(&self.value, &rhs, self.rm))
         }
     }
 
     impl DivAssign<BigFloat> for Context {
         fn div_assign(&mut self, rhs: BigFloat) {
-            self.value(self.value.div(&rhs, self.rm));
+            self.value(BigFloat::div(&self.value, &rhs, self.rm));
         }
     }
 
     impl Rem<BigFloat> for Context {
         type Output = Self;
         fn rem(self, rhs: BigFloat) -> Self::Output {
-            with_value(self.value.rem(&rhs, self.rm))
+            with_value(BigFloat::rem(&self.value, &rhs, self.rm))
         }
     }
 
     impl Mul<BigFloat> for Context {
         type Output = Self;
         fn mul(self, rhs: BigFloat) -> Self::Output {
-            with_value(self.value.mul(&rhs, self.rm))
+            with_value(BigFloat::mul(&self.value, &rhs, self.rm))
         }
     }
 
     impl MulAssign<BigFloat> for Context {
         fn mul_assign(&mut self, rhs: BigFloat) {
-            self.value(self.value.mul(&rhs, self.rm));
+            self.value(BigFloat::mul(&self.value, &rhs, self.rm));
         }
     }
 
@@ -296,68 +281,76 @@ pub mod ops {
         }
     }
 
+    impl<'a> Neg for &'a mut Context {
+        type Output = Self;
+        fn neg(self) -> Self::Output {
+            self.value.inv_sign();
+            self
+        }
+    }
+
     impl Sub<BigFloat> for Context {
         type Output = Self;
         fn sub(self, rhs: BigFloat) -> Self::Output {
-            with_value(self.value.sub(&rhs, self.rm))
+            with_value(BigFloat::sub(&self.value, &rhs, self.rm))
         }
     }
 
     impl SubAssign<BigFloat> for Context {
         fn sub_assign(&mut self, rhs: BigFloat) {
-            self.value(self.value.sub(&rhs, self.rm));
+            self.value(BigFloat::sub(&self.value, &rhs, self.rm));
         }
     }
 
     impl Add<&BigFloat> for Context {
         type Output = Self;
         fn add(self, rhs: &BigFloat) -> Self::Output {
-            with_value(self.value.add(rhs, self.rm))
+            with_value(BigFloat::add(&self.value, rhs, self.rm))
         }
     }
 
     impl AddAssign<&BigFloat> for Context {
         fn add_assign(&mut self, rhs: &BigFloat) {
-            self.value(self.value.add(rhs, self.rm));
+            self.value(BigFloat::add(&self.value, rhs, self.rm));
         }
     }
 
     impl Div<&BigFloat> for Context {
         type Output = Self;
         fn div(self, rhs: &BigFloat) -> Self::Output {
-            with_value(self.value.div(rhs, self.rm))
+            with_value(BigFloat::div(&self.value, rhs, self.rm))
         }
     }
 
     impl DivAssign<&BigFloat> for Context {
         fn div_assign(&mut self, rhs: &BigFloat) {
-            self.value(self.value.div(rhs, self.rm));
+            self.value(BigFloat::div(&self.value, rhs, self.rm));
         }
     }
 
     impl Mul<&BigFloat> for Context {
         type Output = Self;
         fn mul(self, rhs: &BigFloat) -> Self::Output {
-            with_value(self.value.mul(rhs, self.rm))
+            with_value(BigFloat::mul(&self.value, rhs, self.rm))
         }
     }
 
     impl MulAssign<&BigFloat> for Context {
         fn mul_assign(&mut self, rhs: &BigFloat) {
-            self.value(self.value.mul(rhs, self.rm));
+            self.value(BigFloat::mul(&self.value, rhs, self.rm));
         }
     }
 
     impl Sub<&BigFloat> for Context {
         type Output = Self;
         fn sub(self, rhs: &BigFloat) -> Self::Output {
-            with_value(self.value.mul(rhs, self.rm))
+            with_value(BigFloat::sub(&self.value, rhs, self.rm))
         }
     }
 
     impl SubAssign<&BigFloat> for Context {
         fn sub_assign(&mut self, rhs: &BigFloat) {
-            self.value(self.value.sub(rhs, self.rm));
+            self.value(BigFloat::sub(&self.value, rhs, self.rm));
         }
     }
 
@@ -384,7 +377,7 @@ pub mod ops {
                     } else {
                         Some(Ordering::Equal)
                     }
-                },
+                }
                 None => None,
             }
         }
@@ -403,7 +396,6 @@ pub mod ops {
     }
 
     impl Display for Context {
-
         fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
             self.value.write_str(f, Radix::Dec, self.rm)
         }
@@ -453,7 +445,6 @@ pub mod ops {
             }
         }
     }
-
 
     impl<'a> Product<&'a BigFloat> for Context {
         fn product<I: Iterator<Item = &'a BigFloat>>(mut iter: I) -> Self {
