@@ -19,7 +19,7 @@ const RECT_ITER_THRESHOLD: usize = MAX_CACHE / 10 * 9;
 
 /// Generator of polynomial coefficients.
 pub trait PolycoeffGen {
-    /// returns the next polynomial coefficient value.
+    /// Returns the next polynomial coefficient value.
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error>;
 
     /// Returns the cost of one call to next if numbers have precision p.

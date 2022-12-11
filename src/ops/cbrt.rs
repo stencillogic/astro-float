@@ -8,7 +8,7 @@ use crate::{
 };
 
 impl BigFloatNumber {
-    /// Computes cube root of a number. The result is rounded using the rounding mode `rm`.
+    /// Computes the cube root of a number. The result is rounded using the rounding mode `rm`.
     ///
     /// ## Errors
     ///

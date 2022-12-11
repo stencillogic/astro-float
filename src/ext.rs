@@ -2,7 +2,6 @@
 
 use crate::common::consts::ONE;
 use crate::defs::SignedWord;
-use crate::defs::WORD_BIT_SIZE;
 use crate::BigFloatNumber;
 use crate::Consts;
 use crate::Error;
@@ -10,34 +9,21 @@ use crate::Exponent;
 use crate::Radix;
 use crate::RoundingMode;
 use crate::Sign;
-use core::cell::RefCell;
 use core::fmt::Write;
 use core::num::FpCategory;
 
+/// Not a number.
 pub const NAN: BigFloat = BigFloat { inner: Flavor::NaN };
+
+/// Positive infinity.
 pub const INF_POS: BigFloat = BigFloat {
     inner: Flavor::Inf(Sign::Pos),
 };
+
+/// Negative infinity.
 pub const INF_NEG: BigFloat = BigFloat {
     inner: Flavor::Inf(Sign::Neg),
 };
-
-// Context contains default parameters for all operations.
-pub struct Context {
-    cc: Option<RefCell<Consts>>,
-    p: usize,
-    rm: RoundingMode,
-}
-
-impl Context {
-    pub fn new() -> Result<Self, Error> {
-        Ok(Context {
-            cc: Some(RefCell::new(Consts::new()?)),
-            p: WORD_BIT_SIZE * 2,
-            rm: RoundingMode::ToEven,
-        })
-    }
-}
 
 /// Number representation.
 #[derive(Debug)]
@@ -53,6 +39,7 @@ enum Flavor {
 }
 
 impl BigFloat {
+
     /// Returns a new BigFloat with the value of zero and precision `p`.
     pub fn new(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::new(p), false, true)
@@ -128,7 +115,7 @@ impl BigFloat {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
                 Flavor::Value(v2) => Self::result_to_ext(
-                    v1.sub(&v2, rm),
+                    v1.sub(v2, rm),
                     v1.is_zero(),
                     v1.get_sign() == v2.get_sign(),
                 ),
@@ -166,7 +153,7 @@ impl BigFloat {
             Flavor::Value(v1) => {
                 match &d2.inner {
                     Flavor::Value(v2) => Self::result_to_ext(
-                        v1.mul(&v2, rm),
+                        v1.mul(v2, rm),
                         v1.is_zero(),
                         v1.get_sign() == v2.get_sign(),
                     ),
@@ -215,7 +202,7 @@ impl BigFloat {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
                 Flavor::Value(v2) => Self::result_to_ext(
-                    v1.div(&v2, rm),
+                    v1.div(v2, rm),
                     v1.is_zero(),
                     v1.get_sign() == v2.get_sign(),
                 ),
@@ -242,7 +229,7 @@ impl BigFloat {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
                 Flavor::Value(v2) => Self::result_to_ext(
-                    v1.rem(&v2, rm),
+                    v1.rem(v2, rm),
                     v1.is_zero(),
                     v1.get_sign() == v2.get_sign(),
                 ),
@@ -303,7 +290,7 @@ impl BigFloat {
             Flavor::Value(v1) => {
                 match &d1.inner {
                     Flavor::Value(v2) => Self::result_to_ext(
-                        v1.pow(&v2, rm, cc),
+                        v1.pow(v2, rm, cc),
                         v1.is_zero(),
                         v1.get_sign() == v2.get_sign(),
                     ),
@@ -349,6 +336,30 @@ impl BigFloat {
                         }
                     }
                     Flavor::NaN => NAN,
+                }
+            }
+            Flavor::NaN => NAN,
+        }
+    }
+
+    /// Returns `self` to the power of `i`.
+    pub fn powi(&self, i: usize, p: usize, rm: RoundingMode) -> Self {
+        match &self.inner {
+            Flavor::Value(v1) => {
+                Self::result_to_ext(v1.powi(i, rm), false, true)
+            }
+            Flavor::Inf(s1) => {
+                // inf ^ v2
+                if i == 0 {
+                    Self::from_u8(1, p)
+                } else if i > 0 {
+                    if s1.is_negative() && i & 1 == 1 {
+                        INF_NEG
+                    } else {
+                        INF_POS
+                    }
+                } else {
+                    Self::new(p)
                 }
             }
             Flavor::NaN => NAN,
@@ -592,6 +603,7 @@ impl BigFloat {
         ))
     }
 
+    /// Returns category of `self`.
     pub fn classify(&self) -> FpCategory {
         match &self.inner {
             Flavor::Value(v) => {
@@ -672,9 +684,18 @@ impl BigFloat {
         }
     }
 
+    /// Returns exponent of `self` or None if `self` is Inf or NaN.
     pub fn get_exponent(&self) -> Option<Exponent> {
         match &self.inner {
             Flavor::Value(v) => Some(v.get_exponent()),
+            _ => None,
+        }
+    }
+
+    /// Returns precision of `self` or None if `self` is Inf or NaN.
+    pub fn get_precision(&self) -> Option<usize> {
+        match &self.inner {
+            Flavor::Value(v) => Some(v.get_precision()),
             _ => None,
         }
     }

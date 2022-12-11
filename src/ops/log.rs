@@ -1,4 +1,4 @@
-//! Natural logarithm.
+//! Logarithm.
 
 use crate::common::consts::ONE;
 use crate::common::consts::TWO;
