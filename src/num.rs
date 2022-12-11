@@ -648,7 +648,7 @@ impl BigFloatNumber {
         }
 
         let ptr: *const f64 = &f;
-        let u = unsafe { *(ptr as *const u64) };    // bit conversion to u64 is unsafe
+        let u = unsafe { *(ptr as *const u64) }; // bit conversion to u64 is unsafe
         let mut mantissa = u << 12;
         let mut exponent: Exponent = (u >> 52) as Exponent & 0b11111111111;
 

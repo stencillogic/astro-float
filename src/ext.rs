@@ -9,6 +9,7 @@ use crate::Exponent;
 use crate::Radix;
 use crate::RoundingMode;
 use crate::Sign;
+use crate::Word;
 use core::fmt::Write;
 use core::num::FpCategory;
 
@@ -78,10 +79,21 @@ impl BigFloat {
 
     /// Adds `d2` to `self` and returns the result of the addition.
     pub fn add(&self, d2: &Self, rm: RoundingMode) -> Self {
+        self.add_op(d2, rm, false)
+    }
+
+    /// Adds `d2` to `self` and returns the result of the addition.
+    /// The resulting precision is equal to the full precision of the result.
+    /// This operation can be used to emulate integer addition.
+    pub fn add_full_prec(&self, d2: &Self) -> Self {
+        self.add_op(d2, RoundingMode::None, true)
+    }
+
+    fn add_op(&self, d2: &Self, rm: RoundingMode, full_prec: bool) -> Self {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
                 Flavor::Value(v2) => Self::result_to_ext(
-                    v1.add(v2, rm),
+                    if full_prec { v1.add_full_prec(v2) } else { v1.add(v2, rm) },
                     v1.is_zero(),
                     v1.get_sign() == v2.get_sign(),
                 ),
@@ -111,10 +123,21 @@ impl BigFloat {
 
     /// Subtracts `d2` from `self` and return the result of the subtraction.
     pub fn sub(&self, d2: &Self, rm: RoundingMode) -> Self {
+        self.sub_op(d2, rm, false)
+    }
+
+    /// Subtracts `d2` from `self` and returns the result of the operation.
+    /// The resulting precision is equal to the full precision of the result.
+    /// This operation can be used to emulate integer subtraction.
+    pub fn sub_full_prec(&self, d2: &Self) -> Self {
+        self.sub_op(d2, RoundingMode::None, true)
+    }
+
+    fn sub_op(&self, d2: &Self, rm: RoundingMode, full_prec: bool) -> Self {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
                 Flavor::Value(v2) => Self::result_to_ext(
-                    v1.sub(v2, rm),
+                    if full_prec { v1.sub_full_prec(v2) } else { v1.sub(v2, rm) },
                     v1.is_zero(),
                     v1.get_sign() == v2.get_sign(),
                 ),
@@ -148,11 +171,23 @@ impl BigFloat {
 
     /// Multiplies `self` by `d2` and returns the result of the multiplication.
     pub fn mul(&self, d2: &Self, rm: RoundingMode) -> Self {
+        self.mul_op(d2, rm, false)
+    }
+
+    /// Multiplies `d2` by `self` and returns the result of the operation.
+    /// The resulting precision is equal to the full precision of the result.
+    /// This operation can be used to emulate integer multiplication.
+    pub fn mul_full_prec(&self, d2: &Self) -> Self {
+        self.mul_op(d2, RoundingMode::None, true)
+    }
+
+    /// Multiplies `self` by `d2` and returns the result of the multiplication.
+    fn mul_op(&self, d2: &Self, rm: RoundingMode, full_prec: bool) -> Self {
         match &self.inner {
             Flavor::Value(v1) => {
                 match &d2.inner {
                     Flavor::Value(v2) => Self::result_to_ext(
-                        v1.mul(v2, rm),
+                        if full_prec { v1.mul_full_prec(v2) } else { v1.mul(v2, rm) },
                         v1.is_zero(),
                         v1.get_sign() == v2.get_sign(),
                     ),
@@ -566,38 +601,13 @@ impl BigFloat {
     /// # Errors
     ///
     /// InvalidArgument - when `exp_from` is greater than `exp_to`.
-    #[cfg(feature = "rand")]
-    pub fn random_normal(exp_from: i8, exp_to: i8) -> Result<Self, Error> {
-        if exp_from > exp_to {
-            return Err(Error::InvalidArgument);
-        }
-
-        // build mantissa
-        let mut mantissa = [0i16; DECIMAL_PARTS];
-        for v in mantissa.iter_mut() {
-            *v = (random::<u16>() % crate::defs::DECIMAL_BASE as u16) as i16;
-        }
-
-        if mantissa[DECIMAL_PARTS - 1] == 0 {
-            mantissa[DECIMAL_PARTS - 1] = (crate::defs::DECIMAL_BASE - 1) as i16;
-        }
-
-        while mantissa[DECIMAL_PARTS - 1] / 1000 == 0 {
-            mantissa[DECIMAL_PARTS - 1] *= 10;
-        }
-
-        // sign & exponent
-        let sign = if random::<i8>() & 1 == 0 { Sign::Pos } else { Sign::Neg };
-        let exp_range = exp_to as i32 - exp_from as i32;
-        let exp = (if exp_range != 0 { random::<i32>().abs() % exp_range } else { 0 }
-            + exp_from as i32) as i8;
-
-        Ok(BigFloat::from_raw_parts(
-            mantissa,
-            DECIMAL_POSITIONS as i16,
-            sign,
-            exp,
-        ))
+    #[cfg(feature = "random")]
+    pub fn random_normal(p: usize, exp_from: Exponent, exp_to: Exponent) -> Self {
+        Self::result_to_ext(
+            BigFloatNumber::random_normal(p, exp_from, exp_to),
+            true,
+            false,
+        )
     }
 
     /// Returns category of `self`.
@@ -689,11 +699,142 @@ impl BigFloat {
         }
     }
 
-    /// Returns precision of `self` or None if `self` is Inf or NaN.
+    /// Returns the number of significant bits used in the mantissa or None if `self` is Inf or NaN.
+    /// Normal numbers use all bits of the mantissa.
+    /// Subnormal numbers use fewer bits than the mantissa can hold.
     pub fn get_precision(&self) -> Option<usize> {
         match &self.inner {
             Flavor::Value(v) => Some(v.get_precision()),
             _ => None,
+        }
+    }
+
+    /// Returns the maximum value for the specified precision `p`: all bits of the mantissa are set to 1, the exponent has the maximum possible value, and the sign is positive. Precision is rounded upwards to the word size.
+    pub fn max_value(p: usize) -> Self {
+        Self::result_to_ext(BigFloatNumber::max_value(p), false, true)
+    }
+
+    /// Returns the minimum value for the specified precision `p`: all bits of the mantissa are set to 1, the exponent has the maximum possible value, and the sign is negative. Precision is rounded upwards to the word size.
+    pub fn min_value(p: usize) -> Self {
+        Self::result_to_ext(BigFloatNumber::min_value(p), false, true)
+    }
+
+    /// Returns the minimum positive subnormal value for the specified precision `p`:
+    /// only the least significant bit of the mantissa is set to 1, the exponent has
+    /// the minimum possible value, and the sign is positive.
+    /// Precision is rounded upwards to the word size.
+    pub fn min_positive(p: usize) -> Self {
+        Self::result_to_ext(BigFloatNumber::min_positive(p), false, true)
+    }
+
+    /// Returns the minimum positive normal value for the specified precision `p`:
+    /// only the most significant bit of the mantissa is set to 1, the exponent has
+    /// the minimum possible value, and the sign is positive.
+    /// Precision is rounded upwards to the word size.
+    pub fn min_positive_normal(p: usize) -> Self {
+        Self::result_to_ext(BigFloatNumber::min_positive_normal(p), false, true)
+    }
+
+    /// Returns a new number with value `d` and the precision `p`. Precision is rounded upwards to the word size.
+    pub fn from_word(d: Word, p: usize) -> Self {
+        Self::result_to_ext(BigFloatNumber::from_word(d, p), false, true)
+    }
+
+    /// Returns a copy of the number with the sign reversed.
+    pub fn neg(&self) -> Self {
+        let mut ret = self.clone();
+        ret.inv_sign();
+        ret
+    }
+
+    /// Decomposes `self` into raw parts. The function returns a reference to a slice of words representing mantissa, numbers of significant bits in the mantissa, sign, and exponent.
+    pub fn to_raw_parts(&self) -> Option<(&[Word], usize, Sign, Exponent)> {
+        if let Flavor::Value(v) = &self.inner {
+            Some(v.to_raw_parts())
+        } else {
+            None
+        }
+    }
+
+    /// Constructs a number from the raw parts:
+    ///
+    ///  - `m` is the mantisaa.
+    ///  - `n` is the number of significant bits in mantissa.
+    ///  - `s` is the sign.
+    ///  - `e` is the exponent.
+    pub fn from_raw_parts(m: &[Word], n: usize, s: Sign, e: Exponent) -> Self {
+        Self::result_to_ext(BigFloatNumber::from_raw_parts(m, n, s, e), false, true)
+    }
+
+    /// Returns sign of a number or None if `self` is NaN
+    pub fn get_sign(&self) -> Option<Sign> {
+        match &self.inner {
+            Flavor::Value(v) => Some(v.get_sign()),
+            Flavor::Inf(s) => Some(*s),
+            Flavor::NaN => None,
+        }
+    }
+
+    /// Sets the exponent of `self`.
+    pub fn set_exponent(&mut self, e: Exponent) {
+        if let Flavor::Value(v) = &mut self.inner {
+            v.set_exponent(e)
+        }
+    }
+
+    /// Returns the maximum mantissa length of `self` in bits regardless of whether `self` is normal or subnormal.
+    pub fn get_mantissa_max_bit_len(&self) -> Option<usize> {
+        if let Flavor::Value(v) = &self.inner {
+            Some(v.get_mantissa_max_bit_len())
+        } else {
+            None
+        }
+    }
+
+    /// Sets the precision of `self` to `p`.
+    /// If the new precision is smaller than the existing one, the number is rounded using specified rounding mode `rm`.
+    /// If `self` is Inf or NaN, the function has no effect.
+    ///
+    /// ## Errors
+    ///
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - InvalidArgument: precision is incorrect.
+    pub fn set_precision(&mut self, p: usize, rm: RoundingMode) -> Result<(), Error> {
+        if let Flavor::Value(v) = &mut self.inner {
+            v.set_precision(p, rm)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Computes the reciprocal of a number. The result is rounded using the rounding mode `rm`.
+    pub fn reciprocal(&self, p: usize, rm: RoundingMode) -> Self {
+        match &self.inner {
+            Flavor::Value(v) => Self::result_to_ext(v.reciprocal(rm), v.is_zero(), true),
+            Flavor::Inf(s) => {
+                let mut ret = Self::new(p);
+                ret.set_sign(*s);
+                ret
+            }
+            Flavor::NaN => NAN,
+        }
+    }
+
+    /// Sets the sign of `self`.
+    pub fn set_sign(&mut self, s: Sign) {
+        match &mut self.inner {
+            Flavor::Value(v) => v.set_sign(s),
+            Flavor::Inf(_) => self.inner = Flavor::Inf(s),
+            Flavor::NaN => {}
+        };
+    }
+
+    /// Returns the raw mantissa words of a number.
+    pub fn get_mantissa_digits(&self) -> Option<&[Word]> {
+        if let Flavor::Value(v) = &self.inner {
+            Some(v.get_mantissa_digits())
+        } else {
+            None
         }
     }
 }
@@ -792,8 +933,14 @@ impl BigFloat {
         { INF_POS },
         { INF_NEG },
     );
-    gen_wrapper_arg_rm!("Returns a rounded number with `n` decimal positions in the fractional part of the number using the rounding mode `rm`.", round, Self, {INF_POS}, {INF_NEG}, n, usize);
-
+    gen_wrapper_arg_rm!("Returns a rounded number with `n` decimal positions in the fractional part of the number using the rounding mode `rm`.", 
+        round,
+        Self,
+        { INF_POS },
+        { INF_NEG },
+        n,
+        usize
+    );
     gen_wrapper_arg_rm!(
         "Returns the square root of `self`.",
         sqrt,
