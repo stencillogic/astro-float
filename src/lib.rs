@@ -106,6 +106,10 @@ mod parser;
 mod strop;
 
 pub use crate::ctx::Context;
+pub use crate::ctx::with_precision;
+pub use crate::ctx::with_rounding_mode;
+pub use crate::ctx::with_consts;
+pub use crate::ctx::with_value;
 pub use crate::defs::Error;
 pub use crate::defs::Exponent;
 pub use crate::defs::Radix;

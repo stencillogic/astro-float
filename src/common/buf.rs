@@ -25,7 +25,7 @@ impl WordBuf {
         inner
             .try_reserve_exact(sz)
             .map_err(Error::MemoryAllocation)?;
-        unsafe {
+        unsafe {    // values of the newely allocated words stay unitialized for performance reasons
             inner.set_len(sz);
         }
         Ok(WordBuf { inner })
@@ -54,7 +54,7 @@ impl WordBuf {
         let n = (p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         let l = self.inner.len();
         self.inner.try_grow(n).map_err(Error::MemoryAllocation)?;
-        unsafe {
+        unsafe {    // values of the newely allocated words stay unitialized for performance reasons
             self.inner.set_len(n);
         }
         self.inner.rotate_right(n - l);
@@ -67,7 +67,7 @@ impl WordBuf {
         let n = (p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         let l = self.inner.len();
         self.inner.try_grow(n).map_err(Error::MemoryAllocation)?;
-        unsafe {
+        unsafe {    // values of the newely allocated words stay unitialized for performance reasons
             self.inner.set_len(n);
         }
         self.inner[l..].fill(0);

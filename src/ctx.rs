@@ -25,7 +25,7 @@ pub struct Context {
 impl Context {
     /// Create a new context with default parameters.
     ///
-    /// ## panics
+    /// ## Panics
     ///
     /// The function call panics if memory allocation failed.
     pub fn new() -> Self {
@@ -166,7 +166,7 @@ impl Context {
 
 /// Create a new context with precision `p`.
 ///
-/// ## panics
+/// ## Panics
 ///
 /// The function call panics if memory allocation failed.
 pub fn with_precision(p: usize) -> Context {
@@ -180,7 +180,7 @@ pub fn with_precision(p: usize) -> Context {
 
 /// Create a new context with rounding mode `rm`.
 ///
-/// ## panics
+/// ## Panics
 ///
 /// The function call panics if memory allocation failed.
 pub fn with_rounding_mode(rm: RoundingMode) -> Context {
