@@ -277,20 +277,10 @@ impl BigFloat {
                     v1.is_zero(),
                     v1.get_sign() == v2.get_sign(),
                 ),
-                Flavor::Inf(_) => Self::new(v1.get_mantissa_max_bit_len()),
+                Flavor::Inf(_) => self.clone(),
                 Flavor::NaN => NAN,
             },
-            Flavor::Inf(s1) => match &d2.inner {
-                Flavor::Value(v) => {
-                    if *s1 == v.get_sign() {
-                        INF_POS
-                    } else {
-                        INF_NEG
-                    }
-                }
-                Flavor::Inf(_) => NAN,
-                Flavor::NaN => NAN,
-            },
+            Flavor::Inf(_) => NAN,
             Flavor::NaN => NAN,
         }
     }
@@ -1434,7 +1424,25 @@ mod tests {
         assert!(BigFloat::new(rand_p()).div(&INF_POS, rm).is_zero());
         assert!(BigFloat::new(rand_p()).div(&INF_NEG, rm).is_zero());
 
-        for op in [BigFloat::add, BigFloat::sub, BigFloat::mul, BigFloat::div] {
+        assert!(TWO.rem(&TWO, rm).is_zero());
+        assert!(TWO.rem(&INF_POS, rm).cmp(&TWO) == Some(0));
+        assert!(INF_POS.rem(&TWO, rm).is_nan());
+        assert!(TWO.rem(&INF_NEG, rm).cmp(&TWO) == Some(0));
+        assert!(INF_NEG.rem(&TWO, rm).is_nan());
+        assert!(TWO.neg().rem(&INF_POS, rm).cmp(&TWO.neg()) == Some(0));
+        assert!(TWO.neg().rem(&INF_NEG, rm).cmp(&TWO.neg()) == Some(0));
+        assert!(INF_POS.rem(&TWO.neg(), rm).is_nan());
+        assert!(INF_NEG.rem(&TWO.neg(), rm).is_nan());
+        assert!(INF_POS.rem(&INF_POS, rm).is_nan());
+        assert!(INF_POS.rem(&INF_NEG, rm).is_nan());
+        assert!(INF_NEG.rem(&INF_NEG, rm).is_nan());
+        assert!(INF_NEG.rem(&INF_POS, rm).is_nan());
+        assert!(INF_POS.rem(&BigFloat::new(rand_p()), rm).is_nan());
+        assert!(INF_NEG.rem(&BigFloat::new(rand_p()), rm).is_nan());
+        assert!(BigFloat::new(rand_p()).rem(&INF_POS, rm).is_zero());
+        assert!(BigFloat::new(rand_p()).rem(&INF_NEG, rm).is_zero());
+
+        for op in [BigFloat::add, BigFloat::sub, BigFloat::mul, BigFloat::div, BigFloat::rem] {
             assert!(op(&NAN, &ONE, rm).is_nan());
             assert!(op(&ONE, &NAN, rm).is_nan());
             assert!(op(&NAN, &INF_POS, rm).is_nan());
