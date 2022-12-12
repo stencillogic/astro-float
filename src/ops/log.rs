@@ -109,6 +109,11 @@ impl BigFloatNumber {
             0
         } + 2;
 
+        // test for one.
+        if e == 1 && additional_prec == x.get_mantissa_max_bit_len() + 2 {
+            return Self::new(self.get_mantissa_max_bit_len());
+        }
+
         x.set_precision(
             self.get_mantissa_max_bit_len() + additional_prec,
             RoundingMode::None,

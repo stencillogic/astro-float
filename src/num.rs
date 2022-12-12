@@ -260,9 +260,14 @@ impl BigFloatNumber {
     ///  - DivisionByZero: `d2` is zero.
     ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - InvalidArgument: both `self` and `d2` are zero.
     pub fn div(&self, d2: &Self, rm: RoundingMode) -> Result<Self, Error> {
         if d2.m.is_zero() {
-            return Err(Error::DivisionByZero);
+            return if self.is_zero() {
+                Err(Error::InvalidArgument)
+            } else {
+                Err(Error::DivisionByZero)
+            };
         }
 
         if self.m.is_zero() {
@@ -648,7 +653,7 @@ impl BigFloatNumber {
         }
 
         let ptr: *const f64 = &f;
-        let u = unsafe { *(ptr as *const u64) }; // bit conversion to u64 is unsafe
+        let u = unsafe { *(ptr as *const u64) }; // bitwise conversion to u64
         let mut mantissa = u << 12;
         let mut exponent: Exponent = (u >> 52) as Exponent & 0b11111111111;
 
@@ -688,7 +693,7 @@ impl BigFloatNumber {
                     ret |= 0x8000000000000000u64;
                 }
                 let p: *const u64 = &ret;
-                unsafe { *(p as *const f64) }
+                unsafe { *(p as *const f64) } // bitwise conversion to f64
             } else {
                 0.0
             }
@@ -703,7 +708,7 @@ impl BigFloatNumber {
             ret <<= 52;
             ret |= mantissa >> 12;
             let p: *const u64 = &ret;
-            unsafe { *(p as *const f64) }
+            unsafe { *(p as *const f64) } // bitwise conversion to f64
         }
     }
 
@@ -1318,7 +1323,7 @@ mod tests {
         // 0 / 0
         d1 = BigFloatNumber::new(p).unwrap();
         d2 = BigFloatNumber::new(p).unwrap();
-        assert!(d1.div(&d2, rm).unwrap_err() == Error::DivisionByZero);
+        assert!(d1.div(&d2, rm).unwrap_err() == Error::InvalidArgument);
 
         // d2 / 0
         d2 = BigFloatNumber::from_f64(p, 123.0).unwrap();
