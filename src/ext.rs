@@ -521,11 +521,11 @@ impl BigFloat {
         if self.is_nan() {
             NAN
         } else if self.is_negative() {
-            let mut ret = Self::from_u8(1, 1);
+            let mut ret = Self::from_u8(1, DEFAULT_P);
             ret.inv_sign();
             ret
         } else {
-            Self::from_u8(1, 1)
+            Self::from_u8(1, DEFAULT_P)
         }
     }
 
@@ -1378,6 +1378,36 @@ mod tests {
         assert!(INF_NEG.add(&INF_NEG, rm).is_inf_neg());
         assert!(INF_NEG.add(&INF_POS, rm).is_nan());
 
+        assert!(ONE.add_full_prec(&ONE).cmp(&TWO) == Some(0));
+        assert!(ONE.add_full_prec(&INF_POS).is_inf_pos());
+        assert!(INF_POS.add_full_prec(&ONE).is_inf_pos());
+        assert!(ONE.add_full_prec(&INF_NEG).is_inf_neg());
+        assert!(INF_NEG.add_full_prec(&ONE).is_inf_neg());
+        assert!(INF_POS.add_full_prec(&INF_POS).is_inf_pos());
+        assert!(INF_POS.add_full_prec(&INF_NEG).is_nan());
+        assert!(INF_NEG.add_full_prec(&INF_NEG).is_inf_neg());
+        assert!(INF_NEG.add_full_prec(&INF_POS).is_nan());
+
+        assert!(ONE.sub_full_prec(&ONE).is_zero());
+        assert!(ONE.sub_full_prec(&INF_POS).is_inf_neg());
+        assert!(INF_POS.sub_full_prec(&ONE).is_inf_pos());
+        assert!(ONE.sub_full_prec(&INF_NEG).is_inf_pos());
+        assert!(INF_NEG.sub_full_prec(&ONE).is_inf_neg());
+        assert!(INF_POS.sub_full_prec(&INF_POS).is_nan());
+        assert!(INF_POS.sub_full_prec(&INF_NEG).is_inf_pos());
+        assert!(INF_NEG.sub_full_prec(&INF_NEG).is_nan());
+        assert!(INF_NEG.sub_full_prec(&INF_POS).is_inf_neg());
+
+        assert!(ONE.mul_full_prec(&ONE).cmp(&ONE) == Some(0));
+        assert!(ONE.mul_full_prec(&INF_POS).is_inf_pos());
+        assert!(INF_POS.mul_full_prec(&ONE).is_inf_pos());
+        assert!(ONE.mul_full_prec(&INF_NEG).is_inf_neg());
+        assert!(INF_NEG.mul_full_prec(&ONE).is_inf_neg());
+        assert!(INF_POS.mul_full_prec(&INF_POS).is_inf_pos());
+        assert!(INF_POS.mul_full_prec(&INF_NEG).is_inf_neg());
+        assert!(INF_NEG.mul_full_prec(&INF_NEG).is_inf_pos());
+        assert!(INF_NEG.mul_full_prec(&INF_POS).is_inf_neg());
+
         assert!(TWO.sub(&ONE, rm).cmp(&ONE) == Some(0));
         assert!(ONE.sub(&INF_POS, rm).is_inf_neg());
         assert!(INF_POS.sub(&ONE, rm).is_inf_pos());
@@ -1450,6 +1480,16 @@ mod tests {
             assert!(op(&NAN, &INF_NEG, rm).is_nan());
             assert!(op(&INF_NEG, &NAN, rm).is_nan());
             assert!(op(&NAN, &NAN, rm).is_nan());
+        }
+
+        for op in [BigFloat::add_full_prec, BigFloat::sub_full_prec, BigFloat::mul_full_prec] {
+            assert!(op(&NAN, &ONE).is_nan());
+            assert!(op(&ONE, &NAN).is_nan());
+            assert!(op(&NAN, &INF_POS).is_nan());
+            assert!(op(&INF_POS, &NAN).is_nan());
+            assert!(op(&NAN, &INF_NEG).is_nan());
+            assert!(op(&INF_NEG, &NAN).is_nan());
+            assert!(op(&NAN, &NAN).is_nan());
         }
 
         assert!(ONE.cmp(&ONE).unwrap() == 0);
@@ -1555,6 +1595,15 @@ mod tests {
         assert!(INF_NEG.pow(&NAN, rm, &mut cc).is_nan());
         assert!(NAN.pow(&INF_NEG, rm, &mut cc).is_nan());
         assert!(NAN.pow(&NAN, rm, &mut cc).is_nan());
+
+        assert!(NAN.powi(2, rand_p(), rm).is_nan());
+        assert!(NAN.powi(0, rand_p(), rm).is_nan());
+        assert!(INF_POS.powi(2, rand_p(), rm).is_inf_pos());
+        assert!(INF_POS.powi(3, rand_p(), rm).is_inf_pos());
+        assert!(INF_NEG.powi(4, rand_p(), rm).is_inf_pos());
+        assert!(INF_NEG.powi(5, rand_p(), rm).is_inf_neg());
+        assert!(INF_POS.powi(0, rand_p(), rm).cmp(&ONE) == Some(0));
+        assert!(INF_NEG.powi(0, rand_p(), rm).cmp(&ONE) == Some(0));
 
         assert!(TWO.log(&NAN, rm, &mut cc).is_nan());
         assert!(NAN.log(&TWO, rm, &mut cc).is_nan());
@@ -1665,6 +1714,119 @@ mod tests {
         assert!(INF_NEG.atanh(rm, &mut cc).is_zero());
         assert!(INF_POS.atanh(rm, &mut cc).is_zero());
         assert!(NAN.atanh(rm, &mut cc).is_nan());
+
+        assert!(INF_NEG.reciprocal(rand_p(), rm).is_zero());
+        assert!(INF_POS.reciprocal(rand_p(), rm).is_zero());
+        assert!(NAN.reciprocal(rand_p(), rm).is_nan());
+
+        assert!(TWO.signum().cmp(&ONE) == Some(0));
+        assert!(TWO.neg().signum().cmp(&ONE.neg()) == Some(0));
+        assert!(INF_POS.signum().cmp(&ONE) == Some(0));
+        assert!(INF_NEG.signum().cmp(&ONE.neg()) == Some(0));
+        assert!(NAN.signum().is_nan());
+
+        let d1 = ONE.clone();
+        assert!(d1.get_exponent() == Some(1));
+        assert!(d1.get_mantissa_digits() == Some(&[0, 0x8000000000000000]));
+        assert!(d1.get_mantissa_max_bit_len() == Some(DEFAULT_P));
+        assert!(d1.get_precision() == Some(DEFAULT_P));
+        assert!(d1.get_sign() == Some(Sign::Pos));
+
+        assert!(INF_POS.get_exponent().is_none());
+        assert!(INF_POS.get_mantissa_digits().is_none());
+        assert!(INF_POS.get_mantissa_max_bit_len().is_none());
+        assert!(INF_POS.get_precision().is_none());
+        assert!(INF_POS.get_sign() == Some(Sign::Pos));
+
+        assert!(INF_NEG.get_exponent().is_none());
+        assert!(INF_NEG.get_mantissa_digits().is_none());
+        assert!(INF_NEG.get_mantissa_max_bit_len().is_none());
+        assert!(INF_NEG.get_precision().is_none());
+        assert!(INF_NEG.get_sign() == Some(Sign::Neg));
+
+        assert!(NAN.get_exponent().is_none());
+        assert!(NAN.get_mantissa_digits().is_none());
+        assert!(NAN.get_mantissa_max_bit_len().is_none());
+        assert!(NAN.get_precision().is_none());
+        assert!(NAN.get_sign().is_none());
+
+        INF_POS.clone().set_exponent(1);
+        INF_POS.clone().set_precision(1, rm).unwrap();
+        INF_POS.clone().set_sign(Sign::Pos);
+
+        INF_NEG.clone().set_exponent(1);
+        INF_NEG.clone().set_precision(1, rm).unwrap();
+        INF_NEG.clone().set_sign(Sign::Pos);
+
+        NAN.clone().set_exponent(1);
+        NAN.clone().set_precision(1, rm).unwrap();
+        NAN.clone().set_sign(Sign::Pos);
+
+        assert!(INF_POS.min(&ONE).cmp(&ONE) == Some(0));
+        assert!(INF_NEG.min(&ONE).is_inf_neg());
+        assert!(NAN.min(&ONE).is_nan());
+        assert!(ONE.min(&INF_POS).cmp(&ONE) == Some(0));
+        assert!(ONE.min(&INF_NEG).is_inf_neg());
+        assert!(ONE.min(&NAN).is_nan());
+        assert!(NAN.min(&INF_POS).is_nan());
+        assert!(NAN.min(&INF_NEG).is_nan());
+        assert!(NAN.min(&NAN).is_nan());
+        assert!(INF_NEG.min(&INF_POS).is_inf_neg());
+        assert!(INF_POS.min(&INF_NEG).is_inf_neg());
+        assert!(INF_POS.min(&INF_POS).is_inf_pos());
+        assert!(INF_NEG.min(&INF_NEG).is_inf_neg());
+
+        assert!(INF_POS.max(&ONE).is_inf_pos());
+        assert!(INF_NEG.max(&ONE).cmp(&ONE) == Some(0));
+        assert!(NAN.max(&ONE).is_nan());
+        assert!(ONE.max(&INF_POS).is_inf_pos());
+        assert!(ONE.max(&INF_NEG).cmp(&ONE) == Some(0));
+        assert!(ONE.max(&NAN).is_nan());
+        assert!(NAN.max(&INF_POS).is_nan());
+        assert!(NAN.max(&INF_NEG).is_nan());
+        assert!(NAN.max(&NAN).is_nan());
+        assert!(INF_NEG.max(&INF_POS).is_inf_pos());
+        assert!(INF_POS.max(&INF_NEG).is_inf_pos());
+        assert!(INF_POS.max(&INF_POS).is_inf_pos());
+        assert!(INF_NEG.max(&INF_NEG).is_inf_neg());
+
+        assert!(ONE.clamp(&ONE.neg(), &TWO).cmp(&ONE) == Some(0));
+        assert!(ONE.clamp(&TWO, &ONE).is_nan());
+        assert!(ONE.clamp(&INF_POS, &ONE).is_nan());
+        assert!(ONE.clamp(&TWO, &INF_NEG).is_nan());
+        assert!(ONE.neg().clamp(&ONE, &TWO).cmp(&ONE) == Some(0));
+        assert!(TWO.clamp(&ONE.neg(), &ONE).cmp(&ONE) == Some(0));
+        assert!(INF_POS.clamp(&ONE, &TWO).cmp(&TWO) == Some(0));
+        assert!(INF_POS.clamp(&ONE, &INF_POS).is_inf_pos());
+        assert!(INF_POS.clamp(&INF_NEG, &ONE).cmp(&ONE) == Some(0));
+        assert!(INF_POS.clamp(&NAN, &INF_POS).is_nan());
+        assert!(INF_POS.clamp(&ONE, &NAN).is_nan());
+        assert!(INF_POS.clamp(&NAN, &NAN).is_nan());
+        assert!(INF_NEG.clamp(&ONE, &TWO).cmp(&ONE) == Some(0));
+        assert!(INF_NEG.clamp(&ONE, &INF_POS).cmp(&ONE) == Some(0));
+        assert!(INF_NEG.clamp(&INF_NEG, &ONE).is_inf_neg());
+        assert!(INF_NEG.clamp(&NAN, &INF_POS).is_nan());
+        assert!(INF_NEG.clamp(&ONE, &NAN).is_nan());
+        assert!(INF_NEG.clamp(&NAN, &NAN).is_nan());
+        assert!(NAN.clamp(&ONE, &TWO).is_nan());
+        assert!(NAN.clamp(&NAN, &TWO).is_nan());
+        assert!(NAN.clamp(&ONE, &NAN).is_nan());
+        assert!(NAN.clamp(&NAN, &NAN).is_nan());
+        assert!(NAN.clamp(&INF_NEG, &INF_POS).is_nan());
+
+        assert!(BigFloat::min_positive(DEFAULT_P).classify() == FpCategory::Subnormal);
+        assert!(INF_POS.classify() == FpCategory::Infinite);
+        assert!(INF_NEG.classify() == FpCategory::Infinite);
+        assert!(NAN.classify() == FpCategory::Nan);
+        assert!(ONE.classify() == FpCategory::Normal);
+
+        assert!(!INF_POS.is_subnormal());
+        assert!(!INF_NEG.is_subnormal());
+        assert!(!NAN.is_subnormal());
+        assert!(BigFloat::min_positive(DEFAULT_P).is_subnormal());
+        assert!(!BigFloat::min_positive_normal(DEFAULT_P).is_subnormal());
+        assert!(!BigFloat::max_value(DEFAULT_P).is_subnormal());
+        assert!(!BigFloat::min_value(DEFAULT_P).is_subnormal());
     }
 
     #[test]
