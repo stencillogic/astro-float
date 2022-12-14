@@ -217,7 +217,7 @@ impl<'a> SliceWithSign<'a> {
         }
 
         if c > 0 {
-            *iter3.next().unwrap() = c as Word;
+            *iter3.next().unwrap() = c as Word; // dst is supposed to be longer than s1 and s2 to process carry successfully.
         }
 
         for v in iter3 {

@@ -28,7 +28,7 @@ impl Mantissa {
             c = add_carry(*a, 0, c, x);
         }
 
-        *iter3.next().unwrap() = c as Word;
+        *iter3.next().unwrap() = c as Word; // s3 is supposed to be longer than s1 and s2 to process carry.
     }
 
     fn paired_sub(s1: &[Word], s2: &[Word], s3: &mut [Word]) {

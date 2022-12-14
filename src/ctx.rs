@@ -140,28 +140,28 @@ macro_rules! impl_fun_rm_p_cc {
 }
 
 impl Context {
-    impl_fun_rm!("Returns the cosine of a number.", sqrt);
-    impl_fun_rm!("Returns the cosine of a number.", cbrt);
-    impl_fun_rm_cc!("Returns the cosine of a number.", ln);
-    impl_fun_rm_cc!("Returns the cosine of a number.", exp);
-    impl_fun_rm_cc!("Returns the cosine of a number.", log2);
-    impl_fun_rm_cc!("Returns the cosine of a number.", log10);
-    impl_fun_arg_rm_cc!("Returns the cosine of a number.", log);
-    impl_fun_arg_rm_cc!("Returns the cosine of a number.", pow);
+    impl_fun_rm!("Returns the square root of a number.", sqrt);
+    impl_fun_rm!("Returns the cube root of a number.", cbrt);
+    impl_fun_rm_cc!("Returns the natural logarithm of a number.", ln);
+    impl_fun_rm_cc!("Returns the exponent of a number.", exp);
+    impl_fun_rm_cc!("Returns the logarithm base two of a number.", log2);
+    impl_fun_rm_cc!("Returns the logarithm base ten of a number.", log10);
+    impl_fun_arg_rm_cc!("Returns the logarithm of a number.", log);
+    impl_fun_arg_rm_cc!("Returns the power of a number.", pow);
 
     impl_fun_rm_cc!("Returns the cosine of a number.", cos);
-    impl_fun_rm_cc!("Returns the cosine of a number.", acos);
-    impl_fun_rm_cc!("Returns the cosine of a number.", sin);
-    impl_fun_rm_cc!("Returns the cosine of a number.", asin);
-    impl_fun_rm_cc!("Returns the cosine of a number.", tan);
-    impl_fun_rm_p_cc!("Returns the cosine of a number.", atan);
+    impl_fun_rm_cc!("Returns the arccosine of a number.", acos);
+    impl_fun_rm_cc!("Returns the sine of a number.", sin);
+    impl_fun_rm_cc!("Returns the arcsine of a number.", asin);
+    impl_fun_rm_cc!("Returns the tangent of a number.", tan);
+    impl_fun_rm_p_cc!("Returns the arctangent of a number.", atan);
 
-    impl_fun_rm!("Returns the cosine of a number.", cosh);
-    impl_fun_rm_cc!("Returns the cosine of a number.", acosh);
-    impl_fun_rm!("Returns the cosine of a number.", sinh);
-    impl_fun_rm_cc!("Returns the cosine of a number.", asinh);
-    impl_fun_rm_p_cc!("Returns the cosine of a number.", tanh);
-    impl_fun_rm_cc!("Returns the cosine of a number.", atanh);
+    impl_fun_rm!("Returns the hyperbolic cosine of a number.", cosh);
+    impl_fun_rm_cc!("Returns the hyperbolic arccosine of a number.", acosh);
+    impl_fun_rm!("Returns the hyperbolic sine of a number.", sinh);
+    impl_fun_rm_cc!("Returns the hyperbolic arcsine of a number.", asinh);
+    impl_fun_rm_p_cc!("Returns the hyperbolic tangent of a number.", tanh);
+    impl_fun_rm_cc!("Returns the hyperbolic arctangent of a number.", atanh);
 }
 
 /// Create a new context with precision `p`.
@@ -202,7 +202,7 @@ pub fn with_consts(cc: Rc<RefCell<Consts>>) -> Context {
     }
 }
 
-/// Create a new context with constant cache `cc`.
+/// Create a new context with a given value.
 pub fn with_value(value: BigFloat) -> Context {
     Context {
         cc: Rc::new(RefCell::new(Consts::new().expect("Memory allocation"))),

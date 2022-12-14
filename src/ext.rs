@@ -17,15 +17,6 @@ use lazy_static::lazy_static;
 /// Not a number.
 pub const NAN: BigFloat = BigFloat { inner: Flavor::NaN };
 
-lazy_static! {
-
-    /// 1
-    pub static ref ONE: BigFloat = BigFloat { inner: Flavor::Value(BigFloatNumber::from_word(1, DEFAULT_P).expect("Constant ONE initialized")) };
-
-    /// 2
-    pub static ref TWO: BigFloat = BigFloat { inner: Flavor::Value(BigFloatNumber::from_word(2, DEFAULT_P).expect("Constant TWO initialized")) };
-}
-
 /// Positive infinity.
 pub const INF_POS: BigFloat = BigFloat {
     inner: Flavor::Inf(Sign::Pos),
@@ -35,6 +26,15 @@ pub const INF_POS: BigFloat = BigFloat {
 pub const INF_NEG: BigFloat = BigFloat {
     inner: Flavor::Inf(Sign::Neg),
 };
+
+lazy_static! {
+
+    /// 1
+    pub static ref ONE: BigFloat = BigFloat { inner: Flavor::Value(BigFloatNumber::from_word(1, DEFAULT_P).expect("Constant ONE initialized")) };
+
+    /// 2
+    pub static ref TWO: BigFloat = BigFloat { inner: Flavor::Value(BigFloatNumber::from_word(2, DEFAULT_P).expect("Constant TWO initialized")) };
+}
 
 /// Number representation.
 #[derive(Debug)]
@@ -481,10 +481,13 @@ impl BigFloat {
     /// If either argument is NaN or `min` is greater than `max`, the function returns NaN.
     pub fn clamp(&self, min: &Self, max: &Self) -> Self {
         if self.is_nan() || min.is_nan() || max.is_nan() || max.cmp(min).unwrap() < 0 {
+            // call to unwrap() is unreacheable
             NAN
         } else if self.cmp(min).unwrap() < 0 {
+            // call to unwrap() is unreacheable
             min.clone()
         } else if self.cmp(max).unwrap() > 0 {
+            // call to unwrap() is unreacheable
             max.clone()
         } else {
             self.clone()
@@ -497,6 +500,7 @@ impl BigFloat {
         if self.is_nan() || d1.is_nan() {
             NAN
         } else if self.cmp(d1).unwrap() < 0 {
+            // call to unwrap() is unreacheable
             d1.clone()
         } else {
             self.clone()
@@ -509,6 +513,7 @@ impl BigFloat {
         if self.is_nan() || d1.is_nan() {
             NAN
         } else if self.cmp(d1).unwrap() > 0 {
+            // call to unwrap() is unreacheable
             d1.clone()
         } else {
             self.clone()
@@ -573,7 +578,6 @@ impl BigFloat {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn write_str<T: Write>(
         &self,
         w: &mut T,
@@ -582,7 +586,22 @@ impl BigFloat {
     ) -> Result<(), core::fmt::Error> {
         match &self.inner {
             Flavor::Value(v) => {
-                let s = v.format(rdx, rm).unwrap();
+                let s = match v.format(rdx, rm) {
+                    Ok(s) => s,
+                    Err(e) => match e {
+                        Error::ExponentOverflow(s) => {
+                            if s.is_positive() {
+                                "Inf"
+                            } else {
+                                "-Inf"
+                            }
+                        }
+                        Error::DivisionByZero => "Div by zero",
+                        Error::InvalidArgument => "Invalid arg",
+                        Error::MemoryAllocation(_) => panic!("Memory allocation"),
+                    }
+                    .to_owned(),
+                };
                 w.write_str(&s)
             }
             Flavor::Inf(sign) => {

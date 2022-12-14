@@ -352,8 +352,11 @@ impl BigFloatNumber {
 
         let mask = (WORD_MAX >> (WORD_BIT_SIZE - shift)) as DoubleWord;
         let mut iter = self.get_mantissa_digits().iter().rev();
+
+        debug_assert!(iter.by_ref().count() > 0);
+
         let mut done = WORD_BIT_SIZE - shift + e_shift;
-        let mut d = *iter.next().unwrap() as DoubleWord;
+        let mut d = *iter.next().unwrap() as DoubleWord; // iter is never empty.
 
         loop {
             let digit = ((d >> done) & mask) as u8;
@@ -417,12 +420,12 @@ impl BigFloatNumber {
             let rdx_word = Self::word_for_radix(rdx);
             let mut word;
 
-            let d = r.mul(rdx_num, rm).unwrap();
+            let d = r.mul(rdx_num, rm)?;
             r = d.fract()?;
             word = d.get_int_as_word();
             if word == 0 {
                 e_shift = -1;
-                let d = r.mul(rdx_num, rm).unwrap();
+                let d = r.mul(rdx_num, rm)?;
                 r = d.fract()?;
                 word = d.get_int_as_word();
             } else if word >= rdx_word {
@@ -431,7 +434,7 @@ impl BigFloatNumber {
                 ret.push((word / rdx_word) as u8);
                 ret.push((word % rdx_word) as u8);
 
-                let d = r.mul(rdx_num, rm).unwrap();
+                let d = r.mul(rdx_num, rm)?;
                 r = d.fract()?;
                 word = d.get_int_as_word();
             }
@@ -439,12 +442,12 @@ impl BigFloatNumber {
             for _ in 0..l {
                 ret.push(word as u8);
 
-                let d = r.mul(rdx_num, rm).unwrap();
+                let d = r.mul(rdx_num, rm)?;
                 r = d.fract()?;
                 word = d.get_int_as_word();
             }
 
-            if !r.round(0, RoundingMode::ToEven).unwrap().is_zero() {
+            if !r.round(0, RoundingMode::ToEven)?.is_zero() {
                 word += 1;
 
                 if word == rdx_word {

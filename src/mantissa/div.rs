@@ -16,6 +16,7 @@ impl Mantissa {
     // Basic integer division.
     fn div_basic(m1: &[Word], m2: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
         debug_assert!(m1.len() >= m2.len());
+        debug_assert!(!m2.is_empty());
 
         let l1 = m1.len();
         let l2 = m2.len();
@@ -42,7 +43,7 @@ impl Mantissa {
             if val < d {
                 rh = val;
                 val = *iter.next().unwrap_or(&0) as DoubleWord;
-                *m3iter.next().unwrap() = 0;
+                *m3iter.next().unwrap() = 0; // m3 is at least 1 word long.
                 rem[0] = rh as Word;
                 j -= 1;
             }
@@ -161,7 +162,7 @@ impl Mantissa {
                 if val < d {
                     rh = val;
                     val = *iter.next().unwrap_or(&0) as DoubleWord;
-                    *remiter.next().unwrap() = 0;
+                    *remiter.next().unwrap() = 0; // rem is at least 1 word long.
                     j -= 1;
                 }
 

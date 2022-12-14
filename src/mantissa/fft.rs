@@ -116,6 +116,7 @@ impl Mantissa {
         if k1 == 2 {
             let (a, b) = parts.split_at_mut(s);
             Self::fft_butterfly(a.first_mut().unwrap(), b.first_mut().unwrap(), n1, modulus);
+        // a and b are supposed to have non-zero length.
         } else {
             let k2 = k1 / 2;
             let kk = k - 1;
@@ -193,6 +194,8 @@ impl Mantissa {
 
     // decompose in parts.len() = k1 parts, each of size m
     fn fft_decompose(d: &[Word], m: usize, parts: &mut [SliceWithSign]) {
+        debug_assert!(!parts.is_empty());
+
         let mut parts_iter = parts.iter_mut();
 
         if m % WORD_BIT_SIZE == 0 {
