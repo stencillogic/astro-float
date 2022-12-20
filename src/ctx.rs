@@ -474,3 +474,117 @@ pub mod ops {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use core::ops::{Add, Div, Mul, Neg, Sub};
+
+    use super::*;
+
+    #[test]
+    fn test_ctx() {
+        // context building
+        let p = 256;
+        let rm = RoundingMode::ToZero;
+        let cc = Rc::new(RefCell::new(Consts::new().unwrap()));
+        let val = BigFloat::from_i8(123, DEFAULT_P);
+
+        let mut ctx = Context::new();
+        ctx.precision(p)
+            .rounding_mode(rm)
+            .constant_cache(cc.clone())
+            .value(val.clone());
+
+        assert_eq!(ctx.get_precision(), p);
+        assert_eq!(ctx.get_rounding_mode(), rm);
+        assert_eq!(Rc::strong_count(&ctx.get_consts()), Rc::strong_count(&cc));
+        assert_eq!(ctx.get_value(), val);
+
+        // functions
+        let refval = ctx.get_value();
+        let logbase = BigFloat::from_i8(3, DEFAULT_P);
+        let powi = 2;
+
+        let ret = ctx
+            .powi(powi)
+            .sqrt()
+            .cbrt()
+            .pow(&logbase)
+            .ln()
+            .log2()
+            .exp()
+            .log10()
+            .log(&logbase)
+            .cos()
+            .acos()
+            .sin()
+            .asin()
+            .tan()
+            .atan()
+            .cosh()
+            .acosh()
+            .sinh()
+            .asinh()
+            .tanh()
+            .atanh()
+            .get_value();
+
+        let refval =
+            refval
+                .powi(powi, p, rm)
+                .sqrt(rm)
+                .cbrt(rm)
+                .pow(&logbase, rm, &mut cc.borrow_mut());
+        let refval = refval.ln(rm, &mut cc.borrow_mut());
+        let refval = refval.log2(rm, &mut cc.borrow_mut());
+        let refval = refval.exp(rm, &mut cc.borrow_mut());
+        let refval = refval.log10(rm, &mut cc.borrow_mut());
+        let refval = refval.log(&logbase, rm, &mut cc.borrow_mut());
+        let refval = refval.cos(rm, &mut cc.borrow_mut());
+        let refval = refval.acos(rm, &mut cc.borrow_mut());
+        let refval = refval.sin(rm, &mut cc.borrow_mut());
+        let refval = refval.asin(rm, &mut cc.borrow_mut());
+        let refval = refval.tan(rm, &mut cc.borrow_mut());
+        let refval = refval.atan(rm, p, &mut cc.borrow_mut()).cosh(rm);
+        let refval = refval.acosh(rm, &mut cc.borrow_mut()).sinh(rm);
+        let refval = refval.asinh(rm, &mut cc.borrow_mut());
+        let refval = refval.tanh(rm, p, &mut cc.borrow_mut());
+        let refval = refval.atanh(rm, &mut cc.borrow_mut());
+
+        assert_eq!(refval, ret);
+
+        // ops by ref
+        let rhs = BigFloat::from_i8(10, DEFAULT_P);
+        ctx = ctx.add(&rhs).mul(&rhs).sub(&rhs).div(&rhs);
+        ctx += &rhs;
+        ctx -= &rhs;
+        ctx *= &rhs;
+        ctx /= &rhs;
+
+        let mut ctxref = &mut ctx;
+        ctxref = ctxref.neg();
+
+        let refval = BigFloat::add(&refval, &rhs, rm);
+        let refval = BigFloat::mul(&refval, &rhs, rm);
+        let refval = BigFloat::sub(&refval, &rhs, rm);
+        let refval = BigFloat::div(&refval, &rhs, rm);
+        let refval = refval.neg();
+
+        assert_eq!(refval, ctxref.get_value());
+
+        // ops by val
+        ctx = ctx
+            .add(rhs.clone())
+            .mul(rhs.clone())
+            .sub(rhs.clone())
+            .div(rhs.clone());
+
+        let refval = BigFloat::add(&refval, &rhs, rm);
+        let refval = BigFloat::mul(&refval, &rhs, rm);
+        let refval = BigFloat::sub(&refval, &rhs, rm);
+        let refval = BigFloat::div(&refval, &rhs, rm);
+
+        assert_eq!(refval, ctx.get_value());
+    }
+}

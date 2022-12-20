@@ -58,14 +58,12 @@ impl BigFloat {
         Self::result_to_ext(BigFloatNumber::new(p), false, true)
     }
 
-    /// Creates a BigFloat from f64.
-    /// The conversion is not guaranteed to be lossless since BigFloat and f64 have different bases.
+    /// Creates a BigFloat from f64.\
     pub fn from_f64(f: f64, p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::from_f64(p, f), false, true)
     }
 
     /// Creates a BigFloat from f32.
-    /// The conversion is not guaranteed to be lossless since BigFloat and f64 have different bases.
     pub fn from_f32(f: f32, p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::from_f64(p, f as f64), false, true)
     }
@@ -1148,6 +1146,17 @@ pub mod ops {
         };
     }
 
+    macro_rules! impl_binary_op_ctx {
+        ($t:ident, $f:ident, $a:ty, $b:ty) => {
+            impl $t<$b> for $a {
+                type Output = Context;
+                fn $f(self, rhs: $b) -> Self::Output {
+                    with_value(BigFloat::$f(&self, &rhs.get_value(), DEFAULT_RM))
+                }
+            }
+        };
+    }
+
     impl_binary_op!(Add, add, BigFloat, BigFloat);
     impl_binary_op!(Add, add, BigFloat, &BigFloat);
     impl_binary_op!(Add, add, &BigFloat, &BigFloat);
@@ -1172,6 +1181,31 @@ pub mod ops {
     impl_binary_op!(Rem, rem, BigFloat, &BigFloat);
     impl_binary_op!(Rem, rem, &BigFloat, &BigFloat);
     impl_binary_op!(Rem, rem, &BigFloat, BigFloat);
+
+    impl_binary_op_ctx!(Add, add, BigFloat, Context);
+    impl_binary_op_ctx!(Add, add, BigFloat, &Context);
+    impl_binary_op_ctx!(Add, add, &BigFloat, &Context);
+    impl_binary_op_ctx!(Add, add, &BigFloat, Context);
+
+    impl_binary_op_ctx!(Sub, sub, BigFloat, Context);
+    impl_binary_op_ctx!(Sub, sub, BigFloat, &Context);
+    impl_binary_op_ctx!(Sub, sub, &BigFloat, &Context);
+    impl_binary_op_ctx!(Sub, sub, &BigFloat, Context);
+
+    impl_binary_op_ctx!(Mul, mul, BigFloat, Context);
+    impl_binary_op_ctx!(Mul, mul, BigFloat, &Context);
+    impl_binary_op_ctx!(Mul, mul, &BigFloat, &Context);
+    impl_binary_op_ctx!(Mul, mul, &BigFloat, Context);
+
+    impl_binary_op_ctx!(Div, div, BigFloat, Context);
+    impl_binary_op_ctx!(Div, div, BigFloat, &Context);
+    impl_binary_op_ctx!(Div, div, &BigFloat, &Context);
+    impl_binary_op_ctx!(Div, div, &BigFloat, Context);
+
+    impl_binary_op_ctx!(Rem, rem, BigFloat, Context);
+    impl_binary_op_ctx!(Rem, rem, BigFloat, &Context);
+    impl_binary_op_ctx!(Rem, rem, &BigFloat, &Context);
+    impl_binary_op_ctx!(Rem, rem, &BigFloat, Context);
 
     impl Neg for BigFloat {
         type Output = BigFloat;

@@ -353,8 +353,6 @@ impl BigFloatNumber {
         let mask = (WORD_MAX >> (WORD_BIT_SIZE - shift)) as DoubleWord;
         let mut iter = self.get_mantissa_digits().iter().rev();
 
-        debug_assert!(iter.by_ref().count() > 0);
-
         let mut done = WORD_BIT_SIZE - shift + e_shift;
         let mut d = *iter.next().unwrap() as DoubleWord; // iter is never empty.
 
