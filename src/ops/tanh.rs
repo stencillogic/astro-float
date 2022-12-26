@@ -3,6 +3,7 @@
 use crate::common::consts::FIFTEEN;
 use crate::common::consts::ONE;
 use crate::common::consts::THREE;
+use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::defs::EXPONENT_MAX;
@@ -10,17 +11,21 @@ use crate::num::BigFloatNumber;
 use crate::Consts;
 
 impl BigFloatNumber {
-    /// Computes the hyperbolic tangent of a number. The result is rounded using the rounding mode `rm`.
+    /// Computes the hyperbolic tangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
+    /// Precision is rounded upwards to the word size.
     ///
     /// ## Errors
     ///
     ///  - ExponentOverflow: the result is too large or too small number.
     ///  - MemoryAllocation: failed to allocate memory.
-    pub fn tanh(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+    ///  - InvalidArgument: the precision is incorrect.
+    pub fn tanh(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+        let p = round_p(p);
+
         let mut x = self.clone()?;
 
-        if self.get_exponent() as isize >= -(self.get_mantissa_max_bit_len() as isize) / 6 {
+        if self.get_exponent() as isize >= -(p as isize) / 6 {
             // (e^(2*x) - 1) / (e^(2*x) + 1)
 
             let mut additional_prec = 2;
@@ -28,10 +33,8 @@ impl BigFloatNumber {
                 additional_prec += self.get_exponent().unsigned_abs() as usize;
             }
 
-            x.set_precision(
-                x.get_mantissa_max_bit_len() + additional_prec,
-                RoundingMode::None,
-            )?;
+            let p_x = p + additional_prec;
+            x.set_precision(p_x, RoundingMode::None)?;
 
             if x.get_exponent() == EXPONENT_MAX {
                 return Err(Error::ExponentOverflow(self.get_sign()));
@@ -39,34 +42,35 @@ impl BigFloatNumber {
 
             x.set_exponent(x.get_exponent() + 1);
 
-            let xexp = x.exp(RoundingMode::None, cc)?;
+            let xexp = x.exp(p_x, RoundingMode::None, cc)?;
 
-            let d1 = xexp.sub(&ONE, RoundingMode::None)?;
-            let d2 = xexp.add(&ONE, RoundingMode::None)?;
+            let d1 = xexp.sub(&ONE, p_x, RoundingMode::None)?;
+            let d2 = xexp.add(&ONE, p_x, RoundingMode::None)?;
 
-            let mut ret = d1.div(&d2, RoundingMode::None)?;
+            let mut ret = d1.div(&d2, p_x, RoundingMode::None)?;
 
-            ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+            ret.set_precision(p, rm)?;
 
             Ok(ret)
         } else {
             // short series: x - x^3/3 + 2*x^5/15
 
-            x.set_precision(x.get_mantissa_max_bit_len() + 2, RoundingMode::None)?;
+            let p_x = p + 2;
+            x.set_precision(p_x, RoundingMode::None)?;
 
-            let xx = x.mul(&x, RoundingMode::None)?;
-            let x3 = xx.mul(&x, RoundingMode::None)?;
-            let p1 = x3.div(&THREE, RoundingMode::None)?;
+            let xx = x.mul(&x, p_x, RoundingMode::None)?;
+            let x3 = xx.mul(&x, p_x, RoundingMode::None)?;
+            let p1 = x3.div(&THREE, p_x, RoundingMode::None)?;
 
-            let mut ret = x.sub(&p1, RoundingMode::None)?;
+            let mut ret = x.sub(&p1, p_x, RoundingMode::None)?;
 
-            let mut x5 = x3.mul(&xx, RoundingMode::None)?;
+            let mut x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
             x5.set_exponent(x5.get_exponent() + 1);
-            let p2 = x5.div(&FIFTEEN, RoundingMode::None)?;
+            let p2 = x5.div(&FIFTEEN, p_x, RoundingMode::None)?;
 
-            ret = ret.add(&p2, RoundingMode::None)?;
+            ret = ret.add(&p2, p_x, RoundingMode::None)?;
 
-            ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+            ret.set_precision(p, rm)?;
 
             Ok(ret)
         }
@@ -80,24 +84,27 @@ mod tests {
 
     #[test]
     fn test_tanh() {
+        let p = 320;
         let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_word(1, 320).unwrap();
+        let mut n1 = BigFloatNumber::from_word(1, p).unwrap();
         n1.set_exponent(0);
-        let _n2 = n1.tanh(rm, &mut cc).unwrap();
+        let _n2 = n1.tanh(p, rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
 
         // asymptotic & extrema testing
-        let n1 = BigFloatNumber::parse("8.00000000000000100000000000000010B6200000000000000000000000000002E8B9840AAAAAAAAAAAAAAAAAAAAAAAAADE85C5950B78E38E38E38E38E38E38E3902814A92D7C21CDB6DB6DB6DB6DB6E_e+1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
-        let n2 = n1.tanh(rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF3455354A958B21BA74F856FDC3BA2D793AEBE0E1D1ADF118BD9D0B592FF14C815D2C_e-1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+        let p = 640;
+        let n1 = BigFloatNumber::parse("8.00000000000000100000000000000010B6200000000000000000000000000002E8B9840AAAAAAAAAAAAAAAAAAAAAAAAADE85C5950B78E38E38E38E38E38E38E3902814A92D7C21CDB6DB6DB6DB6DB6E_e+1", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n2 = n1.tanh(p, rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF3455354A958B21BA74F856FDC3BA2D793AEBE0E1D1ADF118BD9D0B592FF14C815D2C_e-1", crate::Radix::Hex, p, RoundingMode::None).unwrap();
 
         assert!(n2.cmp(&n3) == 0);
 
         // near zero
-        let n1 = BigFloatNumber::parse("-4.029AC2B966FC8CD896222A09593F0751477AD7BA9C969E57290BDE947A2E1514DF2901A1C5624013106A5197035DCA72C221BA963E190A20_e-13", crate::Radix::Hex, 448, RoundingMode::None).unwrap();
-        let n2 = n1.tanh(rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("-4.029AC2B966FC8CD896222A09593F0751477AC23B7FED67E140D1714FFCEC504D75DF70C388B621AF2FBC77C90C98C50F852D65BEDA273128_e-13", crate::Radix::Hex, 448, RoundingMode::None).unwrap();
+        let p = 448;
+        let n1 = BigFloatNumber::parse("-4.029AC2B966FC8CD896222A09593F0751477AD7BA9C969E57290BDE947A2E1514DF2901A1C5624013106A5197035DCA72C221BA963E190A20_e-13", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n2 = n1.tanh(p, rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("-4.029AC2B966FC8CD896222A09593F0751477AC23B7FED67E140D1714FFCEC504D75DF70C388B621AF2FBC77C90C98C50F852D65BEDA273128_e-13", crate::Radix::Hex, p, RoundingMode::None).unwrap();
 
         // println!("{:?}", n1.format(crate::Radix::Hex, rm).unwrap());
         // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
@@ -109,16 +116,17 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn tanh_perf() {
+        let p = 160;
         let mut cc = Consts::new().unwrap();
         let mut n = vec![];
         for _ in 0..10000 {
-            n.push(BigFloatNumber::random_normal(160, 0, 5).unwrap());
+            n.push(BigFloatNumber::random_normal(p, 0, 5).unwrap());
         }
 
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let _f = ni.tanh(RoundingMode::ToEven, &mut cc).unwrap();
+                let _f = ni.tanh(p, RoundingMode::ToEven, &mut cc).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

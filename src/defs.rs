@@ -39,14 +39,14 @@ pub const WORD_MAX: Word = Word::MAX;
 /// Base of words.
 pub const WORD_BASE: DoubleWord = WORD_MAX as DoubleWord + 1;
 
-/// Size of a word in bits.
+/// Size of a word in bits. Precision is rounded according to word size.
 pub const WORD_BIT_SIZE: usize = core::mem::size_of::<Word>() * 8;
 
 /// Word with the most significant bit set.
 pub const WORD_SIGNIFICANT_BIT: Word = WORD_MAX << (WORD_BIT_SIZE - 1);
 
 /// Default rounding mode.
-pub const DEFAULT_RM: RoundingMode = RoundingMode::ToEven;
+//pub const DEFAULT_RM: RoundingMode = RoundingMode::ToEven;
 
 /// Default precision.
 pub const DEFAULT_P: usize = WORD_BIT_SIZE * 2;
@@ -91,7 +91,7 @@ use smallvec::CollectionAllocErr;
 /// Possible errors.
 #[derive(Debug)]
 pub enum Error {
-    /// The exponent value becomes greater than the upper limit of exponent values or less than the lower limit.
+    /// The exponent value becomes greater than the upper limit of the range of exponent values.
     ExponentOverflow(Sign),
 
     /// Divizor is zero.

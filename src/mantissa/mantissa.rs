@@ -229,6 +229,7 @@ impl Mantissa {
     pub fn abs_sub(
         &self,
         m2: &Self,
+        p: usize,
         m2_shift: usize,
         rm: RoundingMode,
         is_positive: bool,
@@ -238,37 +239,60 @@ impl Mantissa {
         debug_assert!(self.m[self.len() - 1] & WORD_SIGNIFICANT_BIT != 0);
         debug_assert!(m2.m[m2.len() - 1] & WORD_SIGNIFICANT_BIT != 0);
 
+        let p = Self::bit_len_to_word_len(p);
         let mut c = 0;
 
-        let l = if full_prec {
-            self.len()
-                .max(m2.len() + (m2_shift + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE)
+        let l2 = (m2_shift + WORD_BIT_SIZE - 2) / WORD_BIT_SIZE;
+        let (mut m3, mut shift) = if l2 > p && l2 > self.len() && !full_prec {
+            // m2 lays outside of m1's mantissa range and outside the desired precision
+            //
+            // m1 1XXXX00000000   - m1 and trailing zeroes
+            // m2 000000001XXXX   - m2_shift, m2
+
+            let mut m3 = Mantissa::new(self.len() * WORD_BIT_SIZE)?;
+
+            m3.m.copy_from_slice(&self.m);
+
+            (m3, 0)
         } else {
-            self.len().max(m2.len()) + if m2_shift > 0 { 1 } else { 0 }
+            // m2_shift is smaller than the precision of m1
+            // or m2_shift is smaller than the desired precision
+            //
+            // m1 1XXXXXX00000   - m1 and trailing zeroes
+            // m2 0000001XXXXX   - m2_shift, m2
+
+            let l = self
+                .len()
+                .max((m2_shift + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE + m2.len());
+
+            let mut m3 = Mantissa::new(l * WORD_BIT_SIZE)?;
+
+            let m1iter = ExtendedSlice::new(self.m.iter(), l - self.len(), &0);
+            let m2iter = RightShiftedSlice::new(&m2.m, m2_shift, 0, l - m2.len());
+            let m3iter = m3.m.iter_mut();
+
+            for (d, a, b) in izip!(m3iter, m1iter, m2iter) {
+                c = sub_borrow(*a, b, c, d);
+            }
+
+            debug_assert!(c == 0);
+
+            let shift = Self::maximize(&mut m3.m);
+
+            (m3, shift)
         };
-
-        let mut m3 = Mantissa::new(l * WORD_BIT_SIZE)?;
-
-        let m1iter = ExtendedSlice::new(self.m.iter(), l - self.len(), &0);
-        let m2iter = RightShiftedSlice::new(&m2.m, m2_shift, 0, l - m2.len());
-        let m3iter = m3.m.iter_mut();
-
-        for (d, a, b) in izip!(m3iter, m1iter, m2iter) {
-            c = sub_borrow(*a, b, c, d);
-        }
-
-        debug_assert!(c == 0);
-
-        let mut shift = Self::maximize(&mut m3.m);
 
         if full_prec {
             m3.m.trunc_trailing_zeroes();
-        } else if m2_shift > 0 {
-            // remove guard
-            if m3.round_mantissa(WORD_BIT_SIZE, rm, is_positive) {
+        } else if m3.len() < p {
+            let n = m3.len();
+            m3.m.try_extend(p * WORD_BIT_SIZE)?;
+            m3.m[..n].fill(0);
+        } else if m3.len() > p {
+            if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive) {
                 shift -= 1;
             }
-            m3.m.trunc_to((l - 1) * WORD_BIT_SIZE);
+            m3.m.trunc_to(p * WORD_BIT_SIZE);
         }
 
         m3.n = m3.max_bit_len();
@@ -280,6 +304,7 @@ impl Mantissa {
     pub fn abs_add(
         &self,
         m2: &Self,
+        p: usize,
         m2_shift: usize,
         rm: RoundingMode,
         is_positive: bool,
@@ -288,17 +313,14 @@ impl Mantissa {
         debug_assert!(self.m[self.len() - 1] & WORD_SIGNIFICANT_BIT != 0);
         debug_assert!(m2.m[m2.len() - 1] & WORD_SIGNIFICANT_BIT != 0);
 
+        let p = Self::bit_len_to_word_len(p);
         let mut c = 0;
 
-        let l = if full_prec {
-            self.len().max(m2.len() + m2_shift / WORD_BIT_SIZE) + 1
-        } else {
-            self.len().max(m2.len()) + 1
-        };
+        let (mut m3, c) = if m2_shift == 0 {
+            let l = self.len().max(m2.len()) + 1;
 
-        let mut m3 = Mantissa::new(l * WORD_BIT_SIZE)?;
+            let mut m3 = Mantissa::new(l * WORD_BIT_SIZE)?;
 
-        if m2_shift == 0 {
             let m1iter = RightShiftedSlice::new(&self.m, 1, 0, l - self.len());
             let m2iter = RightShiftedSlice::new(&m2.m, 1, 0, l - m2.len());
             let m3iter = m3.m.iter_mut();
@@ -312,59 +334,84 @@ impl Mantissa {
 
             if full_prec {
                 m3.m.trunc_trailing_zeroes();
-            } else {
-                debug_assert!(!m3.round_mantissa(WORD_BIT_SIZE, rm, is_positive));
-                m3.m.trunc_to((l - 1) * WORD_BIT_SIZE);
+            } else if m3.len() < p {
+                let n = m3.len();
+                m3.m.try_extend(p * WORD_BIT_SIZE)?;
+                m3.m[n..].fill(0);
+            } else if m3.len() > p {
+                let rndres = m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive);
+                debug_assert!(!rndres);
+                m3.m.trunc_to(p * WORD_BIT_SIZE);
             }
+
+            (m3, c)
         } else {
-            let m1iter = ExtendedSlice::new(self.m.iter(), l - self.len(), &0);
-            let m2iter = RightShiftedSlice::new(&m2.m, m2_shift, 0, l - m2.len());
-            let m3iter = m3.m.iter_mut();
+            let l2 = (m2_shift + WORD_BIT_SIZE - 2) / WORD_BIT_SIZE;
+            if l2 > p && l2 > self.len() && !full_prec {
+                // m2 lays outside of m1's mantissa range and outside the desired precision
+                //
+                // m1 1XXXX00000000   - m1 and trailing zeroes
+                // m2 000000001XXXX   - m2_shift, m2
 
-            for (d, a, b) in izip!(m3iter, m1iter, m2iter) {
-                c = add_carry(*a, b, c, d);
-            }
+                let mut m3 = Mantissa::new(self.len() * WORD_BIT_SIZE)?;
 
-            if full_prec {
-                if c > 0 {
-                    m3.shift_right(1);
+                m3.m.copy_from_slice(&self.m);
 
-                    let l = m3.m.len();
-                    m3.m[l - 1] |= WORD_SIGNIFICANT_BIT;
-                }
-
-                m3.m.trunc_trailing_zeroes();
+                (m3, 0)
             } else {
-                if c > 0 {
-                    let mut g = 0;
-                    let mut n = m2_shift / WORD_BIT_SIZE;
-                    if n > 0 {
-                        for v in m2.m.iter().rev() {
-                            if *v != 0 {
-                                g = 1;
-                                break;
-                            }
-                            n -= 1;
-                            if n == 0 {
-                                break;
-                            }
-                        }
-                    }
-                    m3.m[0] |= g;
+                // m2_shift is smaller than the precision of m1
+                // or m2_shift is smaller than the desired precision
+                //
+                // m1 1XXXXXX00000   - m1 and trailing zeroes
+                // m2 0000001XXXXX   - m2_shift, m2
 
-                    debug_assert!(!m3.round_mantissa(WORD_BIT_SIZE + 1, rm, is_positive)); // it is not possible that rounding overflows, and c > 0 at the same time.
+                let l = self
+                    .len()
+                    .max((m2_shift + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE + m2.len())
+                    + 1;
 
-                    m3.shift_right(1);
+                let mut m3 = Mantissa::new(l * WORD_BIT_SIZE)?;
 
-                    let l = m3.m.len();
-                    m3.m[l - 1] |= WORD_SIGNIFICANT_BIT;
-                } else if m3.round_mantissa(WORD_BIT_SIZE, rm, is_positive) {
-                    c = 1;
+                let m1iter = ExtendedSlice::new(self.m.iter(), l - self.len(), &0);
+                let m2iter = RightShiftedSlice::new(&m2.m, m2_shift, 0, l - m2.len());
+                let m3iter = m3.m.iter_mut();
+
+                for (d, a, b) in izip!(m3iter, m1iter, m2iter) {
+                    c = add_carry(*a, b, c, d);
                 }
 
-                m3.m.trunc_to((l - 1) * WORD_BIT_SIZE);
+                if full_prec {
+                    if c > 0 {
+                        m3.shift_right(1);
+
+                        let l = m3.m.len();
+                        m3.m[l - 1] |= WORD_SIGNIFICANT_BIT;
+                    }
+
+                    m3.m.trunc_trailing_zeroes();
+                } else {
+                    if c > 0 {
+                        m3.shift_right(1);
+
+                        let l = m3.m.len();
+                        m3.m[l - 1] |= WORD_SIGNIFICANT_BIT;
+                    }
+
+                    if m3.len() < p {
+                        let n = m3.len();
+                        m3.m.try_extend(p * WORD_BIT_SIZE)?;
+                        m3.m[n..].fill(0);
+                    } else if m3.len() > p {
+                        let rndres =
+                            m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive); // it is not possible that rounding overflows, and c > 0 at the same time.
+                        debug_assert!(!rndres);
+                        m3.m.trunc_to(p * WORD_BIT_SIZE);
+                    }
+                }
+
+                (m3, c)
             }
-        }
+        };
 
         m3.n = m3.max_bit_len();
 
@@ -375,6 +422,7 @@ impl Mantissa {
     pub fn mul(
         &self,
         m2: &Self,
+        p: usize,
         rm: RoundingMode,
         is_positive: bool,
         full_prec: bool,
@@ -387,21 +435,24 @@ impl Mantissa {
 
         let mut m3 = Mantissa { m: m3, n: 0 };
 
+        let p = Self::bit_len_to_word_len(p);
+
         if full_prec {
             m3.m.trunc_trailing_zeroes();
-            m3.n = m3.m.len() * WORD_BIT_SIZE;
-        } else {
-            let l = self.len().max(m2.len()) * WORD_BIT_SIZE;
-
-            if m3.round_mantissa(m3.m.len() * WORD_BIT_SIZE - l, rm, is_positive) {
+        } else if m3.len() < p {
+            let n = m3.len();
+            m3.m.try_extend(p * WORD_BIT_SIZE)?;
+            m3.m[n..].fill(0)
+        } else if m3.len() > p {
+            if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive) {
                 shift -= 1;
             }
-
-            m3.m.trunc_to(l);
-            m3.n = l;
-
-            debug_assert!(shift >= -1 && shift <= 1); // prevent exponent overflow
+            m3.m.trunc_to(p * WORD_BIT_SIZE);
         }
+
+        debug_assert!(shift >= -1 && shift <= 1); // prevent exponent overflow
+
+        m3.n = m3.m.len() * WORD_BIT_SIZE;
 
         Ok((shift, m3))
     }
@@ -410,16 +461,23 @@ impl Mantissa {
     pub fn div(
         &self,
         m2: &Self,
+        p: usize,
         rm: RoundingMode,
         is_positive: bool,
     ) -> Result<(isize, Self), Error> {
-        let extra_p = 1;
-        let l = m2.len().max(self.len());
-        let k = extra_p + l - self.len() + m2.len();
+        let p = Self::bit_len_to_word_len(p);
 
-        let mut m1 = Self::reserve_new(self.len() + k)?;
-        m1[k..].copy_from_slice(&self.m);
-        m1[..k].fill(0);
+        let extra_p = 1;
+        let k = extra_p + p + m2.len();
+
+        let mut m1 = Self::reserve_new(k)?;
+        if k > self.len() {
+            let l = k - self.len();
+            m1[l..].copy_from_slice(&self.m);
+            m1[..l].fill(0);
+        } else {
+            m1.copy_from_slice(&self.m[..k]);
+        }
 
         let (q, _r) = Self::div_unbalanced(&m1, &m2.m)?;
 
@@ -433,7 +491,7 @@ impl Mantissa {
             e_shift -= 1;
         }
 
-        m3.m.trunc_to(l * WORD_BIT_SIZE);
+        m3.m.trunc_to(p * WORD_BIT_SIZE);
         m3.n = m3.max_bit_len();
 
         debug_assert!(e_shift >= -1 && e_shift <= 1);
@@ -763,13 +821,13 @@ impl Mantissa {
                     }
                 }
                 RoundingMode::ToEven => {
-                    if gt1 || (eq1 && num2 & 1 != 0) {
+                    if gt1 || (eq1 && (num2 & 1) != 0) {
                         // add 1
                         c = true;
                     }
                 }
                 RoundingMode::ToOdd => {
-                    if gt1 || (eq1 && num2 & 1 == 0) {
+                    if gt1 || (eq1 && (num2 & 1) == 0) {
                         // add 1
                         c = true;
                     }

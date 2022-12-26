@@ -817,7 +817,7 @@ impl BigFloat {
     /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    ///  - InvalidArgument: precision is incorrect.
+    ///  - InvalidArgument: the precision is incorrect.
     pub fn set_precision(&mut self, p: usize, rm: RoundingMode) -> Result<(), Error> {
         if let Flavor::Value(v) = &mut self.inner {
             v.set_precision(p, rm)

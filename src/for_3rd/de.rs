@@ -96,7 +96,7 @@ mod tests {
                 .unwrap()
         );
         assert_eq!(
-            "2.99999999999999999983e-1",
+            "2.99999999999999999973e-1",
             from_str::<BigFloatNumber>("\"0.3\"")
                 .unwrap()
                 .format(Radix::Dec, RoundingMode::None)

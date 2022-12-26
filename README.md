@@ -1,6 +1,10 @@
 ![Rust](https://github.com/stencillogic/astro-float/workflows/Rust/badge.svg)
 ![Minimum rustc version](https://img.shields.io/badge/rustc-1.62.1+-lightgray.svg)
 
+_**Note**. This release has a breaking change: now many operations accept the output precision as an argument. Previously, the resulting precision was computed as the maximum precision of the input arguments._
+
+-----------
+
 Astro-float (astronomically large floating point numbers) is a library that implements arbitrary precision floating point numbers purely in Rust.
 
 The library implements the basic operations and functions. It uses classical algorithms such as Karatsuba, Toom-Cook, Schönhage-Strassen algorithm, and others.
@@ -22,6 +26,9 @@ use astro_float::RoundingMode;
 use astro_float::Radix;
 use astro_float::Error;
 
+// Precision with some space for error.
+let p = 1024 + 8;
+
 // Rounding of all operations
 let rm = RoundingMode::ToEven;
 
@@ -30,14 +37,14 @@ let mut cc = Consts::new().unwrap();
 
 // Compute pi: pi = 6*arctan(1/sqrt(3))
 let six = BigFloatNumber::from_word(6, 1).unwrap();
-let three = BigFloatNumber::parse("3.0", Radix::Dec, 1024+8, rm).unwrap();  // +8 bits of precision to cover error
+let three = BigFloatNumber::from_word(3, p).unwrap();
 
-let n = three.sqrt(rm).unwrap();
-let n = n.reciprocal(rm).unwrap();
-let n = n.atan(rm, &mut cc).unwrap();
-let mut pi = six.mul(&n, rm).unwrap();
+let n = three.sqrt(p, rm).unwrap();
+let n = n.reciprocal(p, rm).unwrap();
+let n = n.atan(p, rm, &mut cc).unwrap();
+let mut pi = six.mul(&n, p, rm).unwrap();
 
-// Reduce precision to desired
+// Reduce precision to 1024
 pi.set_precision(1024, rm).unwrap();
 
 // Use library's constant for verifying the result

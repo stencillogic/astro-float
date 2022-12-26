@@ -5,6 +5,7 @@ use crate::common::consts::ONE;
 use crate::common::consts::THREE;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
+use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
@@ -46,13 +47,16 @@ impl SinPolycoeffGen {
 
 impl PolycoeffGen for SinPolycoeffGen {
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-        self.inc = self.inc.add(&ONE, rm)?;
-        let inv_inc = self.one_full_p.div(&self.inc, rm)?;
-        self.fct = self.fct.mul(&inv_inc, rm)?;
+        let p_inc = self.inc.get_mantissa_max_bit_len();
+        let p_one = self.one_full_p.get_mantissa_max_bit_len();
 
-        self.inc = self.inc.add(&ONE, rm)?;
-        let inv_inc = self.one_full_p.div(&self.inc, rm)?;
-        self.fct = self.fct.mul(&inv_inc, rm)?;
+        self.inc = self.inc.add(&ONE, p_inc, rm)?;
+        let inv_inc = self.one_full_p.div(&self.inc, p_one, rm)?;
+        self.fct = self.fct.mul(&inv_inc, p_one, rm)?;
+
+        self.inc = self.inc.add(&ONE, p_inc, rm)?;
+        let inv_inc = self.one_full_p.div(&self.inc, p_one, rm)?;
+        self.fct = self.fct.mul(&inv_inc, p_one, rm)?;
 
         self.sign *= -1;
         if self.sign > 0 {
@@ -90,18 +94,25 @@ impl ArgReductionEstimator for SinArgReductionEstimator {
 }
 
 impl BigFloatNumber {
-    /// Computes the sine of a number. The result is rounded using the rounding mode `rm`.
+    /// Computes the sine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
+    /// Precision is rounded upwards to the word size.
     ///
     /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory.
-    pub fn sin(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-        let arg = self.reduce_trig_arg(cc, RoundingMode::None)?;
+    ///  - InvalidArgument: the precision is incorrect.
+    pub fn sin(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+        let p = round_p(p);
+
+        let mut arg = self.clone()?;
+        arg.set_precision(p + 1, RoundingMode::None)?;
+
+        let arg = arg.reduce_trig_arg(cc, RoundingMode::None)?;
 
         let mut ret = arg.sin_series(RoundingMode::None)?;
 
-        ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+        ret.set_precision(p, rm)?;
 
         Ok(ret)
     }
@@ -111,16 +122,15 @@ impl BigFloatNumber {
         // sin:  x - x^3/3! + x^5/5! - x^7/7! + ...
 
         let p = self.get_mantissa_max_bit_len();
+
         let mut polycoeff_gen = SinPolycoeffGen::new(p)?;
         let (reduction_times, niter) = series_cost_optimize::<
             SinPolycoeffGen,
             SinArgReductionEstimator,
         >(p, &polycoeff_gen, -self.e as isize, 2, false);
 
-        self.set_precision(
-            self.get_mantissa_max_bit_len() + 1 + reduction_times * 3,
-            rm,
-        )?;
+        let p_arg = p + 1 + reduction_times * 3;
+        self.set_precision(p_arg, rm)?;
 
         let arg = if reduction_times > 0 {
             self.sin_arg_reduce(reduction_times, rm)?
@@ -129,8 +139,8 @@ impl BigFloatNumber {
         };
 
         let acc = arg.clone()?; // x
-        let x_step = arg.mul(&arg, rm)?; // x^2
-        let x_first = arg.mul(&x_step, rm)?; // x^3
+        let x_step = arg.mul(&arg, p_arg, rm)?; // x^2
+        let x_first = arg.mul(&x_step, p_arg, rm)?; // x^3
 
         let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
 
@@ -146,8 +156,9 @@ impl BigFloatNumber {
     fn sin_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // sin(3*x) = 3*sin(x) - 4*sin(x)^3
         let mut ret = self.clone()?;
+        let p = ret.get_mantissa_max_bit_len();
         for _ in 0..n {
-            ret = ret.div(&THREE, rm)?;
+            ret = ret.div(&THREE, p, rm)?;
         }
         Ok(ret)
     }
@@ -157,13 +168,14 @@ impl BigFloatNumber {
     fn sin_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // sin(3*x) = 3*sin(x) - 4*sin(x)^3
         let mut sin = self.clone()?;
+        let p = sin.get_mantissa_max_bit_len();
 
         for _ in 0..n {
-            let mut sin_cub = sin.mul(&sin, rm)?;
-            sin_cub = sin_cub.mul(&sin, rm)?;
-            let p1 = sin.mul(&THREE, rm)?;
-            let p2 = sin_cub.mul(&FOUR, rm)?;
-            sin = p1.sub(&p2, rm)?;
+            let mut sin_cub = sin.mul(&sin, p, rm)?;
+            sin_cub = sin_cub.mul(&sin, p, rm)?;
+            let p1 = sin.mul(&THREE, p, rm)?;
+            let p2 = sin_cub.mul(&FOUR, p, rm)?;
+            sin = p1.sub(&p2, p, rm)?;
         }
 
         Ok(sin)
@@ -177,19 +189,20 @@ mod tests {
 
     #[test]
     fn test_sine() {
+        let p = 320;
         let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_word(5, 320).unwrap();
+        let mut n1 = BigFloatNumber::from_word(5, p).unwrap();
         n1.set_exponent(0);
-        let _n2 = n1.sin(rm, &mut cc).unwrap();
+        let _n2 = n1.sin(p, rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
 
         // asymptotic & extrema testing
         let mut half_pi = cc.pi(128, RoundingMode::None).unwrap();
         half_pi.set_exponent(1);
-        half_pi.set_precision(320, RoundingMode::None).unwrap();
+        half_pi.set_precision(p, RoundingMode::None).unwrap();
 
-        let n2 = half_pi.sin(rm, &mut cc).unwrap();
+        let n2 = half_pi.sin(p, rm, &mut cc).unwrap();
         let n3 = BigFloatNumber::parse(
             "F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC487_e-1",
             crate::Radix::Hex,
@@ -202,7 +215,7 @@ mod tests {
 
         // large exponent
         half_pi.set_exponent(256);
-        let n2 = half_pi.sin(rm, &mut cc).unwrap();
+        let n2 = half_pi.sin(p, rm, &mut cc).unwrap();
         let n3 = BigFloatNumber::parse(
             "F.AE195882CABDC16FAF2A733AB99159AF50C47E8B9ED8BA42C5872FF88A52726061B4231170F1BE8_e-1",
             crate::Radix::Hex,
@@ -216,9 +229,10 @@ mod tests {
         assert!(n2.cmp(&n3) == 0);
 
         // small exponent
-        let d1 = BigFloatNumber::parse("-4.6C7B4339E519CAFC9C58869B348D66FD510B4E74F0A6476126B55FD73F5533C7B84C5733C34BB312677AE7C015A666D0_e-17", crate::Radix::Hex, 384, RoundingMode::None).unwrap();
-        let d2 = d1.sin(RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = BigFloatNumber::parse("-4.6C7B4339E519CAFC9C58869B348D66FD510B4E74F0A638F3725423CE43E0D375A6FEE810D77915E6EA2D8EE32EBCF618_e-17", crate::Radix::Hex, 384, RoundingMode::None).unwrap();
+        let p = 384;
+        let d1 = BigFloatNumber::parse("-4.6C7B4339E519CAFC9C58869B348D66FD510B4E74F0A6476126B55FD73F5533C7B84C5733C34BB312677AE7C015A666D0_e-17", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let d2 = d1.sin(p, RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = BigFloatNumber::parse("-4.6C7B4339E519CAFC9C58869B348D66FD510B4E74F0A638F3725423CE43E0D375A6FEE810D77915E6EA2D8EE32EBCF618_e-17", crate::Radix::Hex, p, RoundingMode::None).unwrap();
 
         // println!("{:?}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
@@ -230,16 +244,17 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn sine_perf() {
+        let p = 133;
         let mut cc = Consts::new().unwrap();
         let mut n = vec![];
         for _ in 0..10000 {
-            n.push(BigFloatNumber::random_normal(133, -5, 5).unwrap());
+            n.push(BigFloatNumber::random_normal(p, -5, 5).unwrap());
         }
 
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let _f = ni.sin(RoundingMode::ToEven, &mut cc).unwrap();
+                let _f = ni.sin(p, RoundingMode::ToEven, &mut cc).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

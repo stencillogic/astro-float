@@ -53,8 +53,11 @@ pub struct ECache {
 impl ECache {
     fn calc_e(p: &BigFloatNumber, q: &BigFloatNumber) -> Result<BigFloatNumber, Error> {
         // 1 + pk / qk
-        let f0 = p.div(q, RoundingMode::None)?;
-        f0.add(&ONE, RoundingMode::None)
+        let prec = p
+            .get_mantissa_max_bit_len()
+            .max(q.get_mantissa_max_bit_len());
+        let f0 = p.div(q, prec, RoundingMode::None)?;
+        f0.add(&ONE, prec, RoundingMode::None)
     }
 
     pub fn new() -> Result<Self, Error> {

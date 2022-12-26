@@ -1,21 +1,25 @@
 //! Cube root computation.
 
 use crate::{
-    common::util::log2_ceil,
+    common::util::{log2_ceil, round_p},
     defs::{Error, EXPONENT_MAX, EXPONENT_MIN},
     num::BigFloatNumber,
     Exponent, RoundingMode,
 };
 
 impl BigFloatNumber {
-    /// Computes the cube root of a number. The result is rounded using the rounding mode `rm`.
+    /// Computes the cube root of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+    /// Precision is rounded upwards to the word size.
     ///
     /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory.
-    pub fn cbrt(&self, rm: RoundingMode) -> Result<Self, Error> {
+    ///  - InvalidArgument: the precision is incorrect.
+    pub fn cbrt(&self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
+        let p = round_p(p);
+
         if self.is_zero() {
-            return self.clone();
+            return Self::new(p);
         }
 
         let mut x = self.clone()?;
@@ -24,25 +28,26 @@ impl BigFloatNumber {
         let e = self.get_exponent() as isize - e;
         let e_shift = e % 3 - 3;
 
-        x.set_precision(x.get_mantissa_max_bit_len() + 1, RoundingMode::None)?;
+        let p_ext = p + 1;
+        x.set_precision(p_ext, RoundingMode::None)?;
         x.set_exponent(e_shift as Exponent);
 
-        let mut iters = log2_ceil(x.get_mantissa_max_bit_len()) * 2 / 3 + 3;
         let mut ret = x.clone()?;
 
+        let mut iters = log2_ceil(p) * 2 / 3 + 4;
         while iters > 0 {
             ret = x.cbrt_step(ret)?;
             iters -= 1;
         }
 
-        ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+        ret.set_precision(p, rm)?;
 
         let mut e_corr = ret.get_exponent() as isize + ((e as isize - e_shift as isize) / 3);
 
         if e_corr < EXPONENT_MIN as isize {
             let is_positive = ret.is_positive();
             if !Self::process_subnormal(&mut ret.m, &mut e_corr, rm, is_positive) {
-                return Self::new(self.get_mantissa_max_bit_len());
+                return Self::new(p);
             }
         }
 
@@ -58,21 +63,23 @@ impl BigFloatNumber {
     fn cbrt_step(&self, mut xn: Self) -> Result<Self, Error> {
         // x(n+1) = 2 * x(n) * (x(n)^3 / 2 + self) / (2 * x(n)^3 + self)
 
-        let xxn = xn.mul(&xn, RoundingMode::None)?;
-        let mut xxxn = xxn.mul(&xn, RoundingMode::None)?;
+        let p = self.get_mantissa_max_bit_len();
+
+        let xxn = xn.mul(&xn, p, RoundingMode::None)?;
+        let mut xxxn = xxn.mul(&xn, p, RoundingMode::None)?;
 
         let e = xxxn.get_exponent();
 
         xxxn.set_exponent(e - 1);
-        let d1 = xxxn.add(self, RoundingMode::None)?;
+        let d1 = xxxn.add(self, p, RoundingMode::None)?;
 
         xn.set_exponent(xn.get_exponent() + 1);
-        let d2 = xn.mul(&d1, RoundingMode::None)?;
+        let d2 = xn.mul(&d1, p, RoundingMode::None)?;
 
         xxxn.set_exponent(e + 1);
-        let d3 = xxxn.add(self, RoundingMode::None)?;
+        let d3 = xxxn.add(self, p, RoundingMode::None)?;
 
-        d2.div(&d3, RoundingMode::None)
+        d2.div(&d3, p, RoundingMode::None)
     }
 }
 
@@ -82,7 +89,7 @@ mod tests {
     use super::*;
     use crate::{
         common::consts::ONE,
-        defs::{EXPONENT_MAX, EXPONENT_MIN},
+        defs::{EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE},
         Exponent,
     };
 
@@ -100,15 +107,15 @@ mod tests {
         return; */
 
         let mut eps = ONE.clone().unwrap();
-        let prec = 320;
 
         for _ in 0..1000 {
+            let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
             let d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
-            let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
+            let d2 = d1.cbrt(prec, RoundingMode::ToEven).unwrap();
             let d3 = d2
-                .mul(&d2, RoundingMode::ToEven)
+                .mul(&d2, prec, RoundingMode::ToEven)
                 .unwrap()
-                .mul(&d2, RoundingMode::ToEven)
+                .mul(&d2, prec, RoundingMode::ToEven)
                 .unwrap();
 
             eps.set_exponent(d1.get_exponent() - prec as Exponent + 3);
@@ -118,7 +125,7 @@ mod tests {
             // println!("d3 {:?}", d3.format(crate::Radix::Dec, RoundingMode::None).unwrap());
 
             assert!(
-                d1.sub(&d3, RoundingMode::ToEven)
+                d1.sub(&d3, prec, RoundingMode::ToEven)
                     .unwrap()
                     .abs()
                     .unwrap()
@@ -128,16 +135,17 @@ mod tests {
         }
 
         // MAX
+        let prec = 320;
         let d1 = BigFloatNumber::max_value(prec).unwrap();
-        let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
+        let d2 = d1.cbrt(prec, RoundingMode::ToEven).unwrap();
         let d3 = d2
-            .mul(&d2, RoundingMode::ToEven)
+            .mul(&d2, prec, RoundingMode::ToEven)
             .unwrap()
-            .mul(&d2, RoundingMode::ToEven)
+            .mul(&d2, prec, RoundingMode::ToEven)
             .unwrap();
         eps.set_exponent(d1.get_exponent() - prec as Exponent + 3);
         assert!(
-            d1.sub(&d3, RoundingMode::ToEven)
+            d1.sub(&d3, prec, RoundingMode::ToEven)
                 .unwrap()
                 .abs()
                 .unwrap()
@@ -147,15 +155,15 @@ mod tests {
 
         // MIN
         let d1 = BigFloatNumber::min_value(prec).unwrap();
-        let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
+        let d2 = d1.cbrt(prec, RoundingMode::ToEven).unwrap();
         let d3 = d2
-            .mul(&d2, RoundingMode::ToEven)
+            .mul(&d2, prec, RoundingMode::ToEven)
             .unwrap()
-            .mul(&d2, RoundingMode::ToEven)
+            .mul(&d2, prec, RoundingMode::ToEven)
             .unwrap();
         eps.set_exponent(d1.get_exponent() - prec as Exponent + 3);
         assert!(
-            d1.sub(&d3, RoundingMode::ToEven)
+            d1.sub(&d3, prec, RoundingMode::ToEven)
                 .unwrap()
                 .abs()
                 .unwrap()
@@ -165,15 +173,15 @@ mod tests {
 
         // MIN POSITIVE
         let d1 = BigFloatNumber::min_positive(prec).unwrap();
-        let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
+        let d2 = d1.cbrt(prec, RoundingMode::ToEven).unwrap();
         let d3 = d2
-            .mul(&d2, RoundingMode::ToEven)
+            .mul(&d2, prec, RoundingMode::ToEven)
             .unwrap()
-            .mul(&d2, RoundingMode::ToEven)
+            .mul(&d2, prec, RoundingMode::ToEven)
             .unwrap();
         let eps = BigFloatNumber::min_positive(prec).unwrap();
         assert!(
-            d1.sub(&d3, RoundingMode::ToEven)
+            d1.sub(&d3, prec, RoundingMode::ToEven)
                 .unwrap()
                 .abs()
                 .unwrap()
@@ -182,18 +190,19 @@ mod tests {
         );
 
         // near 1
+        let p = 320;
         let d1 = BigFloatNumber::parse(
             "F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DC85F7E77EC4872DC85F7E77EC487_e-1",
             crate::Radix::Hex,
-            320,
+            p,
             RoundingMode::None,
         )
         .unwrap();
-        let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
+        let d2 = d1.cbrt(p, RoundingMode::ToEven).unwrap();
         let d3 = BigFloatNumber::parse(
             "F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFB9ED752A27F96D7B9ED752A27F96D8_e-1",
             crate::Radix::Hex,
-            320,
+            p,
             RoundingMode::None,
         )
         .unwrap();
@@ -205,15 +214,15 @@ mod tests {
         let d1 = BigFloatNumber::parse(
             "1.00000000000000000000000000000000000000000000000000000000000000002DC85F7E77EC487C",
             crate::Radix::Hex,
-            320,
+            p,
             RoundingMode::None,
         )
         .unwrap();
-        let d2 = d1.cbrt(RoundingMode::ToEven).unwrap();
+        let d2 = d1.cbrt(p, RoundingMode::ToEven).unwrap();
         let d3 = BigFloatNumber::parse(
             "1.00000000000000000000000000000000000000000000000000000000000000000F42CA7F7D4EC2D4",
             crate::Radix::Hex,
-            320,
+            p,
             RoundingMode::None,
         )
         .unwrap();
@@ -228,8 +237,9 @@ mod tests {
     #[cfg(feature = "std")]
     fn cbrt_perf() {
         let mut n = vec![];
+        let p = 132;
         for _ in 0..100000 {
-            let mut n0 = BigFloatNumber::random_normal(132, -0, 0).unwrap();
+            let mut n0 = BigFloatNumber::random_normal(p, -0, 0).unwrap();
             n0.set_sign(Sign::Pos);
             n.push(n0);
         }
@@ -237,7 +247,7 @@ mod tests {
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let _f = ni.cbrt(RoundingMode::ToEven).unwrap();
+                let _f = ni.cbrt(p, RoundingMode::ToEven).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

@@ -3,6 +3,7 @@ mod ln10;
 mod ln2;
 mod pi;
 
+use crate::common::util::round_p;
 use crate::ops::consts::e::ECache;
 use crate::ops::consts::ln10::Ln10Cache;
 use crate::ops::consts::ln2::Ln2Cache;
@@ -37,42 +38,50 @@ impl Consts {
     }
 
     /// Returns the value of the pi number with precision `p` using rounding mode `rm`.
+    /// Precision is rounded upwards to the word size.
     ///
     /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    ///  - InvalidArgument: precision is incorrect.
+    ///  - InvalidArgument: the precision is incorrect.
     pub fn pi(&mut self, p: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
+        let p = round_p(p);
         self.pi.for_prec(p, rm)
     }
 
     /// Returns the value of the Euler number with precision `p` using rounding mode `rm`.
+    /// Precision is rounded upwards to the word size.
     ///
     /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    ///  - InvalidArgument: precision is incorrect.
+    ///  - InvalidArgument: the precision is incorrect.
     pub fn e(&mut self, p: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
+        let p = round_p(p);
         self.e.for_prec(p, rm)
     }
 
     /// Returns the value of the natural logarithm of 2 with precision `p` using rounding mode `rm`.
+    /// Precision is rounded upwards to the word size.
     ///
     /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    ///  - InvalidArgument: precision is incorrect.
+    ///  - InvalidArgument: the precision is incorrect.
     pub fn ln_2(&mut self, p: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
+        let p = round_p(p);
         self.ln2.for_prec(p, rm)
     }
 
     /// Returns the value of the natural logarithm of 10 with precision `p` using rounding mode `rm`.
+    /// Precision is rounded upwards to the word size.
     ///
     /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    ///  - InvalidArgument: precision is incorrect.
+    ///  - InvalidArgument: the precision is incorrect.
     pub fn ln_10(&mut self, p: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
+        let p = round_p(p);
         self.ln10.for_prec(p, rm)
     }
 }

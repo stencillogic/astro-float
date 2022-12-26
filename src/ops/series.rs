@@ -150,9 +150,14 @@ fn series_rectangular<T: PolycoeffGen>(
 ) -> Result<BigFloatNumber, Error> {
     debug_assert!(niter >= 4);
 
-    let mut acc = BigFloatNumber::new(add.get_mantissa_max_bit_len())?;
-    // build cache
+    let p = add
+        .get_mantissa_max_bit_len()
+        .max(x_first.get_mantissa_max_bit_len())
+        .max(x_step.get_mantissa_max_bit_len());
 
+    let mut acc = BigFloatNumber::new(p)?;
+
+    // build cache
     let mut cache = SmallVec::<[BigFloatNumber; MAX_CACHE]>::new();
     let sqrt_iter = sqrt_int(niter as u32) as usize;
     let cache_sz = MAX_CACHE.min(sqrt_iter);
@@ -163,20 +168,20 @@ fn series_rectangular<T: PolycoeffGen>(
 
     for _ in 0..cache_sz {
         cache.push(x_pow.clone()?);
-        x_pow = x_pow.mul(&x_step, rm)?;
+        x_pow = x_pow.mul(&x_step, p, rm)?;
     }
 
     // run computation
-    let poly_val = compute_row(acc.get_mantissa_max_bit_len(), &cache, polycoeff_gen, rm)?;
-    acc = acc.add(&poly_val, rm)?;
+    let poly_val = compute_row(p, &cache, polycoeff_gen, rm)?;
+    acc = acc.add(&poly_val, p, rm)?;
     let mut terminal_pow = x_pow.clone()?;
     niter -= cache_sz;
 
     loop {
-        let poly_val = compute_row(acc.get_mantissa_max_bit_len(), &cache, polycoeff_gen, rm)?;
-        let part = poly_val.mul(&terminal_pow, rm)?;
-        acc = acc.add(&part, rm)?;
-        terminal_pow = terminal_pow.mul(&x_pow, rm)?;
+        let poly_val = compute_row(p, &cache, polycoeff_gen, rm)?;
+        let part = poly_val.mul(&terminal_pow, p, rm)?;
+        acc = acc.add(&part, p, rm)?;
+        terminal_pow = terminal_pow.mul(&x_pow, p, rm)?;
         niter -= cache_sz;
 
         if niter < cache_sz {
@@ -185,9 +190,9 @@ fn series_rectangular<T: PolycoeffGen>(
     }
     drop(cache);
 
-    acc = acc.mul(&x_first, rm)?;
-    terminal_pow = terminal_pow.mul(&x_first, rm)?;
-    acc = acc.add(&add, rm)?;
+    acc = acc.mul(&x_first, p, rm)?;
+    terminal_pow = terminal_pow.mul(&x_first, p, rm)?;
+    acc = acc.add(&add, p, rm)?;
 
     acc = if niter < MAX_CACHE * 10 && !polycoeff_gen.is_div() {
         // probably not too many iterations left
@@ -208,12 +213,17 @@ fn series_linear<T: PolycoeffGen>(
     polycoeff_gen: &mut T,
     rm: RoundingMode,
 ) -> Result<BigFloatNumber, Error> {
+    let p = acc
+        .get_mantissa_max_bit_len()
+        .max(x_first.get_mantissa_max_bit_len())
+        .max(x_step.get_mantissa_max_bit_len());
+
     let is_div = polycoeff_gen.is_div();
     let mut x_pow = x_first;
 
     loop {
         let coeff = polycoeff_gen.next(rm)?;
-        let part = if is_div { x_pow.div(coeff, rm) } else { x_pow.mul(coeff, rm) }?;
+        let part = if is_div { x_pow.div(coeff, p, rm) } else { x_pow.mul(coeff, p, rm) }?;
 
         if part.get_exponent() as isize
             <= acc.get_exponent() as isize - acc.get_mantissa_max_bit_len() as isize
@@ -221,8 +231,8 @@ fn series_linear<T: PolycoeffGen>(
             break;
         }
 
-        acc = acc.add(&part, rm)?;
-        x_pow = x_pow.mul(&x_step, rm)?;
+        acc = acc.add(&part, p, rm)?;
+        x_pow = x_pow.mul(&x_step, p, rm)?;
     }
 
     Ok(acc)
@@ -240,22 +250,16 @@ fn compute_row<T: PolycoeffGen>(
     let mut acc = BigFloatNumber::new(p)?;
     let coeff = polycoeff_gen.next(rm)?;
     if is_div {
-        let r = if coeff.get_mantissa_max_bit_len() < p {
-            let mut c = coeff.clone()?;
-            c.set_precision(p, rm)?;
-            c.reciprocal(rm)
-        } else {
-            coeff.reciprocal(rm)
-        }?;
-        acc = acc.add(&r, rm)?;
+        let r = coeff.reciprocal(p, rm)?;
+        acc = acc.add(&r, p, rm)?;
     } else {
-        acc = acc.add(coeff, rm)?;
+        acc = acc.add(coeff, p, rm)?;
     }
 
     for x_pow in cache {
         let coeff = polycoeff_gen.next(rm)?;
-        let add = if is_div { x_pow.div(coeff, rm) } else { x_pow.mul(coeff, rm) }?;
-        acc = acc.add(&add, rm)?;
+        let add = if is_div { x_pow.div(coeff, p, rm) } else { x_pow.mul(coeff, p, rm) }?;
+        acc = acc.add(&add, p, rm)?;
     }
 
     Ok(acc)
@@ -274,12 +278,17 @@ fn series_horner<T: PolycoeffGen>(
     debug_assert!(x_step.e <= 0);
     debug_assert!(!polycoeff_gen.is_div());
 
+    let p = add
+        .get_mantissa_max_bit_len()
+        .max(x_first.get_mantissa_max_bit_len())
+        .max(x_step.get_mantissa_max_bit_len());
+
     // determine number of parts and cache plynomial coeffs.
     let mut cache = SmallVec::<[BigFloatNumber; MAX_CACHE]>::new();
     let mut x_p = (-x_first.e) as isize + (-x_step.e) as isize;
     let mut coef_p = 0;
 
-    while x_p + coef_p < add.get_mantissa_max_bit_len() as isize - add.get_exponent() as isize {
+    while x_p + coef_p < p as isize - add.get_exponent() as isize {
         let coeff = polycoeff_gen.next(rm)?;
         coef_p = (-coeff.e) as isize;
         x_p += (-x_step.e) as isize;
@@ -290,12 +299,12 @@ fn series_horner<T: PolycoeffGen>(
     let mut acc = last_coeff.clone()?;
 
     for coeff in cache.iter().rev() {
-        acc = acc.mul(&x_step, rm)?;
-        acc = acc.add(coeff, rm)?;
+        acc = acc.mul(&x_step, p, rm)?;
+        acc = acc.add(coeff, p, rm)?;
     }
 
-    acc = acc.mul(&x_first, rm)?;
-    acc = acc.add(&add, rm)?;
+    acc = acc.mul(&x_first, p, rm)?;
+    acc = acc.add(&add, p, rm)?;
 
     Ok(acc)
 }
@@ -320,7 +329,12 @@ fn ndim_series<T: PolycoeffGen>(
 ) -> Result<BigFloatNumber, Error> {
     debug_assert!((2..=8).contains(&n));
 
-    let mut acc = BigFloatNumber::new(add.get_mantissa_max_bit_len())?;
+    let p = add
+        .get_mantissa_max_bit_len()
+        .max(x_factor.get_mantissa_max_bit_len())
+        .max(x_step.get_mantissa_max_bit_len());
+
+    let mut acc = BigFloatNumber::new(p)?;
 
     // build cache
     let mut cache = SmallVec::<[BigFloatNumber; MAX_CACHE]>::new();
@@ -333,7 +347,7 @@ fn ndim_series<T: PolycoeffGen>(
 
         for _ in 0..cache_dim_sz {
             cache.push(x_pow.clone()?);
-            x_pow = x_pow.mul(&cache_step, rm)?;
+            x_pow = x_pow.mul(&cache_step, p, rm)?;
         }
     }
 
@@ -346,7 +360,7 @@ fn ndim_series<T: PolycoeffGen>(
         cache_dim_sz,
         polycoeff_gen,
     )?;
-    acc = acc.add(&poly_val, rm)?;
+    acc = acc.add(&poly_val, p, rm)?;
     let mut terminal_pow = x_pow.clone()?;
 
     for _ in 1..cache_dim_sz {
@@ -358,14 +372,14 @@ fn ndim_series<T: PolycoeffGen>(
             cache_dim_sz,
             polycoeff_gen,
         )?;
-        let part = poly_val.mul(&terminal_pow, rm)?;
-        acc = acc.add(&part, rm)?;
-        terminal_pow = terminal_pow.mul(&x_pow, rm)?;
+        let part = poly_val.mul(&terminal_pow, p, rm)?;
+        acc = acc.add(&part, p, rm)?;
+        terminal_pow = terminal_pow.mul(&x_pow, p, rm)?;
     }
 
-    acc = acc.mul(&x_factor, rm)?;
-    terminal_pow = terminal_pow.mul(&x_factor, rm)?;
-    acc = acc.add(&add, rm)?;
+    acc = acc.mul(&x_factor, p, rm)?;
+    terminal_pow = terminal_pow.mul(&x_factor, p, rm)?;
+    acc = acc.add(&add, p, rm)?;
     acc = series_linear(acc, terminal_pow, x_step, polycoeff_gen, rm)?;
 
     Ok(acc)
@@ -385,13 +399,13 @@ fn compute_cube<T: PolycoeffGen>(
         let cache_dim_sz = cache_dim_sz;
         // no need to multityply the returned coefficient of the first cube by 1.
         let poly_val = compute_cube(p, n - 1, rm, cache, cache_dim_sz, polycoeff_gen)?;
-        acc = acc.add(&poly_val, rm)?;
+        acc = acc.add(&poly_val, p, rm)?;
 
         // the remaining require multiplication
         for x_pow in &cache[cache_dim_sz * (n - 1)..cache_dim_sz * n] {
             let poly_val = compute_cube(p, n - 1, rm, cache, cache_dim_sz, polycoeff_gen)?;
-            let add = x_pow.mul(&poly_val, rm)?;
-            acc = acc.add(&add, rm)?;
+            let add = x_pow.mul(&poly_val, p, rm)?;
+            acc = acc.add(&add, p, rm)?;
         }
 
         Ok(acc)

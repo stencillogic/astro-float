@@ -110,7 +110,7 @@ mod tests {
                     //println!("\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}", n, s, d, n.format(Radix::Hex, RoundingMode::ToEven), d.format(Radix::Hex, RoundingMode::ToEven));
                     eps.set_exponent(n.get_exponent() - 160);
                     assert!(
-                        d.sub(&n, RoundingMode::ToEven)
+                        d.sub(&n, d.get_mantissa_max_bit_len(), RoundingMode::ToEven)
                             .unwrap()
                             .abs()
                             .unwrap()

@@ -2,10 +2,25 @@
 
 use crate::common::consts::ONE;
 use crate::common::util::{count_leading_ones, count_leading_zeroes_skip_first, log2_ceil};
-use crate::defs::{RoundingMode, EXPONENT_MAX, EXPONENT_MIN};
+use crate::defs::{RoundingMode, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
 use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
 use crate::{Exponent, Sign};
+
+/* // test for debugging
+#[test]
+fn ttt() {
+    let n = BigFloatNumber::from_raw_parts(&[13835058055282163712], 64, Sign::Pos, 3).unwrap();
+    let m = BigFloatNumber::from_raw_parts(&[6585903223086643450, 16094311991002073707, 17000984990068853901], 192, Sign::Neg, -192).unwrap();
+
+    let _z = n.add(&m, 192, RoundingMode::None).unwrap();
+
+    let mut cc = Consts::new().unwrap();
+    let n = BigFloatNumber::parse("-1.00101000010101001110101011101000111100001101000100101000101011001101011011011011100111010101000101111011010101001110100011011100111111100010110011001011111001101110010010100110100100101100110011111111000000100101010011100010011111000111110111101011101101110111001110111000111011010101100111011110000001111000111100011010110000011010001100011101000010100111110000111011001010110111100101100001111010100101000101010101111001010100011000011000101001111010111000101111001000010101100000000000100100010010010000010110000010001001000110111001110011010010111001100100100001100111000011101011110001100000001101011111100101100101001000100101010100011100110001101010010100110110010000011000001001100111000110001111101110110001001101100011001100111101010010100110111110100001010110001000100101110100001111011111101000000010000101001111011000000010111010111011111101010100000011100100100111001110010111000010000100000001010101001011100111010001011010111110100110011100011101011100110010001111101110000001110010101011010000101001001111111111100001011001010011111100000100110101000011111000001110100110010000000000111000001101000111101000101011000101000011110111101001010111001101111001010010101101110010111000100000111000010010011001101001001110001111010101110011100101111101100110010111101010101111100100001110101100111010011010010100001100000101010011010001000010100000101011011000010010001000000110111110011111111011001000011000011010111110101111010000000001101111110011110111100011001110100100000011101100111011000011011001001011101110110101001011110001001001000100011100100000111111100111000100101100000010101001110010111001110000101000001001110100110100000101101110110001100110111001011011100010101010100101101100110011010110001000111011101000101010100011011000101010111010110001010001001001101100100110111100011100010111101001011110111100100111000000101111110010101100011011001001100100100110100000111001001101100000011001100001110001100011100111000011011100101110001110010000111111000111001000001010011100001111110000100010000111000010010001010001001010011111000000101010111111101010000101000011110011001000100111000e-1001", crate::Radix::Bin, 2112, RoundingMode::None).unwrap();
+    let v = n.atan(2112, RoundingMode::None, &mut cc).unwrap();
+
+    println!("{}", v.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+} */
 
 #[test]
 fn test_ln_exp() {
@@ -24,25 +39,24 @@ fn test_ln_exp() {
     return; */
 
     for _ in 0..1000 {
-        // avoid subnormal numbers
-        let prec = rand::random::<usize>() % 1024 + 64;
+        let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let mut d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
         d1.set_sign(Sign::Pos);
 
-        let d2 = d1.ln(RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = d2.exp(RoundingMode::ToEven, &mut cc).unwrap();
+        let d2 = d1.ln(prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = d2.exp(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
         eps.set_exponent(
             d1.get_exponent() - prec as Exponent
                 + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent,
         );
 
-        //println!("{}", d1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
-        //println!("{}", d2.format(crate::Radix::Dec, RoundingMode::None).unwrap());
-        //println!("{}", d3.format(crate::Radix::Dec, RoundingMode::None).unwrap());
+        // println!("{}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
         assert!(
-            d1.sub(&d3, RoundingMode::ToEven)
+            d1.sub(&d3, prec, RoundingMode::ToEven)
                 .unwrap()
                 .abs()
                 .unwrap()
@@ -59,16 +73,16 @@ fn test_pow() {
     let mut cc = Consts::new().unwrap();
 
     for _ in 0..1000 {
-        let prec = rand::random::<usize>() % 1024 + 64;
+        let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let mut d1 = BigFloatNumber::random_normal(prec, -5, 5).unwrap();
         d1.set_sign(Sign::Pos);
         let d2 = BigFloatNumber::random_normal(prec, -5, 5).unwrap();
 
-        let d3 = d1.pow(&d2, RoundingMode::ToEven, &mut cc).unwrap();
-        let d22 = d2.reciprocal(RoundingMode::ToEven).unwrap();
-        let d4 = d3.pow(&d22, RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = d1.pow(&d2, prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let d22 = d2.reciprocal(prec, RoundingMode::ToEven).unwrap();
+        let d4 = d3.pow(&d22, prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-        eps.set_exponent(d2.get_exponent() - prec as Exponent + 15);
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + d2.get_exponent().abs() + 3);
 
         // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
@@ -76,7 +90,7 @@ fn test_pow() {
         // println!("d4 {}", d4.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
         assert!(
-            d4.sub(&d1, RoundingMode::ToEven)
+            d4.sub(&d1, prec, RoundingMode::ToEven)
                 .unwrap()
                 .abs()
                 .unwrap()
@@ -93,17 +107,17 @@ fn test_log2_log10() {
     let mut cc = Consts::new().unwrap();
 
     for _ in 0..1000 {
-        let prec = rand::random::<usize>() % 1024 + 64;
+        let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let mut d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
         d1.set_sign(Sign::Pos);
 
-        let d2 = d1.log2(RoundingMode::ToEven, &mut cc).unwrap();
+        let d2 = d1.log2(prec, RoundingMode::ToEven, &mut cc).unwrap();
         let two = BigFloatNumber::from_word(2, prec).unwrap();
-        let d3 = two.pow(&d2, RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = two.pow(&d2, prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-        let d4 = d1.log10(RoundingMode::ToEven, &mut cc).unwrap();
+        let d4 = d1.log10(prec, RoundingMode::ToEven, &mut cc).unwrap();
         let ten = BigFloatNumber::from_word(10, prec).unwrap();
-        let d5 = ten.pow(&d4, RoundingMode::ToEven, &mut cc).unwrap();
+        let d5 = ten.pow(&d4, prec, RoundingMode::ToEven, &mut cc).unwrap();
 
         eps.set_exponent(
             d1.get_exponent() - prec as Exponent
@@ -116,7 +130,7 @@ fn test_log2_log10() {
         // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
         assert!(
-            d3.sub(&d1, RoundingMode::ToEven)
+            d3.sub(&d1, prec, RoundingMode::ToEven)
                 .unwrap()
                 .abs()
                 .unwrap()
@@ -124,7 +138,7 @@ fn test_log2_log10() {
                 <= 0
         );
         assert!(
-            d5.sub(&d1, RoundingMode::ToEven)
+            d5.sub(&d1, prec, RoundingMode::ToEven)
                 .unwrap()
                 .abs()
                 .unwrap()
@@ -141,14 +155,14 @@ fn test_log() {
     let mut cc = Consts::new().unwrap();
 
     for _ in 0..1000 {
-        let prec = rand::random::<usize>() % 1024 + 64;
+        let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let mut d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
         let mut b = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
         d1.set_sign(Sign::Pos);
         b.set_sign(Sign::Pos);
 
-        let d2 = d1.log(&b, RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = b.pow(&d2, RoundingMode::ToEven, &mut cc).unwrap();
+        let d2 = d1.log(&b, prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = b.pow(&d2, prec, RoundingMode::ToEven, &mut cc).unwrap();
 
         eps.set_exponent(
             d1.get_exponent() - prec as Exponent
@@ -161,7 +175,7 @@ fn test_log() {
         // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
         assert!(
-            d3.sub(&d1, RoundingMode::ToEven)
+            d3.sub(&d1, prec, RoundingMode::ToEven)
                 .unwrap()
                 .abs()
                 .unwrap()
@@ -179,7 +193,7 @@ fn test_sin_asin() {
 
     let mut cc = Consts::new().unwrap();
 
-    let pi = cc.pi(1024 + 64, RoundingMode::None).unwrap();
+    let pi = cc.pi(33 * WORD_BIT_SIZE, RoundingMode::None).unwrap();
 
     let mut half_pi = pi.clone().unwrap();
     half_pi.set_exponent(0);
@@ -199,22 +213,22 @@ fn test_sin_asin() {
 
     return; */
 
-    for _ in 0..1000 {
-        let prec = rand::random::<usize>() % 1024 + 64;
+    for _ in 0..10000 {
+        let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let mut d1 = BigFloatNumber::random_normal(prec, -100, 2).unwrap();
 
         // -pi/2, pi/2
         while d1.abs().unwrap().cmp(&half_pi) > 0 {
             if d1.is_positive() {
-                d1 = d1.sub(&half_pi, RoundingMode::None).unwrap();
+                d1 = d1.sub(&half_pi, prec, RoundingMode::None).unwrap();
             }
             if d1.is_negative() {
-                d1 = d1.add(&half_pi, RoundingMode::None).unwrap();
+                d1 = d1.add(&half_pi, prec, RoundingMode::None).unwrap();
             }
         }
 
-        let d2 = d1.sin(RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = d2.asin(RoundingMode::ToEven, &mut cc).unwrap();
+        let d2 = d1.sin(prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = d2.asin(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
         // println!("{}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
@@ -223,7 +237,7 @@ fn test_sin_asin() {
         eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
 
         assert!(
-            d1.sub(&d3, RoundingMode::ToEven)
+            d1.sub(&d3, prec, RoundingMode::ToEven)
                 .unwrap()
                 .abs()
                 .unwrap()
@@ -233,30 +247,30 @@ fn test_sin_asin() {
     }
 
     for _ in 0..1000 {
-        let prec = rand::random::<usize>() % 1024 + 64;
+        let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let mut d1 = BigFloatNumber::random_normal(prec, -100, 2).unwrap();
 
         // -pi, -pi/2 and pi/2, pi
         while d1.abs().unwrap().cmp(&half_pi) < 0 {
             if d1.is_positive() {
-                d1 = d1.add(&half_pi, RoundingMode::None).unwrap();
+                d1 = d1.add(&half_pi, prec, RoundingMode::None).unwrap();
             }
             if d1.is_negative() {
-                d1 = d1.sub(&half_pi, RoundingMode::None).unwrap();
+                d1 = d1.sub(&half_pi, prec, RoundingMode::None).unwrap();
             }
         }
 
         let arg = if d1.is_positive() {
-            pi.sub(&d1, RoundingMode::ToEven).unwrap()
+            pi.sub(&d1, prec, RoundingMode::ToEven).unwrap()
         } else {
-            pi.add(&d1, RoundingMode::ToEven).unwrap()
+            pi.add(&d1, prec, RoundingMode::ToEven).unwrap()
         };
 
-        let d2 = arg.sin(RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = d2.asin(RoundingMode::ToEven, &mut cc).unwrap();
+        let d2 = arg.sin(prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = d2.asin(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
         if ONE
-            .sub(&d2.abs().unwrap(), RoundingMode::None)
+            .sub(&d2.abs().unwrap(), prec, RoundingMode::None)
             .unwrap()
             .cmp(&thres)
             >= 0
@@ -273,7 +287,7 @@ fn test_sin_asin() {
             assert!(
                 d1.abs()
                     .unwrap()
-                    .sub(&d3, RoundingMode::ToEven)
+                    .sub(&d3, prec, RoundingMode::ToEven)
                     .unwrap()
                     .abs()
                     .unwrap()
@@ -282,7 +296,7 @@ fn test_sin_asin() {
                     || arg
                         .abs()
                         .unwrap()
-                        .sub(&d3, RoundingMode::ToEven)
+                        .sub(&d3, prec, RoundingMode::ToEven)
                         .unwrap()
                         .abs()
                         .unwrap()
@@ -301,7 +315,7 @@ fn test_cos_acos() {
 
     let mut cc = Consts::new().unwrap();
 
-    let pi = cc.pi(1024 + 64, RoundingMode::None).unwrap();
+    let pi = cc.pi(33 * WORD_BIT_SIZE, RoundingMode::None).unwrap();
 
     /*     let d1 = BigFloatNumber::from_raw_parts(&[1456218531, 703164634, 3869174995, 728180707, 794142643, 1990575249, 415454075, 2075230275, 2346793028, 681445537, 145621716, 775498281, 2975140815, 876411724, 3147375501, 2338110642, 3577417010, 3095720384, 2063787162, 1985481632, 168798015, 2477960193, 2032112066, 2819367426, 3040156967, 1564854250, 1142645696, 4153181427, 2939931561, 2569220972, 3593998760, 3295389666, 910688784, 3044919667, 4232521584, 3705749987, 3872951028, 388358967, 758972985, 1173372405, 3549434686, 2065917958, 3850118209, 2075337935, 1139277028, 1620627819, 3530770031, 4204162626, 85810630, 561952971, 2901114392, 1321621731, 716297011, 315030023, 1192364819, 3159540812, 1379143592, 1329431425, 760869437, 3340442410, 1450918057, 4178162271, 2810251834, 366126051, 3753313945, 2784305836, 1730114869, 1207852067, 1792591336, 835955104, 2556793533, 1413506794, 1657823935, 4013600827, 3570589700, 1434587096, 4142313494, 2489567354, 3247747544, 2853876571, 3600630716, 3927628676, 1555580733, 2125119320, 3039930421, 3397107605, 3390076514, 296410084, 3322344380, 3590148927, 1318604625, 3138655051, 2632176848, 665236644, 3818083749, 2850228879, 1790884543, 1461204514, 1969835970, 3242394962], 3200, Sign::Pos, 1).unwrap();
 
@@ -321,21 +335,21 @@ fn test_cos_acos() {
     return; */
 
     for _ in 0..1000 {
-        let prec = rand::random::<usize>() % 1024 + 64;
+        let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let mut d1 = BigFloatNumber::random_normal(prec, -(prec as Exponent) / 2, 3).unwrap();
 
         // -pi, pi
         while d1.abs().unwrap().cmp(&pi) > 0 {
             if d1.is_positive() {
-                d1 = d1.sub(&pi, RoundingMode::None).unwrap();
+                d1 = d1.sub(&pi, prec, RoundingMode::None).unwrap();
             }
             if d1.is_negative() {
-                d1 = d1.add(&pi, RoundingMode::None).unwrap();
+                d1 = d1.add(&pi, prec, RoundingMode::None).unwrap();
             }
         }
 
-        let d2 = d1.cos(RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = d2.acos(RoundingMode::ToEven, &mut cc).unwrap();
+        let d2 = d1.cos(prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = d2.acos(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
         // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("d1 {:?}", d1);
@@ -352,7 +366,7 @@ fn test_cos_acos() {
             assert!(
                 d1.abs()
                     .unwrap()
-                    .sub(&d3, RoundingMode::ToEven)
+                    .sub(&d3, prec, RoundingMode::ToEven)
                     .unwrap()
                     .abs()
                     .unwrap()
@@ -371,27 +385,27 @@ fn test_tan_atan() {
 
     let mut cc = Consts::new().unwrap();
 
-    let pi = cc.pi(1024 + 64, RoundingMode::None).unwrap();
+    let pi = cc.pi(33 * WORD_BIT_SIZE, RoundingMode::None).unwrap();
 
     let mut half_pi = pi.clone().unwrap();
     half_pi.set_exponent(0);
 
     for _ in 0..1000 {
-        let prec = rand::random::<usize>() % 1024 + 64;
+        let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let mut d1 = BigFloatNumber::random_normal(prec, -100, 2).unwrap();
 
         // -pi/2, pi/2
         while d1.abs().unwrap().cmp(&half_pi) > 0 {
             if d1.is_positive() {
-                d1 = d1.sub(&half_pi, RoundingMode::None).unwrap();
+                d1 = d1.sub(&half_pi, prec, RoundingMode::None).unwrap();
             }
             if d1.is_negative() {
-                d1 = d1.add(&half_pi, RoundingMode::None).unwrap();
+                d1 = d1.add(&half_pi, prec, RoundingMode::None).unwrap();
             }
         }
 
-        let d2 = d1.tan(RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = d2.atan(RoundingMode::ToEven, &mut cc).unwrap();
+        let d2 = d1.tan(prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = d2.atan(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
         //println!("d1 {}", d1.format(Radix::Dec, RoundingMode::None).unwrap());
         //println!("d2 {}", d2.format(Radix::Dec, RoundingMode::None).unwrap());
@@ -400,7 +414,7 @@ fn test_tan_atan() {
         eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
 
         assert!(
-            d1.sub(&d3, RoundingMode::ToEven)
+            d1.sub(&d3, prec, RoundingMode::ToEven)
                 .unwrap()
                 .abs()
                 .unwrap()
@@ -412,16 +426,16 @@ fn test_tan_atan() {
 
 #[test]
 fn test_sinh_asinh() {
-    let prec = rand::random::<usize>() % 1024 + 64;
     let mut eps = ONE.clone().unwrap();
 
     let mut cc = Consts::new().unwrap();
 
     for _ in 0..1000 {
+        let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let d1 = BigFloatNumber::random_normal(prec, -100, 2).unwrap();
 
-        let d2 = d1.sinh(RoundingMode::ToEven).unwrap();
-        let d3 = d2.asinh(RoundingMode::ToEven, &mut cc).unwrap();
+        let d2 = d1.sinh(prec, RoundingMode::ToEven).unwrap();
+        let d3 = d2.asinh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
         // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
@@ -434,7 +448,7 @@ fn test_sinh_asinh() {
         );
 
         assert!(
-            d1.sub(&d3, RoundingMode::ToEven)
+            d1.sub(&d3, prec, RoundingMode::ToEven)
                 .unwrap()
                 .abs()
                 .unwrap()
@@ -446,16 +460,16 @@ fn test_sinh_asinh() {
 
 #[test]
 fn test_cosh_acosh() {
-    let prec = rand::random::<usize>() % 1024 + 64;
     let mut eps = ONE.clone().unwrap();
 
     let mut cc = Consts::new().unwrap();
 
     for _ in 0..1000 {
+        let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let d1 = BigFloatNumber::random_normal(prec, -100, 10).unwrap();
 
-        let d2 = d1.cosh(RoundingMode::ToEven).unwrap();
-        let d3 = d2.acosh(RoundingMode::ToEven, &mut cc).unwrap();
+        let d2 = d1.cosh(prec, RoundingMode::ToEven).unwrap();
+        let d3 = d2.acosh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
         eps.set_exponent(
             d1.get_exponent() - prec as Exponent
@@ -471,7 +485,7 @@ fn test_cosh_acosh() {
         assert!(
             d1.abs()
                 .unwrap()
-                .sub(&d3, RoundingMode::ToEven)
+                .sub(&d3, prec, RoundingMode::ToEven)
                 .unwrap()
                 .abs()
                 .unwrap()
@@ -483,17 +497,17 @@ fn test_cosh_acosh() {
 
 #[test]
 fn test_tanh_atanh() {
-    let prec = rand::random::<usize>() % 1024 + 64;
     let mut eps = ONE.clone().unwrap();
 
     let mut cc = Consts::new().unwrap();
 
     for _ in 0..1000 {
+        let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let d1 = BigFloatNumber::random_normal(prec, -100, 1).unwrap();
 
-        let d2 = d1.tanh(RoundingMode::ToEven, &mut cc).unwrap();
+        let d2 = d1.tanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-        let d3 = d2.atanh(RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = d2.atanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
         eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
 
@@ -503,7 +517,7 @@ fn test_tanh_atanh() {
         // println!("e {}", eps.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
         assert!(
-            d1.sub(&d3, RoundingMode::ToEven)
+            d1.sub(&d3, prec, RoundingMode::ToEven)
                 .unwrap()
                 .abs()
                 .unwrap()

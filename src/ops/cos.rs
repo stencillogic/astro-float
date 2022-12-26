@@ -4,6 +4,7 @@ use crate::common::consts::ONE;
 use crate::common::consts::TWO;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
+use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::defs::EXPONENT_MIN;
@@ -50,13 +51,16 @@ impl CosPolycoeffGen {
 
 impl PolycoeffGen for CosPolycoeffGen {
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-        self.inc = self.inc.add(&ONE, rm)?;
-        let inv_inc = self.one_full_p.div(&self.inc, rm)?;
-        self.fct = self.fct.mul(&inv_inc, rm)?;
+        let p_inc = self.inc.get_mantissa_max_bit_len();
+        let p_one = self.one_full_p.get_mantissa_max_bit_len();
 
-        self.inc = self.inc.add(&ONE, rm)?;
-        let inv_inc = self.one_full_p.div(&self.inc, rm)?;
-        self.fct = self.fct.mul(&inv_inc, rm)?;
+        self.inc = self.inc.add(&ONE, p_inc, rm)?;
+        let inv_inc = self.one_full_p.div(&self.inc, p_one, rm)?;
+        self.fct = self.fct.mul(&inv_inc, p_one, rm)?;
+
+        self.inc = self.inc.add(&ONE, p_inc, rm)?;
+        let inv_inc = self.one_full_p.div(&self.inc, p_one, rm)?;
+        self.fct = self.fct.mul(&inv_inc, p_one, rm)?;
 
         self.sign *= -1;
         if self.sign > 0 {
@@ -94,37 +98,39 @@ impl ArgReductionEstimator for CosArgReductionEstimator {
 }
 
 impl BigFloatNumber {
-    /// Computes the cosine of a number. The result is rounded using the rounding mode `rm`.
+    /// Computes the cosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
+    /// Precision is rounded upwards to the word size.
     ///
     /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory.
-    pub fn cos(&self, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-        let mut arg = self.reduce_trig_arg(cc, RoundingMode::None)?;
+    ///  - InvalidArgument: the precision is incorrect.
+    pub fn cos(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+        let p = round_p(p);
 
-        let mut ret;
+        let mut arg1 = self.clone()?;
+        arg1.set_precision(p + 1 + (-COS_EXP_THRES) as usize, RoundingMode::None)?;
 
-        let mut arg1 = arg.clone()?;
+        let arg1 = arg1.reduce_trig_arg(cc, RoundingMode::None)?;
 
-        arg1.set_precision(
-            arg1.get_mantissa_max_bit_len() + (-COS_EXP_THRES) as usize,
-            RoundingMode::None,
-        )?;
-
-        ret = arg1.cos_series(RoundingMode::None)?;
+        let mut ret = arg1.cos_series(RoundingMode::None)?;
 
         if ret.get_exponent() < COS_EXP_THRES {
             // argument is close to pi / 2
-            arg.set_precision(
-                arg.get_mantissa_max_bit_len() + ret.get_exponent().unsigned_abs() as usize,
+
+            let mut arg2 = self.clone()?;
+            arg2.set_precision(
+                p + 1 + ret.get_exponent().unsigned_abs() as usize,
                 RoundingMode::None,
             )?;
 
-            ret = arg.cos_series(RoundingMode::None)?;
+            let arg2 = arg2.reduce_trig_arg(cc, RoundingMode::None)?;
+
+            ret = arg2.cos_series(RoundingMode::None)?;
         }
 
-        ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+        ret.set_precision(p, rm)?;
 
         Ok(ret)
     }
@@ -140,7 +146,8 @@ impl BigFloatNumber {
             CosArgReductionEstimator,
         >(p, &polycoeff_gen, -self.e as isize, 2, false);
 
-        self.set_precision(p + niter * 4 + reduction_times * 3, rm)?;
+        let p_arg = p + niter * 4 + reduction_times * 3;
+        self.set_precision(p_arg, rm)?;
 
         let arg = if reduction_times > 0 {
             self.cos_arg_reduce(reduction_times, rm)?
@@ -148,8 +155,8 @@ impl BigFloatNumber {
             self
         };
 
-        let acc = BigFloatNumber::from_word(1, arg.get_mantissa_max_bit_len())?; // 1
-        let x_step = arg.mul(&arg, rm)?; // x^2
+        let acc = BigFloatNumber::from_word(1, p_arg)?; // 1
+        let x_step = arg.mul(&arg, p_arg, rm)?; // x^2
         let x_first = x_step.clone()?; // x^2
 
         let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
@@ -166,10 +173,11 @@ impl BigFloatNumber {
     fn cos_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // cos(2*x) = 2*cos(x)^2 - 1
         let mut ret = self.clone()?;
+        let p = ret.get_mantissa_max_bit_len();
         if ret.get_exponent() < EXPONENT_MIN + n as Exponent {
             ret.set_exponent(EXPONENT_MIN);
             for _ in 0..n - (ret.get_exponent() - EXPONENT_MIN) as usize {
-                ret = ret.div(&TWO, rm)?;
+                ret = ret.div(&TWO, p, rm)?;
             }
         } else {
             ret.set_exponent(ret.get_exponent() - n as Exponent);
@@ -182,11 +190,12 @@ impl BigFloatNumber {
     fn cos_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // cos(2*x) = 2*cos(x)^2 - 1
         let mut cos = self.clone()?;
+        let p = cos.get_mantissa_max_bit_len();
 
         for _ in 0..n {
-            let mut cos2 = cos.mul(&cos, rm)?;
+            let mut cos2 = cos.mul(&cos, p, rm)?;
             cos2.set_exponent(cos2.get_exponent() + 1);
-            cos = cos2.sub(&ONE, rm)?;
+            cos = cos2.sub(&ONE, p, rm)?;
         }
 
         Ok(cos)
@@ -200,20 +209,20 @@ mod tests {
 
     #[test]
     fn test_cosine() {
+        let p = 320;
         let mut cc = Consts::new().unwrap();
-
         let rm = RoundingMode::ToEven;
         let mut n1 = BigFloatNumber::from_word(1, 320).unwrap();
         n1.set_exponent(0);
-        let _n2 = n1.cos(rm, &mut cc).unwrap();
+        let _n2 = n1.cos(p, rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
 
         // asymptotic & extrema testing
         let mut half_pi = cc.pi(128, RoundingMode::None).unwrap();
         half_pi.set_exponent(1);
-        half_pi.set_precision(320, RoundingMode::None).unwrap();
+        half_pi.set_precision(p, RoundingMode::None).unwrap();
 
-        let n2 = half_pi.cos(rm, &mut cc).unwrap();
+        let n2 = half_pi.cos(p, rm, &mut cc).unwrap();
         let n3 = BigFloatNumber::parse("5.2049C1114CF98E804177D4C76273644A29410F31C6809BBDF2A33679A7486365EEEE1A43A7D13E58_e-21", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
 
         //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
@@ -222,17 +231,18 @@ mod tests {
 
         // large exponent
         half_pi.set_exponent(256);
-        let n2 = half_pi.cos(rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("3.2F00069261A9FFC022D09F662F2E2DDBEFD1AF138813F2A71D7601C58E793299EA052E4EBC59106C_e-1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+        let n2 = half_pi.cos(p, rm, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("3.2F00069261A9FFC022D09F662F2E2DDBEFD1AF138813F2A71D7601C58E793299EA052E4EBC59107C_e-1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
 
         //println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
 
         // small exponent
-        let n1 = BigFloatNumber::parse("1.992EF09686C3DC782C05BFD7863A715ECBDAED45DBAEE3ADFEF1AB8F74DB393D8CD6EAF9CA8443A6C28CF59D35B7FF56_e-20", crate::Radix::Hex, 384, RoundingMode::None).unwrap();
-        let n2 = n1.cos(RoundingMode::ToEven, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEB8FC7D51D69792F9AB263F754D161F6A_e-1", crate::Radix::Hex, 384, RoundingMode::None).unwrap();
+        let p = 384;
+        let n1 = BigFloatNumber::parse("1.992EF09686C3DC782C05BFD7863A715ECBDAED45DBAEE3ADFEF1AB8F74DB393D8CD6EAF9CA8443A6C28CF59D35B7FF56_e-20", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n2 = n1.cos(p, RoundingMode::ToEven, &mut cc).unwrap();
+        let n3 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEB8FC7D51D69792F9AB263F754D161F6A_e-1", crate::Radix::Hex, p, RoundingMode::None).unwrap();
 
         // println!("{:?}", n1.format(crate::Radix::Hex, rm).unwrap());
 
@@ -243,17 +253,17 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn cosine_perf() {
+        let p = 640;
         let mut cc = Consts::new().unwrap();
-
         let mut n = vec![];
         for _ in 0..10000 {
-            n.push(BigFloatNumber::random_normal(640, -5, 5).unwrap());
+            n.push(BigFloatNumber::random_normal(p, -5, 5).unwrap());
         }
 
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let _f = ni.cos(RoundingMode::ToEven, &mut cc).unwrap();
+                let _f = ni.cos(p, RoundingMode::ToEven, &mut cc).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

@@ -5,6 +5,7 @@ use crate::common::consts::ONE;
 use crate::common::consts::THREE;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
+use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
@@ -40,13 +41,16 @@ impl CoshPolycoeffGen {
 
 impl PolycoeffGen for CoshPolycoeffGen {
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-        self.inc = self.inc.add(&ONE, rm)?;
-        let inv_inc = self.one_full_p.div(&self.inc, rm)?;
-        self.fct = self.fct.mul(&inv_inc, rm)?;
+        let p_inc = self.inc.get_mantissa_max_bit_len();
+        let p_one = self.one_full_p.get_mantissa_max_bit_len();
 
-        self.inc = self.inc.add(&ONE, rm)?;
-        let inv_inc = self.one_full_p.div(&self.inc, rm)?;
-        self.fct = self.fct.mul(&inv_inc, rm)?;
+        self.inc = self.inc.add(&ONE, p_inc, rm)?;
+        let inv_inc = self.one_full_p.div(&self.inc, p_one, rm)?;
+        self.fct = self.fct.mul(&inv_inc, p_one, rm)?;
+
+        self.inc = self.inc.add(&ONE, p_inc, rm)?;
+        let inv_inc = self.one_full_p.div(&self.inc, p_one, rm)?;
+        self.fct = self.fct.mul(&inv_inc, p_one, rm)?;
 
         Ok(&self.fct)
     }
@@ -77,34 +81,37 @@ impl ArgReductionEstimator for CoshArgReductionEstimator {
 }
 
 impl BigFloatNumber {
-    /// Computes the hyperbolic cosine of a number. The result is rounded using the rounding mode `rm`.
+    /// Computes the hyperbolic cosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+    /// Precision is rounded upwards to the word size.
     ///
     /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory.
-    pub fn cosh(&self, rm: RoundingMode) -> Result<Self, Error> {
+    ///  - InvalidArgument: the precision is incorrect.
+    pub fn cosh(&self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         let arg = self.clone()?;
 
-        let mut ret = arg.cosh_series(RoundingMode::None)?;
+        let mut ret = arg.cosh_series(p, RoundingMode::None)?;
 
-        ret.set_precision(self.get_mantissa_max_bit_len(), rm)?;
+        ret.set_precision(p, rm)?;
 
         Ok(ret)
     }
 
     /// cosh using series, for |x| < 1
-    pub(super) fn cosh_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
+    pub(super) fn cosh_series(mut self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
+        let p = round_p(p);
+
         // cosh:  1 + x^2/2! + x^4/4! + x^6/6! + ...
 
-        let p = self.get_mantissa_max_bit_len();
         let mut polycoeff_gen = CoshPolycoeffGen::new(p)?;
         let (reduction_times, niter) = series_cost_optimize::<
             CoshPolycoeffGen,
             CoshArgReductionEstimator,
         >(p, &polycoeff_gen, (-self.e) as isize, 2, false);
 
-        let full_p = p + 1 + reduction_times * 3;
-        self.set_precision(full_p, rm)?;
+        let p_arg = p + 1 + reduction_times * 6;
+        self.set_precision(p_arg, rm)?;
 
         let arg = if reduction_times > 0 {
             self.cosh_arg_reduce(reduction_times, rm)?
@@ -112,8 +119,8 @@ impl BigFloatNumber {
             self
         };
 
-        let acc = Self::from_word(1, full_p)?; // 1
-        let x_step = arg.mul(&arg, rm)?; // x^2
+        let acc = Self::from_word(1, p_arg)?; // 1
+        let x_step = arg.mul(&arg, p_arg, rm)?; // x^2
         let x_first = x_step.clone()?; // x^2
 
         let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
@@ -130,8 +137,9 @@ impl BigFloatNumber {
     fn cosh_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // cosh(3*x) = 4*cosh(x)^3 - 3*cosh(x)
         let mut ret = self.clone()?;
+        let p = ret.get_mantissa_max_bit_len();
         for _ in 0..n {
-            ret = ret.div(&THREE, rm)?;
+            ret = ret.div(&THREE, p, rm)?;
         }
         Ok(ret)
     }
@@ -140,13 +148,14 @@ impl BigFloatNumber {
     fn cosh_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // cosh(3*x) = 4*cosh(x)^3 - 3*cosh(x)
         let mut cosh = self.clone()?;
+        let p = cosh.get_mantissa_max_bit_len();
 
         for _ in 0..n {
-            let mut cosh_cub = cosh.mul(&cosh, rm)?;
-            cosh_cub = cosh_cub.mul(&cosh, rm)?;
-            let p1 = cosh.mul(&THREE, rm)?;
-            let p2 = cosh_cub.mul(&FOUR, rm)?;
-            cosh = p2.sub(&p1, rm)?;
+            let mut cosh_cub = cosh.mul(&cosh, p, rm)?;
+            cosh_cub = cosh_cub.mul(&cosh, p, rm)?;
+            let p1 = cosh.mul(&THREE, p, rm)?;
+            let p2 = cosh_cub.mul(&FOUR, p, rm)?;
+            cosh = p2.sub(&p1, p, rm)?;
         }
 
         Ok(cosh)
@@ -160,22 +169,24 @@ mod tests {
 
     #[test]
     fn test_cosh() {
+        let p = 320;
         let rm = RoundingMode::ToEven;
-        let mut n1 = BigFloatNumber::from_word(1, 320).unwrap();
+        let mut n1 = BigFloatNumber::from_word(1, p).unwrap();
         n1.set_exponent(0);
-        let _n2 = n1.cosh(rm).unwrap();
+        let _n2 = n1.cosh(p, rm).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
 
         // asymptotic & extrema testing
+        let p = 640;
         let n1 = BigFloatNumber::parse(
             "1.0111001e-1000000",
             crate::Radix::Bin,
-            640,
+            p,
             RoundingMode::None,
         )
         .unwrap();
-        let n2 = n1.cosh(rm).unwrap();
-        let n3 = BigFloatNumber::parse("1.000000000000000000000000000000010B6200000000000000000000000000002E8B9840AAAAAAAAAAAAAAAAAAAAAAAAADE85C5950B78E38E38E38E38E38E38E3902814A92D7C21CDB6DB6DB6DB6DB6E_e+0", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+        let n2 = n1.cosh(p, rm).unwrap();
+        let n3 = BigFloatNumber::parse("1.000000000000000000000000000000010B6200000000000000000000000000002E8B9840AAAAAAAAAAAAAAAAAAAAAAAAADE85C5950B78E38E38E38E38E38E38E3902814A92D7C21CDB6DB6DB6DB6DB6E_e+0", crate::Radix::Hex, p, RoundingMode::None).unwrap();
 
         assert!(n2.cmp(&n3) == 0);
     }
@@ -184,15 +195,16 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn cosh_perf() {
+        let p = 320;
         let mut n = vec![];
         for _ in 0..10000 {
-            n.push(BigFloatNumber::random_normal(320, -20, 20).unwrap());
+            n.push(BigFloatNumber::random_normal(p, -20, 20).unwrap());
         }
 
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let _f = ni.cosh(RoundingMode::ToEven).unwrap();
+                let _f = ni.cosh(p, RoundingMode::ToEven).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());
