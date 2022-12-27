@@ -1416,6 +1416,123 @@ mod tests {
 
         assert_eq!(w, d3.get_mantissa_digits()[0]);
 
+        // increase precision
+        d1 = BigFloatNumber::from_raw_parts(
+            &[0, WORD_MAX - 10, WORD_MAX],
+            WORD_BIT_SIZE * 3,
+            Sign::Pos,
+            0,
+        )
+        .unwrap();
+        d2 = BigFloatNumber::from_raw_parts(
+            &[0, WORD_MAX, WORD_MAX],
+            WORD_BIT_SIZE * 3,
+            Sign::Pos,
+            -16,
+        )
+        .unwrap();
+
+        d3 = d1
+            .add(&d2, WORD_BIT_SIZE * 3, RoundingMode::ToEven)
+            .unwrap();
+
+        d1 = BigFloatNumber::from_raw_parts(
+            &[WORD_MAX - 10, WORD_MAX],
+            WORD_BIT_SIZE * 2,
+            Sign::Pos,
+            0,
+        )
+        .unwrap();
+        d2 = BigFloatNumber::from_raw_parts(
+            &[WORD_MAX, WORD_MAX],
+            WORD_BIT_SIZE * 2,
+            Sign::Pos,
+            -16,
+        )
+        .unwrap();
+        let d4 = d1
+            .add(&d2, WORD_BIT_SIZE * 4, RoundingMode::ToEven)
+            .unwrap();
+
+        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 4);
+        assert!(d3.cmp(&d4) == 0);
+
+        d1 = BigFloatNumber::from_raw_parts(
+            &[0, WORD_MAX - 10, WORD_MAX],
+            WORD_BIT_SIZE * 3,
+            Sign::Pos,
+            0,
+        )
+        .unwrap();
+        d2 = BigFloatNumber::from_raw_parts(
+            &[0, WORD_MAX, WORD_MAX],
+            WORD_BIT_SIZE * 3,
+            Sign::Pos,
+            -16,
+        )
+        .unwrap();
+
+        d3 = d1
+            .sub(&d2, WORD_BIT_SIZE * 3, RoundingMode::ToEven)
+            .unwrap();
+
+        d1 = BigFloatNumber::from_raw_parts(
+            &[WORD_MAX - 10, WORD_MAX],
+            WORD_BIT_SIZE * 2,
+            Sign::Pos,
+            0,
+        )
+        .unwrap();
+        d2 = BigFloatNumber::from_raw_parts(
+            &[WORD_MAX, WORD_MAX],
+            WORD_BIT_SIZE * 2,
+            Sign::Pos,
+            -16,
+        )
+        .unwrap();
+        let d4 = d1
+            .sub(&d2, WORD_BIT_SIZE * 4, RoundingMode::ToEven)
+            .unwrap();
+
+        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 4);
+        assert!(d3.cmp(&d4) == 0);
+
+        // decrease precision
+        d1 = BigFloatNumber::from_raw_parts(
+            &[0, WORD_MAX - 10, WORD_MAX],
+            WORD_BIT_SIZE * 3,
+            Sign::Pos,
+            0,
+        )
+        .unwrap();
+        d2 = BigFloatNumber::from_raw_parts(
+            &[0, WORD_MAX, WORD_MAX],
+            WORD_BIT_SIZE * 3,
+            Sign::Pos,
+            -16,
+        )
+        .unwrap();
+        d3 = d1.add(&d2, WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
+        let mut d4 = d1
+            .add(&d2, WORD_BIT_SIZE * 3, RoundingMode::ToEven)
+            .unwrap();
+        d4.set_precision(WORD_BIT_SIZE, RoundingMode::ToEven)
+            .unwrap();
+
+        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE);
+        assert!(d3.cmp(&d4) == 0);
+
+        d3 = d1.sub(&d2, WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
+        let mut d4 = d1
+            .sub(&d2, WORD_BIT_SIZE * 3, RoundingMode::ToEven)
+            .unwrap();
+        d4.set_precision(WORD_BIT_SIZE, RoundingMode::ToEven)
+            .unwrap();
+
+        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE);
+        assert!(d3.cmp(&d4) == 0);
+
+        // full prec
         for _ in 0..10000 {
             d1 = BigFloatNumber::random_normal(p, -(p as Exponent) / 2, p as Exponent).unwrap();
             d2 = BigFloatNumber::random_normal(p, -(p as Exponent) / 2, p as Exponent).unwrap();
@@ -1451,6 +1568,7 @@ mod tests {
             }
         }
 
+        // full prec
         for _ in 0..10000 {
             // avoid subnormal numbers
             d1 = BigFloatNumber::random_normal(
@@ -1494,6 +1612,88 @@ mod tests {
             }
         }
 
+        // variable precision
+        d1 = BigFloatNumber::from_raw_parts(
+            &[WORD_MAX - 10, WORD_MAX],
+            WORD_BIT_SIZE * 2,
+            Sign::Pos,
+            0,
+        )
+        .unwrap();
+        d2 = BigFloatNumber::from_raw_parts(
+            &[WORD_MAX, WORD_MAX - 10],
+            WORD_BIT_SIZE * 2,
+            Sign::Pos,
+            -16,
+        )
+        .unwrap();
+
+        d3 = d1.mul_full_prec(&d2).unwrap();
+
+        let d4 = d1
+            .mul(&d2, WORD_BIT_SIZE * 5, RoundingMode::ToEven)
+            .unwrap();
+
+        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 5);
+        assert!(d3.cmp(&d4) == 0);
+
+        let d4 = d1
+            .mul(&d2, WORD_BIT_SIZE * 4, RoundingMode::ToEven)
+            .unwrap();
+
+        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 4);
+        assert!(d3.cmp(&d4) == 0);
+
+        d3.set_precision(WORD_BIT_SIZE * 3, RoundingMode::ToEven)
+            .unwrap();
+        let d4 = d1
+            .mul(&d2, WORD_BIT_SIZE * 3, RoundingMode::ToEven)
+            .unwrap();
+
+        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 3);
+        assert!(d3.cmp(&d4) == 0);
+
+        d3.set_precision(WORD_BIT_SIZE, RoundingMode::ToEven)
+            .unwrap();
+        let d4 = d1.mul(&d2, WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
+
+        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE);
+        assert!(d3.cmp(&d4) == 0);
+
+        d1 = BigFloatNumber::from_i8(2, WORD_BIT_SIZE * 2).unwrap();
+        d2 = BigFloatNumber::from_i8(3, WORD_BIT_SIZE * 2).unwrap();
+
+        d3 = d1
+            .div(&d2, WORD_BIT_SIZE * 5, RoundingMode::ToEven)
+            .unwrap();
+
+        assert!(d3.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 5);
+        assert!(
+            d3.get_mantissa_digits()
+                == [
+                    12297829382473034411,
+                    12297829382473034410,
+                    12297829382473034410,
+                    12297829382473034410,
+                    12297829382473034410
+                ]
+        );
+
+        d3 = d1
+            .div(&d2, WORD_BIT_SIZE * 3, RoundingMode::ToEven)
+            .unwrap();
+
+        assert!(d3.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 3);
+        assert!(
+            d3.get_mantissa_digits()
+                == [12297829382473034411, 12297829382473034410, 12297829382473034410]
+        );
+
+        d3 = d1.div(&d2, WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
+
+        assert!(d3.get_mantissa_max_bit_len() == WORD_BIT_SIZE);
+        assert!(d3.get_mantissa_digits() == [12297829382473034411]);
+
         // reciprocal
         for _ in 0..1000 {
             // avoid subnormal numbers
@@ -1526,6 +1726,27 @@ mod tests {
         // println!("{:?}", d2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(d2.cmp(&d3) == 0);
+
+        // variable precision
+        d1 = BigFloatNumber::from_i8(3, WORD_BIT_SIZE * 2).unwrap();
+        d2 = d1
+            .reciprocal(WORD_BIT_SIZE * 5, RoundingMode::ToEven)
+            .unwrap();
+
+        assert!(
+            d2.get_mantissa_digits()
+                == [
+                    12297829382473034411,
+                    12297829382473034410,
+                    12297829382473034410,
+                    12297829382473034410,
+                    12297829382473034410
+                ]
+        );
+
+        d2 = d1.reciprocal(WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
+
+        assert!(d2.get_mantissa_digits() == [12297829382473034411]);
 
         // subnormal numbers
         d1 = BigFloatNumber::min_positive(p).unwrap();
