@@ -2,6 +2,7 @@
 
 use crate::common::consts::ONE;
 use crate::common::consts::TWO;
+use crate::common::util::get_add_cost;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
@@ -21,7 +22,7 @@ impl AtanhPolycoeffGen {
     fn new(_p: usize) -> Result<Self, Error> {
         let acc = BigFloatNumber::from_word(1, 1)?;
 
-        let iter_cost = 1;
+        let iter_cost = get_add_cost(acc.get_mantissa_max_bit_len());
 
         Ok(AtanhPolycoeffGen { acc, iter_cost })
     }

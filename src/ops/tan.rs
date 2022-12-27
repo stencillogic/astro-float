@@ -2,11 +2,11 @@
 
 use crate::EXPONENT_MIN;
 use crate::Exponent;
+use crate::WORD_BIT_SIZE;
 use crate::common::consts::ONE;
 use crate::common::consts::TWO;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
-use crate::common::util::log2_floor;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
@@ -23,9 +23,7 @@ struct TanPolycoeffGen {
 
 impl TanPolycoeffGen {
     fn new(p: usize) -> Result<Self, Error> {
-        let l = log2_floor(p);
-        let ll = log2_floor(l) * 3 / 2;
-        let iter_cost = (7 * get_mul_cost(p) + 4 * get_add_cost(p)) * ll / l;
+        let iter_cost = 9 * get_mul_cost(p) + 2 * (get_add_cost(p) + get_add_cost(WORD_BIT_SIZE));
 
         Ok(TanPolycoeffGen { iter_cost })
     }
@@ -129,43 +127,45 @@ impl BigFloatNumber {
         let mut q2 = BigFloatNumber::from_word(1, 1)?;
         let mut p2 = BigFloatNumber::from_word(1, 1)?;
 
-        #[inline]
-        fn max_p(x: &BigFloatNumber, y: &BigFloatNumber) -> usize {
-            x.get_mantissa_max_bit_len()
-                .max(y.get_mantissa_max_bit_len())
-        }
-
         while fct.get_exponent() as isize - (xxacc.get_exponent() as isize) <= p as isize {
 
             // -x^2, +x^4, -x^6, ...
             xxacc = xxacc.mul(&xx, p, rm)?;
 
             // cos
-            p1 = p1.mul(&fct, max_p(&p1, &fct), rm)?;
-            let n1 = xxacc.mul(&q1, max_p(&xxacc, &q1), rm)?;
-            p1 = p1.add(&n1, max_p(&p1, &n1), rm)?;
+            p1 = p1.mul(&fct, p, rm)?;
+            let n1 = xxacc.mul(&q1, p, rm)?;
+            p1 = p1.add(&n1, p, rm)?;
 
-            q1 = q1.mul_full_prec(&fct)?;
+            q1 = q1.mul(&fct, p, rm)?;
 
             inc = inc.add(&ONE, inc.get_mantissa_max_bit_len(), rm)?;
-            fct = fct.mul_full_prec(&inc)?;
+            if fct.get_mantissa_max_bit_len() < p {
+                fct = fct.mul_full_prec(&inc)?;
+            } else {
+                fct = fct.mul(&inc, p, rm)?;
+            }
 
             // sin
-            p2 = p2.mul(&fct, max_p(&p2, &fct), rm)?;
-            let n1 = xxacc.mul(&q2, max_p(&xxacc, &q2), rm)?;
-            p2 = p2.add(&n1, max_p(&p2, &n1), rm)?;
+            p2 = p2.mul(&fct, p, rm)?;
+            let n1 = xxacc.mul(&q2, p, rm)?;
+            p2 = p2.add(&n1, p, rm)?;
 
-            q2 = q2.mul_full_prec(&fct)?;
+            q2 = q2.mul(&fct, p, rm)?;
 
             inc = inc.add(&ONE, inc.get_mantissa_max_bit_len(), rm)?;
-            fct = fct.mul_full_prec(&inc)?;
+            if fct.get_mantissa_max_bit_len() < p {
+                fct = fct.mul_full_prec(&inc)?;
+            } else {
+                fct = fct.mul(&inc, p, rm)?;
+            }
         }
 
-        let n0 = p2.mul(self, max_p(&p2, self), rm)?;
-        let n1 = n0.mul(&q1, max_p(&n0, &q1), rm)?;
-        let n2 = p1.mul(&q2, max_p(&p1, &q2), rm)?;
+        let n0 = p2.mul(self, p, rm)?;
+        let n1 = n0.mul(&q1, p, rm)?;
+        let n2 = p1.mul(&q2, p, rm)?;
 
-        n1.div(&n2, max_p(&n1, &n2), rm)
+        n1.div(&n2, p, rm)
     }
 
     // reduce argument n times.

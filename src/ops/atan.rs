@@ -26,7 +26,7 @@ impl AtanPolycoeffGen {
     fn new(_p: usize) -> Result<Self, Error> {
         let f = BigFloatNumber::from_word(1, 1)?;
 
-        let iter_cost = get_add_cost(1);
+        let iter_cost = get_add_cost(f.get_mantissa_max_bit_len());
 
         Ok(AtanPolycoeffGen { f, iter_cost })
     }
@@ -71,6 +71,7 @@ impl ArgReductionEstimator for AtanArgReductionEstimator {
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
     #[inline]
     fn reduction_effect(n: usize, m: isize) -> usize {
+        // for x much smaller than 1, reduction is almost x/2
         (n as isize + m) as usize
     }
 }

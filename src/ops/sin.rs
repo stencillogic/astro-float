@@ -31,7 +31,7 @@ impl SinPolycoeffGen {
         let fct = BigFloatNumber::from_word(1, p)?;
         let one_full_p = BigFloatNumber::from_word(1, p)?;
 
-        let iter_cost = (get_mul_cost(p) + get_add_cost(p)) << 1; // 2 * (cost(mul) + cost(add))
+        let iter_cost = (get_mul_cost(p) + get_add_cost(p) + get_add_cost(inc.get_mantissa_max_bit_len())) * 2;
 
         let sign = 1;
 
@@ -79,10 +79,11 @@ struct SinArgReductionEstimator {}
 impl ArgReductionEstimator for SinArgReductionEstimator {
     /// Estimates cost of reduction n times for number with precision p.
     fn get_reduction_cost(n: usize, p: usize) -> usize {
-        // n * (4 * cost(mul) + 2 * cost(add))
         let cost_mul = get_mul_cost(p);
         let cost_add = get_add_cost(p);
-        (n * ((cost_mul << 1) + cost_add)) << 1
+        let cost_mul2 = get_mul_cost(THREE.get_mantissa_max_bit_len());
+
+        n * (2 * cost_mul + 3 * cost_add + cost_mul2)
     }
 
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
@@ -155,12 +156,11 @@ impl BigFloatNumber {
     // cost: n * O(add)
     fn sin_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // sin(3*x) = 3*sin(x) - 4*sin(x)^3
-        let mut ret = self.clone()?;
-        let p = ret.get_mantissa_max_bit_len();
-        for _ in 0..n {
-            ret = ret.div(&THREE, p, rm)?;
+        let mut d = THREE.clone()?;
+        for _ in 1..n {
+            d = d.mul_full_prec(&THREE)?;
         }
-        Ok(ret)
+        self.div(&d, self.get_mantissa_max_bit_len(), rm)
     }
 
     // restore value for the argument reduced n times.

@@ -181,7 +181,7 @@ fn test_sin_asin() {
     let pi = cc.pi((prec_rng + 1) * WORD_BIT_SIZE, RoundingMode::None).unwrap();
 
     let mut half_pi = pi.clone().unwrap();
-    half_pi.set_exponent(0);
+    half_pi.set_exponent(1);
 
     /*     let d1 = BigFloatNumber::from_raw_parts(&[2097186588, 2125458061, 154726044, 1972526461, 2656367726, 814809964, 990939464, 2788161723, 3328293782, 3887912150], 320, Sign::Neg, 0).unwrap();
 
@@ -220,7 +220,8 @@ fn test_sin_asin() {
         // println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + 1
+                    + count_leading_ones(d2.get_mantissa_digits()) as Exponent);
 
         assert!(
             d1.sub(&d3, prec, RoundingMode::ToEven)
@@ -344,7 +345,7 @@ fn test_cos_acos() {
         if d2.cmp(&ONE) != 0 {
             eps.set_exponent(
                 d1.get_exponent() - prec as Exponent
-                    + 2
+                    + 1
                     + count_leading_ones(d2.get_mantissa_digits()) as Exponent,
             );
 
@@ -372,7 +373,7 @@ fn test_tan_atan() {
     let pi = cc.pi((prec_rng + 1) * WORD_BIT_SIZE, RoundingMode::None).unwrap();
 
     let mut half_pi = pi.clone().unwrap();
-    half_pi.set_exponent(0);
+    half_pi.set_exponent(1);
 
     for _ in 0..1000 {
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;

@@ -33,7 +33,7 @@ impl AtanhPolycoeffGen {
         let one_full_p = BigFloatNumber::from_word(1, p)?;
         let val = BigFloatNumber::from_word(1, p)?;
 
-        let iter_cost = get_add_cost(p) + get_add_cost(1); // div is linear, since add is O(1)
+        let iter_cost = get_add_cost(p) + get_add_cost(acc.get_mantissa_max_bit_len());
 
         Ok(AtanhPolycoeffGen {
             acc,
