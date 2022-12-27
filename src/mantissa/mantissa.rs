@@ -287,7 +287,7 @@ impl Mantissa {
         } else if m3.len() < p {
             let n = m3.len();
             m3.m.try_extend(p * WORD_BIT_SIZE)?;
-            m3.m[..n].fill(0);
+            m3.m[..p - n].fill(0);
         } else if m3.len() > p {
             if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive) {
                 shift -= 1;
@@ -337,7 +337,7 @@ impl Mantissa {
             } else if m3.len() < p {
                 let n = m3.len();
                 m3.m.try_extend(p * WORD_BIT_SIZE)?;
-                m3.m[n..].fill(0);
+                m3.m[..p - n].fill(0);
             } else if m3.len() > p {
                 let rndres = m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive);
                 debug_assert!(!rndres);
@@ -400,7 +400,7 @@ impl Mantissa {
                     if m3.len() < p {
                         let n = m3.len();
                         m3.m.try_extend(p * WORD_BIT_SIZE)?;
-                        m3.m[n..].fill(0);
+                        m3.m[..p - n].fill(0);
                     } else if m3.len() > p {
                         let rndres =
                             m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive); // it is not possible that rounding overflows, and c > 0 at the same time.
@@ -430,7 +430,7 @@ impl Mantissa {
         let mut m3 = Self::reserve_new(self.len() + m2.len())?;
 
         Self::mul_unbalanced(&self.m, &m2.m, &mut m3)?;
-
+        
         let mut shift = Self::maximize(&mut m3) as isize;
 
         let mut m3 = Mantissa { m: m3, n: 0 };
@@ -442,7 +442,7 @@ impl Mantissa {
         } else if m3.len() < p {
             let n = m3.len();
             m3.m.try_extend(p * WORD_BIT_SIZE)?;
-            m3.m[n..].fill(0)
+            m3.m[..p - n].fill(0);
         } else if m3.len() > p {
             if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive) {
                 shift -= 1;

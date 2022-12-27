@@ -1,7 +1,9 @@
 //! Tangent.
 
+use crate::EXPONENT_MIN;
+use crate::Exponent;
 use crate::common::consts::ONE;
-use crate::common::consts::THREE;
+use crate::common::consts::TWO;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
 use crate::common::util::log2_floor;
@@ -47,14 +49,13 @@ impl ArgReductionEstimator for TanArgReductionEstimator {
     fn get_reduction_cost(n: usize, p: usize) -> usize {
         let cost_mul = get_mul_cost(p);
         let cost_add = get_add_cost(p);
-        n * (3 * cost_mul + 5 * cost_add)
+        n * (2 * cost_mul +  cost_add)
     }
 
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
     #[inline]
     fn reduction_effect(n: usize, m: isize) -> usize {
-        // n*log2(3) + m
-        ((n as isize) * 1000 / 631 + m) as usize
+        (n as isize + m) as usize
     }
 }
 
@@ -87,12 +88,12 @@ impl BigFloatNumber {
         let p = self.get_mantissa_max_bit_len();
 
         let polycoeff_gen = TanPolycoeffGen::new(p)?;
-        let (reduction_times, _niter) = series_cost_optimize::<
+        let (reduction_times, niter) = series_cost_optimize::<
             TanPolycoeffGen,
             TanArgReductionEstimator,
         >(p, &polycoeff_gen, -self.e as isize, 1, true);
 
-        let p_arg = p + reduction_times * 4 + 4;
+        let p_arg = p + reduction_times * 3 + niter * 7 + 4;
         self.set_precision(p_arg, rm)?;
 
         let arg_holder;
@@ -115,6 +116,7 @@ impl BigFloatNumber {
     /// Tangent series
     fn tan_series_run(&self, rm: RoundingMode) -> Result<Self, Error> {
         //  sin + cos series combined
+        // tan(x) = x * (((3! - x^2 * 1!) * 5! + x^4 * 3!) * 7! - ...) / (((2! - x^2 * 1!) * 4! + x^4 * 2!) * 6! - ...) / (3*5*7*...)
 
         let p = self.get_mantissa_max_bit_len();
         let mut xx = self.mul(self, p, rm)?;
@@ -134,8 +136,11 @@ impl BigFloatNumber {
         }
 
         while fct.get_exponent() as isize - (xxacc.get_exponent() as isize) <= p as isize {
+
+            // -x^2, +x^4, -x^6, ...
             xxacc = xxacc.mul(&xx, p, rm)?;
 
+            // cos
             p1 = p1.mul(&fct, max_p(&p1, &fct), rm)?;
             let n1 = xxacc.mul(&q1, max_p(&xxacc, &q1), rm)?;
             p1 = p1.add(&n1, max_p(&p1, &n1), rm)?;
@@ -145,6 +150,7 @@ impl BigFloatNumber {
             inc = inc.add(&ONE, inc.get_mantissa_max_bit_len(), rm)?;
             fct = fct.mul_full_prec(&inc)?;
 
+            // sin
             p2 = p2.mul(&fct, max_p(&p2, &fct), rm)?;
             let n1 = xxacc.mul(&q2, max_p(&xxacc, &q2), rm)?;
             p2 = p2.add(&n1, max_p(&p2, &n1), rm)?;
@@ -167,29 +173,29 @@ impl BigFloatNumber {
         // tan(3*x) = 3*tan(x) - tan(x)^3 / (1 - 3*tan(x)^2)
         let mut ret = self.clone()?;
         let p = ret.get_mantissa_max_bit_len();
-        for _ in 0..n {
-            ret = ret.div(&THREE, p, rm)?;
+        if ret.get_exponent() < EXPONENT_MIN + n as Exponent {
+            ret.set_exponent(EXPONENT_MIN);
+            for _ in 0..n - (ret.get_exponent() - EXPONENT_MIN) as usize {
+                ret = ret.div(&TWO, p, rm)?;
+            }
+        } else {
+            ret.set_exponent(ret.get_exponent() - n as Exponent);
         }
         Ok(ret)
     }
 
     // restore value for the argument reduced n times.
     fn tan_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
-        // tan(3*x) = 3*tan(x) - tan(x)^3 / (1 - 3*tan(x)^2)
+        // tan(2*x) = 2*tan(x) / (1 - tan(x)^2)
 
         let mut val = self.clone()?;
         let p = val.get_mantissa_max_bit_len();
 
         for _ in 0..n {
             let val_sq = val.mul(&val, p, rm)?;
-            let val_cub = val_sq.mul(&val, p, rm)?;
-
-            let p1 = val.mul(&THREE, p, rm)?;
-            let p2 = p1.sub(&val_cub, p, rm)?;
-            let p3 = val_sq.mul(&THREE, p, rm)?;
-            let p4 = ONE.sub(&p3, p, rm)?;
-
-            val = p2.div(&p4, p, rm)?;
+            let q = ONE.sub(&val_sq, p, rm)?;
+            val.set_exponent(val.get_exponent() + 1);
+            val = val.div(&q, p, rm)?;
         }
 
         Ok(val)
@@ -213,14 +219,14 @@ mod tests {
 
         // asymptotic & extrema testing
         let mut half_pi = cc.pi(128, RoundingMode::None).unwrap();
-        half_pi.set_exponent(0);
+        half_pi.set_exponent(1);
         half_pi.set_precision(p, RoundingMode::None).unwrap();
 
         let n2 = half_pi.tan(p, rm, &mut cc).unwrap();
         let n3 = BigFloatNumber::parse(
-            "F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFADFB63EEEB306717FBE882B389D8C9BB6A8F6914FC1931BD_e-1",
+            "3.1F0B46DCBD63D29899ECF829DA54DE0EE0852B2569B572B793E50817CEF4C77D959712B45E2B7E4C_e+20",
             crate::Radix::Hex,
-            640,
+            p,
             RoundingMode::None,
         )
         .unwrap();
