@@ -34,7 +34,7 @@ impl BigFloatNumber {
         let int = self.get_int_as_usize()?;
         let e_int = if int > 0 {
             let e_const = cc.e(
-                p + 2 + 2 * core::mem::size_of::<usize>(),
+                p + 1,
                 RoundingMode::None,
             )?;
 
@@ -95,15 +95,15 @@ impl BigFloatNumber {
 
         let mut ret = self.clone()?;
 
-        let p_ret = p + bit_pos;
+        let p_ret = p + bit_pos * 2;
         ret.set_precision(p_ret, RoundingMode::None)?;
 
         // TODO: consider windowing and precomputed values.
         while bit_pos > 0 {
             bit_pos -= 1;
-            ret = ret.mul(&ret, ret.get_mantissa_max_bit_len(), RoundingMode::None)?;
+            ret = ret.mul(&ret, p_ret, RoundingMode::None)?;
             if i & WORD_SIGNIFICANT_BIT as usize != 0 {
-                ret = ret.mul(self, ret.get_mantissa_max_bit_len(), RoundingMode::None)?;
+                ret = ret.mul(self, p_ret, RoundingMode::None)?;
             }
             i <<= 1;
         }

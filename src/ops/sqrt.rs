@@ -30,12 +30,7 @@ impl BigFloatNumber {
 
         let p = round_p(p);
 
-        let mut err = 30;
-        let mut mp = p;
-        while mp >= 32 {
-            mp /= 3;
-            err += 6;
-        }
+        let mut err = 1;
 
         let mut x = self.clone()?;
         let e = x.normalize2() as isize;
@@ -55,6 +50,7 @@ impl BigFloatNumber {
         x.set_exponent((e & 1) as Exponent);
 
         let mut ret = x.sqrt_iter()?;
+        ret = x.sqrt_step(ret)?;
 
         ret = x.mul(&ret, p_ext, RoundingMode::None)?;
         ret.set_precision(p, rm)?;
@@ -83,7 +79,6 @@ impl BigFloatNumber {
         let mut prec = self.get_mantissa_max_bit_len();
 
         if prec <= 64 {
-            prec *= 3;
             let mut x = ONE.div(self, prec, RoundingMode::None)?;
 
             while prec > 0 {
@@ -104,7 +99,7 @@ impl BigFloatNumber {
     }
 
     fn sqrt_step(&self, mut xn: Self) -> Result<Self, Error> {
-        // y(n) = self*x(n)
+        // y(n) = self*x(n)^2
         // x(n+1) = x(n)*2^(-3)*(15 - y(n)*(10 - 3*y(n)))
 
         let p = self.get_mantissa_max_bit_len();
@@ -220,7 +215,7 @@ mod tests {
             let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
 
             let mut d1 =
-                BigFloatNumber::random_normal(prec, -(prec as Exponent), prec as Exponent).unwrap();
+                BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
             if d1.is_negative() {
                 d1.inv_sign();
             }
@@ -229,7 +224,9 @@ mod tests {
             let d3 = d2.mul(&d2, prec, RoundingMode::ToEven).unwrap();
 
             eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+
             //println!("d1 {:?}\nd3 {:?}", d1, d3);
+
             assert!(
                 d1.sub(&d3, prec, RoundingMode::ToEven)
                     .unwrap()

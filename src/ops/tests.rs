@@ -1,5 +1,6 @@
 //! tests
 
+use rand::random;
 use crate::common::consts::ONE;
 use crate::common::util::{count_leading_ones, count_leading_zeroes_skip_first, log2_ceil};
 use crate::defs::{RoundingMode, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
@@ -46,62 +47,48 @@ fn test_ln_exp() {
         let d2 = d1.ln(prec, RoundingMode::ToEven, &mut cc).unwrap();
         let d3 = d2.exp(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-        eps.set_exponent(
-            d1.get_exponent() - prec as Exponent
-                + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent,
-        );
+        eps.set_exponent(d2.get_exponent() - prec as Exponent);
+        let err = eps.exp(prec, RoundingMode::Up, &mut cc).unwrap();
 
-        // println!("{}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        //println!("{}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        //println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        //println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-        assert!(
-            d1.sub(&d3, prec, RoundingMode::ToEven)
-                .unwrap()
-                .abs()
-                .unwrap()
-                .cmp(&eps)
-                < 0
-        );
+        // d2 - ulp(d2)/2 <= ln(d1) <= d2 + ulp(d2)/2  ->  d3 / e^(ulp(d2)/2) <= d1 <= d3 * e^(ulp(d2)/2)
+        assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0);
+        assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0);
     }
 }
 
 #[test]
-fn test_pow() {
-    let mut eps = ONE.clone().unwrap();
-
-    let mut cc = Consts::new().unwrap();
+fn test_powi() {
 
     for _ in 0..1000 {
+        let i = random::<usize>() % 1000 + 1;
         let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
-        let mut d1 = BigFloatNumber::random_normal(prec, -5, 5).unwrap();
+        let mut d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN / i as Exponent, EXPONENT_MAX / i as Exponent).unwrap();
         d1.set_sign(Sign::Pos);
-        let d2 = BigFloatNumber::random_normal(prec, -5, 5).unwrap();
 
-        let d3 = d1.pow(&d2, prec, RoundingMode::ToEven, &mut cc).unwrap();
-        let d22 = d2.reciprocal(prec, RoundingMode::ToEven).unwrap();
-        let d4 = d3.pow(&d22, prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let d2 = d1.powi(i as usize, prec, RoundingMode::ToEven).unwrap();
 
-        eps.set_exponent(d1.get_exponent() - prec as Exponent + d2.get_exponent().abs() + 3);
+        let mut d3 = d1.clone().unwrap();
+        d3.set_precision(prec + core::mem::size_of::<usize>(), RoundingMode::None).unwrap();
+        for _ in 1..i {
+            d3 = d3.mul(&d1, d3.get_mantissa_max_bit_len(), RoundingMode::None).unwrap();
+        }
+        d3.set_precision(prec, RoundingMode::ToEven).unwrap();
 
         // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("d4 {}", d4.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("i {}", i);
 
-        assert!(
-            d4.sub(&d1, prec, RoundingMode::ToEven)
-                .unwrap()
-                .abs()
-                .unwrap()
-                .cmp(&eps)
-                <= 0
-        );
+        assert!(d3.cmp(&d2) == 0);
     }
 }
 
 #[test]
-fn test_log2_log10() {
+fn test_log2_log10_pow() {
     let mut eps = ONE.clone().unwrap();
 
     let mut cc = Consts::new().unwrap();
@@ -119,37 +106,27 @@ fn test_log2_log10() {
         let ten = BigFloatNumber::from_word(10, prec).unwrap();
         let d5 = ten.pow(&d4, prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-        eps.set_exponent(
-            d1.get_exponent() - prec as Exponent
-                + 2
-                + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent,
-        );
+        //println!("{}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        //println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        //println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-        // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // d2 - ulp(d2)/2 <= log2(d1) <= d2 + ulp(d2)/2  ->  d3 / 2^(ulp(d2)/2) <= d1 <= d3 * 2^(ulp(d2)/2)
+        eps.set_exponent(d2.get_exponent() - prec as Exponent);
+        let err = two.pow(&eps, prec, RoundingMode::Up, &mut cc).unwrap();
 
-        assert!(
-            d3.sub(&d1, prec, RoundingMode::ToEven)
-                .unwrap()
-                .abs()
-                .unwrap()
-                .cmp(&eps)
-                <= 0
-        );
-        assert!(
-            d5.sub(&d1, prec, RoundingMode::ToEven)
-                .unwrap()
-                .abs()
-                .unwrap()
-                .cmp(&eps)
-                <= 0
-        );
+        assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0);
+        assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0);
+
+        eps.set_exponent(d4.get_exponent() - prec as Exponent);
+        let err = ten.pow(&eps, prec, RoundingMode::Up, &mut cc).unwrap();
+
+        assert!(d1.cmp(&d5.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0);
+        assert!(d1.cmp(&d5.div(&err, prec, RoundingMode::Down).unwrap()) >= 0);
     }
 }
 
 #[test]
-fn test_log() {
+fn test_log_pow() {
     let mut eps = ONE.clone().unwrap();
 
     let mut cc = Consts::new().unwrap();
@@ -164,24 +141,23 @@ fn test_log() {
         let d2 = d1.log(&b, prec, RoundingMode::ToEven, &mut cc).unwrap();
         let d3 = b.pow(&d2, prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-        eps.set_exponent(
-            d1.get_exponent() - prec as Exponent
-                + 2
-                + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent,
-        );
-
         // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+        // println!("b  {}", b.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-        assert!(
-            d3.sub(&d1, prec, RoundingMode::ToEven)
-                .unwrap()
-                .abs()
-                .unwrap()
-                .cmp(&eps)
-                <= 0
-        );
+        // d2 - ulp(d2)/2 <= log_b(d1) <= d2 + ulp(d2)/2  ->  d3 / b^(ulp(d2)/2) <= d1 <= d3 * b^(ulp(d2)/2)
+        eps.set_exponent(d2.get_exponent() - prec as Exponent);
+        let err = b.pow(&eps, prec, RoundingMode::Up, &mut cc).unwrap();
+
+        if b.get_exponent() > 0 {
+            assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0);
+            assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0);
+        } else {
+            assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) <= 0);
+            assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) >= 0);
+        }
+
     }
 }
 
