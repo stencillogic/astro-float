@@ -430,7 +430,7 @@ impl Mantissa {
         let mut m3 = Self::reserve_new(self.len() + m2.len())?;
 
         Self::mul_unbalanced(&self.m, &m2.m, &mut m3)?;
-        
+
         let mut shift = Self::maximize(&mut m3) as isize;
 
         let mut m3 = Mantissa { m: m3, n: 0 };

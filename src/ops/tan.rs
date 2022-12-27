@@ -1,8 +1,5 @@
 //! Tangent.
 
-use crate::EXPONENT_MIN;
-use crate::Exponent;
-use crate::WORD_BIT_SIZE;
 use crate::common::consts::ONE;
 use crate::common::consts::TWO;
 use crate::common::util::get_add_cost;
@@ -15,6 +12,9 @@ use crate::ops::consts::Consts;
 use crate::ops::series::series_cost_optimize;
 use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::PolycoeffGen;
+use crate::Exponent;
+use crate::EXPONENT_MIN;
+use crate::WORD_BIT_SIZE;
 
 // Polynomial coefficient generator (for tan it only used for cost estmation).
 struct TanPolycoeffGen {
@@ -47,7 +47,7 @@ impl ArgReductionEstimator for TanArgReductionEstimator {
     fn get_reduction_cost(n: usize, p: usize) -> usize {
         let cost_mul = get_mul_cost(p);
         let cost_add = get_add_cost(p);
-        n * (2 * cost_mul +  cost_add)
+        n * (2 * cost_mul + cost_add)
     }
 
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
@@ -128,7 +128,6 @@ impl BigFloatNumber {
         let mut p2 = BigFloatNumber::from_word(1, 1)?;
 
         while fct.get_exponent() as isize - (xxacc.get_exponent() as isize) <= p as isize {
-
             // -x^2, +x^4, -x^6, ...
             xxacc = xxacc.mul(&xx, p, rm)?;
 

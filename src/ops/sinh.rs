@@ -28,7 +28,8 @@ impl SinhPolycoeffGen {
         let fct = BigFloatNumber::from_word(1, p)?;
         let one_full_p = BigFloatNumber::from_word(1, p)?;
 
-        let iter_cost = (get_mul_cost(p) + get_add_cost(p) + get_add_cost(inc.get_mantissa_max_bit_len())) * 2;
+        let iter_cost =
+            (get_mul_cost(p) + get_add_cost(p) + get_add_cost(inc.get_mantissa_max_bit_len())) * 2;
 
         Ok(SinhPolycoeffGen {
             one_full_p,

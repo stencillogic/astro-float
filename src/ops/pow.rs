@@ -33,10 +33,7 @@ impl BigFloatNumber {
         // compute separately for int and fract parts, then combine the results.
         let int = self.get_int_as_usize()?;
         let e_int = if int > 0 {
-            let e_const = cc.e(
-                p + 1,
-                RoundingMode::None,
-            )?;
+            let e_const = cc.e(p + 1, RoundingMode::None)?;
 
             e_const.powi(int, e_const.get_mantissa_max_bit_len(), RoundingMode::None)
         } else {

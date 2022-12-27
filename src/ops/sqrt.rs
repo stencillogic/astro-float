@@ -214,8 +214,7 @@ mod tests {
         for _ in 0..1000 {
             let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
 
-            let mut d1 =
-                BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
+            let mut d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
             if d1.is_negative() {
                 d1.inv_sign();
             }
