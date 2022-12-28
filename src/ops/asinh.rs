@@ -45,10 +45,11 @@ impl BigFloatNumber {
                     Ok(ret)
                 }
             } else {
-                // ln(x + sqrt(x*x + 1))
+                // ln(|x| + sqrt(x*x + 1)) * signum(x)
 
-                let p_x = p + self.get_exponent().unsigned_abs() as usize + 3;
+                let p_x = p + self.get_exponent().unsigned_abs() as usize + 5;
                 x.set_precision(p_x, RoundingMode::None)?;
+                x.set_sign(Sign::Pos);
 
                 let xx = x.mul(&x, p_x, RoundingMode::None)?;
 
@@ -61,6 +62,7 @@ impl BigFloatNumber {
                 let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
 
                 ret.set_precision(p, rm)?;
+                ret.set_sign(self.get_sign());
 
                 Ok(ret)
             }

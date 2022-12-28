@@ -20,10 +20,11 @@ impl BigFloatNumber {
     pub fn asin(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
         let p = round_p(p);
 
-        if self.cmp(&ONE) == 0 {
+        if self.abs_cmp(&ONE) == 0 {
             let mut pi = cc.pi(p, rm)?;
 
             pi.set_exponent(pi.get_exponent() - 1);
+            pi.set_sign(self.get_sign());
 
             return Ok(pi);
         }
@@ -105,6 +106,7 @@ mod tests {
         assert!(d3.asin(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
         assert!(zero.asin(p, rm, &mut cc).unwrap().is_zero());
         assert!(ONE.asin(p, rm, &mut cc).unwrap().cmp(&half_pi) == 0);
+        assert!(ONE.neg().unwrap().asin(p, rm, &mut cc).unwrap().cmp(&half_pi.neg().unwrap()) == 0);
     }
 
     #[ignore]

@@ -607,7 +607,8 @@ impl BigFloatNumber {
             }
         }
 
-        let e: isize = self.e as isize - d2.e as isize;
+        let e: isize = self.e as isize - self.get_mantissa_max_bit_len() as isize + self.get_precision() as isize 
+                    - d2.e as isize + d2.get_mantissa_max_bit_len() as isize - d2.get_precision() as isize;
         if e > 0 {
             return 1 * self.s as SignedWord;
         }
@@ -618,23 +619,23 @@ impl BigFloatNumber {
         self.m.abs_cmp(&d2.m) as SignedWord * self.s as SignedWord
     }
 
-    // Compare absolute values of two numbers.
-    fn abs_cmp(&self, d2: &Self) -> SignedWord {
-        if self.m.is_zero() || d2.m.is_zero() {
-            if !d2.m.is_zero() {
-                return -1;
-            } else if !self.m.is_zero() {
-                return 1;
-            } else {
+    /// Compares the absolute value of `self` to the absolute value of `d2`.
+    /// Returns positive if `|self|` is greater than `|d2|`, negative if `|self|` is smaller than `|d2|`, 0 otherwise.
+    pub fn abs_cmp(&self, d2: &Self) -> SignedWord {
+
+        if self.m.is_zero() {
+            if d2.m.is_zero() {
                 return 0;
+            } else {
+                return -1;
             }
         }
 
-        let e: isize = self.e as isize - d2.e as isize;
+        let e: isize = self.e as isize - self.get_mantissa_max_bit_len() as isize + self.get_precision() as isize 
+                    - d2.e as isize + d2.get_mantissa_max_bit_len() as isize - d2.get_precision() as isize;
         if e > 0 {
             return 1;
-        }
-        if e < 0 {
+        } else if e < 0 {
             return -1;
         }
 
@@ -1268,6 +1269,72 @@ mod tests {
             BigFloatNumber::from_f64(p, f64::NEG_INFINITY).unwrap_err()
                 == Error::ExponentOverflow(Sign::Neg)
         );
+
+        // cmp
+        d1 = BigFloatNumber::from_raw_parts(&[1, WORD_MAX, WORD_SIGNIFICANT_BIT], WORD_BIT_SIZE*3, Sign::Pos, 123).unwrap();
+        d2 = BigFloatNumber::from_raw_parts(&[WORD_MAX, 1, WORD_SIGNIFICANT_BIT], WORD_BIT_SIZE*3, Sign::Pos, 123).unwrap();
+        assert!(d1.cmp(&d1) == 0);
+        assert!(d1.cmp(&d2) > 0);
+        assert!(d2.cmp(&d1) < 0);
+        d1.inv_sign();
+        d2.inv_sign();
+        assert!(d1.cmp(&d2) < 0);
+        assert!(d2.cmp(&d1) > 0);
+        d2.set_exponent(d2.get_exponent() + 1);
+        assert!(d1.cmp(&d2) > 0);
+        assert!(d2.cmp(&d1) < 0);
+        d1.inv_sign();
+        d2.inv_sign();
+        assert!(d1.cmp(&d2) < 0);
+        assert!(d2.cmp(&d1) > 0);
+
+        d3 = d1.clone().unwrap();
+        assert!(d3.cmp(&d1) == 0);
+        d3.inv_sign();
+        assert!(d3.cmp(&d1) < 0);
+
+        // cmp subnormal
+        d1 = BigFloatNumber::from_raw_parts(&[1, WORD_MAX, 1], WORD_BIT_SIZE*2+1, Sign::Pos, EXPONENT_MIN).unwrap();
+        d2 = BigFloatNumber::from_raw_parts(&[WORD_MAX, 1, 2], WORD_BIT_SIZE*2+2, Sign::Pos, EXPONENT_MIN).unwrap();
+        assert!(d1.cmp(&d1) == 0);
+        assert!(d1.cmp(&d2) < 0);
+        assert!(d2.cmp(&d1) > 0);
+        d1.inv_sign();
+        d2.inv_sign();
+        assert!(d1.cmp(&d2) > 0);
+        assert!(d2.cmp(&d1) < 0);
+
+        // abs cmp
+        d1 = BigFloatNumber::from_raw_parts(&[1, WORD_MAX, WORD_SIGNIFICANT_BIT], WORD_BIT_SIZE*3, Sign::Pos, 123).unwrap();
+        d2 = BigFloatNumber::from_raw_parts(&[WORD_MAX, 1, WORD_SIGNIFICANT_BIT], WORD_BIT_SIZE*3, Sign::Pos, 123).unwrap();
+
+        for (s1, s2) in [(Sign::Pos, Sign::Pos), (Sign::Pos, Sign::Neg), (Sign::Neg, Sign::Pos), (Sign::Neg, Sign::Neg)] {
+            d1.set_sign(s1);
+            d2.set_sign(s2);
+
+            d2.set_exponent(d1.get_exponent());
+            assert!(d1.abs_cmp(&d2) > 0);
+            assert!(d2.abs_cmp(&d1) < 0);
+            d2.set_exponent(d1.get_exponent() + 123);
+            assert!(d1.abs_cmp(&d2) < 0);
+            assert!(d2.abs_cmp(&d1) > 0);
+        }
+
+        d3 = d1.clone().unwrap();
+        assert!(d3.abs_cmp(&d1) == 0);
+        d3.inv_sign();
+        assert!(d3.abs_cmp(&d1) == 0);
+
+        // abs cmp subnormal
+        d1 = BigFloatNumber::from_raw_parts(&[1, WORD_MAX, 1], WORD_BIT_SIZE*2+1, Sign::Pos, EXPONENT_MIN).unwrap();
+        d2 = BigFloatNumber::from_raw_parts(&[WORD_MAX, 1, 2], WORD_BIT_SIZE*2+2, Sign::Neg, EXPONENT_MIN).unwrap();
+        assert!(d1.abs_cmp(&d1) == 0);
+        assert!(d1.abs_cmp(&d2) < 0);
+        assert!(d2.abs_cmp(&d1) > 0);
+        d1.inv_sign();
+        d2.inv_sign();
+        assert!(d1.abs_cmp(&d2) < 0);
+        assert!(d2.abs_cmp(&d1) > 0);
 
         // nan
         assert!(BigFloatNumber::from_f64(p, f64::NAN).unwrap_err() == Error::InvalidArgument);

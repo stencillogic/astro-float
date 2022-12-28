@@ -170,10 +170,14 @@ impl BigFloatNumber {
             };
         } else if self.get_exponent() == 1 && self.cmp(&ONE) == 0 {
             return Self::from_word(1, p);
-        } else if n.get_exponent() == 1 && n.cmp(&ONE) == 0 {
-            let mut ret = self.clone()?;
-            ret.set_precision(p, rm)?;
-            return Ok(ret);
+        } else if n.get_exponent() == 1 && n.abs_cmp(&ONE) == 0 {
+            if n.is_positive() {
+                let mut ret = self.clone()?;
+                ret.set_precision(p, rm)?;
+                return Ok(ret);
+            } else {
+                return self.reciprocal(p, rm);
+            }
         }
 
         let p = round_p(p);
@@ -209,6 +213,8 @@ impl BigFloatNumber {
 
 #[cfg(test)]
 mod test {
+
+    use crate::common::consts::TWO;
 
     use super::*;
 
@@ -375,5 +381,11 @@ mod test {
                 .cmp(&ONE)
                 == 0
         );
+
+        let rm = RoundingMode::ToOdd;
+        let d1 = TWO.pow(&ONE.neg().unwrap(), p, rm, &mut cc).unwrap();
+        let d2 = TWO.reciprocal(p, rm).unwrap();
+
+        assert!(d1.cmp(&d2) == 0);
     }
 }

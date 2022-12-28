@@ -1,7 +1,7 @@
 //! tests
 
 use crate::common::consts::ONE;
-use crate::common::util::{count_leading_ones, count_leading_zeroes_skip_first, log2_ceil};
+use crate::common::util::{count_leading_ones, count_leading_zeroes_skip_first};
 use crate::defs::{RoundingMode, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
 use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
@@ -18,11 +18,9 @@ fn ttt() {
 
     let mut cc = Consts::new().unwrap();
     let s = "";
-    let n = BigFloatNumber::parse(s, crate::Radix::Bin, 7040, RoundingMode::None).unwrap();
+    let n = BigFloatNumber::parse(s, crate::Radix::Bin, 704, RoundingMode::None).unwrap();
 
-    println!("\n\n\n\n\n\n\n\n");
-
-    let v = n.tan(7040, RoundingMode::None, &mut cc).unwrap();
+    let v = n.asinh(704, RoundingMode::None, &mut cc).unwrap();
 
     println!("{}", v.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 } */
@@ -435,7 +433,7 @@ fn test_sinh_asinh() {
 
     for _ in 0..1000 {
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
-        let d1 = BigFloatNumber::random_normal(prec, -100, 2).unwrap();
+        let d1 = BigFloatNumber::random_normal(prec, -100, 10).unwrap();
 
         let d2 = d1.sinh(prec, RoundingMode::ToEven, &mut cc).unwrap();
         let d3 = d2.asinh(prec, RoundingMode::ToEven, &mut cc).unwrap();
@@ -444,11 +442,7 @@ fn test_sinh_asinh() {
         // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-        eps.set_exponent(
-            d1.get_exponent() - prec as Exponent
-                + 2
-                + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent,
-        );
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
 
         assert!(
             d1.sub(&d3, prec, RoundingMode::ToEven)
@@ -508,13 +502,13 @@ fn test_tanh_atanh() {
 
     for _ in 0..1000 {
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
-        let d1 = BigFloatNumber::random_normal(prec, -100, 1).unwrap();
+        let d1 = BigFloatNumber::random_normal(prec, -100, 5).unwrap();
 
         let d2 = d1.tanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
         let d3 = d2.atanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+        eps.set_exponent(d1.get_exponent() - prec as Exponent + 1 + count_leading_ones(d2.get_mantissa_digits()) as Exponent);
 
         // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
