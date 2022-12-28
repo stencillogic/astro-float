@@ -111,7 +111,6 @@ mod tests {
         assert!(d3.acos(p, rm, &mut cc).unwrap().cmp(&half_pi) == 0);
         assert!(zero.acos(p, rm, &mut cc).unwrap().cmp(&half_pi) == 0);
         assert!(ONE.acos(p, rm, &mut cc).unwrap().is_zero());
-
     }
 
     #[ignore]

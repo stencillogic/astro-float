@@ -42,7 +42,7 @@ impl BigFloatNumber {
 
             x.set_exponent(x.get_exponent() + 1);
 
-            let xexp = match x.exp(p_x, RoundingMode::None, cc)  {
+            let xexp = match x.exp(p_x, RoundingMode::None, cc) {
                 Ok(v) => Ok(v),
                 Err(e) => match e {
                     Error::ExponentOverflow(s) => return Self::from_i8(s.as_int(), p),

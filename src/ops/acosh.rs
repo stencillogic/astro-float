@@ -1,7 +1,5 @@
 //! Hyperbolic arccosine.
 
-use crate::EXPONENT_MAX;
-use crate::Sign;
 use crate::common::consts::ONE;
 use crate::common::util::count_leading_zeroes_skip_first;
 use crate::common::util::round_p;
@@ -9,6 +7,8 @@ use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
 use crate::Consts;
+use crate::Sign;
+use crate::EXPONENT_MAX;
 
 impl BigFloatNumber {
     /// Computes the hyperbolic arccosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
@@ -31,19 +31,14 @@ impl BigFloatNumber {
         }
 
         if (self.get_exponent() as isize - 1) / 2 > self.get_mantissa_max_bit_len() as isize + 2 {
-
             // acosh(x) = ln(2*x)
             if self.get_exponent() == EXPONENT_MAX {
-
                 Err(Error::ExponentOverflow(Sign::Pos))
-
             } else {
-
                 let mut x = self.clone()?;
                 x.set_exponent(x.get_exponent() + 1);
                 x.ln(p, RoundingMode::None, cc)
             }
-
         } else {
             // ln(x + sqrt(x*x - 1))
 

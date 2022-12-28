@@ -229,7 +229,12 @@ mod tests {
         half_pi.set_exponent(1);
 
         assert!(d1.atan(p, rm, &mut cc).unwrap().cmp(&half_pi) == 0);
-        assert!(d2.atan(p, rm, &mut cc).unwrap().cmp(&half_pi.neg().unwrap()) == 0);
+        assert!(
+            d2.atan(p, rm, &mut cc)
+                .unwrap()
+                .cmp(&half_pi.neg().unwrap())
+                == 0
+        );
         assert!(d3.atan(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
         assert!(zero.atan(p, rm, &mut cc).unwrap().is_zero());
     }

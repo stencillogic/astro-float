@@ -1,7 +1,5 @@
 //! Hyperbolic arcsine.
 
-use crate::EXPONENT_MAX;
-use crate::Sign;
 use crate::common::consts::FOURTY;
 use crate::common::consts::ONE;
 use crate::common::consts::SIX;
@@ -11,6 +9,8 @@ use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
 use crate::Consts;
+use crate::Sign;
+use crate::EXPONENT_MAX;
 
 impl BigFloatNumber {
     /// Computes the hyperbolic arcsine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
@@ -28,16 +28,12 @@ impl BigFloatNumber {
         let mut x = self.clone()?;
 
         if self.get_exponent() as isize >= -(p as isize) / 6 {
-
-            if (self.get_exponent() as isize - 1) / 2 > self.get_mantissa_max_bit_len() as isize + 2 {
-
+            if (self.get_exponent() as isize - 1) / 2 > self.get_mantissa_max_bit_len() as isize + 2
+            {
                 // asinh(x) = ln(2*|x|) * signum(x)
                 if self.get_exponent() == EXPONENT_MAX {
-
                     Err(Error::ExponentOverflow(self.get_sign()))
-
                 } else {
-
                     let mut x = self.clone()?;
                     x.set_sign(Sign::Pos);
                     x.set_exponent(x.get_exponent() + 1);
@@ -48,7 +44,6 @@ impl BigFloatNumber {
 
                     Ok(ret)
                 }
-
             } else {
                 // ln(x + sqrt(x*x + 1))
 

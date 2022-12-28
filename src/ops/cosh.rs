@@ -1,7 +1,5 @@
 //! Hyperbolic cocosine.
 
-use crate::Consts;
-use crate::Sign;
 use crate::common::consts::FOUR;
 use crate::common::consts::ONE;
 use crate::common::consts::THREE;
@@ -15,6 +13,8 @@ use crate::ops::series::series_cost_optimize;
 use crate::ops::series::series_run;
 use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::PolycoeffGen;
+use crate::Consts;
+use crate::Sign;
 
 // Polynomial coefficient generator.
 struct CoshPolycoeffGen {
@@ -96,14 +96,14 @@ impl BigFloatNumber {
         let mut arg = self.clone()?;
 
         if self.get_exponent() > 0 {
-
             arg.set_sign(Sign::Pos);
 
-            let mut ret = if (self.get_exponent() as isize - 1) / 2 > self.get_mantissa_max_bit_len() as isize + 2 {
+            let mut ret = if (self.get_exponent() as isize - 1) / 2
+                > self.get_mantissa_max_bit_len() as isize + 2
+            {
                 // e^x / 2
-    
-                arg.exp(p, rm, cc)
 
+                arg.exp(p, rm, cc)
             } else {
                 // (e^x + e^(-x)) / 2
 
@@ -122,7 +122,6 @@ impl BigFloatNumber {
             ret.set_precision(p, rm)?;
 
             Ok(ret)
-            
         } else {
             let mut ret = arg.cosh_series(p, RoundingMode::None)?;
 
