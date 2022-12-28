@@ -37,12 +37,20 @@ impl BigFloatNumber {
             x.set_precision(p_x, RoundingMode::None)?;
 
             if x.get_exponent() == EXPONENT_MAX {
-                return Err(Error::ExponentOverflow(self.get_sign()));
+                return Self::from_i8(self.get_sign().as_int(), p);
             }
 
             x.set_exponent(x.get_exponent() + 1);
 
-            let xexp = x.exp(p_x, RoundingMode::None, cc)?;
+            let xexp = match x.exp(p_x, RoundingMode::None, cc)  {
+                Ok(v) => Ok(v),
+                Err(e) => match e {
+                    Error::ExponentOverflow(s) => return Self::from_i8(s.as_int(), p),
+                    Error::DivisionByZero => Err(Error::DivisionByZero),
+                    Error::InvalidArgument => Err(Error::InvalidArgument),
+                    Error::MemoryAllocation(a) => Err(Error::MemoryAllocation(a)),
+                },
+            }?;
 
             let d1 = xexp.sub(&ONE, p_x, RoundingMode::None)?;
             let d2 = xexp.add(&ONE, p_x, RoundingMode::None)?;
@@ -110,6 +118,18 @@ mod tests {
         // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
+
+        let d1 = BigFloatNumber::max_value(p).unwrap();
+        let d2 = BigFloatNumber::min_value(p).unwrap();
+
+        assert!(d1.tanh(p, rm, &mut cc).unwrap().cmp(&ONE) == 0);
+        assert!(d2.tanh(p, rm, &mut cc).unwrap().cmp(&ONE.neg().unwrap()) == 0);
+
+        let d3 = BigFloatNumber::min_positive(p).unwrap();
+        let zero = BigFloatNumber::new(1).unwrap();
+
+        assert!(d3.tanh(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
+        assert!(zero.tanh(p, rm, &mut cc).unwrap().is_zero());
     }
 
     #[ignore]

@@ -1,5 +1,7 @@
 //! Hyperbolic arcsine.
 
+use crate::EXPONENT_MAX;
+use crate::Sign;
 use crate::common::consts::FOURTY;
 use crate::common::consts::ONE;
 use crate::common::consts::SIX;
@@ -26,26 +28,47 @@ impl BigFloatNumber {
         let mut x = self.clone()?;
 
         if self.get_exponent() as isize >= -(p as isize) / 6 {
-            // ln(x + sqrt(x*x + 1))
 
-            // TODO: if x much larger than 1, then acosh(x) = ln(2*x)
+            if (self.get_exponent() as isize - 1) / 2 > self.get_mantissa_max_bit_len() as isize + 2 {
 
-            let p_x = p + self.get_exponent().unsigned_abs() as usize + 3;
-            x.set_precision(p_x, RoundingMode::None)?;
+                // asinh(x) = ln(2*|x|) * signum(x)
+                if self.get_exponent() == EXPONENT_MAX {
 
-            let xx = x.mul(&x, p_x, RoundingMode::None)?;
+                    Err(Error::ExponentOverflow(self.get_sign()))
 
-            let d1 = xx.add(&ONE, p_x, RoundingMode::None)?;
+                } else {
 
-            let d2 = d1.sqrt(p_x, RoundingMode::None)?;
+                    let mut x = self.clone()?;
+                    x.set_sign(Sign::Pos);
+                    x.set_exponent(x.get_exponent() + 1);
 
-            let d3 = d2.add(&x, p_x, RoundingMode::None)?;
+                    let mut ret = x.ln(p, RoundingMode::None, cc)?;
 
-            let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
+                    ret.set_sign(self.get_sign());
 
-            ret.set_precision(p, rm)?;
+                    Ok(ret)
+                }
 
-            Ok(ret)
+            } else {
+                // ln(x + sqrt(x*x + 1))
+
+                let p_x = p + self.get_exponent().unsigned_abs() as usize + 3;
+                x.set_precision(p_x, RoundingMode::None)?;
+
+                let xx = x.mul(&x, p_x, RoundingMode::None)?;
+
+                let d1 = xx.add(&ONE, p_x, RoundingMode::None)?;
+
+                let d2 = d1.sqrt(p_x, RoundingMode::None)?;
+
+                let d3 = d2.add(&x, p_x, RoundingMode::None)?;
+
+                let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
+
+                ret.set_precision(p, rm)?;
+
+                Ok(ret)
+            }
         } else {
             // short series: x - x^3/6 + 3*x^5/40 - 5*x^7/112
 
@@ -71,6 +94,8 @@ impl BigFloatNumber {
 
 #[cfg(test)]
 mod tests {
+
+    use crate::Exponent;
 
     use super::*;
 
@@ -103,6 +128,53 @@ mod tests {
         // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
+
+        let mut d1 = BigFloatNumber::max_value(p).unwrap();
+        let mut d2 = BigFloatNumber::min_value(p).unwrap();
+        let d3 = BigFloatNumber::min_positive(p).unwrap();
+        let zero = BigFloatNumber::new(1).unwrap();
+
+        assert!(d1.asinh(p, rm, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+        assert!(d2.asinh(p, rm, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Neg));
+
+        d1.set_exponent(d1.get_exponent() - 1);
+        d2.set_exponent(d2.get_exponent() - 1);
+
+        let mut eps = ONE.clone().unwrap();
+        eps.set_exponent(
+            d1.get_exponent() - p as Exponent + core::mem::size_of::<Exponent>() as Exponent * 8,
+        );
+
+        let d4 = d1.asinh(p, rm, &mut cc).unwrap();
+        let d5 = d4.sinh(p, rm, &mut cc).unwrap();
+
+        assert!(
+            d1.sub(&d5, p, RoundingMode::ToEven)
+                .unwrap()
+                .abs()
+                .unwrap()
+                .cmp(&eps)
+                < 0
+        );
+
+        let d4 = d2.asinh(p, rm, &mut cc).unwrap();
+        let d5 = d4.sinh(p, rm, &mut cc).unwrap();
+
+        eps.set_exponent(
+            d2.get_exponent() - p as Exponent + core::mem::size_of::<Exponent>() as Exponent * 8,
+        );
+
+        assert!(
+            d2.sub(&d5, p, RoundingMode::ToEven)
+                .unwrap()
+                .abs()
+                .unwrap()
+                .cmp(&eps)
+                < 0
+        );
+
+        assert!(d3.asinh(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
+        assert!(zero.asinh(p, rm, &mut cc).unwrap().is_zero());
     }
 
     #[ignore]

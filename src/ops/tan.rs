@@ -89,7 +89,7 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<
             TanPolycoeffGen,
             TanArgReductionEstimator,
-        >(p, &polycoeff_gen, -self.e as isize, 1, true);
+        >(p, &polycoeff_gen, -(self.e as isize), 1, true);
 
         let p_arg = p + reduction_times * 3 + niter * 7 + 4;
         self.set_precision(p_arg, rm)?;
@@ -238,6 +238,12 @@ mod tests {
         let n3 = BigFloatNumber::parse("4.ECDEC5EF3A1EA5339A46BC0C490F52A86A033C56BCDD413E36C657EB7757F073500B013B9A7B43C0_e+0", crate::Radix::Hex, p, RoundingMode::None).unwrap();
 
         assert!(n2.cmp(&n3) == 0);
+
+        let d3 = BigFloatNumber::min_positive(p).unwrap();
+        let zero = BigFloatNumber::new(1).unwrap();
+
+        assert!(d3.tan(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
+        assert!(zero.tan(p, rm, &mut cc).unwrap().is_zero());
     }
 
     #[ignore]

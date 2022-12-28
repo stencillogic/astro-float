@@ -1,5 +1,7 @@
 //! Hyperbolic cocosine.
 
+use crate::Consts;
+use crate::Sign;
 use crate::common::consts::FOUR;
 use crate::common::consts::ONE;
 use crate::common::consts::THREE;
@@ -90,14 +92,44 @@ impl BigFloatNumber {
     ///
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: the precision is incorrect.
-    pub fn cosh(&self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
-        let arg = self.clone()?;
+    pub fn cosh(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+        let mut arg = self.clone()?;
 
-        let mut ret = arg.cosh_series(p, RoundingMode::None)?;
+        if self.get_exponent() > 0 {
 
-        ret.set_precision(p, rm)?;
+            arg.set_sign(Sign::Pos);
 
-        Ok(ret)
+            let mut ret = if (self.get_exponent() as isize - 1) / 2 > self.get_mantissa_max_bit_len() as isize + 2 {
+                // e^x / 2
+    
+                arg.exp(p, rm, cc)
+
+            } else {
+                // (e^x + e^(-x)) / 2
+
+                let p_arg = p + 3;
+
+                arg.set_precision(p_arg, RoundingMode::None)?;
+
+                let ex = arg.exp(p_arg, rm, cc)?;
+
+                let xe = ex.reciprocal(p_arg, RoundingMode::None)?;
+
+                ex.add(&xe, p_arg, RoundingMode::None)
+            }?;
+
+            ret.set_exponent(ret.get_exponent() - 1);
+            ret.set_precision(p, rm)?;
+
+            Ok(ret)
+            
+        } else {
+            let mut ret = arg.cosh_series(p, RoundingMode::None)?;
+
+            ret.set_precision(p, rm)?;
+
+            Ok(ret)
+        }
     }
 
     /// cosh using series, for |x| < 1
@@ -110,7 +142,7 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<
             CoshPolycoeffGen,
             CoshArgReductionEstimator,
-        >(p, &polycoeff_gen, (-self.e) as isize, 2, false);
+        >(p, &polycoeff_gen, -(self.e as isize), 2, false);
 
         let p_arg = p + 1 + reduction_times * 6;
         self.set_precision(p_arg, rm)?;
@@ -166,15 +198,18 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
+    use crate::Sign;
+
     use super::*;
 
     #[test]
     fn test_cosh() {
         let p = 320;
+        let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
         let mut n1 = BigFloatNumber::from_word(1, p).unwrap();
         n1.set_exponent(0);
-        let _n2 = n1.cosh(p, rm).unwrap();
+        let _n2 = n1.cosh(p, rm, &mut cc).unwrap();
         //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
 
         // asymptotic & extrema testing
@@ -186,10 +221,22 @@ mod tests {
             RoundingMode::None,
         )
         .unwrap();
-        let n2 = n1.cosh(p, rm).unwrap();
+        let n2 = n1.cosh(p, rm, &mut cc).unwrap();
         let n3 = BigFloatNumber::parse("1.000000000000000000000000000000010B6200000000000000000000000000002E8B9840AAAAAAAAAAAAAAAAAAAAAAAAADE85C5950B78E38E38E38E38E38E38E3902814A92D7C21CDB6DB6DB6DB6DB6E_e+0", crate::Radix::Hex, p, RoundingMode::None).unwrap();
 
         assert!(n2.cmp(&n3) == 0);
+
+        let d1 = BigFloatNumber::max_value(p).unwrap();
+        let d2 = BigFloatNumber::min_value(p).unwrap();
+
+        assert!(d1.cosh(p, rm, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+        assert!(d2.cosh(p, rm, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+
+        let d3 = BigFloatNumber::min_positive(p).unwrap();
+        let zero = BigFloatNumber::new(1).unwrap();
+
+        assert!(d3.cosh(p, rm, &mut cc).unwrap().cmp(&ONE) == 0);
+        assert!(zero.cosh(p, rm, &mut cc).unwrap().cmp(&ONE) == 0);
     }
 
     #[ignore]
@@ -197,6 +244,7 @@ mod tests {
     #[cfg(feature = "std")]
     fn cosh_perf() {
         let p = 320;
+        let mut cc = Consts::new().unwrap();
         let mut n = vec![];
         for _ in 0..10000 {
             n.push(BigFloatNumber::random_normal(p, -20, 20).unwrap());
@@ -205,7 +253,7 @@ mod tests {
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.iter() {
-                let _f = ni.cosh(p, RoundingMode::ToEven).unwrap();
+                let _f = ni.cosh(p, RoundingMode::ToEven, &mut cc).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

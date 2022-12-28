@@ -1,5 +1,7 @@
 //! Hyperbolic arccosine.
 
+use crate::EXPONENT_MAX;
+use crate::Sign;
 use crate::common::consts::ONE;
 use crate::common::util::count_leading_zeroes_skip_first;
 use crate::common::util::round_p;
@@ -19,9 +21,6 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: when `self` < 1, or the precision is incorrect.
     pub fn acosh(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-        // ln(x + sqrt(x*x - 1))
-
-        // TODO: if x much larger than 1, then acosh(x) = ln(2*x)
         let p = round_p(p);
 
         let cmpone = self.cmp(&ONE);
@@ -31,34 +30,54 @@ impl BigFloatNumber {
             return Err(Error::InvalidArgument);
         }
 
-        let mut additional_prec = 0;
-        if self.get_exponent() == 1 {
-            additional_prec = count_leading_zeroes_skip_first(self.m.get_digits());
+        if (self.get_exponent() as isize - 1) / 2 > self.get_mantissa_max_bit_len() as isize + 2 {
+
+            // acosh(x) = ln(2*x)
+            if self.get_exponent() == EXPONENT_MAX {
+
+                Err(Error::ExponentOverflow(Sign::Pos))
+
+            } else {
+
+                let mut x = self.clone()?;
+                x.set_exponent(x.get_exponent() + 1);
+                x.ln(p, RoundingMode::None, cc)
+            }
+
+        } else {
+            // ln(x + sqrt(x*x - 1))
+
+            let mut additional_prec = 0;
+            if self.get_exponent() == 1 {
+                additional_prec = count_leading_zeroes_skip_first(self.m.get_digits());
+            }
+
+            let mut x = self.clone()?;
+
+            let p_x = p + 3 + additional_prec;
+            x.set_precision(p_x, RoundingMode::None)?;
+
+            let xx = x.mul(&x, p_x, RoundingMode::None)?;
+
+            let d1 = xx.sub(&ONE, p_x, RoundingMode::None)?;
+
+            let d2 = d1.sqrt(p_x, RoundingMode::None)?;
+
+            let d3 = d2.add(&x, p_x, RoundingMode::None)?;
+
+            let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
+
+            ret.set_precision(p, rm)?;
+
+            Ok(ret)
         }
-
-        let mut x = self.clone()?;
-
-        let p_x = p + 3 + additional_prec;
-        x.set_precision(p_x, RoundingMode::None)?;
-
-        let xx = x.mul(&x, p_x, RoundingMode::None)?;
-
-        let d1 = xx.sub(&ONE, p_x, RoundingMode::None)?;
-
-        let d2 = d1.sqrt(p_x, RoundingMode::None)?;
-
-        let d3 = d2.add(&x, p_x, RoundingMode::None)?;
-
-        let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
-
-        ret.set_precision(p, rm)?;
-
-        Ok(ret)
     }
 }
 
 #[cfg(test)]
 mod tests {
+
+    use crate::Exponent;
 
     use super::*;
 
@@ -91,6 +110,34 @@ mod tests {
         //println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
+
+        let mut d1 = BigFloatNumber::max_value(p).unwrap();
+        let d2 = BigFloatNumber::min_value(p).unwrap();
+        let d3 = BigFloatNumber::min_positive(p).unwrap();
+
+        assert!(d1.acosh(p, rm, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+
+        d1.set_exponent(d1.get_exponent() - 1);
+        let d4 = d1.acosh(p, rm, &mut cc).unwrap();
+        let d5 = d4.cosh(p, rm, &mut cc).unwrap();
+        let mut eps = ONE.clone().unwrap();
+        eps.set_exponent(
+            d1.get_exponent() - p as Exponent + core::mem::size_of::<Exponent>() as Exponent * 8,
+        );
+
+        assert!(
+            d1.sub(&d5, p, RoundingMode::ToEven)
+                .unwrap()
+                .abs()
+                .unwrap()
+                .cmp(&eps)
+                < 0
+        );
+
+        assert!(d2.acosh(p, rm, &mut cc).unwrap_err() == Error::InvalidArgument);
+        assert!(d3.acosh(p, rm, &mut cc).unwrap_err() == Error::InvalidArgument);
+
+        assert!(ONE.acosh(p, rm, &mut cc).unwrap().is_zero());
     }
 
     #[ignore]

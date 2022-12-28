@@ -152,6 +152,19 @@ mod tests {
         // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
+
+        let d1 = BigFloatNumber::max_value(p).unwrap();
+        let d2 = BigFloatNumber::min_value(p).unwrap();
+
+        assert!(d1.atanh(p, rm, &mut cc).unwrap_err() == Error::InvalidArgument);
+        assert!(d2.atanh(p, rm, &mut cc).unwrap_err() == Error::InvalidArgument);
+
+        // subnormal
+        let d3 = BigFloatNumber::min_positive(p).unwrap();
+        let zero = BigFloatNumber::new(1).unwrap();
+
+        assert!(d3.atanh(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
+        assert!(zero.atanh(p, rm, &mut cc).unwrap().is_zero());
     }
 
     #[ignore]

@@ -1,5 +1,7 @@
 //! Hyperbolic sine.
 
+use crate::Consts;
+use crate::Sign;
 use crate::common::consts::FOUR;
 use crate::common::consts::ONE;
 use crate::common::consts::THREE;
@@ -90,16 +92,52 @@ impl BigFloatNumber {
     ///
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: the precision is incorrect.
-    pub fn sinh(&self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
-        let arg = self.clone()?;
-
+    pub fn sinh(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+        
         let p = round_p(p);
 
-        let mut ret = arg.sinh_series(p, RoundingMode::None)?;
+        let mut arg = self.clone()?;
 
-        ret.set_precision(p, rm)?;
+        if self.get_exponent() > 0 {
 
-        Ok(ret)
+            arg.set_sign(Sign::Pos);
+
+            let mut ret = if (self.get_exponent() as isize - 1) / 2 > self.get_mantissa_max_bit_len() as isize + 2 {
+                // e^|x| / 2 * signum(x)
+    
+                arg.exp(p, rm, cc)
+
+            } else {
+                // (e^x - e^(-x)) / 2
+
+                let p_arg = p + 3;
+
+                arg.set_precision(p_arg, RoundingMode::None)?;
+
+                let ex = arg.exp(p_arg, rm, cc)?;
+
+                let xe = ex.reciprocal(p_arg, RoundingMode::None)?;
+
+                ex.sub(&xe, p_arg, RoundingMode::None)
+            }.map_err(|e| -> Error { if let Error::ExponentOverflow(_) = e {
+                Error::ExponentOverflow(self.get_sign())
+            } else {
+                e
+            }})?;
+
+            ret.set_sign(self.get_sign());
+            ret.set_exponent(ret.get_exponent() - 1);
+            ret.set_precision(p, rm)?;
+
+            Ok(ret)
+            
+        } else {
+            let mut ret = arg.sinh_series(p, RoundingMode::None)?;
+
+            ret.set_precision(p, rm)?;
+
+            Ok(ret)
+        }
     }
 
     /// sinh using series, for |x| < 1
@@ -167,16 +205,31 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
+    use crate::Sign;
+
     use super::*;
 
     #[test]
     fn test_sinh() {
         let p = 32000;
+        let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
         let mut n1 = BigFloatNumber::from_word(1, 1).unwrap();
         n1.set_exponent(0);
-        let _n2 = n1.sinh(p, rm).unwrap();
+        let _n2 = n1.sinh(p, rm, &mut cc).unwrap();
         //println!("{:?}", n2.fp3(crate::Radix::Dec, rm).unwrap());
+
+        let d1 = BigFloatNumber::max_value(p).unwrap();
+        let d2 = BigFloatNumber::min_value(p).unwrap();
+
+        assert!(d1.sinh(p, rm, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+        assert!(d2.sinh(p, rm, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Neg));
+
+        let d3 = BigFloatNumber::min_positive(p).unwrap();
+        let zero = BigFloatNumber::new(1).unwrap();
+
+        assert!(d3.sinh(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
+        assert!(zero.sinh(p, rm, &mut cc).unwrap().is_zero());
     }
 
     #[ignore]

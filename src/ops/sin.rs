@@ -129,7 +129,7 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<
             SinPolycoeffGen,
             SinArgReductionEstimator,
-        >(p, &polycoeff_gen, -self.e as isize, 2, false);
+        >(p, &polycoeff_gen, -(self.e as isize), 2, false);
 
         let p_arg = p + 1 + reduction_times * 3;
         self.set_precision(p_arg, rm)?;
@@ -239,6 +239,12 @@ mod tests {
         // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
 
         assert!(d2.cmp(&d3) == 0);
+
+        let d3 = BigFloatNumber::min_positive(p).unwrap();
+        let zero = BigFloatNumber::new(1).unwrap();
+
+        assert!(d3.sin(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
+        assert!(zero.sin(p, rm, &mut cc).unwrap().is_zero());
     }
 
     #[ignore]

@@ -437,7 +437,7 @@ fn test_sinh_asinh() {
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let d1 = BigFloatNumber::random_normal(prec, -100, 2).unwrap();
 
-        let d2 = d1.sinh(prec, RoundingMode::ToEven).unwrap();
+        let d2 = d1.sinh(prec, RoundingMode::ToEven, &mut cc).unwrap();
         let d3 = d2.asinh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
         // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
@@ -472,7 +472,7 @@ fn test_cosh_acosh() {
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let d1 = BigFloatNumber::random_normal(prec, -100, 10).unwrap();
 
-        let d2 = d1.cosh(prec, RoundingMode::ToEven).unwrap();
+        let d2 = d1.cosh(prec, RoundingMode::ToEven, &mut cc).unwrap();
         let d3 = d2.acosh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
         eps.set_exponent(

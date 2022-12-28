@@ -122,7 +122,7 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<
             AtanPolycoeffGen,
             AtanArgReductionEstimator,
-        >(p, &polycoeff_gen, -self.e as isize, 2, false);
+        >(p, &polycoeff_gen, -(self.e as isize), 2, false);
 
         let p_arg = self.get_mantissa_max_bit_len() + 1 + reduction_times * 3;
         self.set_precision(p_arg, rm)?;
@@ -218,6 +218,20 @@ mod tests {
         // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
+
+        // max, min, subnormal
+        let d1 = BigFloatNumber::max_value(p).unwrap();
+        let d2 = BigFloatNumber::min_value(p).unwrap();
+        let d3 = BigFloatNumber::min_positive(p).unwrap();
+        let zero = BigFloatNumber::new(1).unwrap();
+
+        let mut half_pi = cc.pi(p, RoundingMode::ToEven).unwrap();
+        half_pi.set_exponent(1);
+
+        assert!(d1.atan(p, rm, &mut cc).unwrap().cmp(&half_pi) == 0);
+        assert!(d2.atan(p, rm, &mut cc).unwrap().cmp(&half_pi.neg().unwrap()) == 0);
+        assert!(d3.atan(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
+        assert!(zero.atan(p, rm, &mut cc).unwrap().is_zero());
     }
 
     #[ignore]

@@ -91,6 +91,20 @@ mod tests {
         //println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
+
+        let d1 = BigFloatNumber::max_value(p).unwrap();
+        let d2 = BigFloatNumber::min_value(p).unwrap();
+        let d3 = BigFloatNumber::min_positive(p).unwrap();
+        let zero = BigFloatNumber::new(1).unwrap();
+
+        let mut half_pi = cc.pi(p, RoundingMode::ToEven).unwrap();
+        half_pi.set_exponent(1);
+
+        assert!(d1.asin(p, rm, &mut cc).is_err());
+        assert!(d2.asin(p, rm, &mut cc).is_err());
+        assert!(d3.asin(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
+        assert!(zero.asin(p, rm, &mut cc).unwrap().is_zero());
+        assert!(ONE.asin(p, rm, &mut cc).unwrap().cmp(&half_pi) == 0);
     }
 
     #[ignore]
