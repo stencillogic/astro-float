@@ -59,7 +59,6 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: when |`self`| > 1, or the precision is incorrect.
     pub fn atanh(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
-
         if self.get_exponent() == 1 && self.abs_cmp(&ONE) == 0 {
             return Err(Error::ExponentOverflow(self.get_sign()));
         }
@@ -174,7 +173,10 @@ mod tests {
         assert!(zero.atanh(p, rm, &mut cc).unwrap().is_zero());
 
         assert!(ONE.atanh(p, rm, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
-        assert!(ONE.neg().unwrap().atanh(p, rm, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Neg));
+        assert!(
+            ONE.neg().unwrap().atanh(p, rm, &mut cc).unwrap_err()
+                == Error::ExponentOverflow(Sign::Neg)
+        );
     }
 
     #[ignore]
