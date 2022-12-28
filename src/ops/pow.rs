@@ -26,9 +26,7 @@ impl BigFloatNumber {
             let x = match self.exp_positive_arg(p, cc) {
                 Ok(v) => Ok(v),
                 Err(e) => match e {
-                    Error::ExponentOverflow(_) => {
-                        Self::new(p)
-                    },
+                    Error::ExponentOverflow(_) => Self::new(p),
                     Error::DivisionByZero => Err(Error::DivisionByZero),
                     Error::InvalidArgument => Err(Error::InvalidArgument),
                     Error::MemoryAllocation(a) => Err(Error::MemoryAllocation(a)),
@@ -193,7 +191,7 @@ impl BigFloatNumber {
             Err(e) => match e {
                 Error::ExponentOverflow(Sign::Neg) => {
                     return Self::new(p);
-                },
+                }
                 Error::ExponentOverflow(Sign::Pos) => Err(Error::ExponentOverflow(Sign::Pos)),
                 Error::DivisionByZero => Err(Error::DivisionByZero),
                 Error::InvalidArgument => Err(Error::InvalidArgument),
@@ -309,23 +307,73 @@ mod test {
         let d1 = BigFloatNumber::max_value(p).unwrap();
         let d2 = BigFloatNumber::min_value(p).unwrap();
         let d3 = BigFloatNumber::min_positive(p).unwrap();
-        
-        assert!(d1.exp(p, RoundingMode::ToEven, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
-        assert!(d1.pow(&d1, p, RoundingMode::ToEven, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
-        assert!(d1.pow(&d2, p, RoundingMode::ToEven, &mut cc).unwrap().is_zero());
-        assert!(d1.pow(&d3, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&ONE) == 0);
+
+        assert!(
+            d1.exp(p, RoundingMode::ToEven, &mut cc).unwrap_err()
+                == Error::ExponentOverflow(Sign::Pos)
+        );
+        assert!(
+            d1.pow(&d1, p, RoundingMode::ToEven, &mut cc).unwrap_err()
+                == Error::ExponentOverflow(Sign::Pos)
+        );
+        assert!(d1
+            .pow(&d2, p, RoundingMode::ToEven, &mut cc)
+            .unwrap()
+            .is_zero());
+        assert!(
+            d1.pow(&d3, p, RoundingMode::ToEven, &mut cc)
+                .unwrap()
+                .cmp(&ONE)
+                == 0
+        );
 
         assert!(d2.exp(p, RoundingMode::ToEven, &mut cc).unwrap().is_zero());
 
         assert!(d3.exp(p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&ONE) == 0);
-        assert!(d3.pow(&d1, p, RoundingMode::ToEven, &mut cc).unwrap().is_zero());
-        assert!(d3.pow(&d2, p, RoundingMode::ToEven, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
-        assert!(d3.pow(&d3, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&ONE) == 0);
+        assert!(d3
+            .pow(&d1, p, RoundingMode::ToEven, &mut cc)
+            .unwrap()
+            .is_zero());
+        assert!(
+            d3.pow(&d2, p, RoundingMode::ToEven, &mut cc).unwrap_err()
+                == Error::ExponentOverflow(Sign::Pos)
+        );
+        assert!(
+            d3.pow(&d3, p, RoundingMode::ToEven, &mut cc)
+                .unwrap()
+                .cmp(&ONE)
+                == 0
+        );
 
-        assert!(d1.pow(&ONE, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&d1) == 0);
-        assert!(d3.pow(&ONE, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&d3) == 0);
-        assert!(ONE.pow(&d1, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&ONE) == 0);
-        assert!(ONE.pow(&d2, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&ONE) == 0);
-        assert!(ONE.pow(&d3, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&ONE) == 0);
+        assert!(
+            d1.pow(&ONE, p, RoundingMode::ToEven, &mut cc)
+                .unwrap()
+                .cmp(&d1)
+                == 0
+        );
+        assert!(
+            d3.pow(&ONE, p, RoundingMode::ToEven, &mut cc)
+                .unwrap()
+                .cmp(&d3)
+                == 0
+        );
+        assert!(
+            ONE.pow(&d1, p, RoundingMode::ToEven, &mut cc)
+                .unwrap()
+                .cmp(&ONE)
+                == 0
+        );
+        assert!(
+            ONE.pow(&d2, p, RoundingMode::ToEven, &mut cc)
+                .unwrap()
+                .cmp(&ONE)
+                == 0
+        );
+        assert!(
+            ONE.pow(&d3, p, RoundingMode::ToEven, &mut cc)
+                .unwrap()
+                .cmp(&ONE)
+                == 0
+        );
     }
 }

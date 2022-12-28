@@ -317,7 +317,7 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
-    use crate::common::{util::log2_ceil, consts::TEN};
+    use crate::common::{consts::TEN, util::log2_ceil};
 
     use super::*;
 
@@ -401,9 +401,11 @@ mod tests {
                         .cmp(&eps)
                         < 0
                 );
-            },
-            Err(e) => if e != Error::ExponentOverflow(Sign::Pos) {
-                panic!("unexpected error");
+            }
+            Err(e) => {
+                if e != Error::ExponentOverflow(Sign::Pos) {
+                    panic!("unexpected error");
+                }
             }
         }
 
@@ -423,9 +425,11 @@ mod tests {
                         .cmp(&eps)
                         < 0
                 );
-            },
-            Err(e) => if e != Error::ExponentOverflow(Sign::Pos) {
-                panic!("unexpected error");
+            }
+            Err(e) => {
+                if e != Error::ExponentOverflow(Sign::Pos) {
+                    panic!("unexpected error");
+                }
             }
         }
 
@@ -482,7 +486,6 @@ mod tests {
         assert!(d2.log(&d2, prec, rm, &mut cc).unwrap().cmp(&ONE) == 0);
         assert!(d1.log(&d2, prec, rm, &mut cc).is_ok());
         assert!(d2.log(&d1, prec, rm, &mut cc).is_ok());
-
     }
 
     #[ignore]
