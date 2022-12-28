@@ -20,6 +20,37 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: the precision is incorrect.
     pub fn exp(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+        let p = round_p(p);
+
+        let mut ret = if self.is_negative() {
+            let x = match self.exp_positive_arg(p, cc) {
+                Ok(v) => Ok(v),
+                Err(e) => match e {
+                    Error::ExponentOverflow(_) => {
+                        Self::new(p)
+                    },
+                    Error::DivisionByZero => Err(Error::DivisionByZero),
+                    Error::InvalidArgument => Err(Error::InvalidArgument),
+                    Error::MemoryAllocation(a) => Err(Error::MemoryAllocation(a)),
+                },
+            }?;
+
+            if x.is_zero() {
+                Ok(x)
+            } else {
+                x.reciprocal(x.get_mantissa_max_bit_len(), RoundingMode::None)
+            }
+        } else {
+            self.exp_positive_arg(p, cc)
+        }?;
+
+        ret.set_precision(p, rm)?;
+
+        Ok(ret)
+    }
+
+    // exp for positive argument
+    fn exp_positive_arg(&self, p: usize, cc: &mut Consts) -> Result<Self, Error> {
         if self.is_zero() {
             return Self::from_word(1, p);
         }
@@ -28,34 +59,24 @@ impl BigFloatNumber {
             return Err(Error::ExponentOverflow(self.get_sign()));
         }
 
-        let p = round_p(p);
+        let p_work = p + 4;
 
         // compute separately for int and fract parts, then combine the results.
         let int = self.get_int_as_usize()?;
         let e_int = if int > 0 {
-            let e_const = cc.e(p + 1, RoundingMode::None)?;
+            let e_const = cc.e(p_work, RoundingMode::None)?;
 
-            e_const.powi(int, e_const.get_mantissa_max_bit_len(), RoundingMode::None)
+            e_const.powi(int, p_work, RoundingMode::None)
         } else {
             ONE.clone()
         }?;
 
         let mut fract = self.fract()?;
-        fract.set_precision(p + 4, RoundingMode::None)?;
+        fract.set_precision(p_work, RoundingMode::None)?;
         fract.set_sign(Sign::Pos);
         let e_fract = fract.expf(RoundingMode::None)?;
 
-        let ret_p = e_int
-            .get_mantissa_max_bit_len()
-            .max(e_fract.get_mantissa_max_bit_len());
-        let mut ret = e_int.mul(&e_fract, ret_p, RoundingMode::None)?;
-        if self.is_negative() {
-            ret = ret.reciprocal(ret_p, RoundingMode::None)?;
-        };
-
-        ret.set_precision(p, rm)?;
-
-        Ok(ret)
+        e_int.mul(&e_fract, p_work, RoundingMode::None)
     }
 
     /// Compute the power of `self` to the integer `i` with precision `p`. The result is rounded using the rounding mode `rm`.
@@ -141,9 +162,7 @@ impl BigFloatNumber {
     ) -> Result<Self, Error> {
         if self.is_negative() {
             return Err(Error::InvalidArgument);
-        }
-
-        if self.is_zero() {
+        } else if self.is_zero() {
             return if n.is_negative() {
                 Err(Error::ExponentOverflow(Sign::Pos))
             } else if n.is_zero() {
@@ -151,6 +170,12 @@ impl BigFloatNumber {
             } else {
                 Self::new(p)
             };
+        } else if self.get_exponent() == 1 && self.cmp(&ONE) == 0 {
+            return Self::from_word(1, p);
+        } else if n.get_exponent() == 1 && n.cmp(&ONE) == 0 {
+            let mut ret = self.clone()?;
+            ret.set_precision(p, rm)?;
+            return Ok(ret);
         }
 
         let p = round_p(p);
@@ -162,7 +187,20 @@ impl BigFloatNumber {
         x.set_precision(p_ext, RoundingMode::None)?;
 
         let ln = x.ln(p_ext, RoundingMode::None, cc)?;
-        let m = n.mul(&ln, p_ext, RoundingMode::None)?;
+
+        let m = match n.mul(&ln, p_ext, RoundingMode::None) {
+            Ok(v) => Ok(v),
+            Err(e) => match e {
+                Error::ExponentOverflow(Sign::Neg) => {
+                    return Self::new(p);
+                },
+                Error::ExponentOverflow(Sign::Pos) => Err(Error::ExponentOverflow(Sign::Pos)),
+                Error::DivisionByZero => Err(Error::DivisionByZero),
+                Error::InvalidArgument => Err(Error::InvalidArgument),
+                Error::MemoryAllocation(a) => Err(Error::MemoryAllocation(a)),
+            },
+        }?;
+
         let mut ret = m.exp(p_ext, RoundingMode::None, cc)?;
 
         ret.set_precision(p, rm)?;
@@ -266,5 +304,28 @@ mod test {
         // println!("{:?}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
         assert!(d4.cmp(&d3) == 0);
+
+        // max, min, subnormal
+        let d1 = BigFloatNumber::max_value(p).unwrap();
+        let d2 = BigFloatNumber::min_value(p).unwrap();
+        let d3 = BigFloatNumber::min_positive(p).unwrap();
+        
+        assert!(d1.exp(p, RoundingMode::ToEven, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+        assert!(d1.pow(&d1, p, RoundingMode::ToEven, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+        assert!(d1.pow(&d2, p, RoundingMode::ToEven, &mut cc).unwrap().is_zero());
+        assert!(d1.pow(&d3, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&ONE) == 0);
+
+        assert!(d2.exp(p, RoundingMode::ToEven, &mut cc).unwrap().is_zero());
+
+        assert!(d3.exp(p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&ONE) == 0);
+        assert!(d3.pow(&d1, p, RoundingMode::ToEven, &mut cc).unwrap().is_zero());
+        assert!(d3.pow(&d2, p, RoundingMode::ToEven, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+        assert!(d3.pow(&d3, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&ONE) == 0);
+
+        assert!(d1.pow(&ONE, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&d1) == 0);
+        assert!(d3.pow(&ONE, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&d3) == 0);
+        assert!(ONE.pow(&d1, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&ONE) == 0);
+        assert!(ONE.pow(&d2, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&ONE) == 0);
+        assert!(ONE.pow(&d3, p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&ONE) == 0);
     }
 }

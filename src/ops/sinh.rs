@@ -110,7 +110,7 @@ impl BigFloatNumber {
         let (reduction_times, niter) = series_cost_optimize::<
             SinhPolycoeffGen,
             SinhArgReductionEstimator,
-        >(p, &polycoeff_gen, (-self.e) as isize, 2, false);
+        >(p, &polycoeff_gen, -(self.e as isize), 2, false);
 
         let p_arg = p + 1 + reduction_times * 3;
         self.set_precision(p_arg, rm)?;

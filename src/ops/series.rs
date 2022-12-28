@@ -89,7 +89,15 @@ pub fn series_run<T: PolycoeffGen>(
     polycoeff_gen: &mut T,
     rm: RoundingMode,
 ) -> Result<BigFloatNumber, Error> {
-    if niter >= RECT_ITER_THRESHOLD {
+    if x_first.is_zero() {
+        Ok(acc)
+    } else if x_step.is_zero() {
+        let p = acc.get_mantissa_max_bit_len().max(x_first.get_mantissa_max_bit_len());
+        let is_div = polycoeff_gen.is_div();
+        let coeff = polycoeff_gen.next(rm)?;
+        let part = if is_div { x_first.div(coeff, p, rm) } else { x_first.mul(coeff, p, rm) }?;
+        acc.add(&part, p, rm)
+    } else if niter >= RECT_ITER_THRESHOLD {
         series_rectangular(niter, acc, x_first, x_step, polycoeff_gen, rm)
     } else if polycoeff_gen.is_div() {
         series_linear(acc, x_first, x_step, polycoeff_gen, rm)

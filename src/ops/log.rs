@@ -283,6 +283,7 @@ impl BigFloatNumber {
     ///
     ///  - InvalidArgument: the argument is zero or negative, or the precision is incorrect.
     ///  - MemoryAllocation: failed to allocate memory.
+    ///  - DivisionByZero: `n` = 1
     pub fn log(
         &self,
         n: &Self,
@@ -316,7 +317,7 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
-    use crate::common::util::log2_ceil;
+    use crate::common::{util::log2_ceil, consts::TEN};
 
     use super::*;
 
@@ -384,9 +385,52 @@ mod tests {
                 < 0
         );
 
+        let d2 = d1.log2(prec, RoundingMode::ToEven, &mut cc).unwrap();
+        match TWO.pow(&d2, prec, RoundingMode::ToEven, &mut cc) {
+            Ok(d3) => {
+                eps.set_exponent(
+                    d1.get_exponent() - prec as Exponent
+                        + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent,
+                );
+
+                assert!(
+                    d1.sub(&d3, prec, RoundingMode::ToEven)
+                        .unwrap()
+                        .abs()
+                        .unwrap()
+                        .cmp(&eps)
+                        < 0
+                );
+            },
+            Err(e) => if e != Error::ExponentOverflow(Sign::Pos) {
+                panic!("unexpected error");
+            }
+        }
+
+        let d2 = d1.log10(prec, RoundingMode::ToEven, &mut cc).unwrap();
+        match TEN.pow(&d2, prec, RoundingMode::ToEven, &mut cc) {
+            Ok(d3) => {
+                eps.set_exponent(
+                    d1.get_exponent() - prec as Exponent
+                        + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent,
+                );
+
+                assert!(
+                    d1.sub(&d3, prec, RoundingMode::ToEven)
+                        .unwrap()
+                        .abs()
+                        .unwrap()
+                        .cmp(&eps)
+                        < 0
+                );
+            },
+            Err(e) => if e != Error::ExponentOverflow(Sign::Pos) {
+                panic!("unexpected error");
+            }
+        }
+
         // MIN
-        let mut d1 = BigFloatNumber::min_positive(prec).unwrap();
-        d1.set_exponent(d1.get_exponent() + d1.get_mantissa_max_bit_len() as Exponent + 2); // avoid exp() overflow
+        let d1 = BigFloatNumber::min_positive(prec).unwrap();
         let d2 = d1.ln(prec, RoundingMode::ToEven, &mut cc).unwrap();
         let d3 = d2.exp(prec, RoundingMode::ToEven, &mut cc).unwrap();
         let eps = BigFloatNumber::min_positive_normal(prec).unwrap();
@@ -399,6 +443,46 @@ mod tests {
                 .cmp(&eps)
                 <= 0
         );
+
+        let d1 = BigFloatNumber::min_positive(prec).unwrap();
+        let d2 = d1.log2(prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = TWO.pow(&d2, prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let eps = BigFloatNumber::min_positive_normal(prec).unwrap();
+
+        assert!(
+            d1.sub(&d3, prec, RoundingMode::ToEven)
+                .unwrap()
+                .abs()
+                .unwrap()
+                .cmp(&eps)
+                <= 0
+        );
+
+        let d1 = BigFloatNumber::min_positive(prec).unwrap();
+        let d2 = d1.log10(prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let d3 = TEN.pow(&d2, prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let eps = BigFloatNumber::min_positive_normal(prec).unwrap();
+
+        assert!(
+            d1.sub(&d3, prec, RoundingMode::ToEven)
+                .unwrap()
+                .abs()
+                .unwrap()
+                .cmp(&eps)
+                <= 0
+        );
+
+        // arbitrary base
+        assert!(TWO.log(&ONE, p, rm, &mut cc).unwrap_err() == Error::DivisionByZero);
+
+        let d1 = BigFloatNumber::min_positive(prec).unwrap();
+        let d2 = BigFloatNumber::max_value(prec).unwrap();
+
+        assert!(d1.log(&d1, prec, rm, &mut cc).unwrap().cmp(&ONE) == 0);
+        assert!(d2.log(&d2, prec, rm, &mut cc).unwrap().cmp(&ONE) == 0);
+        assert!(d1.log(&d2, prec, rm, &mut cc).is_ok());
+        assert!(d2.log(&d1, prec, rm, &mut cc).is_ok());
+
     }
 
     #[ignore]
