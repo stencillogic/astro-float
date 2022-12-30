@@ -2199,8 +2199,8 @@ mod tests {
         }
 
         for _ in 0..1000 {
-            let p1 = (random::<usize>() % 2 + 1) * WORD_BIT_SIZE;
-            let p2 = (random::<usize>() % 2 + 1) * WORD_BIT_SIZE;
+            let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+            let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
             let p = p1.max(p2);
 
             d1 = BigFloatNumber::random_normal(
