@@ -1,6 +1,6 @@
 //! Auxiliary structures.
 
-use crate::{Word, WORD_BIT_SIZE, defs::WORD_SIGNIFICANT_BIT};
+use crate::{defs::WORD_SIGNIFICANT_BIT, Word, WORD_BIT_SIZE};
 
 /// Length of the slice extended by extra size.
 pub struct ExtendedSlice<T, V>
@@ -121,14 +121,20 @@ where
 }
 
 // Represent subnormal as normalized.
-pub struct NormalizedView<T> where T: Iterator<Item = Word> {
+pub struct NormalizedView<T>
+where
+    T: Iterator<Item = Word>,
+{
     iter: T,
     shift: usize,
     prev: Word,
     end: bool,
 }
 
-impl<T> NormalizedView<T>  where T: Iterator<Item = Word> {
+impl<T> NormalizedView<T>
+where
+    T: Iterator<Item = Word>,
+{
     pub fn new(mut iter: T) -> Self {
         let mut shift = 0;
         let mut end = true;
@@ -155,8 +161,10 @@ impl<T> NormalizedView<T>  where T: Iterator<Item = Word> {
     }
 }
 
-
-impl<T> Iterator for NormalizedView<T> where T: Iterator<Item = Word> {
+impl<T> Iterator for NormalizedView<T>
+where
+    T: Iterator<Item = Word>,
+{
     type Item = Word;
 
     fn next(&mut self) -> Option<Self::Item> {

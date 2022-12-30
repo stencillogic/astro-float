@@ -355,7 +355,12 @@ impl BigFloatNumber {
                 let (_shift, mut m3) = m3.normilize()?;
 
                 if e < EXPONENT_MIN as isize {
-                    if !Self::process_subnormal(&mut m3, &mut e, RoundingMode::None, self.is_positive()) {
+                    if !Self::process_subnormal(
+                        &mut m3,
+                        &mut e,
+                        RoundingMode::None,
+                        self.is_positive(),
+                    ) {
                         return Self::new(self.m.max_bit_len());
                     }
                 }
@@ -597,11 +602,9 @@ impl BigFloatNumber {
             }
         }
 
-        let n1 = self.get_mantissa_max_bit_len() as isize
-            - self.get_precision() as isize;
+        let n1 = self.get_mantissa_max_bit_len() as isize - self.get_precision() as isize;
 
-        let n2 = d2.get_mantissa_max_bit_len() as isize
-            - d2.get_precision() as isize;
+        let n2 = d2.get_mantissa_max_bit_len() as isize - d2.get_precision() as isize;
 
         let e: isize = self.e as isize - n1 - d2.e as isize + n2;
         if e > 0 {
@@ -1226,7 +1229,7 @@ impl_int_conv!(i64, u64, from_i64, from_u64);
 #[cfg(test)]
 mod tests {
 
-    use crate::{defs::WORD_MAX, common::util::random_subnormal};
+    use crate::{common::util::random_subnormal, defs::WORD_MAX};
 
     use super::*;
     use rand::random;
@@ -1241,7 +1244,7 @@ mod tests {
         let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
-        
+
         let rm = RoundingMode::ToEven;
 
         let mut d1;
@@ -1499,7 +1502,6 @@ mod tests {
 
         // add & sub & cmp
         for _ in 0..10000 {
-
             let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
             let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
             let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
@@ -1691,11 +1693,15 @@ mod tests {
             let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
             let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
 
-            d1 = BigFloatNumber::random_normal(p1, EXPONENT_MIN / 2 + p as Exponent, EXPONENT_MAX / 2).unwrap();
+            d1 = BigFloatNumber::random_normal(
+                p1,
+                EXPONENT_MIN / 2 + p as Exponent,
+                EXPONENT_MAX / 2,
+            )
+            .unwrap();
             d2 = BigFloatNumber::random_normal(p2, EXPONENT_MIN / 2, EXPONENT_MAX / 2).unwrap();
 
             if !d2.is_zero() {
-
                 let d4 = if i & 1 == 0 {
                     let d3 = d1.div(&d2, p, RoundingMode::ToEven).unwrap();
                     d3.mul(&d2, p, RoundingMode::ToEven).unwrap()
@@ -1740,7 +1746,7 @@ mod tests {
             let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
             let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
             let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
-            
+
             d1 = BigFloatNumber::random_normal(
                 p1,
                 EXPONENT_MIN / 2 + p as Exponent, // avoid subnormal numbers
@@ -1773,7 +1779,6 @@ mod tests {
             d2 = BigFloatNumber::random_normal(p2, EXPONENT_MIN / 2, EXPONENT_MAX / 2).unwrap();
 
             if !d2.is_zero() {
-
                 let d4 = if i & 1 == 0 {
                     let d3 = d1.div(&d2, p, RoundingMode::ToEven).unwrap();
                     d3.mul(&d2, p, RoundingMode::ToEven).unwrap()
@@ -1884,12 +1889,12 @@ mod tests {
 
             d1 = BigFloatNumber::random_normal(
                 p1,
-                EXPONENT_MIN + p as Exponent,   // avoid exponent overflow error
+                EXPONENT_MIN + p as Exponent, // avoid exponent overflow error
                 EXPONENT_MAX,
-            ).unwrap();
+            )
+            .unwrap();
 
             if !d1.is_zero() {
-
                 let d3 = d1.reciprocal(p, rm).unwrap();
                 let d4 = ONE.div(&d3, p, rm).unwrap();
 
@@ -1907,7 +1912,8 @@ mod tests {
             crate::Radix::Hex,
             320,
             RoundingMode::None,
-        ).unwrap();
+        )
+        .unwrap();
 
         d2 = d1.reciprocal(320, RoundingMode::ToEven).unwrap();
         d3 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000000D237A0818813B78_e+0", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
@@ -2144,10 +2150,14 @@ mod tests {
             let p2 = (random::<usize>() % 2 + 1) * WORD_BIT_SIZE;
             let p = p1.max(p2);
 
-            d1 = BigFloatNumber::random_normal(p1, EXPONENT_MIN / 2 - p1 as Exponent, EXPONENT_MAX / 2)
-                .unwrap()
-                .abs()
-                .unwrap();
+            d1 = BigFloatNumber::random_normal(
+                p1,
+                EXPONENT_MIN / 2 - p1 as Exponent,
+                EXPONENT_MAX / 2,
+            )
+            .unwrap()
+            .abs()
+            .unwrap();
             d2 = BigFloatNumber::random_normal(p2, d1.get_exponent() - 1, d1.get_exponent() + 1)
                 .unwrap()
                 .abs()
@@ -2165,7 +2175,8 @@ mod tests {
                         .unwrap(),
                     p + 1,
                     RoundingMode::ToEven,
-                ).unwrap();
+                )
+                .unwrap();
 
             // println!("\n{:?}", d1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
             // println!("{:?}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
@@ -2197,7 +2208,14 @@ mod tests {
             ret.set_exponent((ret.get_mantissa_max_bit_len() - ret.get_precision()) as Exponent);
             d3.set_exponent(0);
 
-            assert!(ret.sub(&d3, p, RoundingMode::ToEven).unwrap().abs().unwrap().cmp(&eps) <= 0);
+            assert!(
+                ret.sub(&d3, p, RoundingMode::ToEven)
+                    .unwrap()
+                    .abs()
+                    .unwrap()
+                    .cmp(&eps)
+                    <= 0
+            );
         }
 
         let d1 = BigFloatNumber::parse("3.0", crate::Radix::Dec, 128, RoundingMode::None).unwrap();

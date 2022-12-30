@@ -15,8 +15,8 @@ use crate::defs::WORD_BIT_SIZE;
 use crate::defs::WORD_MAX;
 use crate::defs::WORD_SIGNIFICANT_BIT;
 use crate::mantissa::util::ExtendedSlice;
-use crate::mantissa::util::RightShiftedSlice;
 use crate::mantissa::util::NormalizedView;
+use crate::mantissa::util::RightShiftedSlice;
 use core::mem::size_of;
 use itertools::izip;
 
@@ -207,19 +207,28 @@ impl Mantissa {
 
     /// Compare to m2 and return positive if self > m2, negative if self < m2, 0 otherwise.
     pub fn abs_cmp(&self, m2: &Self, normalized: bool) -> SignedWord {
-
-        let deref = |x: &Word| { *x };
+        let deref = |x: &Word| *x;
         let n = self.len().min(m2.len());
 
         if normalized {
-            Self::cmp_iters(self.m.iter().rev().map(deref), m2.m.iter().rev().map(deref), n)
+            Self::cmp_iters(
+                self.m.iter().rev().map(deref),
+                m2.m.iter().rev().map(deref),
+                n,
+            )
         } else {
-            Self::cmp_iters(NormalizedView::new(self.m.iter().rev().map(deref)), 
-            NormalizedView::new(m2.m.iter().rev().map(deref)), n)
+            Self::cmp_iters(
+                NormalizedView::new(self.m.iter().rev().map(deref)),
+                NormalizedView::new(m2.m.iter().rev().map(deref)),
+                n,
+            )
         }
     }
 
-    fn cmp_iters<T>(mut iter1: T, mut iter2: T, n: usize) -> SignedWord where T: Iterator<Item = Word> {
+    fn cmp_iters<T>(mut iter1: T, mut iter2: T, n: usize) -> SignedWord
+    where
+        T: Iterator<Item = Word>,
+    {
         for (a, b) in core::iter::zip(iter1.by_ref(), iter2.by_ref()).take(n) {
             let diff = a as SignedWord - b as SignedWord;
             if diff != 0 {

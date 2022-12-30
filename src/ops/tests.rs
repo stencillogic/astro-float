@@ -21,7 +21,7 @@ fn ttt() {
     let n1 = BigFloatNumber::parse(s, crate::Radix::Bin, 320, RoundingMode::None).unwrap();
     let s = "-1.101110101111000000011101000010110111011100110000010011011000001e+0";
     let n2 = BigFloatNumber::parse(s, crate::Radix::Bin, 64, RoundingMode::None).unwrap();
-    
+
     println!("{:?}", n1);
     println!("{:?}", n2);
 
