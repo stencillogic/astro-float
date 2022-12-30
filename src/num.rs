@@ -759,15 +759,33 @@ impl BigFloatNumber {
     /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    pub fn from_raw_parts(m: &[Word], n: usize, s: Sign, e: Exponent) -> Result<Self, Error> {
-        if m.len() * WORD_BIT_SIZE >= isize::MAX as usize / 2 || n > m.len() * WORD_BIT_SIZE {
-            return Err(Error::InvalidArgument);
+    ///  - InvalidArgument: `n` is larger than the number of bits in `m`;
+    /// `n` is smaller than the number of bits in `m`, but `m` does not represent corresponding subnormal number mantissa;
+    /// `n` is smaller than the number of bits in `m`, but `e` is not the minimum possible exponent;
+    /// `n` or the size of `m` is too large.
+    pub fn from_raw_parts(m: &[Word], n: usize, s: Sign, mut e: Exponent) -> Result<Self, Error> {
+        let p = m.len() * WORD_BIT_SIZE;
+        Self::p_assertion(p)?;
+
+        if n > p {
+            Err(Error::InvalidArgument)
+        } else {
+            let m = Mantissa::from_words(p, m)?;
+
+            if m.bit_len() != n {
+                return Err(Error::InvalidArgument);
+            }
+
+            if n > 0 && n < p && e > EXPONENT_MIN {
+                return Err(Error::InvalidArgument);
+            }
+
+            if n == 0 {
+                e = 0;
+            }
+
+            Ok(BigFloatNumber { e, s, m })
         }
-        Ok(BigFloatNumber {
-            e,
-            s,
-            m: Mantissa::from_raw_parts(m, n)?,
-        })
     }
 
     /// Returns sign of a number.
@@ -1252,8 +1270,6 @@ mod tests {
         let mut d3;
         let mut ref_num;
         let mut eps = ONE.clone().unwrap();
-
-        //let n1 = BigFloatNumber::from_raw_parts(&[4165624164, 2129500405, 2551748857, 998953334, 3485534795, 1427512576, 426727679, 2298894833, 2107497530, 385370716, 2626967463, 2694802314, 2373730166], 416, Sign::Neg, 301499356).unwrap();
 
         // inf
         assert!(
@@ -2026,6 +2042,43 @@ mod tests {
         let (m, n, s, e) = d1.to_raw_parts();
         d2 = BigFloatNumber::from_raw_parts(m, n, s, e).unwrap();
         assert!(d1.cmp(&d2) == 0);
+        assert!(BigFloatNumber::from_raw_parts(
+            &[1, WORD_SIGNIFICANT_BIT],
+            WORD_BIT_SIZE * 3,
+            Sign::Pos,
+            123
+        )
+        .is_err());
+        assert!(BigFloatNumber::from_raw_parts(
+            &[1, WORD_SIGNIFICANT_BIT],
+            WORD_BIT_SIZE * 2,
+            Sign::Pos,
+            123
+        )
+        .is_ok());
+        assert!(BigFloatNumber::from_raw_parts(
+            &[1, WORD_SIGNIFICANT_BIT],
+            WORD_BIT_SIZE,
+            Sign::Pos,
+            123
+        )
+        .is_err());
+        assert!(BigFloatNumber::from_raw_parts(&[0, 0], 0, Sign::Pos, 0).is_ok());
+        assert!(BigFloatNumber::from_raw_parts(&[1, 0], 0, Sign::Pos, 0).is_err());
+        assert!(
+            BigFloatNumber::from_raw_parts(&[1, 2], WORD_BIT_SIZE, Sign::Pos, EXPONENT_MIN)
+                .is_err()
+        );
+        assert!(
+            BigFloatNumber::from_raw_parts(&[1, 2], WORD_BIT_SIZE + 2, Sign::Pos, 123).is_err()
+        );
+        assert!(BigFloatNumber::from_raw_parts(
+            &[1, 2],
+            WORD_BIT_SIZE + 2,
+            Sign::Pos,
+            EXPONENT_MIN
+        )
+        .is_ok());
 
         // sign and exponent
         d1 = one.clone().unwrap();
