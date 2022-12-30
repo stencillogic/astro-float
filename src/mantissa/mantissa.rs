@@ -16,6 +16,7 @@ use crate::defs::WORD_MAX;
 use crate::defs::WORD_SIGNIFICANT_BIT;
 use crate::mantissa::util::ExtendedSlice;
 use crate::mantissa::util::RightShiftedSlice;
+use crate::mantissa::util::NormalizedView;
 use core::mem::size_of;
 use itertools::izip;
 
@@ -114,6 +115,11 @@ impl Mantissa {
         self.n = 0;
     }
 
+    #[inline]
+    pub fn set_bit_len(&mut self, n: usize) {
+        self.n = n;
+    }
+
     /// Shift right by n bits.
     pub fn shift_right(&mut self, n: usize) {
         shift_slice_right(&mut self.m, n)
@@ -200,24 +206,35 @@ impl Mantissa {
     }
 
     /// Compare to m2 and return positive if self > m2, negative if self < m2, 0 otherwise.
-    pub fn abs_cmp(&self, m2: &Self) -> SignedWord {
-        let len = self.len().min(m2.len());
+    pub fn abs_cmp(&self, m2: &Self, normalized: bool) -> SignedWord {
 
-        for (a, b) in core::iter::zip(self.m.iter().rev(), m2.m.iter().rev()) {
-            let diff = *a as SignedWord - *b as SignedWord;
+        let deref = |x: &Word| { *x };
+        let n = self.len().min(m2.len());
+
+        if normalized {
+            Self::cmp_iters(self.m.iter().rev().map(deref), m2.m.iter().rev().map(deref), n)
+        } else {
+            Self::cmp_iters(NormalizedView::new(self.m.iter().rev().map(deref)), 
+            NormalizedView::new(m2.m.iter().rev().map(deref)), n)
+        }
+    }
+
+    fn cmp_iters<T>(mut iter1: T, mut iter2: T, n: usize) -> SignedWord where T: Iterator<Item = Word> {
+        for (a, b) in core::iter::zip(iter1.by_ref(), iter2.by_ref()).take(n) {
+            let diff = a as SignedWord - b as SignedWord;
             if diff != 0 {
                 return diff;
             }
         }
 
-        for v in &self.m[..self.m.len() - len] {
-            if *v != 0 {
+        for v in iter1 {
+            if v != 0 {
                 return 1;
             }
         }
 
-        for v in &m2.m[..m2.m.len() - len] {
-            if *v != 0 {
+        for v in iter2 {
+            if v != 0 {
                 return -1;
             }
         }
@@ -476,7 +493,7 @@ impl Mantissa {
             m1[l..].copy_from_slice(&self.m);
             m1[..l].fill(0);
         } else {
-            m1.copy_from_slice(&self.m[..k]);
+            m1.copy_from_slice(&self.m[self.m.len() - k..]);
         }
 
         let (q, _r) = Self::div_unbalanced(&m1, &m2.m)?;

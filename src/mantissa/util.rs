@@ -1,5 +1,7 @@
 //! Auxiliary structures.
 
+use crate::{Word, WORD_BIT_SIZE, defs::WORD_SIGNIFICANT_BIT};
+
 /// Length of the slice extended by extra size.
 pub struct ExtendedSlice<T, V>
 where
@@ -114,6 +116,71 @@ where
             }
         } else {
             Some(self.default)
+        }
+    }
+}
+
+// Represent subnormal as normalized.
+pub struct NormalizedView<T> where T: Iterator<Item = Word> {
+    iter: T,
+    shift: usize,
+    prev: Word,
+    end: bool,
+}
+
+impl<T> NormalizedView<T>  where T: Iterator<Item = Word> {
+    pub fn new(mut iter: T) -> Self {
+        let mut shift = 0;
+        let mut end = true;
+        let mut prev = 0;
+
+        for mut v in iter.by_ref() {
+            if v != 0 {
+                prev = v;
+                while v < WORD_SIGNIFICANT_BIT {
+                    v <<= 1;
+                    shift += 1;
+                }
+                end = false;
+                break;
+            }
+        }
+
+        Self {
+            iter,
+            shift,
+            prev,
+            end,
+        }
+    }
+}
+
+
+impl<T> Iterator for NormalizedView<T> where T: Iterator<Item = Word> {
+    type Item = Word;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.end {
+            if self.shift == 0 {
+                let ret = self.prev;
+                if let Some(v) = self.iter.next() {
+                    self.prev = v;
+                } else {
+                    self.end = true;
+                };
+                Some(ret)
+            } else {
+                let mut ret = self.prev << self.shift;
+                if let Some(v) = self.iter.next() {
+                    ret |= v >> (WORD_BIT_SIZE - self.shift);
+                    self.prev = v;
+                } else {
+                    self.end = true;
+                };
+                Some(ret)
+            }
+        } else {
+            None
         }
     }
 }

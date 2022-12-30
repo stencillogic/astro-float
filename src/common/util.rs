@@ -2,6 +2,9 @@
 
 use crate::defs::{Word, WORD_BIT_SIZE, WORD_MAX, WORD_SIGNIFICANT_BIT};
 
+#[cfg(test)]
+use crate::{BigFloatNumber, Sign, EXPONENT_MIN};
+
 /// integer logarithm base 2 of a number.
 pub fn log2_ceil(mut n: usize) -> usize {
     let mut ret = 0;
@@ -309,4 +312,29 @@ pub fn count_leading_ones(m: &[Word]) -> usize {
 /// Round precision to word bounday.
 pub fn round_p(p: usize) -> usize {
     ((p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE) * WORD_BIT_SIZE
+}
+
+/// Returns random subnormal number.
+#[cfg(test)]
+pub fn random_subnormal(p: usize) -> BigFloatNumber {
+    let p = round_p(if p < 3  * WORD_BIT_SIZE { 3 * WORD_BIT_SIZE } else { p });
+    let n = p - rand::random::<usize>() % (2 * WORD_BIT_SIZE) - 1;
+    let mut m = Vec::with_capacity(p / WORD_BIT_SIZE);
+
+    for _ in 0..n / WORD_BIT_SIZE {
+        m.push(rand::random::<Word>());
+    }
+
+    if n % WORD_BIT_SIZE > 0 {
+        let w = (rand::random::<Word>() | WORD_SIGNIFICANT_BIT) >> (WORD_BIT_SIZE - n % WORD_BIT_SIZE);
+        m.push(w);
+    } else {
+        *m.last_mut().unwrap() |= WORD_SIGNIFICANT_BIT;
+    }
+
+    m.resize(p / WORD_BIT_SIZE, 0);
+
+    let s = if rand::random::<u8>() & 1 == 0 { Sign::Pos } else { Sign::Neg };
+
+    BigFloatNumber::from_raw_parts(&m, n, s, EXPONENT_MIN).unwrap()
 }

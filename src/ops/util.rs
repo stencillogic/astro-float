@@ -13,7 +13,7 @@ impl BigFloatNumber {
 
             pi.set_exponent(pi.get_exponent() + 1);
 
-            self.rem(&pi, rm)
+            self.rem(&pi)
         } else {
             Ok(self)
         }

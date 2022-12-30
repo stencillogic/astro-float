@@ -72,17 +72,17 @@ impl BigFloatNumber {
 
             if e < 1 {
                 let _ = match rdx {
-                    Radix::Bin => write!(mstr, "e-{:b}", (e - 1).unsigned_abs()),
-                    Radix::Oct => write!(mstr, "e-{:o}", (e - 1).unsigned_abs()),
-                    Radix::Dec => write!(mstr, "e-{}", (e - 1).unsigned_abs()),
-                    Radix::Hex => write!(mstr, "e-{:x}", (e - 1).unsigned_abs()),
+                    Radix::Bin => write!(mstr, "e-{:b}", (e as isize - 1).unsigned_abs()),
+                    Radix::Oct => write!(mstr, "e-{:o}", (e as isize - 1).unsigned_abs()),
+                    Radix::Dec => write!(mstr, "e-{}", (e as isize - 1).unsigned_abs()),
+                    Radix::Hex => write!(mstr, "e-{:x}", (e as isize - 1).unsigned_abs()),
                 };
             } else {
                 let _ = match rdx {
-                    Radix::Bin => write!(mstr, "e+{:b}", e - 1),
-                    Radix::Oct => write!(mstr, "e+{:o}", e - 1),
-                    Radix::Dec => write!(mstr, "e+{}", e - 1),
-                    Radix::Hex => write!(mstr, "e+{:x}", e - 1),
+                    Radix::Bin => write!(mstr, "e+{:b}", e as isize - 1),
+                    Radix::Oct => write!(mstr, "e+{:o}", e as isize - 1),
+                    Radix::Dec => write!(mstr, "e+{}", e as isize - 1),
+                    Radix::Hex => write!(mstr, "e+{:x}", e as isize - 1),
                 };
             };
         }
