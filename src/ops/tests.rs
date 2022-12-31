@@ -11,8 +11,9 @@ use rand::random;
 // test for debugging
 /* #[test]
 fn ttt() {
-    let n = BigFloatNumber::from_raw_parts(&[13835058055282163712], 64, Sign::Pos, 3).unwrap();
-    let m = BigFloatNumber::from_raw_parts(&[6585903223086643450, 16094311991002073707, 17000984990068853901], 192, Sign::Neg, -192).unwrap();
+
+    let n = BigFloatNumber::from_raw_parts(&[], 0, Sign::Pos, 0).unwrap();
+    let m = BigFloatNumber::from_raw_parts(&[], 0, Sign::Pos, 0).unwrap();
 
     let _z = n.add(&m, 192, RoundingMode::None).unwrap();
 
@@ -49,8 +50,9 @@ fn test_ln_exp() {
     return; */
 
     for _ in 0..1000 {
+        let p1 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
-        let mut d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
+        let mut d1 = BigFloatNumber::random_normal(p1, EXPONENT_MIN, EXPONENT_MAX).unwrap();
         d1.set_sign(Sign::Pos);
 
         let d2 = d1.ln(prec, RoundingMode::ToEven, &mut cc).unwrap();
@@ -75,9 +77,10 @@ fn test_powi() {
 
     for _ in 0..1000 {
         let i = random::<usize>() % 1000 + 1;
+        let p1 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let mut d1 = BigFloatNumber::random_normal(
-            prec,
+            p1,
             EXPONENT_MIN / i as Exponent,
             EXPONENT_MAX / i as Exponent,
         )
@@ -113,8 +116,9 @@ fn test_log2_log10_pow() {
     let mut cc = Consts::new().unwrap();
 
     for _ in 0..1000 {
+        let p1 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
-        let mut d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
+        let mut d1 = BigFloatNumber::random_normal(p1, EXPONENT_MIN, EXPONENT_MAX).unwrap();
         d1.set_sign(Sign::Pos);
 
         let d2 = d1.log2(prec, RoundingMode::ToEven, &mut cc).unwrap();
@@ -152,9 +156,11 @@ fn test_log_pow() {
     let mut cc = Consts::new().unwrap();
 
     for _ in 0..1000 {
+        let p1 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
+        let p2 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
-        let mut d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
-        let mut b = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
+        let mut d1 = BigFloatNumber::random_normal(p1, EXPONENT_MIN, EXPONENT_MAX).unwrap();
+        let mut b = BigFloatNumber::random_normal(p2, EXPONENT_MIN, EXPONENT_MAX).unwrap();
         d1.set_sign(Sign::Pos);
         b.set_sign(Sign::Pos);
 
@@ -213,62 +219,84 @@ fn test_sin_asin() {
     return; */
 
     // argument between -pi/2, pi/2
-    for _ in 0..1000 {
+    for i in 0..1000 {
+        let p1 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
-        let mut d1 = BigFloatNumber::random_normal(prec, -100, 2).unwrap();
 
-        // -pi/2, pi/2
-        while d1.abs().unwrap().cmp(&half_pi) > 0 {
-            if d1.is_positive() {
-                d1 = d1.sub(&half_pi, prec, RoundingMode::None).unwrap();
+        if i & 1 == 0 {
+            let mut d1 = BigFloatNumber::random_normal(p1, -100, 2).unwrap();
+
+            // -pi/2, pi/2
+            while d1.abs().unwrap().cmp(&half_pi) > 0 {
+                if d1.is_positive() {
+                    d1 = d1.sub(&half_pi, p1, RoundingMode::None).unwrap();
+                }
+                if d1.is_negative() {
+                    d1 = d1.add(&half_pi, p1, RoundingMode::None).unwrap();
+                }
             }
-            if d1.is_negative() {
-                d1 = d1.add(&half_pi, prec, RoundingMode::None).unwrap();
-            }
+
+            let d2 = d1.sin(prec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d3 = d2.asin(prec, RoundingMode::ToEven, &mut cc).unwrap();
+
+            // println!("{}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+            eps.set_exponent(
+                d1.get_exponent() - prec as Exponent
+                    + 1
+                    + count_leading_ones(d2.get_mantissa_digits()) as Exponent,
+            );
+
+            assert!(
+                d1.sub(&d3, prec, RoundingMode::ToEven)
+                    .unwrap()
+                    .abs()
+                    .unwrap()
+                    .cmp(&eps)
+                    < 0
+            );
+        } else {
+            let d1 = BigFloatNumber::random_normal(p1, -(prec as Exponent), 0).unwrap();
+
+            let d2 = d1.asin(prec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d3 = d2.sin(prec, RoundingMode::ToEven, &mut cc).unwrap();
+
+            eps.set_exponent(d1.get_exponent() - prec as Exponent + 1);
+
+            assert!(
+                d1.sub(&d3, prec, RoundingMode::ToEven)
+                    .unwrap()
+                    .abs()
+                    .unwrap()
+                    .cmp(&eps)
+                    < 0
+            );
         }
-
-        let d2 = d1.sin(prec, RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = d2.asin(prec, RoundingMode::ToEven, &mut cc).unwrap();
-
-        // println!("{}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-
-        eps.set_exponent(
-            d1.get_exponent() - prec as Exponent
-                + 1
-                + count_leading_ones(d2.get_mantissa_digits()) as Exponent,
-        );
-
-        assert!(
-            d1.sub(&d3, prec, RoundingMode::ToEven)
-                .unwrap()
-                .abs()
-                .unwrap()
-                .cmp(&eps)
-                < 0
-        );
     }
 
     // argument between -pi, -pi/2 and between pi/2, pi
     for _ in 0..1000 {
+        let p1 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
-        let mut d1 = BigFloatNumber::random_normal(prec, -100, 2).unwrap();
+
+        let mut d1 = BigFloatNumber::random_normal(p1, -100, 2).unwrap();
 
         // -pi, -pi/2 and pi/2, pi
         while d1.abs().unwrap().cmp(&half_pi) < 0 {
             if d1.is_positive() {
-                d1 = d1.add(&half_pi, prec, RoundingMode::None).unwrap();
+                d1 = d1.add(&half_pi, p1, RoundingMode::None).unwrap();
             }
             if d1.is_negative() {
-                d1 = d1.sub(&half_pi, prec, RoundingMode::None).unwrap();
+                d1 = d1.sub(&half_pi, p1, RoundingMode::None).unwrap();
             }
         }
 
         let arg = if d1.is_positive() {
-            pi.sub(&d1, prec, RoundingMode::ToEven).unwrap()
+            pi.sub(&d1, p1, RoundingMode::ToEven).unwrap()
         } else {
-            pi.add(&d1, prec, RoundingMode::ToEven).unwrap()
+            pi.add(&d1, p1, RoundingMode::ToEven).unwrap()
         };
 
         let d2 = arg.sin(prec, RoundingMode::ToEven, &mut cc).unwrap();
@@ -339,45 +367,78 @@ fn test_cos_acos() {
 
     return; */
 
-    for _ in 0..1000 {
+    for i in 0..1000 {
+        let p1 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
-        let mut d1 = BigFloatNumber::random_normal(prec, -(prec as Exponent) / 2, 3).unwrap();
 
-        // -pi, pi
-        while d1.abs().unwrap().cmp(&pi) > 0 {
-            if d1.is_positive() {
-                d1 = d1.sub(&pi, prec, RoundingMode::None).unwrap();
+        if i & 1 == 0 {
+            let mut d1 = BigFloatNumber::random_normal(p1, -(prec as Exponent), 3).unwrap();
+
+            // -pi, pi
+            while d1.abs().unwrap().cmp(&pi) > 0 {
+                if d1.is_positive() {
+                    d1 = d1.sub(&pi, p1, RoundingMode::None).unwrap();
+                }
+                if d1.is_negative() {
+                    d1 = d1.add(&pi, p1, RoundingMode::None).unwrap();
+                }
             }
-            if d1.is_negative() {
-                d1 = d1.add(&pi, prec, RoundingMode::None).unwrap();
+
+            let d2 = d1.cos(prec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d3 = d2.acos(prec, RoundingMode::ToEven, &mut cc).unwrap();
+
+            // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("d1 {:?}", d1);
+            // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+            if d2.cmp(&ONE) != 0 {
+                eps.set_exponent(
+                    d1.get_exponent() - prec as Exponent
+                        + 1
+                        + count_leading_ones(d2.get_mantissa_digits()) as Exponent,
+                );
+
+                assert!(
+                    d1.abs()
+                        .unwrap()
+                        .sub(&d3, prec, RoundingMode::ToEven)
+                        .unwrap()
+                        .abs()
+                        .unwrap()
+                        .cmp(&eps)
+                        < 0
+                );
             }
-        }
+        } else {
+            let d1 = BigFloatNumber::random_normal(p1, -(prec as Exponent), 0).unwrap();
 
-        let d2 = d1.cos(prec, RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = d2.acos(prec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d2 = d1.acos(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-        // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("d1 {:?}", d1);
-        // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            let mut hp = cc.pi(prec, RoundingMode::ToZero).unwrap();
+            hp.set_exponent(1);
 
-        if d2.cmp(&ONE) != 0 {
-            eps.set_exponent(
-                d1.get_exponent() - prec as Exponent
-                    + 1
-                    + count_leading_ones(d2.get_mantissa_digits()) as Exponent,
-            );
+            if d2.abs_cmp(&hp) < 0 {
 
-            assert!(
-                d1.abs()
-                    .unwrap()
-                    .sub(&d3, prec, RoundingMode::ToEven)
-                    .unwrap()
-                    .abs()
-                    .unwrap()
-                    .cmp(&eps)
-                    < 0
-            );
+                let d3 = d2.cos(prec, RoundingMode::ToEven, &mut cc).unwrap();
+
+                eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent - d1.get_exponent() + 2);
+
+                // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+                // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+                // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+                assert!(
+                    d1.abs()
+                        .unwrap()
+                        .sub(&d3, prec, RoundingMode::ToEven)
+                        .unwrap()
+                        .abs()
+                        .unwrap()
+                        .cmp(&eps)
+                        < 0
+                );
+            }
         }
     }
 }
@@ -396,37 +457,67 @@ fn test_tan_atan() {
     let mut half_pi = pi.clone().unwrap();
     half_pi.set_exponent(1);
 
-    for _ in 0..1000 {
+    for i in 0..1000 {
+        let p1 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
-        let mut d1 = BigFloatNumber::random_normal(prec, -100, 2).unwrap();
 
-        // -pi/2, pi/2
-        while d1.abs().unwrap().cmp(&half_pi) > 0 {
-            if d1.is_positive() {
-                d1 = d1.sub(&half_pi, prec, RoundingMode::None).unwrap();
+        if i & 1 == 0 {
+            let mut d1 = BigFloatNumber::random_normal(p1, -100, 2).unwrap();
+
+            // -pi/2, pi/2
+            while d1.abs().unwrap().cmp(&half_pi) > 0 {
+                if d1.is_positive() {
+                    d1 = d1.sub(&half_pi, p1, RoundingMode::None).unwrap();
+                }
+                if d1.is_negative() {
+                    d1 = d1.add(&half_pi, p1, RoundingMode::None).unwrap();
+                }
             }
-            if d1.is_negative() {
-                d1 = d1.add(&half_pi, prec, RoundingMode::None).unwrap();
+
+            let d2 = d1.tan(prec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d3 = d2.atan(prec, RoundingMode::ToEven, &mut cc).unwrap();
+
+            // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+            eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+
+            assert!(
+                d1.sub(&d3, prec, RoundingMode::ToEven)
+                    .unwrap()
+                    .abs()
+                    .unwrap()
+                    .cmp(&eps)
+                    < 0
+            );
+        } else {
+            let d1 = BigFloatNumber::random_normal(p1, EXPONENT_MIN, EXPONENT_MAX).unwrap();
+
+            let d2 = d1.atan(prec, RoundingMode::ToZero, &mut cc).unwrap();
+
+            let mut hp = cc.pi(prec, RoundingMode::ToZero).unwrap();
+            hp.set_exponent(1);
+
+            if d2.abs_cmp(&hp) < 0 {
+                let d3 = d2.tan(prec, RoundingMode::ToEven, &mut cc).unwrap();
+
+                eps.set_exponent(d1.get_exponent() - prec as Exponent);
+
+                // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+                // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+                // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+                assert!(
+                    d1.sub(&d3, prec, RoundingMode::ToEven)
+                        .unwrap()
+                        .abs()
+                        .unwrap()
+                        .cmp(&eps)
+                        < 0
+                );
             }
         }
-
-        let d2 = d1.tan(prec, RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = d2.atan(prec, RoundingMode::ToEven, &mut cc).unwrap();
-
-        // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-
-        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
-
-        assert!(
-            d1.sub(&d3, prec, RoundingMode::ToEven)
-                .unwrap()
-                .abs()
-                .unwrap()
-                .cmp(&eps)
-                < 0
-        );
     }
 }
 
@@ -437,27 +528,58 @@ fn test_sinh_asinh() {
 
     let mut cc = Consts::new().unwrap();
 
-    for _ in 0..1000 {
+    for i in 0..1000 {
+        let p1 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
-        let d1 = BigFloatNumber::random_normal(prec, -100, 10).unwrap();
 
-        let d2 = d1.sinh(prec, RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = d2.asinh(prec, RoundingMode::ToEven, &mut cc).unwrap();
+        if i & 1 == 0 {
+            let d1 = BigFloatNumber::random_normal(p1, -100, 10).unwrap();
 
-        // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            let d2 = d1.sinh(prec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d3 = d2.asinh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+            // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-        assert!(
-            d1.sub(&d3, prec, RoundingMode::ToEven)
-                .unwrap()
-                .abs()
-                .unwrap()
-                .cmp(&eps)
-                < 0
-        );
+            eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+
+            assert!(
+                d1.sub(&d3, prec, RoundingMode::ToEven)
+                    .unwrap()
+                    .abs()
+                    .unwrap()
+                    .cmp(&eps)
+                    < 0
+            );
+        } else {
+            let mut d1 = BigFloatNumber::random_normal(p1, EXPONENT_MIN, EXPONENT_MAX).unwrap();
+
+            let d2 = d1.asinh(prec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d3 = d2.sinh(prec, RoundingMode::ToEven, &mut cc).unwrap();
+
+            if d1.get_exponent() < -(prec as Exponent) {
+                // both asinh and sinh are linear near 0
+                d1.set_precision(prec, RoundingMode::ToEven).unwrap();
+
+                assert!(d1.cmp(&d2) == 0);
+                assert!(d2.cmp(&d3) == 0);
+            } else {
+                let exp = d2.exp(prec + 1, RoundingMode::ToEven, &mut cc).unwrap();
+                let expr = exp.reciprocal(prec + 1, RoundingMode::ToEven).unwrap();
+                let mut d4 = exp.sub(&expr, prec + 1, RoundingMode::ToEven).unwrap();
+                d4.set_exponent(d4.get_exponent() - 1);
+
+                d4.set_precision(prec, RoundingMode::ToEven).unwrap();
+
+                // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+                // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+                // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+                // println!("d4 {}", d4.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+                assert!(d3.cmp(&d4) == 0);
+            }
+        }
     }
 }
 
@@ -468,34 +590,53 @@ fn test_cosh_acosh() {
 
     let mut cc = Consts::new().unwrap();
 
-    for _ in 0..1000 {
+    for i in 0..1000 {
+        let p1 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
-        let d1 = BigFloatNumber::random_normal(prec, -100, 10).unwrap();
 
-        let d2 = d1.cosh(prec, RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = d2.acosh(prec, RoundingMode::ToEven, &mut cc).unwrap();
+        if i & 1 == 0 {
+            let d1 = BigFloatNumber::random_normal(p1, -100, 10).unwrap();
 
-        eps.set_exponent(
-            d1.get_exponent() - prec as Exponent
-                + 2
-                + count_leading_zeroes_skip_first(d2.get_mantissa_digits()) as Exponent,
-        );
+            let d2 = d1.cosh(prec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d3 = d2.acosh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-        // println!("d1 {}", d1.abs().unwrap().format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-        // println!("e {}", eps.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            eps.set_exponent(
+                d1.get_exponent() - prec as Exponent
+                    + 2
+                    + count_leading_zeroes_skip_first(d2.get_mantissa_digits()) as Exponent,
+            );
 
-        assert!(
-            d1.abs()
-                .unwrap()
-                .sub(&d3, prec, RoundingMode::ToEven)
-                .unwrap()
-                .abs()
-                .unwrap()
-                .cmp(&eps)
-                < 0
-        );
+            assert!(
+                d1.abs()
+                    .unwrap()
+                    .sub(&d3, prec, RoundingMode::ToEven)
+                    .unwrap()
+                    .abs()
+                    .unwrap()
+                    .cmp(&eps)
+                    < 0
+            );
+        } else {
+            let mut d1 = BigFloatNumber::random_normal(p1, 1, EXPONENT_MAX).unwrap();
+            d1.set_sign(Sign::Pos);
+
+            let d2 = d1.acosh(prec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d3 = d2.cosh(prec, RoundingMode::ToEven, &mut cc).unwrap();
+
+            let exp = d2.exp(prec + 1, RoundingMode::ToEven, &mut cc).unwrap();
+            let expr = exp.reciprocal(prec + 1, RoundingMode::ToEven).unwrap();
+            let mut d4 = exp.add(&expr, prec + 1, RoundingMode::ToEven).unwrap();
+            d4.set_exponent(d4.get_exponent() - 1);
+
+            d4.set_precision(prec, RoundingMode::ToEven).unwrap();
+
+            // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("d4 {}", d4.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+            assert!(d3.cmp(&d4) == 0);
+        };
     }
 }
 
@@ -506,19 +647,33 @@ fn test_tanh_atanh() {
 
     let mut cc = Consts::new().unwrap();
 
-    for _ in 0..1000 {
+    for i in 0..1000 {
+        let p1 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
-        let d1 = BigFloatNumber::random_normal(prec, -100, 5).unwrap();
 
-        let d2 = d1.tanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let (d1, d3) = if i & 1 == 0 {
+            let d1 = BigFloatNumber::random_normal(p1, -100, 5).unwrap();
 
-        let d3 = d2.atanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d2 = d1.tanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d3 = d2.atanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-        eps.set_exponent(
-            d1.get_exponent() - prec as Exponent
-                + 1
-                + count_leading_ones(d2.get_mantissa_digits()) as Exponent,
-        );
+            eps.set_exponent(
+                d1.get_exponent() - prec as Exponent
+                    + 1
+                    + count_leading_ones(d2.get_mantissa_digits()) as Exponent,
+            );
+
+            (d1, d3)
+        } else {
+            let d1 = BigFloatNumber::random_normal(p1, EXPONENT_MIN, 0).unwrap();
+
+            let d2 = d1.atanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d3 = d2.tanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
+
+            eps.set_exponent(d1.get_exponent() - prec as Exponent + 1);
+
+            (d1, d3)
+        };
 
         // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());

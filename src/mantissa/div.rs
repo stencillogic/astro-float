@@ -203,7 +203,19 @@ impl Mantissa {
     fn div_recursive(m1: &[Word], m2: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
         debug_assert!(m2[m2.len() - 1] & WORD_SIGNIFICANT_BIT != 0);
 
+        if m1.len() < m2.len() {
+            let mut q = WordBuf::new(1)?;
+            q.fill(0);
+
+            let mut r = WordBuf::new(m1.len())?;
+            r.copy_from_slice(m1);
+
+            return Ok((q, r));
+        }
+
         let m = m1.len() - m2.len();
+
+        debug_assert!(m <= m2.len());
 
         if m < 70 {
             Self::div_basic(m1, m2)
@@ -279,9 +291,14 @@ impl Mantissa {
                 }
 
                 // quot = q1 * 2^k + q0;
-                q1[..k].copy_from_slice(&q0[..k]);
-                let q0 = SliceWithSign::new(&q0[k..], 1);
-                q1.add_assign(&q0);
+                let q0l = q0.len();
+                if q0l > k {
+                    q1[..k].copy_from_slice(&q0[..k]);
+                    let q0 = SliceWithSign::new(&q0[k..], 1);
+                    q1.add_assign(&q0);
+                } else {
+                    q1[..q0l].copy_from_slice(&q0);
+                }
             }
 
             Ok((q1buf, rembuf))
