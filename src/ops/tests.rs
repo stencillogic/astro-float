@@ -419,10 +419,11 @@ fn test_cos_acos() {
             hp.set_exponent(1);
 
             if d2.abs_cmp(&hp) < 0 {
-
                 let d3 = d2.cos(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-                eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent - d1.get_exponent() + 2);
+                eps.set_exponent(
+                    d1.get_exponent() - prec.min(p1) as Exponent - d1.get_exponent() + 2,
+                );
 
                 // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
                 // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
