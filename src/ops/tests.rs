@@ -273,13 +273,16 @@ fn test_log_pow() {
             let mut b = BigFloatNumber::random_normal(p2, EXPONENT_MIN, EXPONENT_MAX).unwrap();
             b.set_sign(Sign::Pos);
 
-            if (b.get_exponent() == 0 && count_leading_ones(b.get_mantissa_digits()) > 2)
-                || (b.get_exponent() == 1 && count_leading_zeroes_skip_first(b.get_mantissa_digits()) > 2)
-            {
-                // avoid b close to 1, because error increases significantly, i.e.
+            // if b close to 1, error increases significantly, i.e.
+            // let d2 - err <= b^d1 <= d2 + err, then log_b(d2 - err) <= d1 <= log_b(d2 + err), 
                 // let d2 - err <= b^d1 <= d2 + err, then log_b(d2 - err) <= d1 <= log_b(d2 + err), 
-                // and log_b(x) has steep derivative 1 / x / ln(b).
-                continue;
+            // let d2 - err <= b^d1 <= d2 + err, then log_b(d2 - err) <= d1 <= log_b(d2 + err), 
+            // and log_b(x) has steep derivative 1 / x / ln(b).
+            let mut berr = 0;
+            if b.get_exponent() == 0 {
+                berr = count_leading_ones(b.get_mantissa_digits()) as Exponent;
+            } else if b.get_exponent() == 1 {
+                berr = count_leading_zeroes_skip_first(b.get_mantissa_digits()) as Exponent;
             }
 
             let n = b.get_exponent().unsigned_abs() as usize;
@@ -304,9 +307,9 @@ fn test_log_pow() {
                     count_leading_zeroes_skip_first
                 }(d2.get_mantissa_digits()) as Exponent;
 
-                eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent + addexp + 2);
+                eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent + addexp + berr + 2);
             } else {
-                eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent + 2);
+                eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent + berr + 2);
             }
 
             assert!(d1.sub(&d3, prec, RoundingMode::ToEven)
