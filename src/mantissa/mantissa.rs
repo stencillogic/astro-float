@@ -653,6 +653,15 @@ impl Mantissa {
     pub fn from_usize(u: usize) -> Result<(usize, Self), Error> {
         let mut m;
 
+        if u == 0 {
+            m = Self::reserve_new(1)?;
+            m[0] = 0 as Word;
+
+            let ret = Mantissa { m, n: 0 };
+
+            return Ok((0, ret))
+        }
+
         #[cfg(target_arch = "x86_64")]
         {
             m = Self::reserve_new(1)?;
