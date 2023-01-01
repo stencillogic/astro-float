@@ -95,11 +95,13 @@ fn test_ln_exp() {
             // println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
             // println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-            assert!(d1.sub(&d3, prec, RoundingMode::ToEven)
-                .unwrap()
-                .abs()
-                .unwrap()
-                .cmp(&eps) < 0
+            assert!(
+                d1.sub(&d3, prec, RoundingMode::ToEven)
+                    .unwrap()
+                    .abs()
+                    .unwrap()
+                    .cmp(&eps)
+                    < 0
             );
         }
     }
@@ -194,7 +196,7 @@ fn test_log2_log10_pow() {
             let d4 = ten.pow(&d1, prec, RoundingMode::ToEven, &mut cc).unwrap();
             let d5 = d4.log10(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-            let set_eps = |x, eps: &mut BigFloatNumber| { 
+            let set_eps = |x, eps: &mut BigFloatNumber| {
                 if d1.get_exponent() < 1 {
                     let addexp = if d1.is_negative() {
                         count_leading_ones
@@ -214,20 +216,24 @@ fn test_log2_log10_pow() {
 
             set_eps(d2.get_mantissa_digits(), &mut eps);
 
-            assert!(d1.sub(&d3, prec, RoundingMode::ToEven)
-                .unwrap()
-                .abs()
-                .unwrap()
-                .cmp(&eps) < 0
+            assert!(
+                d1.sub(&d3, prec, RoundingMode::ToEven)
+                    .unwrap()
+                    .abs()
+                    .unwrap()
+                    .cmp(&eps)
+                    < 0
             );
-            
+
             set_eps(d4.get_mantissa_digits(), &mut eps);
 
-            assert!(d1.sub(&d5, prec, RoundingMode::ToEven)
-                .unwrap()
-                .abs()
-                .unwrap()
-                .cmp(&eps) < 0
+            assert!(
+                d1.sub(&d5, prec, RoundingMode::ToEven)
+                    .unwrap()
+                    .abs()
+                    .unwrap()
+                    .cmp(&eps)
+                    < 0
             );
         }
     }
@@ -274,9 +280,9 @@ fn test_log_pow() {
             b.set_sign(Sign::Pos);
 
             // if b close to 1, error increases significantly, i.e.
-            // let d2 - err <= b^d1 <= d2 + err, then log_b(d2 - err) <= d1 <= log_b(d2 + err), 
-                // let d2 - err <= b^d1 <= d2 + err, then log_b(d2 - err) <= d1 <= log_b(d2 + err), 
-            // let d2 - err <= b^d1 <= d2 + err, then log_b(d2 - err) <= d1 <= log_b(d2 + err), 
+            // let d2 - err <= b^d1 <= d2 + err, then log_b(d2 - err) <= d1 <= log_b(d2 + err),
+            // let d2 - err <= b^d1 <= d2 + err, then log_b(d2 - err) <= d1 <= log_b(d2 + err),
+            // let d2 - err <= b^d1 <= d2 + err, then log_b(d2 - err) <= d1 <= log_b(d2 + err),
             // and log_b(x) has steep derivative 1 / x / ln(b).
             let mut berr = 0;
             if b.get_exponent() == 0 {
@@ -286,7 +292,7 @@ fn test_log_pow() {
             }
 
             let n = b.get_exponent().unsigned_abs() as usize;
-            let emax = log2_floor(EXPONENT_MAX as usize / if n == 0 { 1 } else { n } ) as Exponent;
+            let emax = log2_floor(EXPONENT_MAX as usize / if n == 0 { 1 } else { n }) as Exponent;
             let emin = -emax;
             let d1 = BigFloatNumber::random_normal(p1, emin, emax).unwrap();
 
@@ -296,11 +302,11 @@ fn test_log_pow() {
             // println!("\nb  {}", b.format(crate::Radix::Bin, RoundingMode::None).unwrap());
             // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
             // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-            // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());            
+            // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
             if d1.get_exponent() < 1 {
-                let addexp = if (b.get_exponent() > 0 && d1.is_negative()) || 
-                    b.get_exponent() <= 0 && d1.is_positive()
+                let addexp = if (b.get_exponent() > 0 && d1.is_negative())
+                    || b.get_exponent() <= 0 && d1.is_positive()
                 {
                     count_leading_ones
                 } else {
@@ -312,11 +318,13 @@ fn test_log_pow() {
                 eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent + berr + 2);
             }
 
-            assert!(d1.sub(&d3, prec, RoundingMode::ToEven)
-                .unwrap()
-                .abs()
-                .unwrap()
-                .cmp(&eps) < 0
+            assert!(
+                d1.sub(&d3, prec, RoundingMode::ToEven)
+                    .unwrap()
+                    .abs()
+                    .unwrap()
+                    .cmp(&eps)
+                    < 0
             );
         }
     }

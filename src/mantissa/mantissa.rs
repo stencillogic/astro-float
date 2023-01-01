@@ -659,7 +659,7 @@ impl Mantissa {
 
             let ret = Mantissa { m, n: 0 };
 
-            return Ok((0, ret))
+            return Ok((0, ret));
         }
 
         #[cfg(target_arch = "x86_64")]
