@@ -56,6 +56,8 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
+    use crate::common::util::random_subnormal;
+
     use super::*;
 
     #[test]
@@ -114,6 +116,10 @@ mod tests {
                 .cmp(&half_pi.neg().unwrap())
                 == 0
         );
+
+        // subnormal arg
+        let n1 = random_subnormal(p);
+        assert!(n1.asin(p, rm, &mut cc).unwrap().cmp(&n1) == 0);
     }
 
     #[ignore]

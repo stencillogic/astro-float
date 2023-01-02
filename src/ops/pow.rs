@@ -214,7 +214,7 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod test {
 
-    use crate::common::consts::TWO;
+    use crate::common::{consts::TWO, util::random_subnormal};
 
     use super::*;
 
@@ -265,6 +265,10 @@ mod test {
         // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
 
         assert!(d2.cmp(&d3) == 0);
+
+        // random subnormal
+        let d1 = random_subnormal(p);
+        assert!(d1.exp(p, RoundingMode::ToEven, &mut cc).unwrap().cmp(&ONE) == 0);
 
         // pow(small, small)
         let p = 256;

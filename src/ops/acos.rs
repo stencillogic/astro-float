@@ -57,7 +57,7 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
-    use crate::common::consts::ONE;
+    use crate::common::{consts::ONE, util::random_subnormal};
 
     use super::*;
 
@@ -111,6 +111,10 @@ mod tests {
         assert!(d3.acos(p, rm, &mut cc).unwrap().cmp(&half_pi) == 0);
         assert!(zero.acos(p, rm, &mut cc).unwrap().cmp(&half_pi) == 0);
         assert!(ONE.acos(p, rm, &mut cc).unwrap().is_zero());
+
+        // subnormal arg
+        let n1 = random_subnormal(p);
+        assert!(n1.acos(p, rm, &mut cc).unwrap().cmp(&half_pi) == 0);
     }
 
     #[ignore]

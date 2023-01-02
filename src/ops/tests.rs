@@ -407,7 +407,11 @@ fn test_sin_asin() {
             let d2 = d1.asin(prec, RoundingMode::ToEven, &mut cc).unwrap();
             let d3 = d2.sin(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-            eps.set_exponent(d1.get_exponent() - prec as Exponent + 1);
+            // println!("{}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+            eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent + 1);
 
             assert!(
                 d1.sub(&d3, prec, RoundingMode::ToEven)

@@ -197,7 +197,7 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
-    use crate::Sign;
+    use crate::{Sign, common::util::random_subnormal};
 
     use super::*;
 
@@ -233,9 +233,11 @@ mod tests {
 
         let d3 = BigFloatNumber::min_positive(p).unwrap();
         let zero = BigFloatNumber::new(1).unwrap();
+        let d4 = random_subnormal(p);
 
         assert!(d3.cosh(p, rm, &mut cc).unwrap().cmp(&ONE) == 0);
         assert!(zero.cosh(p, rm, &mut cc).unwrap().cmp(&ONE) == 0);
+        assert!(d4.cosh(p, rm, &mut cc).unwrap().cmp(&ONE) == 0);
     }
 
     #[ignore]

@@ -121,7 +121,7 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
-    use crate::Sign;
+    use crate::{Sign, common::util::random_subnormal};
 
     use super::*;
 
@@ -177,6 +177,9 @@ mod tests {
             ONE.neg().unwrap().atanh(p, rm, &mut cc).unwrap_err()
                 == Error::ExponentOverflow(Sign::Neg)
         );
+
+        let n1 = random_subnormal(p);
+        assert!(n1.atanh(p, rm, &mut cc).unwrap().cmp(&n1) == 0);
     }
 
     #[ignore]

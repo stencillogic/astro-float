@@ -206,6 +206,8 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
+    use crate::common::util::random_subnormal;
+
     use super::*;
 
     #[test]
@@ -251,9 +253,11 @@ mod tests {
 
         let d3 = BigFloatNumber::min_positive(p).unwrap();
         let zero = BigFloatNumber::new(1).unwrap();
+        let d4 = random_subnormal(p);
 
         assert!(d3.cos(p, rm, &mut cc).unwrap().cmp(&ONE) == 0);
         assert!(zero.cos(p, rm, &mut cc).unwrap().cmp(&ONE) == 0);
+        assert!(d4.cos(p, rm, &mut cc).unwrap().cmp(&ONE) == 0);
     }
 
     #[ignore]

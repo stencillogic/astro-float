@@ -88,7 +88,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        common::consts::ONE,
+        common::{consts::ONE, util::random_subnormal},
         defs::{EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE},
         Exponent,
     };
@@ -230,6 +230,34 @@ mod tests {
         // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
 
         assert!(d2.cmp(&d3) == 0);
+
+        // random subnormal arg
+        for _ in 0..1000 {
+            let d1 = random_subnormal(prec);
+            
+            let d2 = d1.cbrt(prec, RoundingMode::ToEven).unwrap();
+            let d3 = d2
+                .mul(&d2, prec, RoundingMode::ToEven)
+                .unwrap()
+                .mul(&d2, prec, RoundingMode::ToEven)
+                .unwrap();
+
+            let eps = BigFloatNumber::min_positive(prec).unwrap();
+            // eps.set_exponent(eps.get_exponent() + 3);
+
+            // println!("{:?}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("{:?}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("{:?}", eps.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+            assert!(
+                d1.sub(&d3, prec, RoundingMode::ToEven)
+                    .unwrap()
+                    .abs()
+                    .unwrap()
+                    .cmp(&eps)
+                    <= 0
+            );
+        }
     }
 
     #[ignore]

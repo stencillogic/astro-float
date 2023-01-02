@@ -167,6 +167,8 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
+    use crate::common::util::random_subnormal;
+
     use super::*;
 
     #[test]
@@ -237,6 +239,10 @@ mod tests {
         );
         assert!(d3.atan(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
         assert!(zero.atan(p, rm, &mut cc).unwrap().is_zero());
+
+        // subnormal arg
+        let n1 = random_subnormal(p);
+        assert!(n1.atan(p, rm, &mut cc).unwrap().cmp(&n1) == 0);
     }
 
     #[ignore]

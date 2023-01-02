@@ -92,7 +92,7 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
-    use crate::Exponent;
+    use crate::{Exponent, common::util::random_subnormal};
 
     use super::*;
 
@@ -172,6 +172,10 @@ mod tests {
 
         assert!(d3.asinh(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
         assert!(zero.asinh(p, rm, &mut cc).unwrap().is_zero());
+
+        // subnormal arg
+        let n1 = random_subnormal(p);
+        assert!(n1.asinh(p, rm, &mut cc).unwrap().cmp(&n1) == 0);
     }
 
     #[ignore]

@@ -88,6 +88,8 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
+    use crate::common::util::random_subnormal;
+
     use super::*;
 
     #[test]
@@ -127,9 +129,11 @@ mod tests {
 
         let d3 = BigFloatNumber::min_positive(p).unwrap();
         let zero = BigFloatNumber::new(1).unwrap();
+        let n1 = random_subnormal(p);
 
         assert!(d3.tanh(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
         assert!(zero.tanh(p, rm, &mut cc).unwrap().is_zero());
+        assert!(n1.tanh(p, rm, &mut cc).unwrap().cmp(&n1) == 0);
     }
 
     #[ignore]

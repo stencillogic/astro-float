@@ -317,7 +317,7 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
-    use crate::common::{consts::TEN, util::log2_ceil};
+    use crate::{common::{consts::TEN, util::{log2_ceil, random_subnormal}}, WORD_BIT_SIZE};
 
     use super::*;
 
@@ -448,6 +448,31 @@ mod tests {
                 <= 0
         );
 
+        // random subnormal arg
+        let mut eps = ONE.clone().unwrap();
+        for _ in 0..1000 {
+            let prec = (rand::random::<usize>() % 3 + 3) * WORD_BIT_SIZE;
+
+            let mut d1 = random_subnormal(prec);
+            d1.set_sign(Sign::Pos);
+            let mut d2 = d1.ln(prec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d2e = d2.get_exponent();
+            d2.set_exponent(d2e / 2 + (d2e & 1));
+            let d3 = d2.exp(prec + 1, RoundingMode::None, &mut cc).unwrap();
+            let d4 = d3.powi(1 << (d2e / 2), prec, RoundingMode::ToEven).unwrap();
+
+            eps.set_exponent(d2e - prec as Exponent);
+            let err = eps.exp(prec, RoundingMode::Up, &mut cc).unwrap();
+
+            // println!("{:?}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("{:?}", d4.mul(&err, prec, RoundingMode::Up).unwrap().format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("{:?}", d4.div(&err, prec, RoundingMode::Down).unwrap().format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+            // d2 - ulp(d2)/2 <= ln(d1) <= d2 + ulp(d2)/2  ->  d3 / e^(ulp(d2)/2) <= d1 <= d3 * e^(ulp(d2)/2)
+            assert!(d1.cmp(&d4.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0);
+            assert!(d1.cmp(&d4.div(&err, prec, RoundingMode::Down).unwrap()) >= 0);
+        }
+
         let d1 = BigFloatNumber::min_positive(prec).unwrap();
         let d2 = d1.log2(prec, RoundingMode::ToEven, &mut cc).unwrap();
         let d3 = TWO.pow(&d2, prec, RoundingMode::ToEven, &mut cc).unwrap();
@@ -487,7 +512,7 @@ mod tests {
         assert!(d1.log(&d2, prec, rm, &mut cc).is_ok());
         assert!(d2.log(&d1, prec, rm, &mut cc).is_ok());
 
-        // base close to 0, 1, or large value
+        // base close to 0, 1, or a large value
         let mut nums = vec![];
         for s in [
             "1.23456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF12_e-100000",

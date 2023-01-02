@@ -120,7 +120,7 @@ impl BigFloatNumber {
 mod tests {
 
     use super::*;
-    use crate::{defs::WORD_BIT_SIZE, Exponent};
+    use crate::{defs::WORD_BIT_SIZE, Exponent, common::util::random_subnormal};
 
     #[cfg(feature = "std")]
     use crate::Sign;
@@ -233,6 +233,33 @@ mod tests {
                     .unwrap()
                     .cmp(&eps)
                     < 0
+            );
+        }
+
+        // random subnormal arg
+        for _ in 0..1000 {
+            let mut d1 = random_subnormal(prec);
+            d1.set_sign(Sign::Pos);
+
+            let d2 = d1.sqrt(prec, RoundingMode::ToEven).unwrap();
+            let d3 = d2
+                .mul(&d2, prec, RoundingMode::ToEven)
+                .unwrap();
+
+            let eps = BigFloatNumber::min_positive(prec).unwrap();
+            // eps.set_exponent(eps.get_exponent() + 2);
+
+            // println!("{:?}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("{:?}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            // println!("{:?}", eps.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+
+            assert!(
+                d1.sub(&d3, prec, RoundingMode::ToEven)
+                    .unwrap()
+                    .abs()
+                    .unwrap()
+                    .cmp(&eps)
+                    <= 0
             );
         }
     }

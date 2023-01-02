@@ -645,7 +645,7 @@ mod tests {
         let mut eps = ONE.clone().unwrap();
 
         for _ in 0..10000 {
-            let n = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
+            let n = BigFloatNumber::random_normal(prec, EXPONENT_MIN + prec as Exponent, EXPONENT_MAX).unwrap();
             let rdx = random_radix();
 
             let (s1, m1, e1) = n.convert_to_radix(rdx, RoundingMode::ToEven).unwrap();
