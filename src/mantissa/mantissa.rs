@@ -963,6 +963,10 @@ impl Mantissa {
         &self.m
     }
 
+    pub fn get_digits_mut(&mut self) -> &mut [Word] {
+        &mut self.m
+    }
+
     pub fn bit_len(&self) -> usize {
         self.n
     }

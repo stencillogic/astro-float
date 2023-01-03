@@ -234,7 +234,7 @@ mod tests {
         // random subnormal arg
         for _ in 0..1000 {
             let d1 = random_subnormal(prec);
-            
+
             let d2 = d1.cbrt(prec, RoundingMode::ToEven).unwrap();
             let d3 = d2
                 .mul(&d2, prec, RoundingMode::ToEven)

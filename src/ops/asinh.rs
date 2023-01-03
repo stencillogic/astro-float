@@ -92,7 +92,7 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
-    use crate::{Exponent, common::util::random_subnormal};
+    use crate::{common::util::random_subnormal, Exponent};
 
     use super::*;
 

@@ -317,7 +317,13 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
-    use crate::{common::{consts::TEN, util::{log2_ceil, random_subnormal}}, WORD_BIT_SIZE};
+    use crate::{
+        common::{
+            consts::TEN,
+            util::{log2_ceil, random_subnormal},
+        },
+        WORD_BIT_SIZE,
+    };
 
     use super::*;
 

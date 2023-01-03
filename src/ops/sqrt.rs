@@ -120,7 +120,7 @@ impl BigFloatNumber {
 mod tests {
 
     use super::*;
-    use crate::{defs::WORD_BIT_SIZE, Exponent, common::util::random_subnormal};
+    use crate::{common::util::random_subnormal, defs::WORD_BIT_SIZE, Exponent};
 
     #[cfg(feature = "std")]
     use crate::Sign;
@@ -242,9 +242,7 @@ mod tests {
             d1.set_sign(Sign::Pos);
 
             let d2 = d1.sqrt(prec, RoundingMode::ToEven).unwrap();
-            let d3 = d2
-                .mul(&d2, prec, RoundingMode::ToEven)
-                .unwrap();
+            let d3 = d2.mul(&d2, prec, RoundingMode::ToEven).unwrap();
 
             let eps = BigFloatNumber::min_positive(prec).unwrap();
             // eps.set_exponent(eps.get_exponent() + 2);

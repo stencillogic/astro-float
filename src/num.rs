@@ -762,7 +762,7 @@ impl BigFloatNumber {
     ///  - InvalidArgument: `n` is larger than the number of bits in `m`;
     /// `n` is smaller than the number of bits in `m`, but `m` does not represent corresponding subnormal number mantissa;
     /// `n` is smaller than the number of bits in `m`, but `e` is not the minimum possible exponent;
-    /// `n` or the size of `m` is too large.
+    /// `n` or the size of `m` is too large (larger than isize::MAX / 2 + EXPONENT_MIN).
     pub fn from_raw_parts(m: &[Word], n: usize, s: Sign, mut e: Exponent) -> Result<Self, Error> {
         let p = m.len() * WORD_BIT_SIZE;
         Self::p_assertion(p)?;
@@ -786,6 +786,40 @@ impl BigFloatNumber {
 
             Ok(BigFloatNumber { e, s, m })
         }
+    }
+
+    /// Constructs a number from the slice of words:
+    ///
+    ///  - `m` is the mantissa.
+    ///  - `s` is the sign.
+    ///  - `e` is the exponent.
+    ///
+    /// ## Errors
+    ///
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - InvalidArgument: size of `m` is larger than isize::MAX / 2 + EXPONENT_MIN.
+    pub fn from_words(m: &[Word], s: Sign, mut e: Exponent) -> Result<Self, Error> {
+        let p = m.len() * WORD_BIT_SIZE;
+        Self::p_assertion(p)?;
+
+        let mut m = Mantissa::from_words(p, m)?;
+        let bl = m.bit_len();
+
+        if m.is_zero() {
+            e = 0;
+        } else if bl < p {
+            let mut shift = p - bl;
+            if (e as isize) < EXPONENT_MIN as isize + shift as isize {
+                shift = (e as isize - EXPONENT_MIN as isize) as usize;
+                e = EXPONENT_MIN;
+            } else {
+                e -= shift as Exponent;
+            }
+            m.shift_left(shift);
+            m.set_bit_len(bl + shift);
+        }
+
+        Ok(BigFloatNumber { e, s, m })
     }
 
     /// Returns sign of a number.
@@ -2312,6 +2346,54 @@ mod tests {
         )
         .unwrap();
         assert!(!d1.is_odd_int());
+
+        // build from words
+        let d1 = BigFloatNumber::from_words(&[], Sign::Pos, EXPONENT_MAX).unwrap();
+        assert!(d1.is_zero());
+        assert_eq!(d1.get_exponent(), 0);
+        assert_eq!(d1.get_precision(), 0);
+        assert_eq!(d1.get_mantissa_max_bit_len(), 0);
+        assert_eq!(d1.get_sign(), Sign::Pos);
+
+        let d1 = BigFloatNumber::from_words(&[0, 0], Sign::Neg, EXPONENT_MIN).unwrap();
+        assert!(d1.is_zero());
+        assert_eq!(d1.get_exponent(), 0);
+        assert_eq!(d1.get_precision(), 0);
+        assert_eq!(d1.get_mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.get_sign(), Sign::Neg);
+
+        let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Pos, EXPONENT_MAX).unwrap();
+        assert_eq!(
+            d1.get_mantissa_digits(),
+            [0x8000000000000000u64, 0x8000000000000001u64]
+        );
+        assert_eq!(d1.get_exponent(), EXPONENT_MAX - 63);
+        assert_eq!(d1.get_precision(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.get_mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.get_sign(), Sign::Pos);
+
+        let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Neg, EXPONENT_MIN).unwrap();
+        assert_eq!(d1.get_mantissa_digits(), [3, 1]);
+        assert_eq!(d1.get_exponent(), EXPONENT_MIN);
+        assert_eq!(d1.get_precision(), 65);
+        assert_eq!(d1.get_mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.get_sign(), Sign::Neg);
+
+        let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Pos, EXPONENT_MIN + 5).unwrap();
+        assert_eq!(d1.get_mantissa_digits(), [3 << 5, 1 << 5]);
+        assert_eq!(d1.get_exponent(), EXPONENT_MIN);
+        assert_eq!(d1.get_precision(), WORD_BIT_SIZE + 6);
+        assert_eq!(d1.get_mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.get_sign(), Sign::Pos);
+
+        let d1 =
+            BigFloatNumber::from_words(&[3, 0x8000000000000000u64], Sign::Pos, EXPONENT_MIN + 5)
+                .unwrap();
+        assert_eq!(d1.get_mantissa_digits(), [3, 0x8000000000000000u64]);
+        assert_eq!(d1.get_exponent(), EXPONENT_MIN + 5);
+        assert_eq!(d1.get_precision(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.get_mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.get_sign(), Sign::Pos);
     }
 
     fn random_f64() -> f64 {
