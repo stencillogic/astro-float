@@ -800,7 +800,7 @@ impl Mantissa {
         }
 
         let self_len = self.m.len();
-        if n > 0 && n <= self.max_bit_len() {
+        if n > 0 && n < self.max_bit_len() {
             let n = n - 1;
             let mut rem_zero = true;
 

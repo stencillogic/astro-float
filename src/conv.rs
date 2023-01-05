@@ -66,6 +66,10 @@ impl BigFloatNumber {
         let p = round_p(p);
         Self::p_assertion(p)?;
 
+        if p == 0 {
+            return Self::new(0);
+        }
+
         match rdx {
             Radix::Bin => Self::conv_from_binary(sign, digits, e, p, rm),
             Radix::Oct => Self::conv_from_commensurable(sign, digits, e, 3, p, rm),
@@ -245,6 +249,10 @@ impl BigFloatNumber {
         // TODO: divide and conquer can be used to build the mantissa.
         let mut i = 0;
         for &d in digits.iter().skip(leadzeroes) {
+            if d > 9 {
+                return Err(Error::InvalidArgument);
+            }
+
             word *= 10;
             word += d as Word;
 
@@ -843,6 +851,63 @@ mod tests {
                     g.set_precision(p, rm).unwrap();
                 }
                 assert!(n.cmp(&g) == 0);
+            }
+        }
+
+        // misc/invalid input
+        let s1 = Sign::Pos;
+        for rdx in [Radix::Bin, Radix::Oct, Radix::Dec, Radix::Hex] {
+            for e1 in [123, -123, 0] {
+                let m1 = [];
+                assert!(BigFloatNumber::convert_from_radix(
+                    s1,
+                    &m1,
+                    e1,
+                    rdx,
+                    p1,
+                    RoundingMode::ToEven
+                )
+                .unwrap()
+                .is_zero());
+                let m1 = [1, rdx as u8, 0];
+                assert!(
+                    BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p1, RoundingMode::ToEven)
+                        .unwrap_err()
+                        == Error::InvalidArgument
+                );
+                let m1 = [1, rdx as u8 - 1, 0];
+                assert!(BigFloatNumber::convert_from_radix(
+                    s1,
+                    &m1,
+                    e1,
+                    rdx,
+                    0,
+                    RoundingMode::ToEven
+                )
+                .unwrap()
+                .is_zero());
+                let m1 = [0; 256];
+                assert!(BigFloatNumber::convert_from_radix(
+                    s1,
+                    &m1,
+                    e1,
+                    rdx,
+                    p1,
+                    RoundingMode::ToEven
+                )
+                .unwrap()
+                .is_zero());
+                let m1 = [0];
+                assert!(BigFloatNumber::convert_from_radix(
+                    s1,
+                    &m1,
+                    e1,
+                    rdx,
+                    p1,
+                    RoundingMode::ToEven
+                )
+                .unwrap()
+                .is_zero());
             }
         }
     }

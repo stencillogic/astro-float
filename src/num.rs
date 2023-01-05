@@ -1069,7 +1069,7 @@ impl BigFloatNumber {
     pub fn set_precision(&mut self, p: usize, rm: RoundingMode) -> Result<(), Error> {
         Self::p_assertion(p)?;
 
-        if self.get_mantissa_max_bit_len() > p {
+        if self.get_mantissa_max_bit_len() > p && p > 0 {
             if self
                 .m
                 .round_mantissa(self.get_mantissa_max_bit_len() - p, rm, self.is_positive())
