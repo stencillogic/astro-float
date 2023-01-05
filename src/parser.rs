@@ -1,38 +1,37 @@
 //! Parser parses numbers represented in scientific format.
 
+use smallvec::SmallVec;
+
 use crate::defs::Exponent;
 use crate::defs::Sign;
 use crate::defs::EXPONENT_MAX;
+use crate::Error;
 use crate::Radix;
-
-#[cfg(feature = "std")]
-use std::str::Chars;
-
-#[cfg(not(feature = "std"))]
-use {alloc::vec::Vec, core::str::Chars};
+use crate::EXPONENT_MIN;
+use core::str::Chars;
 
 pub struct ParserState<'a> {
     chars: Chars<'a>,
     cur_ch: Option<char>,
+    s_len: usize,
     sign: Sign,
-    mantissa_bytes: Vec<u8>,
-    e: Exponent,
+    mantissa_bytes: SmallVec<[u8; 1]>,
+    e: isize,
     inf: bool,
     nan: bool,
-    valid: bool,
 }
 
 impl<'a> ParserState<'a> {
     fn new(s: &'a str) -> Self {
         ParserState {
             chars: s.chars(),
+            s_len: s.len(),
             cur_ch: None,
             sign: Sign::Pos,
-            mantissa_bytes: Vec::new(),
+            mantissa_bytes: SmallVec::new(),
             e: 0,
             inf: false,
-            nan: false,
-            valid: false,
+            nan: true,
         }
     }
 
@@ -47,16 +46,11 @@ impl<'a> ParserState<'a> {
         self.cur_ch
     }
 
-    pub fn is_valid(&self) -> bool {
-        self.valid
-    }
-
     #[allow(dead_code)]
     pub fn is_inf(&self) -> bool {
         self.inf
     }
 
-    #[allow(dead_code)]
     pub fn is_nan(&self) -> bool {
         self.nan
     }
@@ -68,12 +62,12 @@ impl<'a> ParserState<'a> {
 
     /// Returns mantissa digits, mantissa length, sign, exponent.
     pub fn raw_parts(&self) -> (&[u8], Sign, Exponent) {
-        (&self.mantissa_bytes, self.sign, self.e)
+        (&self.mantissa_bytes, self.sign, self.e as Exponent)
     }
 }
 
 /// Parse BigFloat.
-pub fn parse(s: &str, rdx: Radix) -> ParserState {
+pub fn parse(s: &str, rdx: Radix) -> Result<ParserState, Error> {
     let mut parser_state = ParserState::new(s);
     let mut ch = parser_state.next_char();
 
@@ -93,22 +87,23 @@ pub fn parse(s: &str, rdx: Radix) -> ParserState {
         match (c, rdx) {
             ('i', _) => parse_inf(&mut parser_state),
             ('n', _) => parse_nan(&mut parser_state),
-            ('.' | '0' | '1', Radix::Bin) => parse_num(&mut parser_state, rdx),
+            ('.' | '0' | '1', Radix::Bin) => parse_num(&mut parser_state, rdx)?,
             ('.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7', Radix::Oct) => {
-                parse_num(&mut parser_state, rdx)
+                parse_num(&mut parser_state, rdx)?
             }
             ('.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9', Radix::Dec) => {
-                parse_num(&mut parser_state, rdx)
+                parse_num(&mut parser_state, rdx)?
             }
             (
                 '.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'a' | 'b' | 'c'
                 | 'd' | 'e' | 'f',
                 Radix::Hex,
-            ) => parse_num(&mut parser_state, rdx),
+            ) => parse_num(&mut parser_state, rdx)?,
             _ => {}
         };
     }
-    parser_state
+
+    Ok(parser_state)
 }
 
 fn parse_inf(parser_state: &mut ParserState) {
@@ -116,7 +111,7 @@ fn parse_inf(parser_state: &mut ParserState) {
     let f = parser_state.next_char();
     if Some('n') == n && Some('f') == f {
         parser_state.inf = true;
-        parser_state.valid = true;
+        parser_state.nan = false;
     }
 }
 
@@ -125,18 +120,17 @@ fn parse_nan(parser_state: &mut ParserState) {
     let n = parser_state.next_char();
     if Some('n') == n && Some('a') == a {
         parser_state.nan = true;
-        parser_state.valid = true;
     }
 }
 
-fn parse_num(parser_state: &mut ParserState, rdx: Radix) {
-    let (int_len, skip_cnt1) = parse_digits(parser_state, true, true, rdx);
+fn parse_num(parser_state: &mut ParserState, rdx: Radix) -> Result<(), Error> {
+    let (int_len, skip_cnt1) = parse_digits(parser_state, true, true, rdx)?;
     if Some('.') == parser_state.cur_char() {
         parser_state.next_char();
     }
-    let (frac_len, skip_cnt2) = parse_digits(parser_state, int_len == 0, false, rdx);
+    let (frac_len, _) = parse_digits(parser_state, false, false, rdx)?;
     if frac_len > 0 || int_len > 0 {
-        parser_state.valid = true;
+        parser_state.nan = false;
         if rdx == Radix::Hex {
             if Some('_') == parser_state.cur_char() {
                 parser_state.next_char();
@@ -150,14 +144,24 @@ fn parse_num(parser_state: &mut ParserState, rdx: Radix) {
             parse_exp(parser_state, rdx);
         }
         if int_len != 0 {
-            parser_state.e += int_len as Exponent;
-        } else {
-            parser_state.e -= skip_cnt2 as Exponent;
+            parser_state.e = parser_state.e.saturating_add(int_len as isize);
         }
-    } else if skip_cnt1 > 0 || skip_cnt2 > 0 {
+
+        if parser_state.e < EXPONENT_MIN as isize {
+            let mut zero = SmallVec::new();
+            zero.try_reserve_exact(1).map_err(Error::MemoryAllocation)?;
+            zero.push(0);
+            parser_state.mantissa_bytes = zero;
+            parser_state.e = 0;
+        } else if parser_state.e > EXPONENT_MAX as isize {
+            parser_state.inf = true;
+        }
+    } else if skip_cnt1 > 0 {
         // just zeroes
-        parser_state.valid = true;
+        parser_state.nan = false;
     }
+
+    Ok(())
 }
 
 fn parse_digits(
@@ -165,10 +169,11 @@ fn parse_digits(
     skip_zeroes: bool,
     int: bool,
     rdx: Radix,
-) -> (usize, usize) {
+) -> Result<(usize, usize), Error> {
     let mut ch = parser_state.cur_char();
     let mut len = 0;
     let mut skip_cnt = 0;
+
     if skip_zeroes {
         // skip leading zeroes
         while let Some(c) = ch {
@@ -184,22 +189,32 @@ fn parse_digits(
             ch = parser_state.next_char();
         }
     }
-    while let Some(c) = ch {
-        if is_radix_digit(c, rdx) {
-            parser_state
-                .mantissa_bytes
-                .push(c.to_digit(rdx as u32).unwrap() as u8); // call to unwrap() is unreachable, because c is surely a digit.
-            len += 1;
-        } else {
-            break;
+
+    if ch.is_some() && is_radix_digit(ch.unwrap(), rdx) {
+        parser_state
+            .mantissa_bytes
+            .try_reserve_exact(parser_state.s_len)
+            .map_err(Error::MemoryAllocation)?;
+
+        while let Some(c) = ch {
+            if is_radix_digit(c, rdx) {
+                parser_state
+                    .mantissa_bytes
+                    .push(c.to_digit(rdx as u32).unwrap() as u8); // call to unwrap() is unreachable, because c is surely a digit.
+                len += 1;
+            } else {
+                break;
+            }
+            ch = parser_state.next_char();
         }
-        ch = parser_state.next_char();
     }
+
     if skip_cnt == len {
         // just zeroes
         len = 0;
     }
-    (len, skip_cnt)
+
+    Ok((len, skip_cnt))
 }
 
 fn is_radix_digit(c: char, rdx: Radix) -> bool {
@@ -249,11 +264,13 @@ fn parse_exp(parser_state: &mut ParserState, rdx: Radix) {
     }
     while let Some(c) = ch {
         if is_radix_digit(c, rdx) {
-            if parser_state.e >= EXPONENT_MAX / 10 {
+            if parser_state.e
+                > EXPONENT_MAX.unsigned_abs().max(EXPONENT_MIN.unsigned_abs()) as isize
+            {
                 break;
             }
-            parser_state.e *= rdx as Exponent;
-            parser_state.e += c.to_digit(rdx as u32).unwrap() as Exponent; // call to unwrap() is unreachable, because c is surely a digit.
+            parser_state.e *= rdx as isize;
+            parser_state.e += c.to_digit(rdx as u32).unwrap() as isize; // call to unwrap() is unreachable, because c is surely a digit.
         } else {
             break;
         }
@@ -277,18 +294,18 @@ mod tests {
         // combinations of possible valid components of a number and expected resulting characteristics.
         let mantissas = ["0.0", "0", ".000", "00.", "00123", "456.", "789.012", ".3456", "0.0078"];
         let expected_mantissas = [
+            vec![0],
             vec![],
-            vec![],
-            vec![],
+            vec![0, 0, 0],
             vec![],
             vec![1, 2, 3],
             vec![4, 5, 6],
             vec![7, 8, 9, 0, 1, 2],
             vec![3, 4, 5, 6],
-            vec![7, 8],
+            vec![0, 0, 7, 8],
         ];
-        let expected_mantissa_len = [0, 0, 0, 0, 3, 3, 6, 4, 2];
-        let expected_exp_shifts = [0, 0, 0, 0, 3, 3, 3, 0, -2];
+        let expected_mantissa_len = [1, 0, 3, 0, 3, 3, 6, 4, 4];
+        let expected_exp_shifts = [0, 0, 0, 0, 3, 3, 3, 0, 0];
 
         let signs = ["", "+", "-"];
         let expected_signs = [Sign::Pos, Sign::Pos, Sign::Neg];
@@ -308,11 +325,10 @@ mod tests {
                     let e = exponents[k];
                     let numstr = String::from(s) + m + e;
 
-                    let ps = parse(&numstr, Radix::Dec);
+                    let ps = parse(&numstr, Radix::Dec).unwrap();
 
                     assert!(!ps.is_inf());
                     assert!(!ps.is_nan());
-                    assert!(ps.is_valid());
 
                     let (m, s, e) = ps.raw_parts();
                     assert!(s == expected_signs[i]);
@@ -333,42 +349,95 @@ mod tests {
                 let s = signs[i];
                 let numstr = String::from(s) + inf;
 
-                let ps = parse(&numstr, Radix::Dec);
+                let ps = parse(&numstr, Radix::Dec).unwrap();
 
                 assert!(ps.is_inf());
                 assert!(ps.sign() == expected_signs[i]);
                 assert!(!ps.is_nan());
-                assert!(ps.is_valid());
             }
         }
 
         // test nan
         for nan in nans {
-            let ps = parse(nan, Radix::Dec);
+            let ps = parse(nan, Radix::Dec).unwrap();
             assert!(!ps.is_inf());
             assert!(ps.is_nan());
-            assert!(ps.is_valid());
         }
 
         // bin
-        let ps = parse("101.00101e+1101", Radix::Bin);
+        let ps = parse("101.00101e+1101", Radix::Bin).unwrap();
         let (m, s, e) = ps.raw_parts();
         assert!(m == [1, 0, 1, 0, 0, 1, 0, 1]);
         assert!(s == Sign::Pos);
         assert!(e == 16);
 
         // oct
-        let ps = parse("2670.343e+703", Radix::Oct);
+        let ps = parse("2670.343e+703", Radix::Oct).unwrap();
         let (m, s, e) = ps.raw_parts();
         assert!(m == [2, 6, 7, 0, 3, 4, 3]);
         assert!(s == Sign::Pos);
         assert!(e == 0o707);
 
         // hex
-        let ps = parse("abc.def09123e_e-1fa", Radix::Hex);
+        let ps = parse("abc.def09123e_e-1fa", Radix::Hex).unwrap();
         let (m, s, e) = ps.raw_parts();
         assert!(m == [10, 11, 12, 13, 14, 15, 0, 9, 1, 2, 3, 14]);
         assert!(s == Sign::Pos);
         assert!(e == -0x1f7);
+
+        // large exp
+        let ps = parse("abc.def09123e_e+7FFFFFFF", Radix::Hex).unwrap();
+        assert!(ps.is_inf());
+        assert!(ps.sign().is_positive());
+
+        let ps = parse("-abc.def09123e_e+7FFFFFFF", Radix::Hex).unwrap();
+        assert!(ps.is_inf());
+        assert!(!ps.is_nan());
+        assert!(ps.sign().is_negative());
+
+        let ps = parse(
+            "-abc.def09123e_e+ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            Radix::Hex,
+        )
+        .unwrap();
+        assert!(ps.is_inf());
+        assert!(!ps.is_nan());
+        assert!(ps.sign().is_negative());
+
+        let ps = parse("0.0000abc_e+7FFFFFFF", Radix::Hex).unwrap();
+        assert!(!ps.is_inf());
+        assert!(!ps.is_nan());
+        let (m, _s, e) = ps.raw_parts();
+        assert_eq!(m, [0, 0, 0, 0, 0xa, 0xb, 0xc]);
+        assert_eq!(e, 0x7FFFFFFF);
+
+        // small exp
+        let ps = parse("abc.def09123e_e-80000004", Radix::Hex).unwrap();
+        assert!(!ps.is_inf());
+        assert!(!ps.is_nan());
+        let (m, _s, e) = ps.raw_parts();
+        assert_eq!(m.iter().filter(|&&x| x != 0).count(), 0);
+        assert!(e == 0);
+
+        let ps = parse("0.0000abcdef09123e_e-80000000", Radix::Hex).unwrap();
+        assert!(!ps.is_inf());
+        assert!(!ps.is_nan());
+        let (m, _s, e) = ps.raw_parts();
+        assert_eq!(
+            m,
+            [0, 0, 0, 0, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x0, 0x9, 0x1, 0x2, 0x3, 0xe]
+        );
+        assert_eq!(e, -0x80000000);
+
+        let ps = parse(
+            "abc.def09123e_e-ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            Radix::Hex,
+        )
+        .unwrap();
+        assert!(!ps.is_inf());
+        assert!(!ps.is_nan());
+        let (m, _s, e) = ps.raw_parts();
+        assert_eq!(m.iter().filter(|&&x| x != 0).count(), 0);
+        assert!(e == 0);
     }
 }

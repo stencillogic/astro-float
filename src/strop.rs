@@ -1,10 +1,13 @@
 //! BigFloatNumber formatting.
 
+use smallvec::CollectionAllocErr;
+
 use crate::defs::Error;
 use crate::defs::Radix;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
 use crate::parser;
+use crate::Exponent;
 use crate::Sign;
 
 #[cfg(feature = "std")]
@@ -30,13 +33,13 @@ impl BigFloatNumber {
     pub fn parse(s: &str, rdx: Radix, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         Self::p_assertion(p)?;
 
-        let ps = parser::parse(s, rdx);
+        let ps = parser::parse(s, rdx)?;
 
-        if ps.is_valid() {
+        if ps.is_nan() || ps.is_inf() {
+            Err(Error::InvalidArgument)
+        } else {
             let (m, s, e) = ps.raw_parts();
             BigFloatNumber::convert_from_radix(s, m, e, rdx, p, rm)
-        } else {
-            Err(Error::InvalidArgument)
         }
     }
 
@@ -52,30 +55,55 @@ impl BigFloatNumber {
     pub fn format(&self, rdx: Radix, rm: RoundingMode) -> Result<String, Error> {
         let (s, m, e) = self.convert_to_radix(rdx, rm)?;
 
-        let mut mstr = if s == Sign::Neg { String::from("-") } else { String::new() };
+        let mut mstr = String::new();
+        let mstr_sz = 8
+            + (self.get_mantissa_max_bit_len() + core::mem::size_of::<Exponent>() * 8)
+                / match rdx {
+                    Radix::Bin => 1,
+                    Radix::Oct => 3,
+                    Radix::Dec => 3,
+                    Radix::Hex => 4,
+                };
+
+        // TODO: replace SmallVec with Vec.
+        mstr.try_reserve_exact(mstr_sz)
+            .map_err(|_| Error::MemoryAllocation(CollectionAllocErr::CapacityOverflow))?;
+        if s == Sign::Neg {
+            mstr.push('-');
+        }
 
         if m.is_empty() {
             mstr.push_str("0.0");
         } else {
-            mstr.push(DIGIT_CHARS[m[0] as usize]);
+            let mut iter = m.iter();
+
+            if self.is_subnormal() {
+                mstr.push('0');
+            } else {
+                mstr.push(DIGIT_CHARS[*iter.next().unwrap() as usize]); // m is not empty as checked above, hence unwrap
+            }
+
             mstr.push('.');
-            mstr.push_str(
-                &m.iter()
-                    .skip(1)
-                    .map(|d| DIGIT_CHARS[*d as usize])
-                    .collect::<String>(),
-            );
+
+            iter.map(|&d| DIGIT_CHARS[d as usize])
+                .for_each(|v| mstr.push(v));
 
             if rdx == Radix::Hex {
                 let _ = write!(mstr, "_");
             }
 
             if e < 1 {
+                let val = if self.is_subnormal() {
+                    e.unsigned_abs() as usize
+                } else {
+                    (e as isize - 1).unsigned_abs()
+                };
+
                 let _ = match rdx {
-                    Radix::Bin => write!(mstr, "e-{:b}", (e as isize - 1).unsigned_abs()),
-                    Radix::Oct => write!(mstr, "e-{:o}", (e as isize - 1).unsigned_abs()),
-                    Radix::Dec => write!(mstr, "e-{}", (e as isize - 1).unsigned_abs()),
-                    Radix::Hex => write!(mstr, "e-{:x}", (e as isize - 1).unsigned_abs()),
+                    Radix::Bin => write!(mstr, "e-{:b}", val),
+                    Radix::Oct => write!(mstr, "e-{:o}", val),
+                    Radix::Dec => write!(mstr, "e-{}", val),
+                    Radix::Hex => write!(mstr, "e-{:x}", val),
                 };
             } else {
                 let _ = match rdx {
@@ -94,32 +122,121 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
+    use rand::random;
+
+    use crate::{
+        common::util::random_subnormal, Exponent, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE,
+    };
+
     use super::*;
 
     #[test]
     fn test_strop() {
         let mut eps = BigFloatNumber::from_word(1, 192).unwrap();
+        let rm = RoundingMode::ToEven;
 
-        for _ in 0..10000 {
+        for i in 0..1000 {
+            let p1 = (random::<usize>() % 32 + 3) * WORD_BIT_SIZE;
+            let p2 = (random::<usize>() % 32 + 3) * WORD_BIT_SIZE;
+            let p = p1.min(p2);
+
             for rdx in [Radix::Bin, Radix::Oct, Radix::Hex, Radix::Dec] {
-                let n = BigFloatNumber::random_normal(192, -2, -2).unwrap();
-                let s = n.format(rdx, RoundingMode::ToEven).unwrap();
-                let d = BigFloatNumber::parse(&s, rdx, 200, RoundingMode::ToEven).unwrap();
+                let mut n = if i & 1 == 0 {
+                    BigFloatNumber::random_normal(p1, EXPONENT_MIN, EXPONENT_MAX).unwrap()
+                } else {
+                    random_subnormal(p1)
+                };
+                let s = n.format(rdx, rm).unwrap();
+                let mut d = BigFloatNumber::parse(&s, rdx, p2, rm).unwrap();
 
                 if rdx == Radix::Dec {
-                    //println!("\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}", n, s, d, n.format(Radix::Hex, RoundingMode::ToEven), d.format(Radix::Hex, RoundingMode::ToEven));
-                    eps.set_exponent(n.get_exponent() - 160);
-                    assert!(
-                        d.sub(&n, d.get_mantissa_max_bit_len(), RoundingMode::ToEven)
-                            .unwrap()
-                            .abs()
-                            .unwrap()
-                            .cmp(&eps)
-                            < 0
-                    );
+                    //println!("\n{:?}\n{:?}\n{:?}", s, n, d);
+                    if i & 1 == 0 {
+                        eps.set_exponent(n.get_exponent() - p as Exponent + 3);
+                        assert!(
+                            d.sub(&n, d.get_mantissa_max_bit_len(), rm)
+                                .unwrap()
+                                .abs()
+                                .unwrap()
+                                .cmp(&eps)
+                                < 0
+                        );
+                    } else {
+                        let mut eps2 = BigFloatNumber::min_positive(p).unwrap();
+                        eps2.set_exponent(eps2.get_exponent() + 2);
+                        assert!(
+                            d.sub(&n, d.get_mantissa_max_bit_len(), rm)
+                                .unwrap()
+                                .abs()
+                                .unwrap()
+                                .cmp(&eps2)
+                                < 0
+                        );
+                    }
                 } else {
+                    if p2 < p1 {
+                        n.set_precision(p, rm).unwrap();
+                    } else if p2 > p1 {
+                        d.set_precision(p, rm).unwrap();
+                    }
+                    //println!("\n{:?}\n{:?}\n{:?}", s, n, d);
                     assert!(d.cmp(&n) == 0);
                 }
+            }
+        }
+
+        // MIN, MAX, min_positive
+        let p1 = (random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
+        let p2 = (random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
+        let p = p1.min(p2);
+
+        for rdx in [Radix::Bin, Radix::Oct, Radix::Dec, Radix::Hex] {
+            // min, max
+            // for p2 < p1 rounding will cause overflow, for p2 >= p1 no rounding is needed.
+            let rm = RoundingMode::None;
+            for mut n in
+                [BigFloatNumber::max_value(p1).unwrap(), BigFloatNumber::min_value(p1).unwrap()]
+            {
+                //println!("\n{:?} {} {}", rdx, p1, p2);
+                //println!("{:?}", n);
+
+                let s = n.format(rdx, rm).unwrap();
+                let mut g = BigFloatNumber::parse(&s, rdx, p2, rm).unwrap();
+
+                //println!("{:?}", g);
+
+                if rdx == Radix::Dec {
+                    eps.set_exponent(n.get_exponent() - p as Exponent + 3);
+                    assert!(n.sub(&g, p, rm).unwrap().abs().unwrap().cmp(&eps) <= 0);
+                } else {
+                    if p2 < p1 {
+                        n.set_precision(p, rm).unwrap();
+                    } else if p2 > p1 {
+                        g.set_precision(p, rm).unwrap();
+                    }
+
+                    assert!(n.cmp(&g) == 0);
+                }
+            }
+
+            // min subnormal
+            let rm = RoundingMode::ToEven;
+
+            let mut n = BigFloatNumber::min_positive(p1).unwrap();
+            let s = n.format(rdx, rm).unwrap();
+            let mut g = BigFloatNumber::parse(&s, rdx, p2, rm).unwrap();
+
+            if rdx == Radix::Dec {
+                let mut eps = BigFloatNumber::min_positive(p).unwrap();
+                eps.set_exponent(eps.get_exponent() + 2);
+                assert!(n.sub(&g, p, rm).unwrap().abs().unwrap().cmp(&eps) < 0);
+            } else {
+                if p2 < p1 {
+                    n.set_precision(p, rm).unwrap();
+                } else if p2 > p1 {
+                    g.set_precision(p, rm).unwrap();
+                }
+                assert!(n.cmp(&g) == 0);
             }
         }
     }
