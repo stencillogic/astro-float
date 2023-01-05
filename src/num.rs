@@ -676,7 +676,7 @@ impl BigFloatNumber {
     }
 
     /// Converts a number to f64 value.
-    #[allow(dead_code)] // used in tests
+    #[cfg(test)]
     pub(crate) fn as_f64(&self) -> f64 {
         if self.m.is_zero() {
             return 0.0;
@@ -731,7 +731,7 @@ impl BigFloatNumber {
 
     /// Converts a number to f32 value.
     #[inline]
-    #[allow(dead_code)] // used in tests
+    #[cfg(test)]
     pub(crate) fn as_f32(&self) -> f32 {
         self.as_f64() as f32
     }
@@ -933,7 +933,7 @@ impl BigFloatNumber {
     }
 
     /// Returns true if `self` is odd integer number.
-    #[allow(dead_code)] // used in tests
+    #[cfg(test)]
     pub(crate) fn is_odd_int(&self) -> bool {
         if self.e > 0 {
             if (self.e as usize) < self.m.max_bit_len() {

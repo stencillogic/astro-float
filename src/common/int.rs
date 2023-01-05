@@ -1,9 +1,9 @@
 //! Lightweigh integer.
 
-use super::util::add_carry;
+use crate::common::util::add_carry;
 use crate::common::util::shift_slice_right;
 use crate::common::util::{shift_slice_left, sub_borrow};
-use crate::defs::{DoubleWord, SignedWord, Word, WORD_BASE, WORD_BIT_SIZE, WORD_MAX};
+use crate::defs::{DoubleWord, SignedWord, Word, WORD_BASE, WORD_MAX};
 use core::ops::Deref;
 use core::ops::DerefMut;
 use itertools::izip;
@@ -92,7 +92,7 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
-    #[allow(dead_code)] // used intests
+    #[cfg(test)]
     pub fn mul_assign<'c>(&mut self, s2: &SliceWithSign<'c>, work_buf: &mut [Word]) {
         work_buf.fill(0);
         for (i, d1mi) in self.deref().iter().enumerate() {
@@ -106,33 +106,12 @@ impl<'a> SliceWithSign<'a> {
                 let m = d1mi * (*m2j as DoubleWord) + *m3ij as DoubleWord + k;
 
                 *m3ij = m as Word;
-                k = m >> (WORD_BIT_SIZE);
+                k = m >> (crate::WORD_BIT_SIZE);
             }
             work_buf[i + s2.len()] += k as Word;
         }
         self.deref_mut().copy_from_slice(work_buf);
         self.sign *= s2.sign;
-    }
-
-    #[allow(dead_code)] // used intests
-    pub fn mul<'c>(&self, s2: &SliceWithSign<'c>, dst: &mut SliceWithSign<'c>) {
-        dst.fill(0);
-        for (i, d1mi) in self.deref().iter().enumerate() {
-            let d1mi = *d1mi as DoubleWord;
-            if d1mi == 0 {
-                continue;
-            }
-
-            let mut k = 0;
-            for (m2j, m3ij) in s2.deref().iter().zip(dst[i..].iter_mut()) {
-                let m = d1mi * (*m2j as DoubleWord) + *m3ij as DoubleWord + k;
-
-                *m3ij = m as Word;
-                k = m >> (WORD_BIT_SIZE);
-            }
-            dst[i + s2.len()] += k as Word;
-        }
-        dst.sign = self.sign * s2.sign;
     }
 
     #[inline]

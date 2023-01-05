@@ -120,10 +120,8 @@ impl BigFloatNumber {
 mod tests {
 
     use super::*;
-    use crate::{common::util::random_subnormal, defs::WORD_BIT_SIZE, Exponent};
-
-    #[cfg(feature = "std")]
     use crate::Sign;
+    use crate::{common::util::random_subnormal, defs::WORD_BIT_SIZE, Exponent};
 
     #[test]
     fn test_sqrt() {

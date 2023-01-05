@@ -694,6 +694,7 @@ impl Mantissa {
         Ok((shift, ret))
     }
 
+    #[cfg(test)]
     pub fn to_u64(&self) -> u64 {
         #[cfg(target_arch = "x86_64")]
         {
@@ -972,6 +973,7 @@ impl Mantissa {
     }
 
     /// returns true if `self` represents odd integer.
+    #[cfg(test)]
     pub fn is_odd_int(&self, n: usize) -> bool {
         debug_assert!(n < self.max_bit_len() && n > 0);
 

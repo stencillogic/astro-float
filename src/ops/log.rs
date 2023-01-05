@@ -327,6 +327,9 @@ mod tests {
 
     use super::*;
 
+    #[cfg(not(feature = "std"))]
+    use alloc::vec::Vec;
+
     #[test]
     fn test_logarithm() {
         let mut cc = Consts::new().unwrap();
@@ -519,7 +522,7 @@ mod tests {
         assert!(d2.log(&d1, prec, rm, &mut cc).is_ok());
 
         // base close to 0, 1, or a large value
-        let mut nums = vec![];
+        let mut nums = Vec::new();
         for s in [
             "1.23456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF12_e-100000",
             "0.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF123456789ABCDEF0123456789ABCDEF12_e+0",
