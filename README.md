@@ -1,10 +1,6 @@
 ![Rust](https://github.com/stencillogic/astro-float/workflows/Rust/badge.svg)
 ![Minimum rustc version](https://img.shields.io/badge/rustc-1.62.1+-lightgray.svg)
 
-_**Note**. This release besides many improvements has a breaking change: now many operations accept the output precision as an argument. Previously, the resulting precision was computed as the maximum precision of the input arguments._
-
------------
-
 Astro-float (astronomically large floating point numbers) is a library that implements arbitrary precision floating point numbers purely in Rust.
 
 The library implements the basic operations and functions. It uses classical algorithms such as Karatsuba, Toom-Cook, Schönhage-Strassen algorithm, and others.
