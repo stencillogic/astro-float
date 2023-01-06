@@ -22,6 +22,7 @@ use crate::EXPONENT_MIN;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+use smallvec::CollectionAllocErr;
 
 impl BigFloatNumber {
     /// Converts an array of digits in radix `rdx` to BigFloatNumber with precision `p`.
@@ -366,19 +367,14 @@ impl BigFloatNumber {
         let (digits, e_shift) = if n == 0 {
             self.conv_mantissa(l, Radix::Dec, rm)
         } else {
-            let rdx = Self::number_for_radix(Radix::Dec)?;
-            let mut rdx_p = rdx.clone()?;
-            let max_p = self
-                .get_mantissa_max_bit_len()
-                .min(self.get_exponent().unsigned_abs() as usize)
-                + core::mem::size_of::<Exponent>()
-                + 2;
-            rdx_p.set_precision(max_p, RoundingMode::None)?;
+            let p_w = self.get_mantissa_max_bit_len() + WORD_BIT_SIZE;
 
-            let mut f = if n >= 646456993 {
+            let rdx = Self::number_for_radix(Radix::Dec)?;
+
+            let f = if n >= 646456993 {
                 // avoid powi overflow
 
-                let d = rdx_p.powi(n - 1, max_p, rm)?;
+                let d = rdx.powi(n - 1, p_w, RoundingMode::None)?;
 
                 if self.get_exponent() < 0 {
                     self.mul(&d, self.get_mantissa_max_bit_len(), RoundingMode::None)?
@@ -388,7 +384,7 @@ impl BigFloatNumber {
                         .div(rdx, self.get_mantissa_max_bit_len(), RoundingMode::None)
                 }
             } else {
-                let d = rdx_p.powi(n, max_p, rm)?;
+                let d = rdx.powi(n, p_w, RoundingMode::None)?;
 
                 if self.get_exponent() < 0 {
                     self.mul(&d, self.get_mantissa_max_bit_len(), RoundingMode::None)
@@ -396,8 +392,6 @@ impl BigFloatNumber {
                     self.div(&d, self.get_mantissa_max_bit_len(), RoundingMode::None)
                 }
             }?;
-
-            f.set_precision(self.get_mantissa_max_bit_len(), rm)?;
 
             f.conv_mantissa(l, Radix::Dec, rm)
         }?;
@@ -481,20 +475,28 @@ impl BigFloatNumber {
         let mut e_shift = 0;
 
         if self.is_zero() {
+            ret.try_reserve_exact(1)
+                .map_err(|_| Error::MemoryAllocation(CollectionAllocErr::CapacityOverflow))?;
             ret.push(0);
         } else {
+            ret.try_reserve_exact(3 + l)
+                .map_err(|_| Error::MemoryAllocation(CollectionAllocErr::CapacityOverflow))?;
+
             let mut r = self.clone()?;
             r.set_sign(Sign::Pos);
+            r.set_precision(r.get_mantissa_max_bit_len() + 4, RoundingMode::None)?;
+
             let rdx_num = Self::number_for_radix(rdx)?;
             let rdx_word = Self::word_for_radix(rdx);
+
             let mut word;
 
-            let d = r.mul(rdx_num, r.get_mantissa_max_bit_len(), rm)?;
+            let d = r.mul(rdx_num, r.get_mantissa_max_bit_len(), RoundingMode::None)?;
             r = d.fract()?;
             word = d.get_int_as_word();
             if word == 0 {
                 e_shift = -1;
-                let d = r.mul(rdx_num, r.get_mantissa_max_bit_len(), rm)?;
+                let d = r.mul(rdx_num, r.get_mantissa_max_bit_len(), RoundingMode::None)?;
                 r = d.fract()?;
                 word = d.get_int_as_word();
             } else if word >= rdx_word {
@@ -503,7 +505,7 @@ impl BigFloatNumber {
                 ret.push((word / rdx_word) as u8);
                 ret.push((word % rdx_word) as u8);
 
-                let d = r.mul(rdx_num, r.get_mantissa_max_bit_len(), rm)?;
+                let d = r.mul(rdx_num, r.get_mantissa_max_bit_len(), RoundingMode::None)?;
                 r = d.fract()?;
                 word = d.get_int_as_word();
             }
@@ -511,12 +513,12 @@ impl BigFloatNumber {
             for _ in 0..l {
                 ret.push(word as u8);
 
-                let d = r.mul(rdx_num, r.get_mantissa_max_bit_len(), rm)?;
+                let d = r.mul(rdx_num, r.get_mantissa_max_bit_len(), RoundingMode::None)?;
                 r = d.fract()?;
                 word = d.get_int_as_word();
             }
 
-            if !r.round(0, RoundingMode::ToEven)?.is_zero() {
+            if !r.round(0, rm)?.is_zero() {
                 word += 1;
 
                 if word == rdx_word {
@@ -679,12 +681,12 @@ mod tests {
                 .convert_to_radix(Radix::Dec, RoundingMode::ToEven)
                 .unwrap();
 
-            //println!("{:?}", m);
-            assert!(
-                m == [
+            assert_eq!(
+                m,
+                [
                     5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
                     9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-                    9, 9, 9, 9, 9, 8, 8
+                    9, 9, 9, 9, 9, 9, 1
                 ]
             );
             assert!(s == Sign::Pos);
@@ -708,10 +710,11 @@ mod tests {
 
         // random normal values
         let mut eps = ONE.clone().unwrap();
+        let p_rng = 32;
 
         for _ in 0..1000 {
-            let p1 = (random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
-            let p2 = (random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
+            let p1 = (random::<usize>() % p_rng + 1) * WORD_BIT_SIZE;
+            let p2 = (random::<usize>() % p_rng + 1) * WORD_BIT_SIZE;
             let p = p1.min(p2);
 
             let mut n =
@@ -751,8 +754,8 @@ mod tests {
 
         // subnormal values
         for _ in 0..1000 {
-            let p1 = (random::<usize>() % 32 + 3) * WORD_BIT_SIZE;
-            let p2 = (random::<usize>() % 32 + 3) * WORD_BIT_SIZE;
+            let p1 = (random::<usize>() % p_rng + 3) * WORD_BIT_SIZE;
+            let p2 = (random::<usize>() % p_rng + 3) * WORD_BIT_SIZE;
             let p = p1.min(p2);
 
             let mut n = random_subnormal(p1);
@@ -792,8 +795,8 @@ mod tests {
         }
 
         // MIN, MAX, min_subnormal
-        let p1 = (random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
-        let p2 = (random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
+        let p1 = (random::<usize>() % p_rng + 1) * WORD_BIT_SIZE;
+        let p2 = (random::<usize>() % p_rng + 1) * WORD_BIT_SIZE;
         let p = p1.min(p2);
 
         for rdx in [Radix::Bin, Radix::Oct, Radix::Dec, Radix::Hex] {
