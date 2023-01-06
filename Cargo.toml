@@ -26,6 +26,7 @@ default = ["std", "random", "serde"]
 std = []
 random = ["dep:rand"]
 serde = ["dep:serde"]
+no_panic = []
 
 [profile.release]
 opt-level = 3

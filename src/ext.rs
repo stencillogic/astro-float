@@ -54,16 +54,28 @@ enum Flavor {
 
 impl BigFloat {
     /// Returns a new BigFloat with the value of zero and precision `p`.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn new(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::new(p), false, true)
     }
 
-    /// Creates a BigFloat from f64.\
+    /// Creates a BigFloat from f64.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn from_f64(f: f64, p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::from_f64(p, f), false, true)
     }
 
     /// Creates a BigFloat from f32.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn from_f32(f: f32, p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::from_f64(p, f as f64), false, true)
     }
@@ -89,22 +101,30 @@ impl BigFloat {
     }
 
     /// Adds `d2` to `self` and returns the result of the addition.
-    pub fn add(&self, d2: &Self, rm: RoundingMode) -> Self {
-        self.add_op(d2, rm, false)
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
+    pub fn add(&self, d2: &Self, p: usize, rm: RoundingMode) -> Self {
+        self.add_op(d2, p, rm, false)
     }
 
     /// Adds `d2` to `self` and returns the result of the addition.
     /// The resulting precision is equal to the full precision of the result.
     /// This operation can be used to emulate integer addition.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn add_full_prec(&self, d2: &Self) -> Self {
-        self.add_op(d2, RoundingMode::None, true)
+        self.add_op(d2, 0, RoundingMode::None, true)
     }
 
-    fn add_op(&self, d2: &Self, rm: RoundingMode, full_prec: bool) -> Self {
+    fn add_op(&self, d2: &Self, p: usize, rm: RoundingMode, full_prec: bool) -> Self {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
                 Flavor::Value(v2) => Self::result_to_ext(
-                    if full_prec { v1.add_full_prec(v2) } else { v1.add(v2, rm) },
+                    if full_prec { v1.add_full_prec(v2) } else { v1.add(v2, p, rm) },
                     v1.is_zero(),
                     v1.get_sign() == v2.get_sign(),
                 ),
@@ -133,22 +153,30 @@ impl BigFloat {
     }
 
     /// Subtracts `d2` from `self` and return the result of the subtraction.
-    pub fn sub(&self, d2: &Self, rm: RoundingMode) -> Self {
-        self.sub_op(d2, rm, false)
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
+    pub fn sub(&self, d2: &Self, p: usize, rm: RoundingMode) -> Self {
+        self.sub_op(d2, p, rm, false)
     }
 
     /// Subtracts `d2` from `self` and returns the result of the operation.
     /// The resulting precision is equal to the full precision of the result.
     /// This operation can be used to emulate integer subtraction.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn sub_full_prec(&self, d2: &Self) -> Self {
-        self.sub_op(d2, RoundingMode::None, true)
+        self.sub_op(d2, 0, RoundingMode::None, true)
     }
 
-    fn sub_op(&self, d2: &Self, rm: RoundingMode, full_prec: bool) -> Self {
+    fn sub_op(&self, d2: &Self, p: usize, rm: RoundingMode, full_prec: bool) -> Self {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
                 Flavor::Value(v2) => Self::result_to_ext(
-                    if full_prec { v1.sub_full_prec(v2) } else { v1.sub(v2, rm) },
+                    if full_prec { v1.sub_full_prec(v2) } else { v1.sub(v2, p, rm) },
                     v1.is_zero(),
                     v1.get_sign() == v2.get_sign(),
                 ),
@@ -181,24 +209,32 @@ impl BigFloat {
     }
 
     /// Multiplies `self` by `d2` and returns the result of the multiplication.
-    pub fn mul(&self, d2: &Self, rm: RoundingMode) -> Self {
-        self.mul_op(d2, rm, false)
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
+    pub fn mul(&self, d2: &Self, p: usize, rm: RoundingMode) -> Self {
+        self.mul_op(d2, p, rm, false)
     }
 
     /// Multiplies `d2` by `self` and returns the result of the operation.
     /// The resulting precision is equal to the full precision of the result.
     /// This operation can be used to emulate integer multiplication.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn mul_full_prec(&self, d2: &Self) -> Self {
-        self.mul_op(d2, RoundingMode::None, true)
+        self.mul_op(d2, 0, RoundingMode::None, true)
     }
 
     /// Multiplies `self` by `d2` and returns the result of the multiplication.
-    fn mul_op(&self, d2: &Self, rm: RoundingMode, full_prec: bool) -> Self {
+    fn mul_op(&self, d2: &Self, p: usize, rm: RoundingMode, full_prec: bool) -> Self {
         match &self.inner {
             Flavor::Value(v1) => {
                 match &d2.inner {
                     Flavor::Value(v2) => Self::result_to_ext(
-                        if full_prec { v1.mul_full_prec(v2) } else { v1.mul(v2, rm) },
+                        if full_prec { v1.mul_full_prec(v2) } else { v1.mul(v2, p, rm) },
                         v1.is_zero(),
                         v1.get_sign() == v2.get_sign(),
                     ),
@@ -243,11 +279,15 @@ impl BigFloat {
     }
 
     /// Divides `self` by `d2` and returns the result of the division.
-    pub fn div(&self, d2: &Self, rm: RoundingMode) -> Self {
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
+    pub fn div(&self, d2: &Self, p: usize, rm: RoundingMode) -> Self {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
                 Flavor::Value(v2) => Self::result_to_ext(
-                    v1.div(v2, rm),
+                    v1.div(v2, p, rm),
                     v1.is_zero(),
                     v1.get_sign() == v2.get_sign(),
                 ),
@@ -270,14 +310,16 @@ impl BigFloat {
     }
 
     /// Returns the remainder of division of `self` by `d1`.
-    pub fn rem(&self, d2: &Self, rm: RoundingMode) -> Self {
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
+    pub fn rem(&self, d2: &Self) -> Self {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
-                Flavor::Value(v2) => Self::result_to_ext(
-                    v1.rem(v2, rm),
-                    v1.is_zero(),
-                    v1.get_sign() == v2.get_sign(),
-                ),
+                Flavor::Value(v2) => {
+                    Self::result_to_ext(v1.rem(v2), v1.is_zero(), v1.get_sign() == v2.get_sign())
+                }
                 Flavor::Inf(_) => self.clone(),
                 Flavor::NaN => NAN,
             },
@@ -320,12 +362,16 @@ impl BigFloat {
     }
 
     /// Returns `self` to the power of `d1`.
-    pub fn pow(&self, d1: &Self, rm: RoundingMode, cc: &mut Consts) -> Self {
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
+    pub fn pow(&self, d1: &Self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v1) => {
                 match &d1.inner {
                     Flavor::Value(v2) => Self::result_to_ext(
-                        v1.pow(v2, rm, cc),
+                        v1.pow(v2, p, rm, cc),
                         v1.is_zero(),
                         v1.get_sign() == v2.get_sign(),
                     ),
@@ -337,9 +383,9 @@ impl BigFloat {
                                 inner: Flavor::Inf(*s2),
                             }
                         } else if val < 0 {
-                            Self::new(v1.get_mantissa_max_bit_len())
+                            Self::new(p)
                         } else {
-                            Self::from_u8(1, v1.get_mantissa_max_bit_len())
+                            Self::from_u8(1, p)
                         }
                     }
                     Flavor::NaN => NAN,
@@ -350,7 +396,7 @@ impl BigFloat {
                     Flavor::Value(v2) => {
                         // inf ^ v2
                         if v2.is_zero() {
-                            Self::from_u8(1, v2.get_mantissa_max_bit_len())
+                            Self::from_u8(1, p)
                         } else if v2.is_positive() {
                             if s1.is_negative() && v2.is_odd_int() {
                                 // v2 is odd and has no fractional part.
@@ -359,7 +405,7 @@ impl BigFloat {
                                 INF_POS
                             }
                         } else {
-                            Self::new(v2.get_mantissa_max_bit_len())
+                            Self::new(p)
                         }
                     }
                     Flavor::Inf(s2) => {
@@ -367,7 +413,7 @@ impl BigFloat {
                         if s2.is_positive() {
                             INF_POS
                         } else {
-                            Self::new(1)
+                            Self::new(p)
                         }
                     }
                     Flavor::NaN => NAN,
@@ -378,9 +424,13 @@ impl BigFloat {
     }
 
     /// Returns `self` to the power of `i`.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn powi(&self, i: usize, p: usize, rm: RoundingMode) -> Self {
         match &self.inner {
-            Flavor::Value(v1) => Self::result_to_ext(v1.powi(i, rm), false, true),
+            Flavor::Value(v1) => Self::result_to_ext(v1.powi(i, p, rm), false, true),
             Flavor::Inf(s1) => {
                 // inf ^ v2
                 if i == 0 {
@@ -400,15 +450,19 @@ impl BigFloat {
     }
 
     /// Returns the logarithm base `b` of a number.
-    pub fn log(&self, b: &Self, rm: RoundingMode, cc: &mut Consts) -> Self {
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
+    pub fn log(&self, b: &Self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v1) => {
                 match &b.inner {
-                    Flavor::Value(v2) => Self::result_to_ext(v1.log(v2, rm, cc), false, true),
+                    Flavor::Value(v2) => Self::result_to_ext(v1.log(v2, p, rm, cc), false, true),
                     Flavor::Inf(s2) => {
                         // v1.log(inf)
                         if s2.is_positive() {
-                            Self::new(v1.get_mantissa_max_bit_len())
+                            Self::new(p)
                         } else {
                             NAN
                         }
@@ -480,6 +534,10 @@ impl BigFloat {
     /// Restricts the value of `self` to an interval determined by the values of `min` and `max`.
     /// The function returns `max` if `self` is greater than `max`, `min` if `self` is less than `min`, and `self` otherwise.
     /// If either argument is NaN or `min` is greater than `max`, the function returns NaN.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn clamp(&self, min: &Self, max: &Self) -> Self {
         if self.is_nan() || min.is_nan() || max.is_nan() || max.cmp(min).unwrap() < 0 {
             // call to unwrap() is unreacheable
@@ -497,6 +555,10 @@ impl BigFloat {
 
     /// Returns the value of `d1` if `d1` is greater than `self`, or the value of `self` otherwise.
     /// If either argument is NaN, the function returns NaN.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn max(&self, d1: &Self) -> Self {
         if self.is_nan() || d1.is_nan() {
             NAN
@@ -510,6 +572,10 @@ impl BigFloat {
 
     /// Returns value of `d1` if `d1` is less than `self`, or the value of `self` otherwise.
     /// If either argument is NaN, the function returns NaN.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn min(&self, d1: &Self) -> Self {
         if self.is_nan() || d1.is_nan() {
             NAN
@@ -523,6 +589,10 @@ impl BigFloat {
 
     /// Returns a BigFloat with the value -1 if `self` is negative, 1 if `self` is positive, zero otherwise.
     /// The function returns NaN If `self` is NaN.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn signum(&self) -> Self {
         if self.is_nan() {
             NAN
@@ -545,37 +615,49 @@ impl BigFloat {
     /// use astro_float::Radix;
     /// use astro_float::RoundingMode;
     ///
-    /// let n = BigFloat::parse("0.0", Radix::Bin, 64, RoundingMode::ToEven).unwrap();
+    /// let n = BigFloat::parse("0.0", Radix::Bin, 64, RoundingMode::ToEven);
     /// assert!(n.is_zero());
-    /// let n = BigFloat::parse("1.124e-24", Radix::Dec, 128, RoundingMode::ToEven).unwrap();
-    /// assert!(n.sub(&BigFloat::from_f64(1.124e-24, 128), RoundingMode::ToEven).get_exponent() <= Some(-52 - 24));
-    /// let n = BigFloat::parse("-Inf", Radix::Hex, 1, RoundingMode::None).unwrap();
+    /// let n = BigFloat::parse("1.124e-24", Radix::Dec, 128, RoundingMode::ToEven);
+    /// assert!(n.sub(&BigFloat::from_f64(1.124e-24, 128), 128, RoundingMode::ToEven).get_exponent() <= Some(-52 - 24));
+    /// let n = BigFloat::parse("-Inf", Radix::Hex, 1, RoundingMode::None);
     /// assert!(n.is_inf_neg());
-    /// let n = BigFloat::parse("NaN", Radix::Oct, 2, RoundingMode::None).unwrap();
+    /// let n = BigFloat::parse("NaN", Radix::Oct, 2, RoundingMode::None);
     /// assert!(n.is_nan());
     /// ```
-    pub fn parse(s: &str, rdx: Radix, p: usize, rm: RoundingMode) -> Option<Self> {
-        let ps = crate::parser::parse(s, rdx);
-
-        if ps.is_valid() {
-            if ps.is_inf() {
-                if ps.sign() == Sign::Pos {
-                    Some(INF_POS)
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
+    pub fn parse(s: &str, rdx: Radix, p: usize, rm: RoundingMode) -> Self {
+        match crate::parser::parse(s, rdx) {
+            Ok(ps) => {
+                if ps.is_inf() {
+                    if ps.sign() == Sign::Pos {
+                        INF_POS
+                    } else {
+                        INF_NEG
+                    }
+                } else if ps.is_nan() {
+                    NAN
                 } else {
-                    Some(INF_NEG)
+                    let (m, s, e) = ps.raw_parts();
+                    Self::result_to_ext(
+                        BigFloatNumber::convert_from_radix(s, m, e, rdx, p, rm),
+                        false,
+                        true,
+                    )
                 }
-            } else if ps.is_nan() {
-                Some(NAN)
-            } else {
-                let (m, s, e) = ps.raw_parts();
-                Some(Self::result_to_ext(
-                    BigFloatNumber::convert_from_radix(s, m, e, rdx, p, rm),
-                    false,
-                    true,
-                ))
             }
-        } else {
-            None
+            Err(_) => {
+                #[cfg(feature = "no_panic")]
+                {
+                    NAN
+                }
+                #[cfg(not(feature = "no_panic"))]
+                {
+                    panic!("Memory allocation error");
+                }
+            }
         }
     }
 
@@ -599,7 +681,16 @@ impl BigFloat {
                         }
                         Error::DivisionByZero => "Div by zero",
                         Error::InvalidArgument => "Invalid arg",
-                        Error::MemoryAllocation(_) => panic!("Memory allocation"),
+                        Error::MemoryAllocation(_) => {
+                            #[cfg(feature = "no_panic")]
+                            {
+                                "NaN"
+                            }
+                            #[cfg(not(feature = "no_panic"))]
+                            {
+                                panic!("Memory allocation error")
+                            }
+                        }
                     }),
                 };
                 w.write_str(&s)
@@ -617,9 +708,9 @@ impl BigFloat {
     /// Function does not follow any specific distribution law.
     /// The intended use of this function is for testing.
     ///
-    /// # Errors
+    /// ## Panics
     ///
-    /// InvalidArgument - when `exp_from` is greater than `exp_to`.
+    ///  - Failed to allocate memory.
     #[cfg(feature = "random")]
     pub fn random_normal(p: usize, exp_from: Exponent, exp_to: Exponent) -> Self {
         Self::result_to_ext(
@@ -647,18 +738,26 @@ impl BigFloat {
     }
 
     /// Returns the arctangent of `self`. The result is an angle in radians ranging from -pi/2 to pi/2.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn atan(&self, rm: RoundingMode, p: usize, cc: &mut Consts) -> Self {
         match &self.inner {
-            Flavor::Value(v) => Self::result_to_ext(v.atan(rm, cc), v.is_zero(), true),
+            Flavor::Value(v) => Self::result_to_ext(v.atan(p, rm, cc), v.is_zero(), true),
             Flavor::Inf(s) => Self::result_to_ext(Self::half_pi(*s, p, rm, cc), false, true),
             Flavor::NaN => NAN,
         }
     }
 
     /// Returns the hyperbolic tangent of `self`.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn tanh(&self, rm: RoundingMode, p: usize, cc: &mut Consts) -> Self {
         match &self.inner {
-            Flavor::Value(v) => Self::result_to_ext(v.atan(rm, cc), v.is_zero(), true),
+            Flavor::Value(v) => Self::result_to_ext(v.atan(p, rm, cc), v.is_zero(), true),
             Flavor::Inf(s) => Self::from_i8(s.as_int(), p),
             Flavor::NaN => NAN,
         }
@@ -701,7 +800,16 @@ impl BigFloat {
                         INF_NEG
                     }
                 }
-                Error::MemoryAllocation(_) => panic!("Memory allocation for BigFloat failed"),
+                Error::MemoryAllocation(_) => {
+                    #[cfg(feature = "no_panic")]
+                    {
+                        NAN
+                    }
+                    #[cfg(not(feature = "no_panic"))]
+                    {
+                        panic!("Memory allocation error")
+                    }
+                }
                 Error::InvalidArgument => NAN,
             },
             Ok(v) => BigFloat {
@@ -729,11 +837,19 @@ impl BigFloat {
     }
 
     /// Returns the maximum value for the specified precision `p`: all bits of the mantissa are set to 1, the exponent has the maximum possible value, and the sign is positive. Precision is rounded upwards to the word size.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn max_value(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::max_value(p), false, true)
     }
 
     /// Returns the minimum value for the specified precision `p`: all bits of the mantissa are set to 1, the exponent has the maximum possible value, and the sign is negative. Precision is rounded upwards to the word size.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn min_value(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::min_value(p), false, true)
     }
@@ -742,6 +858,10 @@ impl BigFloat {
     /// only the least significant bit of the mantissa is set to 1, the exponent has
     /// the minimum possible value, and the sign is positive.
     /// Precision is rounded upwards to the word size.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn min_positive(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::min_positive(p), false, true)
     }
@@ -750,16 +870,28 @@ impl BigFloat {
     /// only the most significant bit of the mantissa is set to 1, the exponent has
     /// the minimum possible value, and the sign is positive.
     /// Precision is rounded upwards to the word size.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn min_positive_normal(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::min_positive_normal(p), false, true)
     }
 
     /// Returns a new number with value `d` and the precision `p`. Precision is rounded upwards to the word size.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn from_word(d: Word, p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::from_word(d, p), false, true)
     }
 
     /// Returns a copy of the number with the sign reversed.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn neg(&self) -> Self {
         let mut ret = self.clone();
         ret.inv_sign();
@@ -781,8 +913,25 @@ impl BigFloat {
     ///  - `n` is the number of significant bits in mantissa.
     ///  - `s` is the sign.
     ///  - `e` is the exponent.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn from_raw_parts(m: &[Word], n: usize, s: Sign, e: Exponent) -> Self {
         Self::result_to_ext(BigFloatNumber::from_raw_parts(m, n, s, e), false, true)
+    }
+
+    /// Constructs a number from the array of words:
+    ///
+    ///  - `m` is the mantisaa.
+    ///  - `s` is the sign.
+    ///  - `e` is the exponent.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
+    pub fn from_words(m: &[Word], s: Sign, e: Exponent) -> Self {
+        Self::result_to_ext(BigFloatNumber::from_words(m, s, e), false, true)
     }
 
     /// Returns sign of a number or None if `self` is NaN
@@ -827,9 +976,13 @@ impl BigFloat {
     }
 
     /// Computes the reciprocal of a number. The result is rounded using the rounding mode `rm`.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     pub fn reciprocal(&self, p: usize, rm: RoundingMode) -> Self {
         match &self.inner {
-            Flavor::Value(v) => Self::result_to_ext(v.reciprocal(rm), v.is_zero(), true),
+            Flavor::Value(v) => Self::result_to_ext(v.reciprocal(p, rm), v.is_zero(), true),
             Flavor::Inf(s) => {
                 let mut ret = Self::new(p);
                 ret.set_sign(*s);
@@ -859,6 +1012,11 @@ impl BigFloat {
 }
 
 impl Clone for BigFloat {
+    /// Clones `self`.
+    ///
+    /// ## Panics
+    ///
+    ///  - Failed to allocate memory.
     fn clone(&self) -> Self {
         match &self.inner {
             Flavor::Value(v) => Self::result_to_ext(v.clone(), false, true),
@@ -922,37 +1080,41 @@ macro_rules! gen_wrapper_arg_rm_cc {
 
 impl BigFloat {
     gen_wrapper_arg!(
-        "Returns the absolute value of `self`.",
+        "Returns the absolute value of `self`.\n## Panics\n - Failed to allocate memory.",
         abs,
         Self,
         { INF_POS },
         { INF_POS },
     );
-    gen_wrapper_arg!("Returns the integer part of `self`.", int, Self, { NAN }, {
-        NAN
-    },);
     gen_wrapper_arg!(
-        "Returns the fractional part of `self`.",
+        "Returns the integer part of `self`.\n## Panics\n - Failed to allocate memory.",
+        int,
+        Self,
+        { NAN },
+        { NAN },
+    );
+    gen_wrapper_arg!(
+        "Returns the fractional part of `self`.\n## Panics\n - Failed to allocate memory.",
         fract,
         Self,
         { NAN },
         { NAN },
     );
     gen_wrapper_arg!(
-        "Returns the smallest integer greater than or equal to `self`.",
+        "Returns the smallest integer greater than or equal to `self`.\n## Panics\n - Failed to allocate memory.",
         ceil,
         Self,
         { INF_POS },
         { INF_NEG },
     );
     gen_wrapper_arg!(
-        "Returns the largest integer less than or equal to `self`.",
+        "Returns the largest integer less than or equal to `self`.\n## Panics\n - Failed to allocate memory.",
         floor,
         Self,
         { INF_POS },
         { INF_NEG },
     );
-    gen_wrapper_arg_rm!("Returns a rounded number with `n` decimal positions in the fractional part of the number using the rounding mode `rm`.", 
+    gen_wrapper_arg_rm!("Returns a rounded number with `n` decimal positions in the fractional part of the number using the rounding mode `rm`.\n## Panics\n - Failed to allocate memory.", 
         round,
         Self,
         { INF_POS },
@@ -961,117 +1123,149 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm!(
-        "Returns the square root of `self`.",
+        "Returns the square root of `self`.\n## Panics\n - Failed to allocate memory.",
         sqrt,
         Self,
         { INF_POS },
         { NAN },
+        p,
+        usize
     );
     gen_wrapper_arg_rm!(
-        "Returns the cube root of `self`.",
+        "Returns the cube root of `self`.\n## Panics\n - Failed to allocate memory.",
         cbrt,
         Self,
         { INF_POS },
         { INF_NEG },
+        p,
+        usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the natural logarithm of `self`.",
+        "Returns the natural logarithm of `self`.\n## Panics\n - Failed to allocate memory.",
         ln,
         Self,
         { INF_POS },
         { NAN },
+        p,
+        usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the logarithm base 2 of `self`.",
+        "Returns the logarithm base 2 of `self`.\n## Panics\n - Failed to allocate memory.",
         log2,
         Self,
         { INF_POS },
         { NAN },
+        p,
+        usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the logarithm base 10 of `self`.",
+        "Returns the logarithm base 10 of `self`.\n## Panics\n - Failed to allocate memory.",
         log10,
         Self,
         { INF_POS },
         { NAN },
+        p,
+        usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns `e` to the power of `self`.",
+        "Returns `e` to the power of `self`.\n## Panics\n - Failed to allocate memory.",
         exp,
         Self,
         { INF_POS },
         { INF_NEG },
+        p,
+        usize
     );
 
     gen_wrapper_arg_rm_cc!(
-        "Returns the sine of `self`. The function takes an angle in radians as an argument.",
+        "Returns the sine of `self`. The function takes an angle in radians as an argument.\n## Panics\n - Failed to allocate memory.",
         sin,
         Self,
         { NAN },
         { NAN },
+        p,
+        usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the cosine of `self`. The function takes an angle in radians as an argument.",
+        "Returns the cosine of `self`. The function takes an angle in radians as an argument.\n## Panics\n - Failed to allocate memory.",
         cos,
         Self,
         { NAN },
         { NAN },
+        p,
+        usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the tangent of `self`. The function takes an angle in radians as an argument.",
+        "Returns the tangent of `self`. The function takes an angle in radians as an argument.\n## Panics\n - Failed to allocate memory.",
         tan,
         Self,
         { NAN },
         { NAN },
+        p,
+        usize
     );
-    gen_wrapper_arg_rm_cc!("Returns the arcsine of `self`. The result is an angle in radians ranging from -pi/2 to pi/2.", 
+    gen_wrapper_arg_rm_cc!("Returns the arcsine of `self`. The result is an angle in radians ranging from -pi/2 to pi/2.\n## Panics\n - Failed to allocate memory.", 
         asin,
         Self,
         {NAN},
         {NAN},
+        p,
+        usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the arccosine of `self`. The result is an angle in radians ranging from 0 to pi.",
+        "Returns the arccosine of `self`. The result is an angle in radians ranging from 0 to pi.\n## Panics\n - Failed to allocate memory.",
         acos,
         Self,
         { NAN },
         { NAN },
+        p,
+        usize
     );
 
-    gen_wrapper_arg_rm!(
-        "Returns the hyperbolic sine of `self`.",
+    gen_wrapper_arg_rm_cc!(
+        "Returns the hyperbolic sine of `self`.\n## Panics\n - Failed to allocate memory.",
         sinh,
         Self,
         { INF_POS },
         { INF_NEG },
+        p,
+        usize
     );
-    gen_wrapper_arg_rm!(
-        "Returns the hyperbolic cosine of `self`.",
+    gen_wrapper_arg_rm_cc!(
+        "Returns the hyperbolic cosine of `self`.\n## Panics\n - Failed to allocate memory.",
         cosh,
         Self,
         { INF_POS },
         { INF_POS },
+        p,
+        usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the inverse hyperbolic sine of `self`.",
+        "Returns the inverse hyperbolic sine of `self`.\n## Panics\n - Failed to allocate memory.",
         asinh,
         Self,
         { INF_POS },
         { INF_NEG },
+        p,
+        usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the inverse hyperbolic cosine of `self`.",
+        "Returns the inverse hyperbolic cosine of `self`.\n## Panics\n - Failed to allocate memory.",
         acosh,
         Self,
         { BigFloat::new(1) },
         { BigFloat::new(1) },
+        p,
+        usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the inverse hyperbolic tangent of `self`.",
+        "Returns the inverse hyperbolic tangent of `self`.\n## Panics\n - Failed to allocate memory.",
         atanh,
         Self,
         { BigFloat::new(1) },
         { BigFloat::new(1) },
+        p,
+        usize
     );
 }
 
@@ -1079,6 +1273,10 @@ macro_rules! impl_int_conv {
     ($s:ty, $from_s:ident) => {
         impl BigFloat {
             /// Construct BigFloat from an integer value.
+            ///
+            /// ## Panics
+            ///
+            ///  - Failed to allocate memory.
             pub fn $from_s(i: $s, p: usize) -> Self {
                 Self::result_to_ext(BigFloatNumber::$from_s(i, p), false, true)
             }
@@ -1117,95 +1315,15 @@ impl From<BigFloatNumber> for BigFloat {
 /// Standard library features
 pub mod ops {
 
-    use crate::ctx::with_value;
-    use crate::ctx::Context;
     use crate::defs::DEFAULT_P;
     use crate::defs::DEFAULT_RM;
     use crate::BigFloat;
     use crate::Radix;
-    use crate::NAN;
 
     use core::{
         cmp::Eq, cmp::Ordering, cmp::PartialEq, cmp::PartialOrd, fmt::Display, fmt::Formatter,
-        iter::Product, iter::Sum, ops::Add, ops::Div, ops::Mul, ops::Neg, ops::Rem, ops::Sub,
-        str::FromStr,
+        ops::Neg, str::FromStr,
     };
-
-    //
-    // ops traits
-    //
-
-    macro_rules! impl_binary_op {
-        ($t:ident, $f:ident, $a:ty, $b:ty) => {
-            impl $t<$b> for $a {
-                type Output = Context;
-                fn $f(self, rhs: $b) -> Self::Output {
-                    with_value(BigFloat::$f(&self, &rhs, DEFAULT_RM))
-                }
-            }
-        };
-    }
-
-    macro_rules! impl_binary_op_ctx {
-        ($t:ident, $f:ident, $a:ty, $b:ty) => {
-            impl $t<$b> for $a {
-                type Output = Context;
-                fn $f(self, rhs: $b) -> Self::Output {
-                    with_value(BigFloat::$f(&self, &rhs.get_value(), DEFAULT_RM))
-                }
-            }
-        };
-    }
-
-    impl_binary_op!(Add, add, BigFloat, BigFloat);
-    impl_binary_op!(Add, add, BigFloat, &BigFloat);
-    impl_binary_op!(Add, add, &BigFloat, &BigFloat);
-    impl_binary_op!(Add, add, &BigFloat, BigFloat);
-
-    impl_binary_op!(Sub, sub, BigFloat, BigFloat);
-    impl_binary_op!(Sub, sub, BigFloat, &BigFloat);
-    impl_binary_op!(Sub, sub, &BigFloat, &BigFloat);
-    impl_binary_op!(Sub, sub, &BigFloat, BigFloat);
-
-    impl_binary_op!(Mul, mul, BigFloat, BigFloat);
-    impl_binary_op!(Mul, mul, BigFloat, &BigFloat);
-    impl_binary_op!(Mul, mul, &BigFloat, &BigFloat);
-    impl_binary_op!(Mul, mul, &BigFloat, BigFloat);
-
-    impl_binary_op!(Div, div, BigFloat, BigFloat);
-    impl_binary_op!(Div, div, BigFloat, &BigFloat);
-    impl_binary_op!(Div, div, &BigFloat, &BigFloat);
-    impl_binary_op!(Div, div, &BigFloat, BigFloat);
-
-    impl_binary_op!(Rem, rem, BigFloat, BigFloat);
-    impl_binary_op!(Rem, rem, BigFloat, &BigFloat);
-    impl_binary_op!(Rem, rem, &BigFloat, &BigFloat);
-    impl_binary_op!(Rem, rem, &BigFloat, BigFloat);
-
-    impl_binary_op_ctx!(Add, add, BigFloat, Context);
-    impl_binary_op_ctx!(Add, add, BigFloat, &Context);
-    impl_binary_op_ctx!(Add, add, &BigFloat, &Context);
-    impl_binary_op_ctx!(Add, add, &BigFloat, Context);
-
-    impl_binary_op_ctx!(Sub, sub, BigFloat, Context);
-    impl_binary_op_ctx!(Sub, sub, BigFloat, &Context);
-    impl_binary_op_ctx!(Sub, sub, &BigFloat, &Context);
-    impl_binary_op_ctx!(Sub, sub, &BigFloat, Context);
-
-    impl_binary_op_ctx!(Mul, mul, BigFloat, Context);
-    impl_binary_op_ctx!(Mul, mul, BigFloat, &Context);
-    impl_binary_op_ctx!(Mul, mul, &BigFloat, &Context);
-    impl_binary_op_ctx!(Mul, mul, &BigFloat, Context);
-
-    impl_binary_op_ctx!(Div, div, BigFloat, Context);
-    impl_binary_op_ctx!(Div, div, BigFloat, &Context);
-    impl_binary_op_ctx!(Div, div, &BigFloat, &Context);
-    impl_binary_op_ctx!(Div, div, &BigFloat, Context);
-
-    impl_binary_op_ctx!(Rem, rem, BigFloat, Context);
-    impl_binary_op_ctx!(Rem, rem, BigFloat, &Context);
-    impl_binary_op_ctx!(Rem, rem, &BigFloat, &Context);
-    impl_binary_op_ctx!(Rem, rem, &BigFloat, Context);
 
     impl Neg for BigFloat {
         type Output = BigFloat;
@@ -1305,35 +1423,11 @@ pub mod ops {
     }
 
     impl FromStr for BigFloat {
-        type Err = BigFloat;
+        type Err = ();
 
         /// Returns parsed number or NAN in case of error.
         fn from_str(src: &str) -> Result<BigFloat, Self::Err> {
-            BigFloat::parse(src, Radix::Dec, DEFAULT_P, DEFAULT_RM).ok_or(NAN)
-        }
-    }
-
-    impl Product for BigFloat {
-        fn product<I: Iterator<Item = BigFloat>>(iter: I) -> Self {
-            Context::product(iter).get_value()
-        }
-    }
-
-    impl Sum for BigFloat {
-        fn sum<I: Iterator<Item = BigFloat>>(iter: I) -> Self {
-            Context::sum(iter).get_value()
-        }
-    }
-
-    impl<'a> Product<&'a BigFloat> for BigFloat {
-        fn product<I: Iterator<Item = &'a BigFloat>>(iter: I) -> Self {
-            Context::product(iter).get_value()
-        }
-    }
-
-    impl<'a> Sum<&'a BigFloat> for BigFloat {
-        fn sum<I: Iterator<Item = &'a BigFloat>>(iter: I) -> Self {
-            Context::sum(iter).get_value()
+            Ok(BigFloat::parse(src, Radix::Dec, DEFAULT_P, DEFAULT_RM))
         }
     }
 }
@@ -1370,7 +1464,7 @@ mod tests {
         assert!(!d1.is_inf_neg());
         assert!(d1.is_positive());
 
-        let mut d1 = d1.div(&BigFloat::new(rand_p()), rm);
+        let mut d1 = d1.div(&BigFloat::new(rand_p()), rand_p(), rm);
         assert!(d1.is_inf());
         assert!(!d1.is_nan());
         assert!(d1.is_inf_pos());
@@ -1384,7 +1478,7 @@ mod tests {
         assert!(d1.is_inf_neg());
         assert!(d1.is_negative());
 
-        let d1 = BigFloat::new(rand_p()).div(&BigFloat::new(rand_p()), rm);
+        let d1 = BigFloat::new(rand_p()).div(&BigFloat::new(rand_p()), rand_p(), rm);
         assert!(!d1.is_inf());
         assert!(d1.is_nan());
         assert!(!d1.is_inf_pos());
@@ -1394,22 +1488,22 @@ mod tests {
         for _ in 0..1000 {
             let i = rand::random::<i64>();
             let d1 = BigFloat::from_i64(i, rand_p());
-            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm).unwrap();
+            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm);
             assert!(d1.cmp(&n1) == Some(0));
 
             let i = rand::random::<u64>();
             let d1 = BigFloat::from_u64(i, rand_p());
-            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm).unwrap();
+            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm);
             assert!(d1.cmp(&n1) == Some(0));
 
             let i = rand::random::<i128>();
             let d1 = BigFloat::from_i128(i, rand_p());
-            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm).unwrap();
+            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm);
             assert!(d1.cmp(&n1) == Some(0));
 
             let i = rand::random::<u128>();
             let d1 = BigFloat::from_u128(i, rand_p());
-            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm).unwrap();
+            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm);
             assert!(d1.cmp(&n1) == Some(0));
         }
 
@@ -1423,15 +1517,15 @@ mod tests {
         assert!(INF_NEG.to_raw_parts().is_none());
         assert!(NAN.to_raw_parts().is_none());
 
-        assert!(ONE.add(&ONE, rm).cmp(&TWO) == Some(0));
-        assert!(ONE.add(&INF_POS, rm).is_inf_pos());
-        assert!(INF_POS.add(&ONE, rm).is_inf_pos());
-        assert!(ONE.add(&INF_NEG, rm).is_inf_neg());
-        assert!(INF_NEG.add(&ONE, rm).is_inf_neg());
-        assert!(INF_POS.add(&INF_POS, rm).is_inf_pos());
-        assert!(INF_POS.add(&INF_NEG, rm).is_nan());
-        assert!(INF_NEG.add(&INF_NEG, rm).is_inf_neg());
-        assert!(INF_NEG.add(&INF_POS, rm).is_nan());
+        assert!(ONE.add(&ONE, rand_p(), rm).cmp(&TWO) == Some(0));
+        assert!(ONE.add(&INF_POS, rand_p(), rm).is_inf_pos());
+        assert!(INF_POS.add(&ONE, rand_p(), rm).is_inf_pos());
+        assert!(ONE.add(&INF_NEG, rand_p(), rm).is_inf_neg());
+        assert!(INF_NEG.add(&ONE, rand_p(), rm).is_inf_neg());
+        assert!(INF_POS.add(&INF_POS, rand_p(), rm).is_inf_pos());
+        assert!(INF_POS.add(&INF_NEG, rand_p(), rm).is_nan());
+        assert!(INF_NEG.add(&INF_NEG, rand_p(), rm).is_inf_neg());
+        assert!(INF_NEG.add(&INF_POS, rand_p(), rm).is_nan());
 
         assert!(ONE.add_full_prec(&ONE).cmp(&TWO) == Some(0));
         assert!(ONE.add_full_prec(&INF_POS).is_inf_pos());
@@ -1463,79 +1557,95 @@ mod tests {
         assert!(INF_NEG.mul_full_prec(&INF_NEG).is_inf_pos());
         assert!(INF_NEG.mul_full_prec(&INF_POS).is_inf_neg());
 
-        assert!(TWO.sub(&ONE, rm).cmp(&ONE) == Some(0));
-        assert!(ONE.sub(&INF_POS, rm).is_inf_neg());
-        assert!(INF_POS.sub(&ONE, rm).is_inf_pos());
-        assert!(ONE.sub(&INF_NEG, rm).is_inf_pos());
-        assert!(INF_NEG.sub(&ONE, rm).is_inf_neg());
-        assert!(INF_POS.sub(&INF_POS, rm).is_nan());
-        assert!(INF_POS.sub(&INF_NEG, rm).is_inf_pos());
-        assert!(INF_NEG.sub(&INF_NEG, rm).is_nan());
-        assert!(INF_NEG.sub(&INF_POS, rm).is_inf_neg());
+        assert!(TWO.sub(&ONE, rand_p(), rm).cmp(&ONE) == Some(0));
+        assert!(ONE.sub(&INF_POS, rand_p(), rm).is_inf_neg());
+        assert!(INF_POS.sub(&ONE, rand_p(), rm).is_inf_pos());
+        assert!(ONE.sub(&INF_NEG, rand_p(), rm).is_inf_pos());
+        assert!(INF_NEG.sub(&ONE, rand_p(), rm).is_inf_neg());
+        assert!(INF_POS.sub(&INF_POS, rand_p(), rm).is_nan());
+        assert!(INF_POS.sub(&INF_NEG, rand_p(), rm).is_inf_pos());
+        assert!(INF_NEG.sub(&INF_NEG, rand_p(), rm).is_nan());
+        assert!(INF_NEG.sub(&INF_POS, rand_p(), rm).is_inf_neg());
 
-        assert!(TWO.mul(&ONE, rm).cmp(&TWO) == Some(0));
-        assert!(ONE.mul(&INF_POS, rm).is_inf_pos());
-        assert!(INF_POS.mul(&ONE, rm).is_inf_pos());
-        assert!(ONE.mul(&INF_NEG, rm).is_inf_neg());
-        assert!(INF_NEG.mul(&ONE, rm).is_inf_neg());
-        assert!(ONE.neg().mul(&INF_POS, rm).is_inf_neg());
-        assert!(ONE.neg().mul(&INF_NEG, rm).is_inf_pos());
-        assert!(INF_POS.mul(&ONE.neg(), rm).is_inf_neg());
-        assert!(INF_NEG.mul(&ONE.neg(), rm).is_inf_pos());
-        assert!(INF_POS.mul(&INF_POS, rm).is_inf_pos());
-        assert!(INF_POS.mul(&INF_NEG, rm).is_inf_neg());
-        assert!(INF_NEG.mul(&INF_NEG, rm).is_inf_pos());
-        assert!(INF_NEG.mul(&INF_POS, rm).is_inf_neg());
-        assert!(INF_POS.mul(&BigFloat::new(rand_p()), rm).is_nan());
-        assert!(INF_NEG.mul(&BigFloat::new(rand_p()), rm).is_nan());
-        assert!(BigFloat::new(rand_p()).mul(&INF_POS, rm).is_nan());
-        assert!(BigFloat::new(rand_p()).mul(&INF_NEG, rm).is_nan());
+        assert!(TWO.mul(&ONE, rand_p(), rm).cmp(&TWO) == Some(0));
+        assert!(ONE.mul(&INF_POS, rand_p(), rm).is_inf_pos());
+        assert!(INF_POS.mul(&ONE, rand_p(), rm).is_inf_pos());
+        assert!(ONE.mul(&INF_NEG, rand_p(), rm).is_inf_neg());
+        assert!(INF_NEG.mul(&ONE, rand_p(), rm).is_inf_neg());
+        assert!(ONE.neg().mul(&INF_POS, rand_p(), rm).is_inf_neg());
+        assert!(ONE.neg().mul(&INF_NEG, rand_p(), rm).is_inf_pos());
+        assert!(INF_POS.mul(&ONE.neg(), rand_p(), rm).is_inf_neg());
+        assert!(INF_NEG.mul(&ONE.neg(), rand_p(), rm).is_inf_pos());
+        assert!(INF_POS.mul(&INF_POS, rand_p(), rm).is_inf_pos());
+        assert!(INF_POS.mul(&INF_NEG, rand_p(), rm).is_inf_neg());
+        assert!(INF_NEG.mul(&INF_NEG, rand_p(), rm).is_inf_pos());
+        assert!(INF_NEG.mul(&INF_POS, rand_p(), rm).is_inf_neg());
+        assert!(INF_POS.mul(&BigFloat::new(rand_p()), rand_p(), rm).is_nan());
+        assert!(INF_NEG.mul(&BigFloat::new(rand_p()), rand_p(), rm).is_nan());
+        assert!(BigFloat::new(rand_p()).mul(&INF_POS, rand_p(), rm).is_nan());
+        assert!(BigFloat::new(rand_p()).mul(&INF_NEG, rand_p(), rm).is_nan());
 
-        assert!(TWO.div(&TWO, rm).cmp(&ONE) == Some(0));
-        assert!(TWO.div(&INF_POS, rm).is_zero());
-        assert!(INF_POS.div(&TWO, rm).is_inf_pos());
-        assert!(TWO.div(&INF_NEG, rm).is_zero());
-        assert!(INF_NEG.div(&TWO, rm).is_inf_neg());
-        assert!(TWO.neg().div(&INF_POS, rm).is_zero());
-        assert!(TWO.neg().div(&INF_NEG, rm).is_zero());
-        assert!(INF_POS.div(&TWO.neg(), rm).is_inf_neg());
-        assert!(INF_NEG.div(&TWO.neg(), rm).is_inf_pos());
-        assert!(INF_POS.div(&INF_POS, rm).is_nan());
-        assert!(INF_POS.div(&INF_NEG, rm).is_nan());
-        assert!(INF_NEG.div(&INF_NEG, rm).is_nan());
-        assert!(INF_NEG.div(&INF_POS, rm).is_nan());
-        assert!(INF_POS.div(&BigFloat::new(rand_p()), rm).is_inf_pos());
-        assert!(INF_NEG.div(&BigFloat::new(rand_p()), rm).is_inf_neg());
-        assert!(BigFloat::new(rand_p()).div(&INF_POS, rm).is_zero());
-        assert!(BigFloat::new(rand_p()).div(&INF_NEG, rm).is_zero());
+        assert!(TWO.div(&TWO, rand_p(), rm).cmp(&ONE) == Some(0));
+        assert!(TWO.div(&INF_POS, rand_p(), rm).is_zero());
+        assert!(INF_POS.div(&TWO, rand_p(), rm).is_inf_pos());
+        assert!(TWO.div(&INF_NEG, rand_p(), rm).is_zero());
+        assert!(INF_NEG.div(&TWO, rand_p(), rm).is_inf_neg());
+        assert!(TWO.neg().div(&INF_POS, rand_p(), rm).is_zero());
+        assert!(TWO.neg().div(&INF_NEG, rand_p(), rm).is_zero());
+        assert!(INF_POS.div(&TWO.neg(), rand_p(), rm).is_inf_neg());
+        assert!(INF_NEG.div(&TWO.neg(), rand_p(), rm).is_inf_pos());
+        assert!(INF_POS.div(&INF_POS, rand_p(), rm).is_nan());
+        assert!(INF_POS.div(&INF_NEG, rand_p(), rm).is_nan());
+        assert!(INF_NEG.div(&INF_NEG, rand_p(), rm).is_nan());
+        assert!(INF_NEG.div(&INF_POS, rand_p(), rm).is_nan());
+        assert!(INF_POS
+            .div(&BigFloat::new(rand_p()), rand_p(), rm)
+            .is_inf_pos());
+        assert!(INF_NEG
+            .div(&BigFloat::new(rand_p()), rand_p(), rm)
+            .is_inf_neg());
+        assert!(BigFloat::new(rand_p())
+            .div(&INF_POS, rand_p(), rm)
+            .is_zero());
+        assert!(BigFloat::new(rand_p())
+            .div(&INF_NEG, rand_p(), rm)
+            .is_zero());
 
-        assert!(TWO.rem(&TWO, rm).is_zero());
-        assert!(TWO.rem(&INF_POS, rm).cmp(&TWO) == Some(0));
-        assert!(INF_POS.rem(&TWO, rm).is_nan());
-        assert!(TWO.rem(&INF_NEG, rm).cmp(&TWO) == Some(0));
-        assert!(INF_NEG.rem(&TWO, rm).is_nan());
-        assert!(TWO.neg().rem(&INF_POS, rm).cmp(&TWO.neg()) == Some(0));
-        assert!(TWO.neg().rem(&INF_NEG, rm).cmp(&TWO.neg()) == Some(0));
-        assert!(INF_POS.rem(&TWO.neg(), rm).is_nan());
-        assert!(INF_NEG.rem(&TWO.neg(), rm).is_nan());
-        assert!(INF_POS.rem(&INF_POS, rm).is_nan());
-        assert!(INF_POS.rem(&INF_NEG, rm).is_nan());
-        assert!(INF_NEG.rem(&INF_NEG, rm).is_nan());
-        assert!(INF_NEG.rem(&INF_POS, rm).is_nan());
-        assert!(INF_POS.rem(&BigFloat::new(rand_p()), rm).is_nan());
-        assert!(INF_NEG.rem(&BigFloat::new(rand_p()), rm).is_nan());
-        assert!(BigFloat::new(rand_p()).rem(&INF_POS, rm).is_zero());
-        assert!(BigFloat::new(rand_p()).rem(&INF_NEG, rm).is_zero());
+        assert!(TWO.rem(&TWO).is_zero());
+        assert!(TWO.rem(&INF_POS).cmp(&TWO) == Some(0));
+        assert!(INF_POS.rem(&TWO).is_nan());
+        assert!(TWO.rem(&INF_NEG).cmp(&TWO) == Some(0));
+        assert!(INF_NEG.rem(&TWO).is_nan());
+        assert!(TWO.neg().rem(&INF_POS).cmp(&TWO.neg()) == Some(0));
+        assert!(TWO.neg().rem(&INF_NEG).cmp(&TWO.neg()) == Some(0));
+        assert!(INF_POS.rem(&TWO.neg()).is_nan());
+        assert!(INF_NEG.rem(&TWO.neg()).is_nan());
+        assert!(INF_POS.rem(&INF_POS).is_nan());
+        assert!(INF_POS.rem(&INF_NEG).is_nan());
+        assert!(INF_NEG.rem(&INF_NEG).is_nan());
+        assert!(INF_NEG.rem(&INF_POS).is_nan());
+        assert!(INF_POS.rem(&BigFloat::new(rand_p())).is_nan());
+        assert!(INF_NEG.rem(&BigFloat::new(rand_p())).is_nan());
+        assert!(BigFloat::new(rand_p()).rem(&INF_POS).is_zero());
+        assert!(BigFloat::new(rand_p()).rem(&INF_NEG).is_zero());
 
-        for op in [BigFloat::add, BigFloat::sub, BigFloat::mul, BigFloat::div, BigFloat::rem] {
-            assert!(op(&NAN, &ONE, rm).is_nan());
-            assert!(op(&ONE, &NAN, rm).is_nan());
-            assert!(op(&NAN, &INF_POS, rm).is_nan());
-            assert!(op(&INF_POS, &NAN, rm).is_nan());
-            assert!(op(&NAN, &INF_NEG, rm).is_nan());
-            assert!(op(&INF_NEG, &NAN, rm).is_nan());
-            assert!(op(&NAN, &NAN, rm).is_nan());
+        for op in [BigFloat::add, BigFloat::sub, BigFloat::mul, BigFloat::div] {
+            assert!(op(&NAN, &ONE, rand_p(), rm).is_nan());
+            assert!(op(&ONE, &NAN, rand_p(), rm).is_nan());
+            assert!(op(&NAN, &INF_POS, rand_p(), rm).is_nan());
+            assert!(op(&INF_POS, &NAN, rand_p(), rm).is_nan());
+            assert!(op(&NAN, &INF_NEG, rand_p(), rm).is_nan());
+            assert!(op(&INF_NEG, &NAN, rand_p(), rm).is_nan());
+            assert!(op(&NAN, &NAN, rand_p(), rm).is_nan());
         }
+
+        assert!(BigFloat::rem(&NAN, &ONE).is_nan());
+        assert!(BigFloat::rem(&ONE, &NAN).is_nan());
+        assert!(BigFloat::rem(&NAN, &INF_POS).is_nan());
+        assert!(BigFloat::rem(&INF_POS, &NAN).is_nan());
+        assert!(BigFloat::rem(&NAN, &INF_NEG).is_nan());
+        assert!(BigFloat::rem(&INF_NEG, &NAN).is_nan());
+        assert!(BigFloat::rem(&NAN, &NAN).is_nan());
 
         for op in [BigFloat::add_full_prec, BigFloat::sub_full_prec, BigFloat::mul_full_prec] {
             assert!(op(&NAN, &ONE).is_nan());
@@ -1576,63 +1686,63 @@ mod tests {
 
         let mut cc = Consts::new().unwrap();
 
-        assert!(ONE.pow(&ONE, rm, &mut cc).cmp(&ONE) == Some(0));
+        assert!(ONE.pow(&ONE, rand_p(), rm, &mut cc).cmp(&ONE) == Some(0));
         assert!(BigFloat::new(DEFAULT_P)
-            .pow(&INF_POS, rm, &mut cc)
+            .pow(&INF_POS, rand_p(), rm, &mut cc)
             .is_zero());
         assert!(BigFloat::new(DEFAULT_P)
-            .pow(&INF_NEG, rm, &mut cc)
+            .pow(&INF_NEG, rand_p(), rm, &mut cc)
             .is_zero());
-        assert!(ONE.pow(&INF_POS, rm, &mut cc).cmp(&ONE) == Some(0));
-        assert!(ONE.pow(&INF_NEG, rm, &mut cc).cmp(&ONE) == Some(0));
-        assert!(TWO.pow(&INF_POS, rm, &mut cc).is_inf_pos());
-        assert!(TWO.pow(&INF_NEG, rm, &mut cc).is_inf_neg());
-        assert!(INF_POS.pow(&ONE, rm, &mut cc).is_inf_pos());
-        assert!(INF_NEG.pow(&ONE, rm, &mut cc).is_inf_neg());
-        assert!(INF_NEG.pow(&TWO, rm, &mut cc).is_inf_pos());
+        assert!(ONE.pow(&INF_POS, rand_p(), rm, &mut cc).cmp(&ONE) == Some(0));
+        assert!(ONE.pow(&INF_NEG, rand_p(), rm, &mut cc).cmp(&ONE) == Some(0));
+        assert!(TWO.pow(&INF_POS, rand_p(), rm, &mut cc).is_inf_pos());
+        assert!(TWO.pow(&INF_NEG, rand_p(), rm, &mut cc).is_inf_neg());
+        assert!(INF_POS.pow(&ONE, rand_p(), rm, &mut cc).is_inf_pos());
+        assert!(INF_NEG.pow(&ONE, rand_p(), rm, &mut cc).is_inf_neg());
+        assert!(INF_NEG.pow(&TWO, rand_p(), rm, &mut cc).is_inf_pos());
         assert!(INF_NEG
-            .pow(&BigFloat::from_f64(10.2, DEFAULT_P), rm, &mut cc)
+            .pow(&BigFloat::from_f64(10.2, DEFAULT_P), rand_p(), rm, &mut cc)
             .is_inf_pos());
         assert!(INF_NEG
-            .pow(&BigFloat::from_f64(3.0, DEFAULT_P), rm, &mut cc)
+            .pow(&BigFloat::from_f64(3.0, DEFAULT_P), rand_p(), rm, &mut cc)
             .is_inf_neg());
-        assert!(INF_POS.pow(&ONE.neg(), rm, &mut cc).is_zero());
-        assert!(INF_NEG.pow(&ONE.neg(), rm, &mut cc).is_zero());
+        assert!(INF_POS.pow(&ONE.neg(), rand_p(), rm, &mut cc).is_zero());
+        assert!(INF_NEG.pow(&ONE.neg(), rand_p(), rm, &mut cc).is_zero());
         assert!(
             INF_POS
-                .pow(&BigFloat::new(DEFAULT_P), rm, &mut cc)
+                .pow(&BigFloat::new(DEFAULT_P), rand_p(), rm, &mut cc)
                 .cmp(&ONE)
                 == Some(0)
         );
         assert!(
             INF_NEG
-                .pow(&BigFloat::new(DEFAULT_P), rm, &mut cc)
+                .pow(&BigFloat::new(DEFAULT_P), rand_p(), rm, &mut cc)
                 .cmp(&ONE)
                 == Some(0)
         );
-        assert!(INF_POS.pow(&INF_POS, rm, &mut cc).is_inf_pos());
-        assert!(INF_NEG.pow(&INF_POS, rm, &mut cc).is_inf_pos());
-        assert!(INF_POS.pow(&INF_NEG, rm, &mut cc).is_zero());
-        assert!(INF_NEG.pow(&INF_NEG, rm, &mut cc).is_zero());
+        assert!(INF_POS.pow(&INF_POS, rand_p(), rm, &mut cc).is_inf_pos());
+        assert!(INF_NEG.pow(&INF_POS, rand_p(), rm, &mut cc).is_inf_pos());
+        assert!(INF_POS.pow(&INF_NEG, rand_p(), rm, &mut cc).is_zero());
+        assert!(INF_NEG.pow(&INF_NEG, rand_p(), rm, &mut cc).is_zero());
 
-        let half = ONE.div(&TWO, rm);
-        assert!(TWO.log(&TWO, rm, &mut cc).cmp(&ONE) == Some(0));
-        assert!(TWO.log(&INF_POS, rm, &mut cc).is_zero());
-        assert!(TWO.log(&INF_NEG, rm, &mut cc).is_nan());
-        assert!(INF_POS.log(&TWO, rm, &mut cc).is_inf_pos());
-        assert!(INF_NEG.log(&TWO, rm, &mut cc).is_nan());
-        assert!(half.log(&half, rm, &mut cc).cmp(&ONE) == Some(0));
-        assert!(half.log(&INF_POS, rm, &mut cc).is_zero());
-        assert!(half.log(&INF_NEG, rm, &mut cc).is_nan());
-        assert!(INF_POS.log(&half, rm, &mut cc).is_inf_neg());
-        assert!(INF_NEG.log(&half, rm, &mut cc).is_nan());
-        assert!(INF_POS.log(&INF_POS, rm, &mut cc).is_nan());
-        assert!(INF_POS.log(&INF_NEG, rm, &mut cc).is_nan());
-        assert!(INF_NEG.log(&INF_POS, rm, &mut cc).is_nan());
-        assert!(INF_NEG.log(&INF_NEG, rm, &mut cc).is_nan());
-        assert!(TWO.log(&ONE, rm, &mut cc).is_inf_pos());
-        assert!(half.log(&ONE, rm, &mut cc).is_inf_pos());
-        assert!(ONE.log(&ONE, rm, &mut cc).is_nan());
+        let half = ONE.div(&TWO, rand_p(), rm);
+        assert!(TWO.log(&TWO, rand_p(), rm, &mut cc).cmp(&ONE) == Some(0));
+        assert!(TWO.log(&INF_POS, rand_p(), rm, &mut cc).is_zero());
+        assert!(TWO.log(&INF_NEG, rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_POS.log(&TWO, rand_p(), rm, &mut cc).is_inf_pos());
+        assert!(INF_NEG.log(&TWO, rand_p(), rm, &mut cc).is_nan());
+        assert!(half.log(&half, rand_p(), rm, &mut cc).cmp(&ONE) == Some(0));
+        assert!(half.log(&INF_POS, rand_p(), rm, &mut cc).is_zero());
+        assert!(half.log(&INF_NEG, rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_POS.log(&half, rand_p(), rm, &mut cc).is_inf_neg());
+        assert!(INF_NEG.log(&half, rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_POS.log(&INF_POS, rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_POS.log(&INF_NEG, rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_NEG.log(&INF_POS, rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_NEG.log(&INF_NEG, rand_p(), rm, &mut cc).is_nan());
+        assert!(TWO.log(&ONE, rand_p(), rm, &mut cc).is_inf_pos());
+        assert!(half.log(&ONE, rand_p(), rm, &mut cc).is_inf_pos());
+        assert!(ONE.log(&ONE, rand_p(), rm, &mut cc).is_nan());
 
         assert!(BigFloat::from_f32(f32::NAN, DEFAULT_P).is_nan());
         assert!(BigFloat::from_f32(f32::INFINITY, DEFAULT_P).is_inf_pos());
@@ -1643,13 +1753,13 @@ mod tests {
         assert!(BigFloat::from_f64(f64::NEG_INFINITY, DEFAULT_P).is_inf_neg());
         assert!(!BigFloat::from_f64(1.0, DEFAULT_P).is_nan());
 
-        assert!(ONE.pow(&NAN, rm, &mut cc).is_nan());
-        assert!(NAN.pow(&ONE, rm, &mut cc).is_nan());
-        assert!(INF_POS.pow(&NAN, rm, &mut cc).is_nan());
-        assert!(NAN.pow(&INF_POS, rm, &mut cc).is_nan());
-        assert!(INF_NEG.pow(&NAN, rm, &mut cc).is_nan());
-        assert!(NAN.pow(&INF_NEG, rm, &mut cc).is_nan());
-        assert!(NAN.pow(&NAN, rm, &mut cc).is_nan());
+        assert!(ONE.pow(&NAN, rand_p(), rm, &mut cc).is_nan());
+        assert!(NAN.pow(&ONE, rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_POS.pow(&NAN, rand_p(), rm, &mut cc).is_nan());
+        assert!(NAN.pow(&INF_POS, rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_NEG.pow(&NAN, rand_p(), rm, &mut cc).is_nan());
+        assert!(NAN.pow(&INF_NEG, rand_p(), rm, &mut cc).is_nan());
+        assert!(NAN.pow(&NAN, rand_p(), rm, &mut cc).is_nan());
 
         assert!(NAN.powi(2, rand_p(), rm).is_nan());
         assert!(NAN.powi(0, rand_p(), rm).is_nan());
@@ -1660,13 +1770,13 @@ mod tests {
         assert!(INF_POS.powi(0, rand_p(), rm).cmp(&ONE) == Some(0));
         assert!(INF_NEG.powi(0, rand_p(), rm).cmp(&ONE) == Some(0));
 
-        assert!(TWO.log(&NAN, rm, &mut cc).is_nan());
-        assert!(NAN.log(&TWO, rm, &mut cc).is_nan());
-        assert!(INF_POS.log(&NAN, rm, &mut cc).is_nan());
-        assert!(NAN.log(&INF_POS, rm, &mut cc).is_nan());
-        assert!(INF_NEG.log(&NAN, rm, &mut cc).is_nan());
-        assert!(NAN.log(&INF_NEG, rm, &mut cc).is_nan());
-        assert!(NAN.log(&NAN, rm, &mut cc).is_nan());
+        assert!(TWO.log(&NAN, rand_p(), rm, &mut cc).is_nan());
+        assert!(NAN.log(&TWO, rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_POS.log(&NAN, rand_p(), rm, &mut cc).is_nan());
+        assert!(NAN.log(&INF_POS, rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_NEG.log(&NAN, rand_p(), rm, &mut cc).is_nan());
+        assert!(NAN.log(&INF_NEG, rand_p(), rm, &mut cc).is_nan());
+        assert!(NAN.log(&NAN, rand_p(), rm, &mut cc).is_nan());
 
         assert!(INF_NEG.abs().is_inf_pos());
         assert!(INF_POS.abs().is_inf_pos());
@@ -1701,43 +1811,43 @@ mod tests {
             assert!(NAN.round(0, rm).is_nan());
         }
 
-        assert!(INF_NEG.sqrt(rm).is_nan());
-        assert!(INF_POS.sqrt(rm).is_inf_pos());
-        assert!(NAN.sqrt(rm).is_nan());
+        assert!(INF_NEG.sqrt(rand_p(), rm).is_nan());
+        assert!(INF_POS.sqrt(rand_p(), rm).is_inf_pos());
+        assert!(NAN.sqrt(rand_p(), rm).is_nan());
 
-        assert!(INF_NEG.cbrt(rm).is_inf_neg());
-        assert!(INF_POS.cbrt(rm).is_inf_pos());
-        assert!(NAN.cbrt(rm).is_nan());
+        assert!(INF_NEG.cbrt(rand_p(), rm).is_inf_neg());
+        assert!(INF_POS.cbrt(rand_p(), rm).is_inf_pos());
+        assert!(NAN.cbrt(rand_p(), rm).is_nan());
 
         for op in [BigFloat::ln, BigFloat::log2, BigFloat::log10] {
-            assert!(op(&INF_NEG, rm, &mut cc).is_nan());
-            assert!(op(&INF_POS, rm, &mut cc).is_inf_pos());
-            assert!(op(&NAN, rm, &mut cc).is_nan());
+            assert!(op(&INF_NEG, rand_p(), rm, &mut cc).is_nan());
+            assert!(op(&INF_POS, rand_p(), rm, &mut cc).is_inf_pos());
+            assert!(op(&NAN, rand_p(), rm, &mut cc).is_nan());
         }
 
-        assert!(INF_NEG.exp(rm, &mut cc).is_inf_neg());
-        assert!(INF_POS.exp(rm, &mut cc).is_inf_pos());
-        assert!(NAN.exp(rm, &mut cc).is_nan());
+        assert!(INF_NEG.exp(rand_p(), rm, &mut cc).is_inf_neg());
+        assert!(INF_POS.exp(rand_p(), rm, &mut cc).is_inf_pos());
+        assert!(NAN.exp(rand_p(), rm, &mut cc).is_nan());
 
-        assert!(INF_NEG.sin(rm, &mut cc).is_nan());
-        assert!(INF_POS.sin(rm, &mut cc).is_nan());
-        assert!(NAN.sin(rm, &mut cc).is_nan());
+        assert!(INF_NEG.sin(rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_POS.sin(rand_p(), rm, &mut cc).is_nan());
+        assert!(NAN.sin(rand_p(), rm, &mut cc).is_nan());
 
-        assert!(INF_NEG.cos(rm, &mut cc).is_nan());
-        assert!(INF_POS.cos(rm, &mut cc).is_nan());
-        assert!(NAN.cos(rm, &mut cc).is_nan());
+        assert!(INF_NEG.cos(rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_POS.cos(rand_p(), rm, &mut cc).is_nan());
+        assert!(NAN.cos(rand_p(), rm, &mut cc).is_nan());
 
-        assert!(INF_NEG.tan(rm, &mut cc).is_nan());
-        assert!(INF_POS.tan(rm, &mut cc).is_nan());
-        assert!(NAN.tan(rm, &mut cc).is_nan());
+        assert!(INF_NEG.tan(rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_POS.tan(rand_p(), rm, &mut cc).is_nan());
+        assert!(NAN.tan(rand_p(), rm, &mut cc).is_nan());
 
-        assert!(INF_NEG.asin(rm, &mut cc).is_nan());
-        assert!(INF_POS.asin(rm, &mut cc).is_nan());
-        assert!(NAN.asin(rm, &mut cc).is_nan());
+        assert!(INF_NEG.asin(rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_POS.asin(rand_p(), rm, &mut cc).is_nan());
+        assert!(NAN.asin(rand_p(), rm, &mut cc).is_nan());
 
-        assert!(INF_NEG.acos(rm, &mut cc).is_nan());
-        assert!(INF_POS.acos(rm, &mut cc).is_nan());
-        assert!(NAN.acos(rm, &mut cc).is_nan());
+        assert!(INF_NEG.acos(rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_POS.acos(rand_p(), rm, &mut cc).is_nan());
+        assert!(NAN.acos(rand_p(), rm, &mut cc).is_nan());
 
         let p = rand_p();
         let mut half_pi: BigFloat = cc.pi(p, rm).unwrap().into();
@@ -1746,29 +1856,29 @@ mod tests {
         assert!(INF_POS.atan(rm, p, &mut cc).cmp(&half_pi) == Some(0));
         assert!(NAN.atan(rm, rand_p(), &mut cc).is_nan());
 
-        assert!(INF_NEG.sinh(rm).is_inf_neg());
-        assert!(INF_POS.sinh(rm).is_inf_pos());
-        assert!(NAN.sinh(rm).is_nan());
+        assert!(INF_NEG.sinh(rand_p(), rm, &mut cc).is_inf_neg());
+        assert!(INF_POS.sinh(rand_p(), rm, &mut cc).is_inf_pos());
+        assert!(NAN.sinh(rand_p(), rm, &mut cc).is_nan());
 
-        assert!(INF_NEG.cosh(rm).is_inf_pos());
-        assert!(INF_POS.cosh(rm).is_inf_pos());
-        assert!(NAN.cosh(rm).is_nan());
+        assert!(INF_NEG.cosh(rand_p(), rm, &mut cc).is_inf_pos());
+        assert!(INF_POS.cosh(rand_p(), rm, &mut cc).is_inf_pos());
+        assert!(NAN.cosh(rand_p(), rm, &mut cc).is_nan());
 
         assert!(INF_NEG.tanh(rm, rand_p(), &mut cc).cmp(&ONE.neg()) == Some(0));
         assert!(INF_POS.tanh(rm, rand_p(), &mut cc).cmp(&ONE) == Some(0));
         assert!(NAN.tanh(rm, rand_p(), &mut cc).is_nan());
 
-        assert!(INF_NEG.asinh(rm, &mut cc).is_inf_neg());
-        assert!(INF_POS.asinh(rm, &mut cc).is_inf_pos());
-        assert!(NAN.asinh(rm, &mut cc).is_nan());
+        assert!(INF_NEG.asinh(rand_p(), rm, &mut cc).is_inf_neg());
+        assert!(INF_POS.asinh(rand_p(), rm, &mut cc).is_inf_pos());
+        assert!(NAN.asinh(rand_p(), rm, &mut cc).is_nan());
 
-        assert!(INF_NEG.acosh(rm, &mut cc).is_zero());
-        assert!(INF_POS.acosh(rm, &mut cc).is_zero());
-        assert!(NAN.acosh(rm, &mut cc).is_nan());
+        assert!(INF_NEG.acosh(rand_p(), rm, &mut cc).is_zero());
+        assert!(INF_POS.acosh(rand_p(), rm, &mut cc).is_zero());
+        assert!(NAN.acosh(rand_p(), rm, &mut cc).is_nan());
 
-        assert!(INF_NEG.atanh(rm, &mut cc).is_zero());
-        assert!(INF_POS.atanh(rm, &mut cc).is_zero());
-        assert!(NAN.atanh(rm, &mut cc).is_nan());
+        assert!(INF_NEG.atanh(rand_p(), rm, &mut cc).is_zero());
+        assert!(INF_POS.atanh(rand_p(), rm, &mut cc).is_zero());
+        assert!(NAN.atanh(rand_p(), rm, &mut cc).is_nan());
 
         assert!(INF_NEG.reciprocal(rand_p(), rm).is_zero());
         assert!(INF_POS.reciprocal(rand_p(), rm).is_zero());
@@ -1886,26 +1996,6 @@ mod tests {
 
     #[test]
     pub fn test_ops() {
-        let d1 = ONE.clone();
-        let d2 = BigFloat::new(rand_p());
-        assert!(d1.clone() - d2.clone() == d1);
-        assert!(d1.clone() + d2 == d1);
-        let d3 = TWO.clone();
-        assert!(TWO.clone() == d3);
-        assert!(ONE.clone() < d3);
-        assert!(ONE.clone() == (d3.clone() / d3.clone()).get_value());
-
-        assert!(d3.is_positive());
-        let d1 = -d3;
-        assert!(d1.is_negative());
-
-        let d1 = ONE.clone();
-        let d2 = BigFloat::new(rand_p());
-        assert!(&d1 - &d2 == d1);
-        assert!(&d1 + &d2 == d1);
-        let d3 = TWO.clone();
-        assert!(ONE.clone() == (d3.clone() / &d3).get_value());
-
         let d1 = -&(TWO.clone());
         assert!(d1.is_negative());
 
@@ -1914,74 +2004,54 @@ mod tests {
             Radix::Dec,
             DEFAULT_P,
             RoundingMode::None,
-        )
-        .unwrap();
+        );
 
         let d1str = format!("{}", d1);
-        assert_eq!(&d1str, "1.23456789012345678901234567890123456789e-2");
+        assert_eq!(&d1str, "1.234567890123456789012345678901234567889e-2");
         assert!(BigFloat::from_str(&d1str).unwrap() == d1);
 
         let d1 = BigFloat::parse(
-            "-123.4567890123456789012345678901234567895",
+            "-123.456789012345678901234567890123456789",
             Radix::Dec,
             DEFAULT_P,
             RoundingMode::None,
-        )
-        .unwrap();
+        );
         let d1str = format!("{}", d1);
-        assert_eq!(&d1str, "-1.23456789012345678901234567890123456789153e+2");
+        assert_eq!(&d1str, "-1.23456789012345678901234567890123456788918e+2");
         assert_eq!(BigFloat::from_str(&d1str).unwrap(), d1);
 
         let d1str = format!("{}", INF_POS);
-        assert!(d1str == "Inf");
+        assert_eq!(d1str, "Inf");
 
         let d1str = format!("{}", INF_NEG);
-        assert!(d1str == "-Inf");
+        assert_eq!(d1str, "-Inf");
 
         let d1str = format!("{}", NAN);
-        assert!(d1str == "NaN");
+        assert_eq!(d1str, "NaN");
 
-        assert!(BigFloat::from_str("abc").unwrap_err().is_nan());
-
-        let arr = [TWO.clone(), ONE.clone(), TWO.clone()];
-        assert!(arr.into_iter().product::<BigFloat>() == (TWO.clone() * TWO.clone()).get_value());
-        let arr = [TWO.clone(), ONE.clone(), TWO.clone()];
-        assert!(
-            arr.into_iter().sum::<BigFloat>()
-                == (TWO.clone() + ONE.clone() + TWO.clone()).get_value()
-        );
+        assert!(BigFloat::from_str("abc").is_ok());
+        assert!(BigFloat::from_str("abc").unwrap().is_nan());
 
         let p = DEFAULT_P;
         let rm = RoundingMode::ToEven;
-        assert!(
-            BigFloat::from_i8(-123, p) == BigFloat::parse("-1.23e+2", Radix::Dec, p, rm).unwrap()
-        );
-        assert!(
-            BigFloat::from_u8(123, p) == BigFloat::parse("1.23e+2", Radix::Dec, p, rm).unwrap()
-        );
-        assert!(
-            BigFloat::from_i16(-12312, p)
-                == BigFloat::parse("-1.2312e+4", Radix::Dec, p, rm).unwrap()
-        );
-        assert!(
-            BigFloat::from_u16(12312, p)
-                == BigFloat::parse("1.2312e+4", Radix::Dec, p, rm).unwrap()
-        );
+        assert!(BigFloat::from_i8(-123, p) == BigFloat::parse("-1.23e+2", Radix::Dec, p, rm));
+        assert!(BigFloat::from_u8(123, p) == BigFloat::parse("1.23e+2", Radix::Dec, p, rm));
+        assert!(BigFloat::from_i16(-12312, p) == BigFloat::parse("-1.2312e+4", Radix::Dec, p, rm));
+        assert!(BigFloat::from_u16(12312, p) == BigFloat::parse("1.2312e+4", Radix::Dec, p, rm));
         assert!(
             BigFloat::from_i32(-123456789, p)
-                == BigFloat::parse("-1.23456789e+8", Radix::Dec, p, rm).unwrap()
+                == BigFloat::parse("-1.23456789e+8", Radix::Dec, p, rm)
         );
         assert!(
-            BigFloat::from_u32(123456789, p)
-                == BigFloat::parse("1.23456789e+8", Radix::Dec, p, rm).unwrap()
+            BigFloat::from_u32(123456789, p) == BigFloat::parse("1.23456789e+8", Radix::Dec, p, rm)
         );
         assert!(
             BigFloat::from_i64(-1234567890123456789, p)
-                == BigFloat::parse("-1.234567890123456789e+18", Radix::Dec, p, rm).unwrap()
+                == BigFloat::parse("-1.234567890123456789e+18", Radix::Dec, p, rm)
         );
         assert!(
             BigFloat::from_u64(1234567890123456789, p)
-                == BigFloat::parse("1.234567890123456789e+18", Radix::Dec, p, rm).unwrap()
+                == BigFloat::parse("1.234567890123456789e+18", Radix::Dec, p, rm)
         );
         assert!(
             BigFloat::from_i128(-123456789012345678901234567890123456789, p)
@@ -1991,7 +2061,6 @@ mod tests {
                     p,
                     rm
                 )
-                .unwrap()
         );
         assert!(
             BigFloat::from_u128(123456789012345678901234567890123456789, p)
@@ -2001,7 +2070,6 @@ mod tests {
                     p,
                     rm
                 )
-                .unwrap()
         );
     }
 }

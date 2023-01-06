@@ -933,7 +933,6 @@ impl BigFloatNumber {
     }
 
     /// Returns true if `self` is odd integer number.
-    #[cfg(test)]
     pub(crate) fn is_odd_int(&self) -> bool {
         if self.e > 0 {
             if (self.e as usize) < self.m.max_bit_len() {
@@ -1185,7 +1184,7 @@ impl BigFloatNumber {
     /// Constructs BigFloatNumber with precision `p` from a signed integer value `i`.
     /// Precision is rounded upwards to the word size.
     ///
-    /// # Errors
+    /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - InvalidArgument: the precision is incorrect.
@@ -1199,7 +1198,7 @@ impl BigFloatNumber {
     /// Constructs BigFloatNumber with precision `p` from an unsigned integer value `u`.
     /// Precision is rounded upwards to the word size.
     ///
-    /// # Errors
+    /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - InvalidArgument: the precision is incorrect.        
@@ -1242,7 +1241,7 @@ macro_rules! impl_int_conv {
             /// Constructs BigFloatNumber with precision `p` from a signed integer value `i`.
             /// Precision is rounded upwards to the word size.
             ///
-            /// # Errors
+            /// ## Errors
             ///
             ///  - MemoryAllocation: failed to allocate memory for mantissa.
             ///  - InvalidArgument: the precision is incorrect.
@@ -1256,7 +1255,7 @@ macro_rules! impl_int_conv {
             /// Constructs BigFloatNumber with precision `p` from an unsigned integer value `u`.
             /// Precision is rounded upwards to the word size.
             ///
-            /// # Errors
+            /// ## Errors
             ///
             ///  - MemoryAllocation: failed to allocate memory for mantissa.
             ///  - InvalidArgument: the precision is incorrect.

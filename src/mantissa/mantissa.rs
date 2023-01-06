@@ -973,7 +973,6 @@ impl Mantissa {
     }
 
     /// returns true if `self` represents odd integer.
-    #[cfg(test)]
     pub fn is_odd_int(&self, n: usize) -> bool {
         debug_assert!(n < self.max_bit_len() && n > 0);
 
