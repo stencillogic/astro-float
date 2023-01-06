@@ -18,7 +18,9 @@ use lazy_static::lazy_static;
 use alloc::string::String;
 
 /// Not a number.
-pub const NAN: BigFloat = BigFloat { inner: Flavor::NaN };
+pub const NAN: BigFloat = BigFloat {
+    inner: Flavor::NaN(None),
+};
 
 /// Positive infinity.
 pub const INF_POS: BigFloat = BigFloat {
@@ -48,7 +50,7 @@ pub struct BigFloat {
 #[derive(Debug)]
 enum Flavor {
     Value(BigFloatNumber),
-    NaN,
+    NaN(Option<Error>),
     Inf(Sign), // signed Inf
 }
 
@@ -69,6 +71,12 @@ impl BigFloat {
     ///  - Failed to allocate memory.
     pub fn from_f64(f: f64, p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::from_f64(p, f), false, true)
+    }
+
+    fn nan(err: Option<Error>) -> Self {
+        BigFloat {
+            inner: Flavor::NaN(err),
+        }
     }
 
     /// Creates a BigFloat from f32.
@@ -97,7 +105,15 @@ impl BigFloat {
 
     /// Return true if `self` is not a number.
     pub fn is_nan(&self) -> bool {
-        matches!(self.inner, Flavor::NaN)
+        matches!(self.inner, Flavor::NaN(_))
+    }
+
+    /// Returs the associated with `NaN` error, if any.
+    pub fn get_err(&self) -> Option<Error> {
+        match &self.inner {
+            Flavor::NaN(Some(e)) => Some(e.clone()),
+            _ => None,
+        }
     }
 
     /// Adds `d2` to `self` and returns the result of the addition.
@@ -131,7 +147,7 @@ impl BigFloat {
                 Flavor::Inf(s2) => BigFloat {
                     inner: Flavor::Inf(*s2),
                 },
-                Flavor::NaN => NAN,
+                Flavor::NaN(err) => Self::nan(err.clone()),
             },
             Flavor::Inf(s1) => match &d2.inner {
                 Flavor::Value(_) => BigFloat {
@@ -146,9 +162,9 @@ impl BigFloat {
                         }
                     }
                 }
-                Flavor::NaN => NAN,
+                Flavor::NaN(err) => Self::nan(err.clone()),
             },
-            Flavor::NaN => NAN,
+            Flavor::NaN(err) => Self::nan(err.clone()),
         }
     }
 
@@ -187,7 +203,7 @@ impl BigFloat {
                         INF_POS
                     }
                 }
-                Flavor::NaN => NAN,
+                Flavor::NaN(err) => Self::nan(err.clone()),
             },
             Flavor::Inf(s1) => match &d2.inner {
                 Flavor::Value(_) => BigFloat {
@@ -202,9 +218,9 @@ impl BigFloat {
                         }
                     }
                 }
-                Flavor::NaN => NAN,
+                Flavor::NaN(err) => Self::nan(err.clone()),
             },
-            Flavor::NaN => NAN,
+            Flavor::NaN(err) => Self::nan(err.clone()),
         }
     }
 
@@ -249,7 +265,7 @@ impl BigFloat {
                             }
                         }
                     }
-                    Flavor::NaN => NAN,
+                    Flavor::NaN(err) => Self::nan(err.clone()),
                 }
             }
             Flavor::Inf(s1) => {
@@ -271,10 +287,10 @@ impl BigFloat {
                             inner: Flavor::Inf(s),
                         }
                     }
-                    Flavor::NaN => NAN,
+                    Flavor::NaN(err) => Self::nan(err.clone()),
                 }
             }
-            Flavor::NaN => NAN,
+            Flavor::NaN(err) => Self::nan(err.clone()),
         }
     }
 
@@ -292,7 +308,7 @@ impl BigFloat {
                     v1.get_sign() == v2.get_sign(),
                 ),
                 Flavor::Inf(_) => Self::new(v1.get_mantissa_max_bit_len()),
-                Flavor::NaN => NAN,
+                Flavor::NaN(err) => Self::nan(err.clone()),
             },
             Flavor::Inf(s1) => match &d2.inner {
                 Flavor::Value(v) => {
@@ -303,9 +319,9 @@ impl BigFloat {
                     }
                 }
                 Flavor::Inf(_) => NAN,
-                Flavor::NaN => NAN,
+                Flavor::NaN(err) => Self::nan(err.clone()),
             },
-            Flavor::NaN => NAN,
+            Flavor::NaN(err) => Self::nan(err.clone()),
         }
     }
 
@@ -321,10 +337,10 @@ impl BigFloat {
                     Self::result_to_ext(v1.rem(v2), v1.is_zero(), v1.get_sign() == v2.get_sign())
                 }
                 Flavor::Inf(_) => self.clone(),
-                Flavor::NaN => NAN,
+                Flavor::NaN(err) => Self::nan(err.clone()),
             },
             Flavor::Inf(_) => NAN,
-            Flavor::NaN => NAN,
+            Flavor::NaN(err) => Self::nan(err.clone()),
         }
     }
 
@@ -341,14 +357,14 @@ impl BigFloat {
                         Some(1)
                     }
                 }
-                Flavor::NaN => None,
+                Flavor::NaN(_) => None,
             },
             Flavor::Inf(s1) => match &d2.inner {
                 Flavor::Value(_) => Some(*s1 as SignedWord),
                 Flavor::Inf(s2) => Some(*s1 as SignedWord - *s2 as SignedWord),
-                Flavor::NaN => None,
+                Flavor::NaN(_) => None,
             },
-            Flavor::NaN => None,
+            Flavor::NaN(_) => None,
         }
     }
 
@@ -357,7 +373,7 @@ impl BigFloat {
         match &mut self.inner {
             Flavor::Value(v1) => v1.inv_sign(),
             Flavor::Inf(s) => self.inner = Flavor::Inf(s.invert()),
-            Flavor::NaN => {}
+            Flavor::NaN(_) => {}
         }
     }
 
@@ -388,7 +404,7 @@ impl BigFloat {
                             Self::from_u8(1, p)
                         }
                     }
-                    Flavor::NaN => NAN,
+                    Flavor::NaN(err) => Self::nan(err.clone()),
                 }
             }
             Flavor::Inf(s1) => {
@@ -416,10 +432,10 @@ impl BigFloat {
                             Self::new(p)
                         }
                     }
-                    Flavor::NaN => NAN,
+                    Flavor::NaN(err) => Self::nan(err.clone()),
                 }
             }
-            Flavor::NaN => NAN,
+            Flavor::NaN(err) => Self::nan(err.clone()),
         }
     }
 
@@ -445,7 +461,7 @@ impl BigFloat {
                     Self::new(p)
                 }
             }
-            Flavor::NaN => NAN,
+            Flavor::NaN(err) => Self::nan(err.clone()),
         }
     }
 
@@ -467,7 +483,7 @@ impl BigFloat {
                             NAN
                         }
                     }
-                    Flavor::NaN => NAN,
+                    Flavor::NaN(err) => Self::nan(err.clone()),
                 }
             }
             Flavor::Inf(s1) => {
@@ -485,11 +501,11 @@ impl BigFloat {
                             }
                         }
                         Flavor::Inf(_) => NAN, // +inf.log(inf)
-                        Flavor::NaN => NAN,
+                        Flavor::NaN(err) => Self::nan(err.clone()),
                     }
                 }
             }
-            Flavor::NaN => NAN,
+            Flavor::NaN(err) => Self::nan(err.clone()),
         }
     }
 
@@ -499,7 +515,7 @@ impl BigFloat {
         match &self.inner {
             Flavor::Value(v) => v.is_positive(),
             Flavor::Inf(s) => *s == Sign::Pos,
-            Flavor::NaN => false,
+            Flavor::NaN(_) => false,
         }
     }
 
@@ -509,7 +525,7 @@ impl BigFloat {
         match &self.inner {
             Flavor::Value(v) => v.is_negative(),
             Flavor::Inf(s) => *s == Sign::Neg,
-            Flavor::NaN => false,
+            Flavor::NaN(_) => false,
         }
     }
 
@@ -527,7 +543,7 @@ impl BigFloat {
         match &self.inner {
             Flavor::Value(v) => v.is_zero(),
             Flavor::Inf(_) => false,
-            Flavor::NaN => false,
+            Flavor::NaN(_) => false,
         }
     }
 
@@ -648,16 +664,7 @@ impl BigFloat {
                     )
                 }
             }
-            Err(_) => {
-                #[cfg(feature = "no_panic")]
-                {
-                    NAN
-                }
-                #[cfg(not(feature = "no_panic"))]
-                {
-                    panic!("Memory allocation error");
-                }
-            }
+            Err(e) => Self::nan(Some(e)),
         }
     }
 
@@ -681,16 +688,7 @@ impl BigFloat {
                         }
                         Error::DivisionByZero => "Div by zero",
                         Error::InvalidArgument => "Invalid arg",
-                        Error::MemoryAllocation(_) => {
-                            #[cfg(feature = "no_panic")]
-                            {
-                                "NaN"
-                            }
-                            #[cfg(not(feature = "no_panic"))]
-                            {
-                                panic!("Memory allocation error")
-                            }
-                        }
+                        Error::MemoryAllocation(_) => "NaN",
                     }),
                 };
                 w.write_str(&s)
@@ -699,7 +697,7 @@ impl BigFloat {
                 let s = if sign.is_negative() { "-Inf" } else { "Inf" };
                 w.write_str(s)
             }
-            crate::ext::Flavor::NaN => w.write_str("NaN"),
+            crate::ext::Flavor::NaN(_) => w.write_str("NaN"),
         }
     }
 
@@ -733,7 +731,7 @@ impl BigFloat {
                 }
             }
             Flavor::Inf(_) => FpCategory::Infinite,
-            Flavor::NaN => FpCategory::Nan,
+            Flavor::NaN(_) => FpCategory::Nan,
         }
     }
 
@@ -746,7 +744,7 @@ impl BigFloat {
         match &self.inner {
             Flavor::Value(v) => Self::result_to_ext(v.atan(p, rm, cc), v.is_zero(), true),
             Flavor::Inf(s) => Self::result_to_ext(Self::half_pi(*s, p, rm, cc), false, true),
-            Flavor::NaN => NAN,
+            Flavor::NaN(err) => Self::nan(err.clone()),
         }
     }
 
@@ -759,7 +757,7 @@ impl BigFloat {
         match &self.inner {
             Flavor::Value(v) => Self::result_to_ext(v.atan(p, rm, cc), v.is_zero(), true),
             Flavor::Inf(s) => Self::from_i8(s.as_int(), p),
-            Flavor::NaN => NAN,
+            Flavor::NaN(err) => Self::nan(err.clone()),
         }
     }
 
@@ -800,17 +798,8 @@ impl BigFloat {
                         INF_NEG
                     }
                 }
-                Error::MemoryAllocation(_) => {
-                    #[cfg(feature = "no_panic")]
-                    {
-                        NAN
-                    }
-                    #[cfg(not(feature = "no_panic"))]
-                    {
-                        panic!("Memory allocation error")
-                    }
-                }
-                Error::InvalidArgument => NAN,
+                Error::MemoryAllocation(e) => Self::nan(Some(Error::MemoryAllocation(e))),
+                Error::InvalidArgument => Self::nan(Some(Error::InvalidArgument)),
             },
             Ok(v) => BigFloat {
                 inner: Flavor::Value(v),
@@ -939,7 +928,7 @@ impl BigFloat {
         match &self.inner {
             Flavor::Value(v) => Some(v.get_sign()),
             Flavor::Inf(s) => Some(*s),
-            Flavor::NaN => None,
+            Flavor::NaN(_) => None,
         }
     }
 
@@ -988,7 +977,7 @@ impl BigFloat {
                 ret.set_sign(*s);
                 ret
             }
-            Flavor::NaN => NAN,
+            Flavor::NaN(err) => Self::nan(err.clone()),
         }
     }
 
@@ -997,7 +986,7 @@ impl BigFloat {
         match &mut self.inner {
             Flavor::Value(v) => v.set_sign(s),
             Flavor::Inf(_) => self.inner = Flavor::Inf(s),
-            Flavor::NaN => {}
+            Flavor::NaN(_) => {}
         };
     }
 
@@ -1027,7 +1016,7 @@ impl Clone for BigFloat {
                     INF_NEG
                 }
             }
-            Flavor::NaN => NAN,
+            Flavor::NaN(err) => Self::nan(err.clone()),
         }
     }
 }
@@ -1040,7 +1029,7 @@ macro_rules! gen_wrapper_arg {
             match &self.inner {
                 Flavor::Value(v) => Self::result_to_ext(v.$fname($($arg,)*), v.is_zero(), true),
                 Flavor::Inf(s) => if s.is_positive() $pos_inf else $neg_inf,
-                Flavor::NaN => NAN,
+                Flavor::NaN(err) => Self::nan(err.clone()),
             }
         }
     };
@@ -1056,7 +1045,7 @@ macro_rules! gen_wrapper_arg_rm {
                     Self::result_to_ext(v.$fname($($arg,)* rm), v.is_zero(), true)
                 },
                 Flavor::Inf(s) => if s.is_positive() $pos_inf else $neg_inf,
-                Flavor::NaN => NAN,
+                Flavor::NaN(err) => Self::nan(err.clone()),
             }
         }
     };
@@ -1072,7 +1061,7 @@ macro_rules! gen_wrapper_arg_rm_cc {
                     Self::result_to_ext(v.$fname($($arg,)* rm, cc), v.is_zero(), true)
                 },
                 Flavor::Inf(s) => if s.is_positive() $pos_inf else $neg_inf,
-                Flavor::NaN => NAN,
+                Flavor::NaN(err) => Self::nan(err.clone()),
             }
         }
     };

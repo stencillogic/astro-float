@@ -104,6 +104,22 @@ pub enum Error {
     MemoryAllocation(CollectionAllocErr),
 }
 
+impl Clone for Error {
+    fn clone(&self) -> Self {
+        match self {
+            Self::ExponentOverflow(arg) => Self::ExponentOverflow(arg.clone()),
+            Self::DivisionByZero => Self::DivisionByZero,
+            Self::InvalidArgument => Self::InvalidArgument,
+            Self::MemoryAllocation(arg) => Self::MemoryAllocation(match arg {
+                CollectionAllocErr::CapacityOverflow => CollectionAllocErr::CapacityOverflow,
+                CollectionAllocErr::AllocErr { layout } => {
+                    CollectionAllocErr::AllocErr { layout: *layout }
+                }
+            }),
+        }
+    }
+}
+
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
