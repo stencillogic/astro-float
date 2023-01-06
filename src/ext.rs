@@ -14,9 +14,6 @@ use core::fmt::Write;
 use core::num::FpCategory;
 use lazy_static::lazy_static;
 
-#[cfg(not(feature = "std"))]
-use alloc::string::String;
-
 /// Not a number.
 pub const NAN: BigFloat = BigFloat {
     inner: Flavor::NaN(None),
@@ -629,24 +626,19 @@ impl BigFloat {
         rm: RoundingMode,
     ) -> Result<(), core::fmt::Error> {
         match &self.inner {
-            Flavor::Value(v) => {
-                let s = match v.format(rdx, rm) {
-                    Ok(s) => s,
-                    Err(e) => String::from(match e {
-                        Error::ExponentOverflow(s) => {
-                            if s.is_positive() {
-                                "Inf"
-                            } else {
-                                "-Inf"
-                            }
+            Flavor::Value(v) => match v.format(rdx, rm) {
+                Ok(s) => w.write_str(&s),
+                Err(e) => match e {
+                    Error::ExponentOverflow(s) => {
+                        if s.is_positive() {
+                            w.write_str("Inf")
+                        } else {
+                            w.write_str("-Inf")
                         }
-                        Error::DivisionByZero => "Div by zero",
-                        Error::InvalidArgument => "Invalid arg",
-                        Error::MemoryAllocation(_) => "NaN",
-                    }),
-                };
-                w.write_str(&s)
-            }
+                    }
+                    _ => w.write_str("Err"),
+                },
+            },
             Flavor::Inf(sign) => {
                 let s = if sign.is_negative() { "-Inf" } else { "Inf" };
                 w.write_str(s)
