@@ -98,7 +98,7 @@ impl BigFloat {
         matches!(self.inner, Flavor::NaN(_))
     }
 
-    /// Returs the associated with `NaN` error, if any.
+    /// Returns the associated with `NaN` error, if any.
     pub fn get_err(&self) -> Option<Error> {
         match &self.inner {
             Flavor::NaN(Some(e)) => Some(e.clone()),
