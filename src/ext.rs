@@ -359,10 +359,10 @@ impl BigFloat {
     /// Compute the power of `self` to the `n` with precision `p`. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
     /// Precision is rounded upwards to the word size.
-    pub fn pow(&self, d1: &Self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
+    pub fn pow(&self, n: &Self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v1) => {
-                match &d1.inner {
+                match &n.inner {
                     Flavor::Value(v2) => Self::result_to_ext(
                         v1.pow(v2, p, rm, cc),
                         v1.is_zero(),
@@ -385,7 +385,7 @@ impl BigFloat {
                 }
             }
             Flavor::Inf(s1) => {
-                match &d1.inner {
+                match &n.inner {
                     Flavor::Value(v2) => {
                         // inf ^ v2
                         if v2.is_zero() {
@@ -442,10 +442,10 @@ impl BigFloat {
     /// Computes the logarithm base `n` of a number with precision `p`. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
     /// Precision is rounded upwards to the word size.
-    pub fn log(&self, b: &Self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
+    pub fn log(&self, n: &Self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v1) => {
-                match &b.inner {
+                match &n.inner {
                     Flavor::Value(v2) => Self::result_to_ext(v1.log(v2, p, rm, cc), false, true),
                     Flavor::Inf(s2) => {
                         // v1.log(inf)
@@ -463,7 +463,7 @@ impl BigFloat {
                     // -inf.log(any)
                     NAN
                 } else {
-                    match &b.inner {
+                    match &n.inner {
                         Flavor::Value(v2) => {
                             // +inf.log(v2)
                             if v2.get_exponent() <= 0 {
@@ -521,10 +521,6 @@ impl BigFloat {
     /// Restricts the value of `self` to an interval determined by the values of `min` and `max`.
     /// The function returns `max` if `self` is greater than `max`, `min` if `self` is less than `min`, and `self` otherwise.
     /// If either argument is NaN or `min` is greater than `max`, the function returns NaN.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn clamp(&self, min: &Self, max: &Self) -> Self {
         if self.is_nan() || min.is_nan() || max.is_nan() || max.cmp(min).unwrap() < 0 {
             // call to unwrap() is unreacheable
@@ -542,10 +538,6 @@ impl BigFloat {
 
     /// Returns the value of `d1` if `d1` is greater than `self`, or the value of `self` otherwise.
     /// If either argument is NaN, the function returns NaN.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn max(&self, d1: &Self) -> Self {
         if self.is_nan() || d1.is_nan() {
             NAN
@@ -559,10 +551,6 @@ impl BigFloat {
 
     /// Returns value of `d1` if `d1` is less than `self`, or the value of `self` otherwise.
     /// If either argument is NaN, the function returns NaN.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn min(&self, d1: &Self) -> Self {
         if self.is_nan() || d1.is_nan() {
             NAN
@@ -576,10 +564,6 @@ impl BigFloat {
 
     /// Returns a BigFloat with the value -1 if `self` is negative, 1 if `self` is positive, zero otherwise.
     /// The function returns NaN If `self` is NaN.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn signum(&self) -> Self {
         if self.is_nan() {
             NAN
@@ -595,7 +579,7 @@ impl BigFloat {
     /// Parses a number from the string `s`.
     /// The function expects `s` to be a number in scientific format in base 10, or +-Inf, or NaN.
     ///
-    /// # Examples
+    /// ## Examples
     ///
     /// ```
     /// use astro_float::BigFloat;
@@ -604,17 +588,16 @@ impl BigFloat {
     ///
     /// let n = BigFloat::parse("0.0", Radix::Bin, 64, RoundingMode::ToEven);
     /// assert!(n.is_zero());
+    ///
     /// let n = BigFloat::parse("1.124e-24", Radix::Dec, 128, RoundingMode::ToEven);
     /// assert!(n.sub(&BigFloat::from_f64(1.124e-24, 128), 128, RoundingMode::ToEven).get_exponent() <= Some(-52 - 24));
+    ///
     /// let n = BigFloat::parse("-Inf", Radix::Hex, 1, RoundingMode::None);
     /// assert!(n.is_inf_neg());
+    ///
     /// let n = BigFloat::parse("NaN", Radix::Oct, 2, RoundingMode::None);
     /// assert!(n.is_nan());
     /// ```
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn parse(s: &str, rdx: Radix, p: usize, rm: RoundingMode) -> Self {
         match crate::parser::parse(s, rdx) {
             Ok(ps) => {
@@ -677,16 +660,12 @@ impl BigFloat {
     /// Precision is rounded upwards to the word size.
     /// Function does not follow any specific distribution law.
     /// The intended use of this function is for testing.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     #[cfg(feature = "random")]
     pub fn random_normal(p: usize, exp_from: Exponent, exp_to: Exponent) -> Self {
         Self::result_to_ext(
             BigFloatNumber::random_normal(p, exp_from, exp_to),
-            true,
             false,
+            true,
         )
     }
 
@@ -869,7 +848,7 @@ impl BigFloat {
         Self::result_to_ext(BigFloatNumber::from_words(m, s, e), false, true)
     }
 
-    /// Returns sign of a number or None if `self` is NaN.
+    /// Returns the sign of `self` or None if `self` is NaN.
     pub fn get_sign(&self) -> Option<Sign> {
         match &self.inner {
             Flavor::Value(v) => Some(v.get_sign()),
@@ -879,6 +858,28 @@ impl BigFloat {
     }
 
     /// Sets the exponent of `self`.
+    /// Note that if `self` is subnormal, the exponent may not change, but the mantissa will shift instead.
+    /// See example below.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use astro_float::BigFloat;
+    /// use astro_float::EXPONENT_MIN;
+    ///
+    /// // construct a subnormal value.
+    /// let mut n = BigFloat::min_positive(128);
+    ///
+    /// assert_eq!(n.get_exponent().unwrap(), EXPONENT_MIN);
+    /// assert_eq!(n.get_precision().unwrap(), 1);
+    ///
+    /// // increase exponent.
+    /// n.set_exponent(n.get_exponent().unwrap() + 1);
+    ///
+    /// // the outcome for subnormal number.
+    /// assert_eq!(n.get_exponent().unwrap(), EXPONENT_MIN);
+    /// assert_eq!(n.get_precision().unwrap(), 2);
+    /// ```
     pub fn set_exponent(&mut self, e: Exponent) {
         if let Flavor::Value(v) = &mut self.inner {
             v.set_exponent(e)
@@ -1168,6 +1169,7 @@ impl BigFloat {
 
     gen_wrapper_arg_rm_cc!(
         "Computes the hyperbolic sine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache cc for computing the result. 
         Precision is rounded upwards to the word size.",
         sinh,
         Self,
@@ -1178,6 +1180,7 @@ impl BigFloat {
     );
     gen_wrapper_arg_rm_cc!(
         "Computes the hyperbolic cosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache cc for computing the result. 
         Precision is rounded upwards to the word size.",
         cosh,
         Self,

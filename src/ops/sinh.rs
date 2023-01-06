@@ -86,6 +86,7 @@ impl ArgReductionEstimator for SinhArgReductionEstimator {
 
 impl BigFloatNumber {
     /// Computes the hyperbolic sine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache cc for computing the result.
     /// Precision is rounded upwards to the word size.
     ///
     /// ## Errors

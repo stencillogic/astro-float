@@ -822,7 +822,7 @@ impl BigFloatNumber {
         Ok(BigFloatNumber { e, s, m })
     }
 
-    /// Returns sign of a number.
+    /// Returns the sign of a number.
     #[inline]
     pub fn get_sign(&self) -> Sign {
         self.s
@@ -962,6 +962,28 @@ impl BigFloatNumber {
     }
 
     /// Sets the exponent of `self`.
+    /// Note that if `self` is subnormal, the exponent may not change, but the mantissa will shift instead.
+    /// See example below.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use astro_float::BigFloatNumber;
+    /// use astro_float::EXPONENT_MIN;
+    ///
+    /// // construct a subnormal value.
+    /// let mut n = BigFloatNumber::min_positive(128).unwrap();
+    ///
+    /// assert_eq!(n.get_exponent(), EXPONENT_MIN);
+    /// assert_eq!(n.get_precision(), 1);
+    ///
+    /// // increase exponent.
+    /// n.set_exponent(n.get_exponent() + 1);
+    ///
+    /// // the outcome for subnormal number.
+    /// assert_eq!(n.get_exponent(), EXPONENT_MIN);
+    /// assert_eq!(n.get_precision(), 2);
+    /// ```
     #[inline]
     pub fn set_exponent(&mut self, e: Exponent) {
         if !self.is_zero() {
