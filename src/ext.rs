@@ -55,20 +55,13 @@ enum Flavor {
 }
 
 impl BigFloat {
-    /// Returns a new BigFloat with the value of zero and precision `p`.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Returns a new number with value of 0 and precision of `p` bits. Precision is rounded upwards to the word size.
     pub fn new(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::new(p), false, true)
     }
 
-    /// Creates a BigFloat from f64.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Constructs a number with precision `p` from f64 value.
+    /// Precision is rounded upwards to the word size.
     pub fn from_f64(f: f64, p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::from_f64(p, f), false, true)
     }
@@ -79,11 +72,8 @@ impl BigFloat {
         }
     }
 
-    /// Creates a BigFloat from f32.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Constructs a number with precision `p` from f32 value.
+    /// Precision is rounded upwards to the word size.
     pub fn from_f32(f: f32, p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::from_f64(p, f as f64), false, true)
     }
@@ -116,22 +106,15 @@ impl BigFloat {
         }
     }
 
-    /// Adds `d2` to `self` and returns the result of the addition.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Adds `d2` to `self` and returns the result of the operation with precision `p` rounded according to `rm`.
+    /// Precision is rounded upwards to the word size.
     pub fn add(&self, d2: &Self, p: usize, rm: RoundingMode) -> Self {
         self.add_op(d2, p, rm, false)
     }
 
-    /// Adds `d2` to `self` and returns the result of the addition.
+    /// Adds `d2` to `self` and returns the result of the operation.
     /// The resulting precision is equal to the full precision of the result.
     /// This operation can be used to emulate integer addition.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn add_full_prec(&self, d2: &Self) -> Self {
         self.add_op(d2, 0, RoundingMode::None, true)
     }
@@ -168,11 +151,8 @@ impl BigFloat {
         }
     }
 
-    /// Subtracts `d2` from `self` and return the result of the subtraction.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Subtracts `d2` from `self` and returns the result of the operation with precision `p` rounded according to `rm`.
+    /// Precision is rounded upwards to the word size.
     pub fn sub(&self, d2: &Self, p: usize, rm: RoundingMode) -> Self {
         self.sub_op(d2, p, rm, false)
     }
@@ -180,10 +160,6 @@ impl BigFloat {
     /// Subtracts `d2` from `self` and returns the result of the operation.
     /// The resulting precision is equal to the full precision of the result.
     /// This operation can be used to emulate integer subtraction.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn sub_full_prec(&self, d2: &Self) -> Self {
         self.sub_op(d2, 0, RoundingMode::None, true)
     }
@@ -224,11 +200,8 @@ impl BigFloat {
         }
     }
 
-    /// Multiplies `self` by `d2` and returns the result of the multiplication.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Multiplies `d2` by `self` and returns the result of the operation with precision `p` rounded according to `rm`.
+    /// Precision is rounded upwards to the word size.
     pub fn mul(&self, d2: &Self, p: usize, rm: RoundingMode) -> Self {
         self.mul_op(d2, p, rm, false)
     }
@@ -236,15 +209,10 @@ impl BigFloat {
     /// Multiplies `d2` by `self` and returns the result of the operation.
     /// The resulting precision is equal to the full precision of the result.
     /// This operation can be used to emulate integer multiplication.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn mul_full_prec(&self, d2: &Self) -> Self {
         self.mul_op(d2, 0, RoundingMode::None, true)
     }
 
-    /// Multiplies `self` by `d2` and returns the result of the multiplication.
     fn mul_op(&self, d2: &Self, p: usize, rm: RoundingMode, full_prec: bool) -> Self {
         match &self.inner {
             Flavor::Value(v1) => {
@@ -294,11 +262,8 @@ impl BigFloat {
         }
     }
 
-    /// Divides `self` by `d2` and returns the result of the division.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Divides `self` by `d2` and returns the result of the operation with precision `p` rounded according to `rm`.
+    /// Precision is rounded upwards to the word size.
     pub fn div(&self, d2: &Self, p: usize, rm: RoundingMode) -> Self {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
@@ -325,11 +290,7 @@ impl BigFloat {
         }
     }
 
-    /// Returns the remainder of division of `self` by `d1`.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Divides `self` by `d2` and returns the remainder.
     pub fn rem(&self, d2: &Self) -> Self {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
@@ -368,6 +329,24 @@ impl BigFloat {
         }
     }
 
+    /// Compares the absolute value of `self` to the absolute value of `d2`.
+    /// Returns positive if `|self|` is greater than `|d2|`, negative if `|self|` is smaller than `|d2|`, 0 if `|self|` equals to `|d2|`, None if `self` or `d2` is NaN.
+    pub fn abs_cmp(&self, d2: &Self) -> Option<SignedWord> {
+        match &self.inner {
+            Flavor::Value(v1) => match &d2.inner {
+                Flavor::Value(v2) => Some(v1.cmp(&v2)),
+                Flavor::Inf(_) => Some(-1),
+                Flavor::NaN(_) => None,
+            },
+            Flavor::Inf(_) => match &d2.inner {
+                Flavor::Value(_) => Some(1),
+                Flavor::Inf(_) => Some(0),
+                Flavor::NaN(_) => None,
+            },
+            Flavor::NaN(_) => None,
+        }
+    }
+
     /// Reverses the sign of `self`.
     pub fn inv_sign(&mut self) {
         match &mut self.inner {
@@ -377,11 +356,9 @@ impl BigFloat {
         }
     }
 
-    /// Returns `self` to the power of `d1`.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Compute the power of `self` to the `n` with precision `p`. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache `cc` for computing the result.
+    /// Precision is rounded upwards to the word size.
     pub fn pow(&self, d1: &Self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v1) => {
@@ -439,11 +416,8 @@ impl BigFloat {
         }
     }
 
-    /// Returns `self` to the power of `i`.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Compute the power of `self` to the integer `i` with precision `p`. The result is rounded using the rounding mode `rm`.
+    /// Precision is rounded upwards to the word size.
     pub fn powi(&self, i: usize, p: usize, rm: RoundingMode) -> Self {
         match &self.inner {
             Flavor::Value(v1) => Self::result_to_ext(v1.powi(i, p, rm), false, true),
@@ -465,11 +439,9 @@ impl BigFloat {
         }
     }
 
-    /// Returns the logarithm base `b` of a number.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Computes the logarithm base `n` of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache `cc` for computing the result.
+    /// Precision is rounded upwards to the word size.
     pub fn log(&self, b: &Self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v1) => {
@@ -529,8 +501,7 @@ impl BigFloat {
         }
     }
 
-    /// Returns true if `self` is subnormal.
-    /// A number is considered subnormal if not all digits of the mantissa are used, and the exponent has the minimum possible value.
+    /// Returns true if `self` is subnormal. A number is subnormal if the most significant bit of the mantissa is not equal to 1.
     pub fn is_subnormal(&self) -> bool {
         if let Flavor::Value(v) = &self.inner {
             return v.is_subnormal();
@@ -703,6 +674,7 @@ impl BigFloat {
 
     /// Returns a random normalized (not subnormal) BigFloat number with exponent in the range
     /// from `exp_from` to `exp_to` inclusive. The sign can be positive and negative. Zero is excluded.
+    /// Precision is rounded upwards to the word size.
     /// Function does not follow any specific distribution law.
     /// The intended use of this function is for testing.
     ///
@@ -735,11 +707,9 @@ impl BigFloat {
         }
     }
 
-    /// Returns the arctangent of `self`. The result is an angle in radians ranging from -pi/2 to pi/2.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Computes the arctangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache `cc` for computing the result.
+    /// Precision is rounded upwards to the word size.
     pub fn atan(&self, rm: RoundingMode, p: usize, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v) => Self::result_to_ext(v.atan(p, rm, cc), v.is_zero(), true),
@@ -748,14 +718,12 @@ impl BigFloat {
         }
     }
 
-    /// Returns the hyperbolic tangent of `self`.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Computes the hyperbolic tangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+    /// This function requires constants cache `cc` for computing the result.
+    /// Precision is rounded upwards to the word size.
     pub fn tanh(&self, rm: RoundingMode, p: usize, cc: &mut Consts) -> Self {
         match &self.inner {
-            Flavor::Value(v) => Self::result_to_ext(v.atan(p, rm, cc), v.is_zero(), true),
+            Flavor::Value(v) => Self::result_to_ext(v.tanh(p, rm, cc), v.is_zero(), true),
             Flavor::Inf(s) => Self::from_i8(s.as_int(), p),
             Flavor::NaN(err) => Self::nan(err.clone()),
         }
@@ -825,20 +793,14 @@ impl BigFloat {
         }
     }
 
-    /// Returns the maximum value for the specified precision `p`: all bits of the mantissa are set to 1, the exponent has the maximum possible value, and the sign is positive. Precision is rounded upwards to the word size.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Returns the maximum value for the specified precision `p`: all bits of the mantissa are set to 1,
+    /// the exponent has the maximum possible value, and the sign is positive.
+    /// Precision is rounded upwards to the word size.
     pub fn max_value(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::max_value(p), false, true)
     }
 
     /// Returns the minimum value for the specified precision `p`: all bits of the mantissa are set to 1, the exponent has the maximum possible value, and the sign is negative. Precision is rounded upwards to the word size.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn min_value(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::min_value(p), false, true)
     }
@@ -847,10 +809,6 @@ impl BigFloat {
     /// only the least significant bit of the mantissa is set to 1, the exponent has
     /// the minimum possible value, and the sign is positive.
     /// Precision is rounded upwards to the word size.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn min_positive(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::min_positive(p), false, true)
     }
@@ -859,35 +817,24 @@ impl BigFloat {
     /// only the most significant bit of the mantissa is set to 1, the exponent has
     /// the minimum possible value, and the sign is positive.
     /// Precision is rounded upwards to the word size.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn min_positive_normal(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::min_positive_normal(p), false, true)
     }
 
     /// Returns a new number with value `d` and the precision `p`. Precision is rounded upwards to the word size.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn from_word(d: Word, p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::from_word(d, p), false, true)
     }
 
     /// Returns a copy of the number with the sign reversed.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn neg(&self) -> Self {
         let mut ret = self.clone();
         ret.inv_sign();
         ret
     }
 
-    /// Decomposes `self` into raw parts. The function returns a reference to a slice of words representing mantissa, numbers of significant bits in the mantissa, sign, and exponent.
+    /// Decomposes `self` into raw parts.
+    /// The function returns a reference to a slice of words representing mantissa, numbers of significant bits in the mantissa, sign, and exponent.
     pub fn to_raw_parts(&self) -> Option<(&[Word], usize, Sign, Exponent)> {
         if let Flavor::Value(v) = &self.inner {
             Some(v.to_raw_parts())
@@ -903,27 +850,26 @@ impl BigFloat {
     ///  - `s` is the sign.
     ///  - `e` is the exponent.
     ///
-    /// ## Panics
+    /// This function returns NaN in the following situations:
     ///
-    ///  - Failed to allocate memory.
+    /// - `n` is larger than the number of bits in `m`.
+    /// - `n` is smaller than the number of bits in `m`, but `m` does not represent corresponding subnormal number mantissa.
+    /// - `n` is smaller than the number of bits in `m`, but `e` is not the minimum possible exponent.
+    /// - `n` or the size of `m` is too large (larger than isize::MAX / 2 + EXPONENT_MIN).
     pub fn from_raw_parts(m: &[Word], n: usize, s: Sign, e: Exponent) -> Self {
         Self::result_to_ext(BigFloatNumber::from_raw_parts(m, n, s, e), false, true)
     }
 
-    /// Constructs a number from the array of words:
+    /// Constructs a number from the slice of words:
     ///
-    ///  - `m` is the mantisaa.
+    ///  - `m` is the mantissa.
     ///  - `s` is the sign.
     ///  - `e` is the exponent.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     pub fn from_words(m: &[Word], s: Sign, e: Exponent) -> Self {
         Self::result_to_ext(BigFloatNumber::from_words(m, s, e), false, true)
     }
 
-    /// Returns sign of a number or None if `self` is NaN
+    /// Returns sign of a number or None if `self` is NaN.
     pub fn get_sign(&self) -> Option<Sign> {
         match &self.inner {
             Flavor::Value(v) => Some(v.get_sign()),
@@ -950,7 +896,6 @@ impl BigFloat {
 
     /// Sets the precision of `self` to `p`.
     /// If the new precision is smaller than the existing one, the number is rounded using specified rounding mode `rm`.
-    /// If `self` is Inf or NaN, the function has no effect.
     ///
     /// ## Errors
     ///
@@ -964,11 +909,9 @@ impl BigFloat {
         }
     }
 
-    /// Computes the reciprocal of a number. The result is rounded using the rounding mode `rm`.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
+    /// Computes the reciprocal of a number with precision `p`.
+    /// The result is rounded using the rounding mode `rm`.
+    /// Precision is rounded upwards to the word size.
     pub fn reciprocal(&self, p: usize, rm: RoundingMode) -> Self {
         match &self.inner {
             Flavor::Value(v) => Self::result_to_ext(v.reciprocal(p, rm), v.is_zero(), true),
@@ -1001,11 +944,6 @@ impl BigFloat {
 }
 
 impl Clone for BigFloat {
-    /// Clones `self`.
-    ///
-    /// ## Panics
-    ///
-    ///  - Failed to allocate memory.
     fn clone(&self) -> Self {
         match &self.inner {
             Flavor::Value(v) => Self::result_to_ext(v.clone(), false, true),
@@ -1069,41 +1007,37 @@ macro_rules! gen_wrapper_arg_rm_cc {
 
 impl BigFloat {
     gen_wrapper_arg!(
-        "Returns the absolute value of `self`.\n## Panics\n - Failed to allocate memory.",
+        "Returns the absolute value of `self`.",
         abs,
         Self,
         { INF_POS },
         { INF_POS },
     );
+    gen_wrapper_arg!("Returns the integer part of `self`.", int, Self, { NAN }, {
+        NAN
+    },);
     gen_wrapper_arg!(
-        "Returns the integer part of `self`.\n## Panics\n - Failed to allocate memory.",
-        int,
-        Self,
-        { NAN },
-        { NAN },
-    );
-    gen_wrapper_arg!(
-        "Returns the fractional part of `self`.\n## Panics\n - Failed to allocate memory.",
+        "Returns the fractional part of `self`.",
         fract,
         Self,
         { NAN },
         { NAN },
     );
     gen_wrapper_arg!(
-        "Returns the smallest integer greater than or equal to `self`.\n## Panics\n - Failed to allocate memory.",
+        "Returns the smallest integer greater than or equal to `self`.",
         ceil,
         Self,
         { INF_POS },
         { INF_NEG },
     );
     gen_wrapper_arg!(
-        "Returns the largest integer less than or equal to `self`.\n## Panics\n - Failed to allocate memory.",
+        "Returns the largest integer less than or equal to `self`.",
         floor,
         Self,
         { INF_POS },
         { INF_NEG },
     );
-    gen_wrapper_arg_rm!("Returns a rounded number with `n` decimal positions in the fractional part of the number using the rounding mode `rm`.\n## Panics\n - Failed to allocate memory.", 
+    gen_wrapper_arg_rm!("Returns the rounded number with `n` binary positions in the fractional part of the number using rounding mode `rm`.", 
         round,
         Self,
         { INF_POS },
@@ -1112,7 +1046,8 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm!(
-        "Returns the square root of `self`.\n## Panics\n - Failed to allocate memory.",
+        "Computes the square root of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        Precision is rounded upwards to the word size.",
         sqrt,
         Self,
         { INF_POS },
@@ -1121,7 +1056,8 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm!(
-        "Returns the cube root of `self`.\n## Panics\n - Failed to allocate memory.",
+        "Computes the cube root of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        Precision is rounded upwards to the word size.",
         cbrt,
         Self,
         { INF_POS },
@@ -1130,7 +1066,9 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the natural logarithm of `self`.\n## Panics\n - Failed to allocate memory.",
+        "Computes the natural logarithm of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache `cc` for computing the result.
+        Precision is rounded upwards to the word size.",
         ln,
         Self,
         { INF_POS },
@@ -1139,7 +1077,9 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the logarithm base 2 of `self`.\n## Panics\n - Failed to allocate memory.",
+        "Computes the logarithm base 2 of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache `cc` for computing the result.
+        Precision is rounded upwards to the word size.",
         log2,
         Self,
         { INF_POS },
@@ -1148,7 +1088,9 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the logarithm base 10 of `self`.\n## Panics\n - Failed to allocate memory.",
+        "Computes the logarithm base 10 of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache `cc` for computing the result.
+        Precision is rounded upwards to the word size.",
         log10,
         Self,
         { INF_POS },
@@ -1157,7 +1099,9 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns `e` to the power of `self`.\n## Panics\n - Failed to allocate memory.",
+        "Computes `e` to the power of `self` with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache `cc` for computing the result.
+        Precision is rounded upwards to the word size.",
         exp,
         Self,
         { INF_POS },
@@ -1167,7 +1111,9 @@ impl BigFloat {
     );
 
     gen_wrapper_arg_rm_cc!(
-        "Returns the sine of `self`. The function takes an angle in radians as an argument.\n## Panics\n - Failed to allocate memory.",
+        "Computes the sine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache `cc` for computing the result.
+        Precision is rounded upwards to the word size.",
         sin,
         Self,
         { NAN },
@@ -1176,7 +1122,9 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the cosine of `self`. The function takes an angle in radians as an argument.\n## Panics\n - Failed to allocate memory.",
+        "Computes the cosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache `cc` for computing the result.
+        Precision is rounded upwards to the word size.",
         cos,
         Self,
         { NAN },
@@ -1185,7 +1133,9 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the tangent of `self`. The function takes an angle in radians as an argument.\n## Panics\n - Failed to allocate memory.",
+        "Computes the tangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache `cc` for computing the result.
+        Precision is rounded upwards to the word size.",
         tan,
         Self,
         { NAN },
@@ -1193,7 +1143,10 @@ impl BigFloat {
         p,
         usize
     );
-    gen_wrapper_arg_rm_cc!("Returns the arcsine of `self`. The result is an angle in radians ranging from -pi/2 to pi/2.\n## Panics\n - Failed to allocate memory.", 
+    gen_wrapper_arg_rm_cc!(
+        "Computes the arcsine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache `cc` for computing the result.
+        Precision is rounded upwards to the word size.", 
         asin,
         Self,
         {NAN},
@@ -1202,7 +1155,9 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the arccosine of `self`. The result is an angle in radians ranging from 0 to pi.\n## Panics\n - Failed to allocate memory.",
+        "Computes the arccosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache `cc` for computing the result.
+        Precision is rounded upwards to the word size.",
         acos,
         Self,
         { NAN },
@@ -1212,7 +1167,8 @@ impl BigFloat {
     );
 
     gen_wrapper_arg_rm_cc!(
-        "Returns the hyperbolic sine of `self`.\n## Panics\n - Failed to allocate memory.",
+        "Computes the hyperbolic sine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        Precision is rounded upwards to the word size.",
         sinh,
         Self,
         { INF_POS },
@@ -1221,7 +1177,8 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the hyperbolic cosine of `self`.\n## Panics\n - Failed to allocate memory.",
+        "Computes the hyperbolic cosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        Precision is rounded upwards to the word size.",
         cosh,
         Self,
         { INF_POS },
@@ -1230,7 +1187,9 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the inverse hyperbolic sine of `self`.\n## Panics\n - Failed to allocate memory.",
+        "Computes the hyperbolic arcsine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache `cc` for computing the result.
+        Precision is rounded upwards to the word size.",
         asinh,
         Self,
         { INF_POS },
@@ -1239,7 +1198,9 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the inverse hyperbolic cosine of `self`.\n## Panics\n - Failed to allocate memory.",
+        "Computes the hyperbolic arccosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache `cc` for computing the result.
+        Precision is rounded upwards to the word size.",
         acosh,
         Self,
         { BigFloat::new(1) },
@@ -1248,7 +1209,9 @@ impl BigFloat {
         usize
     );
     gen_wrapper_arg_rm_cc!(
-        "Returns the inverse hyperbolic tangent of `self`.\n## Panics\n - Failed to allocate memory.",
+        "Computes the hyperbolic arctangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
+        This function requires constants cache `cc` for computing the result.
+        Precision is rounded upwards to the word size.",
         atanh,
         Self,
         { BigFloat::new(1) },
@@ -1261,11 +1224,8 @@ impl BigFloat {
 macro_rules! impl_int_conv {
     ($s:ty, $from_s:ident) => {
         impl BigFloat {
-            /// Construct BigFloat from an integer value.
-            ///
-            /// ## Panics
-            ///
-            ///  - Failed to allocate memory.
+            /// Constructs BigFloat with precision `p` from an integer value `i`.
+            /// Precision is rounded upwards to the word size.
             pub fn $from_s(i: $s, p: usize) -> Self {
                 Self::result_to_ext(BigFloatNumber::$from_s(i, p), false, true)
             }

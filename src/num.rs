@@ -1025,8 +1025,11 @@ impl BigFloatNumber {
     }
 
     #[cfg(feature = "random")]
-    /// Generates a random normal number with precision `p` and an exponent within the range from `exp_from` to `exp_to`.
+    /// Returns a random normalized (not subnormal) BigFloat number with exponent in the range
+    /// from `exp_from` to `exp_to` inclusive. The sign can be positive and negative. Zero is excluded.
     /// Precision is rounded upwards to the word size.
+    /// Function does not follow any specific distribution law.
+    /// The intended use of this function is for testing.
     ///
     /// ## Errors
     ///
