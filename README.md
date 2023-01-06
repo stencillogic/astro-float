@@ -16,11 +16,9 @@ For more information please refer to the library documentation: https://docs.rs/
 Calculate Pi with 1024 bit precision:
 
 ``` rust
-use astro_float::BigFloatNumber;
+use astro_float::BigFloat;
 use astro_float::Consts;
 use astro_float::RoundingMode;
-use astro_float::Radix;
-use astro_float::Error;
 
 // Precision with some space for error.
 let p = 1024 + 8;
@@ -32,26 +30,25 @@ let rm = RoundingMode::ToEven;
 let mut cc = Consts::new().unwrap();
 
 // Compute pi: pi = 6*arctan(1/sqrt(3))
-let six = BigFloatNumber::from_word(6, 1).unwrap();
-let three = BigFloatNumber::from_word(3, p).unwrap();
+let six = BigFloat::from_word(6, 1);
+let three = BigFloat::from_word(3, p);
 
-let n = three.sqrt(p, rm).unwrap();
-let n = n.reciprocal(p, rm).unwrap();
-let n = n.atan(p, rm, &mut cc).unwrap();
-let mut pi = six.mul(&n, p, rm).unwrap();
+let n = three.sqrt(p, rm);
+let n = n.reciprocal(p, rm);
+let n = n.atan(p, rm, &mut cc);
+let mut pi = six.mul(&n, p, rm);
 
 // Reduce precision to 1024
-pi.set_precision(1024, rm).unwrap();
+pi.set_precision(1024, rm).expect("Precision updated");
 
 // Use library's constant for verifying the result
-let pi_lib = cc.pi(1024, rm).unwrap();
+let pi_lib = cc.pi(1024, rm).unwrap().into();
 
 // Compare computed constant with library's constant
-assert!(pi.cmp(&pi_lib) == 0);
+assert_eq!(pi.cmp(&pi_lib), Some(0));
 
-// Print computed result as decimal number
-let s = pi.format(Radix::Dec, rm).unwrap();
-println!("{}", s);
+// Print using decimal radix.
+println!("{}", pi);
 ```
 
 ## Performance

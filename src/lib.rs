@@ -5,23 +5,41 @@
 //! **Numbers**
 //!
 //!
-//! The number is defined by the data type `BigFloatNumber`. Each number consists of an array of words representing the mantissa, an exponent, and the sign of the number.
+//! The number is defined by the data type `BigFloat`.
+//! Each finite number consists of an array of words representing the mantissa, exponent, and sign.
+//! `BigFloat` can also be `Inf` (positive infinity), `-Inf` (negative infinity) or `NaN` (not-a-number).
 //!
 //!
-//! `BigFloatNumber` creation operations take bit precision as an argument. Precision is always rounded up to the nearest word. For example, if you specify a precision of 1 bit, then it will be converted to 64 bits when one word has a size of 64 bits. If you specify a precision of 65 bits, the resulting precision will be 128 bits (2 words), and so on.
+//! `BigFloat` creation operations take bit precision as an argument.
+//! Precision is always rounded up to the nearest word.
+//! For example, if you specify a precision of 1 bit, then it will be converted to 64 bits when one word has a size of 64 bits.
+//! If you specify a precision of 65 bits, the resulting precision will be 128 bits (2 words), and so on.
 //!
 //!
-//! Most operations take the rounding mode as an argument. The operation will typically internally result in a number with more precision than necessary. Before the result is returned to the user, the result is rounded according to the rounding mode and reduced to the expected precision.
+//! Most operations take the rounding mode as an argument.
+//! The operation will typically internally result in a number with more precision than necessary.
+//! Before the result is returned to the user, the result is rounded according to the rounding mode and reduced to the expected precision.
 //!
 //!
-//! `BigFloatNumber` can be parsed from a string and formatted into a string using binary, octal, decimal, or hexadecimal representation.
+//! `BigFloat` can be parsed from a string and formatted into a string using binary, octal, decimal, or hexadecimal representation.
 //!
 //!
-//! Numbers can be subnormal. Usually any number is normalized: the most significant bit of the mantissa is set to 1. If the result of the operation has the smallest possible exponent, then normalization cannot be performed, and some significant bits of the mantissa may become 0. This allows for a more gradual transition to zero.
+//! Numbers can be subnormal. Usually any number is normalized: the most significant bit of the mantissa is set to 1.
+//! If the result of the operation has the smallest possible exponent, then normalization cannot be performed,
+//! and some significant bits of the mantissa may become 0. This allows for a more gradual transition to zero.
 //!
+//! **Error handling**
+//!
+//! In case of an error, such as memory allocation error, `BigFloat` takes the value `NaN`.
+//! `BigFloat::get_err()` can be used to get the associated error in this situation.
+//!
+//! **BigFloatNumber**
+//!
+//! `BigFloatNumber` is a data type provided for backward compatibility.
+//! It represents the finite number, i.e. it has mantissa, sign, and exponent, and can't be `Inf` or `NaN`.
+//! `BigFloat` uses `BigFloatNumber` internally.
 //!
 //! **Constants**
-//!
 //!
 //! Constants such as pi or the Euler number have arbitrary precision and are evaluated lazily and then cached in the constants cache.
 //! Some functions expect constants cache as parameter because the library does not maintain global state.
@@ -30,10 +48,9 @@
 //! ## Examples
 //!
 //! ``` rust
-//! use astro_float::BigFloatNumber;
+//! use astro_float::BigFloat;
 //! use astro_float::Consts;
 //! use astro_float::RoundingMode;
-//! use astro_float::Radix;
 //!
 //! // Precision with some space for error.
 //! let p = 1024 + 8;
@@ -45,28 +62,27 @@
 //! let mut cc = Consts::new().unwrap();
 //!
 //! // Compute pi: pi = 6*arctan(1/sqrt(3))
-//! let six = BigFloatNumber::from_word(6, 1).unwrap();
-//! let three = BigFloatNumber::parse("3.0", Radix::Dec, p, rm).unwrap();  // +8 bits of precision to cover error
+//! let six = BigFloat::from_word(6, 1);
+//! let three = BigFloat::from_word(3, p);
 //!
-//! let n = three.sqrt(p, rm).unwrap();
-//! let n = n.reciprocal(p, rm).unwrap();
-//! let n = n.atan(p, rm, &mut cc).unwrap();
-//! let mut pi = six.mul(&n, p, rm).unwrap();
+//! let n = three.sqrt(p, rm);
+//! let n = n.reciprocal(p, rm);
+//! let n = n.atan(p, rm, &mut cc);
+//! let mut pi = six.mul(&n, p, rm);
 //!
-//! // Reduce precision to desired
-//! pi.set_precision(1024, rm).unwrap();
+//! // Reduce precision to 1024
+//! pi.set_precision(1024, rm).expect("Precision updated");
 //!
 //! // Use library's constant for verifying the result
-//! let pi_lib = cc.pi(1024, rm).unwrap();
+//! let pi_lib = cc.pi(1024, rm).unwrap().into();
 //!
 //! // Compare computed constant with library's constant
-//! assert!(pi.cmp(&pi_lib) == 0);
+//! assert_eq!(pi.cmp(&pi_lib), Some(0));
 //!
-//! // Print computed result as decimal number.
-//! let s = pi.format(Radix::Dec, rm).unwrap();
-//! println!("{}", s);
+//! // Print using decimal radix.
+//! println!("{}", pi);
 //!
-//! // output: 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458698858e+0
+//! // output: 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458699748e+0
 //! ```
 //!
 //! ## no_std
@@ -76,7 +92,7 @@
 //!
 //! ``` toml
 //! [dependencies]
-//! astro-float = { version = "0.3.1", default-features = false }
+//! astro-float = { version = "0.3.2", default-features = false }
 //! ```
 //!
 
@@ -126,9 +142,8 @@ mod tests {
 
     #[test]
     fn test_bigfloat() {
-        use crate::BigFloatNumber;
+        use crate::BigFloat;
         use crate::Consts;
-        use crate::Radix;
         use crate::RoundingMode;
 
         // Precision with some space for error.
@@ -141,24 +156,24 @@ mod tests {
         let mut cc = Consts::new().unwrap();
 
         // Compute pi: pi = 6*arctan(1/sqrt(3))
-        let six = BigFloatNumber::from_word(6, 1).unwrap();
-        let three = BigFloatNumber::from_word(3, p).unwrap();
+        let six = BigFloat::from_word(6, 1);
+        let three = BigFloat::from_word(3, p);
 
-        let n = three.sqrt(p, rm).unwrap();
-        let n = n.reciprocal(p, rm).unwrap();
-        let n = n.atan(p, rm, &mut cc).unwrap();
-        let mut pi = six.mul(&n, p, rm).unwrap();
+        let n = three.sqrt(p, rm);
+        let n = n.reciprocal(p, rm);
+        let n = n.atan(p, rm, &mut cc);
+        let mut pi = six.mul(&n, p, rm);
 
         // Reduce precision to 1024
-        pi.set_precision(1024, rm).unwrap();
+        pi.set_precision(1024, rm).expect("Precision updated");
 
         // Use library's constant for verifying the result
-        let pi_lib = cc.pi(1024, rm).unwrap();
+        let pi_lib = cc.pi(1024, rm).unwrap().into();
 
         // Compare computed constant with library's constant
-        assert!(pi.cmp(&pi_lib) == 0);
+        assert_eq!(pi.cmp(&pi_lib), Some(0));
 
-        let _s = pi.format(Radix::Dec, rm).unwrap();
-        //println!("{}", s);
+        // Print using decimal radix.
+        //println!("{}", pi);
     }
 }

@@ -41,7 +41,7 @@ lazy_static! {
     pub static ref TWO: BigFloat = BigFloat { inner: Flavor::Value(BigFloatNumber::from_word(2, DEFAULT_P).expect("Constant TWO initialized")) };
 }
 
-/// Number representation.
+/// A floating point number of arbitrary precision.
 #[derive(Debug)]
 pub struct BigFloat {
     inner: Flavor,
@@ -689,7 +689,7 @@ impl BigFloat {
     /// Computes the arctangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
     /// Precision is rounded upwards to the word size.
-    pub fn atan(&self, rm: RoundingMode, p: usize, cc: &mut Consts) -> Self {
+    pub fn atan(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v) => Self::result_to_ext(v.atan(p, rm, cc), v.is_zero(), true),
             Flavor::Inf(s) => Self::result_to_ext(Self::half_pi(*s, p, rm, cc), false, true),
@@ -700,7 +700,7 @@ impl BigFloat {
     /// Computes the hyperbolic tangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
     /// Precision is rounded upwards to the word size.
-    pub fn tanh(&self, rm: RoundingMode, p: usize, cc: &mut Consts) -> Self {
+    pub fn tanh(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v) => Self::result_to_ext(v.tanh(p, rm, cc), v.is_zero(), true),
             Flavor::Inf(s) => Self::from_i8(s.as_int(), p),
@@ -1804,9 +1804,9 @@ mod tests {
         let p = rand_p();
         let mut half_pi: BigFloat = cc.pi(p, rm).unwrap().into();
         half_pi.set_exponent(1);
-        assert!(INF_NEG.atan(rm, p, &mut cc).cmp(&half_pi.neg()) == Some(0));
-        assert!(INF_POS.atan(rm, p, &mut cc).cmp(&half_pi) == Some(0));
-        assert!(NAN.atan(rm, rand_p(), &mut cc).is_nan());
+        assert!(INF_NEG.atan(p, rm, &mut cc).cmp(&half_pi.neg()) == Some(0));
+        assert!(INF_POS.atan(p, rm, &mut cc).cmp(&half_pi) == Some(0));
+        assert!(NAN.atan(rand_p(), rm, &mut cc).is_nan());
 
         assert!(INF_NEG.sinh(rand_p(), rm, &mut cc).is_inf_neg());
         assert!(INF_POS.sinh(rand_p(), rm, &mut cc).is_inf_pos());
@@ -1816,9 +1816,9 @@ mod tests {
         assert!(INF_POS.cosh(rand_p(), rm, &mut cc).is_inf_pos());
         assert!(NAN.cosh(rand_p(), rm, &mut cc).is_nan());
 
-        assert!(INF_NEG.tanh(rm, rand_p(), &mut cc).cmp(&ONE.neg()) == Some(0));
-        assert!(INF_POS.tanh(rm, rand_p(), &mut cc).cmp(&ONE) == Some(0));
-        assert!(NAN.tanh(rm, rand_p(), &mut cc).is_nan());
+        assert!(INF_NEG.tanh(rand_p(), rm, &mut cc).cmp(&ONE.neg()) == Some(0));
+        assert!(INF_POS.tanh(rand_p(), rm, &mut cc).cmp(&ONE) == Some(0));
+        assert!(NAN.tanh(rand_p(), rm, &mut cc).is_nan());
 
         assert!(INF_NEG.asinh(rand_p(), rm, &mut cc).is_inf_neg());
         assert!(INF_POS.asinh(rand_p(), rm, &mut cc).is_inf_pos());
