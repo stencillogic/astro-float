@@ -1608,6 +1608,9 @@ mod tests {
         assert!(ONE.cmp(&INF_NEG).unwrap() > 0);
         assert!(INF_NEG.cmp(&ONE).unwrap() < 0);
         assert!(INF_NEG.cmp(&INF_NEG).unwrap() == 0);
+        assert!(INF_POS.cmp(&INF_NEG).unwrap() > 0);
+        assert!(INF_NEG.cmp(&INF_POS).unwrap() < 0);
+        assert!(INF_POS.cmp(&INF_POS).unwrap() == 0);
         assert!(ONE.cmp(&NAN).is_none());
         assert!(NAN.cmp(&ONE).is_none());
         assert!(INF_POS.cmp(&NAN).is_none());
@@ -1615,6 +1618,24 @@ mod tests {
         assert!(INF_NEG.cmp(&NAN).is_none());
         assert!(NAN.cmp(&INF_NEG).is_none());
         assert!(NAN.cmp(&NAN).is_none());
+
+        assert!(ONE.abs_cmp(&ONE).unwrap() == 0);
+        assert!(ONE.abs_cmp(&INF_POS).unwrap() < 0);
+        assert!(INF_POS.abs_cmp(&ONE).unwrap() > 0);
+        assert!(INF_POS.abs_cmp(&INF_POS).unwrap() == 0);
+        assert!(ONE.abs_cmp(&INF_NEG).unwrap() < 0);
+        assert!(INF_NEG.abs_cmp(&ONE).unwrap() > 0);
+        assert!(INF_NEG.abs_cmp(&INF_NEG).unwrap() == 0);
+        assert!(INF_POS.abs_cmp(&INF_NEG).unwrap() == 0);
+        assert!(INF_NEG.abs_cmp(&INF_POS).unwrap() == 0);
+        assert!(INF_POS.abs_cmp(&INF_POS).unwrap() == 0);
+        assert!(ONE.abs_cmp(&NAN).is_none());
+        assert!(NAN.abs_cmp(&ONE).is_none());
+        assert!(INF_POS.abs_cmp(&NAN).is_none());
+        assert!(NAN.abs_cmp(&INF_POS).is_none());
+        assert!(INF_NEG.abs_cmp(&NAN).is_none());
+        assert!(NAN.abs_cmp(&INF_NEG).is_none());
+        assert!(NAN.abs_cmp(&NAN).is_none());
 
         assert!(ONE.is_positive());
         assert!(!ONE.is_negative());
