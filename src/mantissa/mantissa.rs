@@ -275,9 +275,28 @@ impl Mantissa {
             // m1 1XXXX00000000   - m1 and trailing zeroes
             // m2 000000001XXXX   - m2_shift, m2
 
-            let mut m3 = Mantissa::new(self.len() * WORD_BIT_SIZE)?;
+            let m3l = self.len().max(p + 1);
+            let mut m3 = Mantissa::new(m3l * WORD_BIT_SIZE)?;
 
-            m3.m.copy_from_slice(&self.m);
+            // subtract 1
+            let m1iter = ExtendedSlice::new(self.m.iter(), m3l - self.len(), &0);
+            let m3iter = m3.m.iter_mut();
+
+            c = 1;
+            for (d, &a) in izip!(m3iter, m1iter) {
+                if c > 0 {
+                    if a == 0 {
+                        *d = WORD_MAX;
+                    } else {
+                        *d = a - c;
+                        c = 0;
+                    }
+                } else {
+                    *d = a;
+                }
+            }
+
+            debug_assert!(c == 0);
 
             (m3, 0)
         } else {
@@ -358,18 +377,6 @@ impl Mantissa {
             debug_assert!(c == 0);
             c = 1;
 
-            if full_prec {
-                m3.m.trunc_trailing_zeroes();
-            } else if m3.len() < p {
-                let n = m3.len();
-                m3.m.try_extend(p * WORD_BIT_SIZE)?;
-                m3.m[..p - n].fill(0);
-            } else if m3.len() > p {
-                let rndres = m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive);
-                debug_assert!(!rndres);
-                m3.m.trunc_to(p * WORD_BIT_SIZE);
-            }
-
             (m3, c)
         } else {
             let l2 = (m2_shift + WORD_BIT_SIZE - 2) / WORD_BIT_SIZE;
@@ -379,9 +386,17 @@ impl Mantissa {
                 // m1 1XXXX00000000   - m1 and trailing zeroes
                 // m2 000000001XXXX   - m2_shift, m2
 
-                let mut m3 = Mantissa::new(self.len() * WORD_BIT_SIZE)?;
+                let mut m3 = Mantissa::new((p + 1) * WORD_BIT_SIZE)?;
 
-                m3.m.copy_from_slice(&self.m);
+                if m3.len() >= self.m.len() {
+                    let l = m3.len() - self.len();
+                    m3.m[l..].copy_from_slice(&self.m);
+                } else {
+                    let l = self.len() - m3.len();
+                    m3.m.copy_from_slice(&self.m[l..]);
+                }
+
+                m3.m[0] |= 1; // add sticky for rounding
 
                 (m3, 0)
             } else {
@@ -406,38 +421,27 @@ impl Mantissa {
                     c = add_carry(*a, b, c, d);
                 }
 
-                if full_prec {
-                    if c > 0 {
-                        m3.shift_right(1);
-
-                        let l = m3.m.len();
-                        m3.m[l - 1] |= WORD_SIGNIFICANT_BIT;
-                    }
-
-                    m3.m.trunc_trailing_zeroes();
-                } else {
-                    if c > 0 {
-                        m3.shift_right(1);
-
-                        let l = m3.m.len();
-                        m3.m[l - 1] |= WORD_SIGNIFICANT_BIT;
-                    }
-
-                    if m3.len() < p {
-                        let n = m3.len();
-                        m3.m.try_extend(p * WORD_BIT_SIZE)?;
-                        m3.m[..p - n].fill(0);
-                    } else if m3.len() > p {
-                        let rndres =
-                            m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive); // it is not possible that rounding overflows, and c > 0 at the same time.
-                        debug_assert!(!rndres);
-                        m3.m.trunc_to(p * WORD_BIT_SIZE);
-                    }
+                if c > 0 {
+                    m3.shift_right(1);
+                    let l = m3.m.len();
+                    m3.m[l - 1] |= WORD_SIGNIFICANT_BIT;
                 }
 
                 (m3, c)
             }
         };
+
+        if full_prec {
+            m3.m.trunc_trailing_zeroes();
+        } else if m3.len() < p {
+            let n = m3.len();
+            m3.m.try_extend(p * WORD_BIT_SIZE)?;
+            m3.m[..p - n].fill(0);
+        } else if m3.len() > p {
+            let rndres = m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive); // it is not possible that rounding overflows, and c > 0 at the same time.
+            debug_assert!(!rndres);
+            m3.m.trunc_to(p * WORD_BIT_SIZE);
+        }
 
         m3.n = m3.max_bit_len();
 
@@ -793,7 +797,7 @@ impl Mantissa {
         self.len() * WORD_BIT_SIZE
     }
 
-    // Round n positons, return true if exponent is to be incremented.
+    // Round n positions, return true if exponent is to be incremented.
     pub fn round_mantissa(&mut self, n: usize, rm: RoundingMode, is_positive: bool) -> bool {
         if rm == RoundingMode::None {
             return false;
@@ -801,85 +805,110 @@ impl Mantissa {
 
         let self_len = self.m.len();
         if n > 0 && n < self.max_bit_len() {
-            let n = n - 1;
-            let mut rem_zero = true;
+            let mut i;
+            let mut t;
+            let mut c = false;
 
-            // anything before n'th word becomes 0
-            for v in &mut self.m[..n / WORD_BIT_SIZE] {
-                if *v != 0 {
+            if rm == RoundingMode::ToEven || rm == RoundingMode::ToOdd {
+                let n = n - 1;
+                let mut rem_zero = true;
+
+                // anything before n'th word becomes 0
+                for v in &mut self.m[..n / WORD_BIT_SIZE] {
+                    if *v != 0 {
+                        rem_zero = false;
+                    }
+                    *v = 0;
+                }
+
+                // analyze bits at n and at n+1
+                // to decide if we need to add 1 or not.
+                let np1 = n + 1;
+                i = n / WORD_BIT_SIZE;
+                t = n % WORD_BIT_SIZE;
+                let ip1 = np1 / WORD_BIT_SIZE;
+                let tp1 = np1 % WORD_BIT_SIZE;
+                let num = (self.m[i] >> t) & 1;
+                if t > 0 && self.m[i] << (WORD_BIT_SIZE - t) as Word != 0 {
                     rem_zero = false;
                 }
-                *v = 0;
+
+                let nump1 = if ip1 < self_len { (self.m[ip1] >> tp1) & 1 } else { 0 };
+
+                let eq1 = num == 1 && rem_zero;
+                let gt1 = num == 1 && !rem_zero;
+
+                match rm {
+                    RoundingMode::ToEven => {
+                        if gt1 || (eq1 && (nump1 & 1) != 0) {
+                            // add 1
+                            c = true;
+                        }
+                    }
+                    RoundingMode::ToOdd => {
+                        if gt1 || (eq1 && (nump1 & 1) == 0) {
+                            // add 1
+                            c = true;
+                        }
+                    }
+                    _ => unreachable!(),
+                };
+
+                if c {
+                    // add 1 at (n+1)'th position
+                    if ip1 > i {
+                        self.m[i] = 0;
+                    }
+                    i = ip1;
+                    t = tp1;
+                } else {
+                    t += 1;
+                }
+            } else {
+                let mut rem_zero = true;
+
+                // anything before n'th word becomes 0
+                for v in &mut self.m[..n / WORD_BIT_SIZE] {
+                    if *v != 0 {
+                        rem_zero = false;
+                    }
+                    *v = 0;
+                }
+
+                i = n / WORD_BIT_SIZE;
+                t = n % WORD_BIT_SIZE;
+                if t > 0 && self.m[i] << (WORD_BIT_SIZE - t) as Word != 0 {
+                    rem_zero = false;
+                }
+
+                match rm {
+                    RoundingMode::ToZero => {}
+                    RoundingMode::FromZero => {
+                        if !rem_zero {
+                            // add 1
+                            c = true;
+                        }
+                    }
+                    RoundingMode::Up => {
+                        if !rem_zero && is_positive {
+                            // add 1
+                            c = true;
+                        }
+                    }
+                    RoundingMode::Down => {
+                        if !rem_zero && !is_positive {
+                            // add 1
+                            c = true;
+                        }
+                    }
+                    _ => unreachable!(),
+                };
             }
-
-            // analyze words at n and at n+1
-            // to decide if we need to add 1 or not.
-            let mut c = false;
-            let np1 = n + 1;
-            let mut i = n / WORD_BIT_SIZE;
-            let i1 = np1 / WORD_BIT_SIZE;
-            let t = n % WORD_BIT_SIZE;
-            let t2 = np1 % WORD_BIT_SIZE;
-            let num = (self.m[i] >> t) & 1;
-            if t > 0 && self.m[i] << (WORD_BIT_SIZE - t) as Word != 0 {
-                rem_zero = false;
-            }
-
-            let num2 = if i1 < self_len { (self.m[i1] >> t2) & 1 } else { 0 };
-
-            let eq1 = num == 1 && rem_zero;
-            let gt1 = num == 1 && !rem_zero;
-            let gte1 = num == 1;
-
-            match rm {
-                RoundingMode::Up => {
-                    if gte1 && is_positive || gt1 && !is_positive {
-                        // add 1
-                        c = true;
-                    }
-                }
-                RoundingMode::Down => {
-                    if gt1 && is_positive || gte1 && !is_positive {
-                        // add 1
-                        c = true;
-                    }
-                }
-                RoundingMode::FromZero => {
-                    if gte1 {
-                        // add 1
-                        c = true;
-                    }
-                }
-                RoundingMode::ToZero => {
-                    if gt1 {
-                        // add 1
-                        c = true;
-                    }
-                }
-                RoundingMode::ToEven => {
-                    if gt1 || (eq1 && (num2 & 1) != 0) {
-                        // add 1
-                        c = true;
-                    }
-                }
-                RoundingMode::ToOdd => {
-                    if gt1 || (eq1 && (num2 & 1) == 0) {
-                        // add 1
-                        c = true;
-                    }
-                }
-                RoundingMode::None => unreachable!(),
-            };
 
             if c {
-                // add 1 at (n+1)'th position
-                if i1 > i {
-                    self.m[i] = 0;
-                }
-                i = i1;
                 if i < self_len {
-                    if (self.m[i] >> t2) as DoubleWord + 1 < (WORD_BASE >> t2) {
-                        self.m[i] = ((self.m[i] >> t2) + 1) << t2;
+                    if (self.m[i] >> t) as DoubleWord + 1 < (WORD_BASE >> t) {
+                        self.m[i] = ((self.m[i] >> t) + 1) << t;
                         return false;
                     } else {
                         self.m[i] = 0;
@@ -900,8 +929,7 @@ impl Mantissa {
                 self.m[self_len - 1] = WORD_SIGNIFICANT_BIT;
                 return true;
             } else {
-                // just remove trailing words
-                let t = t + 1;
+                // just remove trailing bits
                 self.m[i] = if t >= WORD_BIT_SIZE { 0 } else { (self.m[i] >> t) << t };
             }
         }

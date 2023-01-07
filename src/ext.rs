@@ -1264,6 +1264,9 @@ pub mod ops {
     use crate::BigFloat;
     use crate::Radix;
 
+    use core::fmt::Binary;
+    use core::fmt::Octal;
+    use core::fmt::UpperHex;
     use core::{
         cmp::Eq, cmp::Ordering, cmp::PartialEq, cmp::PartialOrd, fmt::Display, fmt::Formatter,
         ops::Neg, str::FromStr,
@@ -1357,6 +1360,24 @@ pub mod ops {
     impl Display for BigFloat {
         fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
             self.write_str(f, Radix::Dec, DEFAULT_RM)
+        }
+    }
+
+    impl Binary for BigFloat {
+        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
+            self.write_str(f, Radix::Bin, DEFAULT_RM)
+        }
+    }
+
+    impl Octal for BigFloat {
+        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
+            self.write_str(f, Radix::Oct, DEFAULT_RM)
+        }
+    }
+
+    impl UpperHex for BigFloat {
+        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
+            self.write_str(f, Radix::Hex, DEFAULT_RM)
         }
     }
 

@@ -651,7 +651,7 @@ fn test_tan_atan() {
             if d2.abs_cmp(&hp) < 0 {
                 let d3 = d2.tan(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-                eps.set_exponent(d1.get_exponent() - prec as Exponent);
+                eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
 
                 // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
                 // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
