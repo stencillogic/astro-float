@@ -1,8 +1,44 @@
+//! This test suite performs comparison of mpfr and astro-float at bit level.
+
+use std::ops::Add;
+
 use astro_float::{WORD_BIT_SIZE, BigFloat, EXPONENT_MIN, EXPONENT_MAX, Exponent, RoundingMode, Radix};
 use rand::random;
 use rug::{Float, float::{exp_min, exp_max}};
-use gmp_mpfr_sys::{mpfr, gmp::exp_t};
+use gmp_mpfr_sys::{mpfr::{self, rnd_t}, gmp::exp_t};
 
+
+macro_rules! test_astro_op {
+    ($n1:ident, $n2:ident, $astro_op:ident, $f1:ident, $f2:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_name:literal) => {
+        let n3 = BigFloat::$astro_op(&($n1), &($n2), $p, $rm);
+
+        let mut f3 = Float::with_val($p as u32, 1);
+
+        unsafe { mpfr::$mpfr_op(f3.as_raw_mut(), ($f1).as_raw(), ($f2).as_raw(), $rnd) };
+
+        // println!("\n{:b}\n{}", $n1, $f1.to_string_radix(2, None));
+        // println!("\n{:b}\n{}", $n2, $f2.to_string_radix(2, None));
+
+        if n3.is_inf() {
+            let ovf = unsafe { mpfr::overflow_p() };
+            assert!(ovf != 0);
+            if n3.is_positive() {
+                assert!(f3.is_sign_positive());
+            } else {
+                assert!(f3.is_sign_negative());
+            }
+        } else if n3.is_nan() {
+            assert!(f3.is_nan());
+        } else {
+            if n3.is_subnormal() || n3.is_zero() {
+                let unf = unsafe { mpfr::underflow_p() };
+                assert!(unf != 0);
+            } else {
+                assert_float_eq(n3, f3, $p, $op_name);
+            }
+        }
+    };
+}
 
 #[test]
 fn mpfr_compare() {
@@ -28,8 +64,8 @@ fn mpfr_compare() {
     println!("{:?}", n1.sub(&n2, 128, RoundingMode::None));
     return; */
 
-    // round
-    for _ in 0..10000 {
+    // rounding
+    for _ in 0..1000 {
         let p1 = (random::<usize>() % p_rng + 3) * WORD_BIT_SIZE;
         let p = p1 - random::<usize>() % WORD_BIT_SIZE;
 
@@ -45,38 +81,74 @@ fn mpfr_compare() {
     }
 
     // add, sub
-    for _ in 0..10000 {
+    for _ in 0..1000 {
         let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
 
         let (rm, rnd) = get_random_rnd_pair();
 
-        let (n1, f1) = get_float_pair(p1, -(p1 as Exponent), p1 as Exponent);
-        let (n2, f2) = get_float_pair(p2, -(p2 as Exponent), p2 as Exponent);
+        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, EXPONENT_MAX);
+        let n1e = n1.get_exponent().unwrap();
+        let (n2, f2) = get_float_pair(p2, n1e.saturating_sub(2 * (p2 + p1) as Exponent), n1e.saturating_add(2 * (p2 + p1) as Exponent));
 
         // println!("\n{:?}", rm);
         // println!("{:b}\n{}", n1, f1.to_string_radix(2, None));
         // println!("\n{:b}\n{}", n2, f2.to_string_radix(2, None));
 
-        // add
-        let n3 = n1.add(&n2, p, rm);
+        test_astro_op!(n1, n2, add, f1, f2, add, p, rm, rnd, "add");
+        test_astro_op!(n1, n2, sub, f1, f2, sub, p, rm, rnd, "sub");
+    }
+
+    // mul, div
+    for _ in 0..1000 {
+        let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+        let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+        let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+
+        let (rm, rnd) = get_random_rnd_pair();
+
+        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, EXPONENT_MAX);
+        let (n2, f2) = get_float_pair(p2, EXPONENT_MIN, EXPONENT_MAX);
+
+        // println!("\n{:?}", rm);
+        // println!("{:b}\n{}", n1, f1.to_string_radix(2, None));
+        // println!("\n{:b}\n{}", n2, f2.to_string_radix(2, None));
+
+        test_astro_op!(n1, n2, mul, f1, f2, mul, p, rm, rnd, "mul");
+        test_astro_op!(n1, n2, div, f1, f2, div, p, rm, rnd, "div");
+    }
+
+    // rem
+    for _ in 0..10000 {
+        let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+        let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+        let p = p1.max(p2);
+
+        let (_rm, rnd) = get_random_rnd_pair();
+
+        let (n1, mut f1) = get_float_pair(p1, EXPONENT_MIN / 2 - p1 as Exponent, EXPONENT_MAX / 2);
+        let (n2, mut f2) = get_float_pair(p2, EXPONENT_MIN / 2 - p2 as Exponent, EXPONENT_MAX / 2);
+        f1 = f1.abs();
+        f2 = f2.abs();
+
+        // println!("\nn1 f1\n{:b}\n{}", n1, f1.to_string_radix(2, None));
+        // println!("\nn2 f2\n{:b}\n{}", n2, f2.to_string_radix(2, None));
+
+        let mut n3 = n1.rem(&n2);
 
         let mut f3 = Float::with_val(p as u32, 1);
-        unsafe { mpfr::add(f3.as_raw_mut(), f1.as_raw(), f2.as_raw(), rnd) };
+        unsafe { mpfr::remainder(f3.as_raw_mut(), f1.as_raw(), f2.as_raw(), rnd) };
 
-        // println!("\n{:b}\n{}", n3, f3.to_string_radix(2, None));
-        // println!("\n{:b}", n1.add(&n2, p1.max(p2) + 1, rm));
+        n3 = n3.abs();  // n3 sign is set to the sign of n1.
 
-        assert_float_eq(n3, f3, p, "add");
+        if f3.is_sign_negative() {  // f3 can become negative because quotinent rounding.
+            f3 = f3.add(f2);
+        }
 
-        // sub
-        let n3 = n1.sub(&n2, p, rm);
+        // println!("\nn3 f3\n{:b}\n{}", n3, f3.to_string_radix(2, None));
 
-        let mut f3 = Float::with_val(p as u32, 1);
-        unsafe { mpfr::sub(f3.as_raw_mut(), f1.as_raw(), f2.as_raw(), rnd) };
-
-        assert_float_eq(n3, f3, p, "sub");
+        assert_float_eq(n3, f3, p, "rem");
     }
 }
 
@@ -99,32 +171,31 @@ fn assert_float_eq(n: BigFloat, f: Float, p: usize, op: &str) {
 
 fn conv_str_to_mpfr_compat(s: String) -> String {
     let (sig, exp) = s.split_at(s.find('e').unwrap() + 1);
-    let expn = i32::from_str_radix(exp, 2).unwrap();
+    let expn = i64::from_str_radix(exp, 2).unwrap();
     sig.to_owned() + &expn.to_string()
 }
 
 fn conv_str_from_mpfr_compat(s: String) -> String {
     if let Some(epos) = s.find('e') {
         let (sig, exp) = s.split_at(epos + 1);
-        let expn = exp.parse::<i32>().unwrap();
+        let expn = exp.parse::<i64>().unwrap();
         if expn < 0 {
             sig.to_owned() + "-" + &format!("{:b}", -expn)
         } else {
             sig.to_owned() + &format!("{:b}", expn)
         }
-        
     } else {
         s
     }
 }
 
-fn get_random_rnd_pair() -> (RoundingMode, mpfr::rnd_t) {
+fn get_random_rnd_pair() -> (RoundingMode, rnd_t) {
     match random::<u8>() % 5 {
-        0 => (RoundingMode::ToEven, mpfr::rnd_t::RNDN),
-        1 => (RoundingMode::Up, mpfr::rnd_t::RNDU),
-        2 => (RoundingMode::Down, mpfr::rnd_t::RNDD),
-        3 => (RoundingMode::FromZero, mpfr::rnd_t::RNDA),
-        4 => (RoundingMode::ToZero, mpfr::rnd_t::RNDZ),
+        0 => (RoundingMode::ToEven, rnd_t::RNDN),
+        1 => (RoundingMode::Up, rnd_t::RNDU),
+        2 => (RoundingMode::Down, rnd_t::RNDD),
+        3 => (RoundingMode::FromZero, rnd_t::RNDA),
+        4 => (RoundingMode::ToZero, rnd_t::RNDZ),
         _ => unreachable!(),
     }
 }

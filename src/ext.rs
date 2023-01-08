@@ -287,7 +287,7 @@ impl BigFloat {
         }
     }
 
-    /// Divides `self` by `d2` and returns the remainder.
+    /// Returns the remainder of division of `|self|` by `|d2|`. The sign of the result is set to the sign of `self`.
     pub fn rem(&self, d2: &Self) -> Self {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {

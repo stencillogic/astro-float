@@ -327,16 +327,21 @@ impl BigFloatNumber {
         Ok(ret)
     }
 
-    /// Divides `self` by `d2` and returns the remainder.
+    /// Returns the remainder of division of `|self|` by `|d2|`. The sign of the result is set to the sign of `self`.
     ///
     /// ## Errors
     ///
     ///  - DivisionByZero: `d2` is zero.
     ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - InvalidArgument: both `self` and `d2` are zero.
     pub fn rem(&self, d2: &Self) -> Result<Self, Error> {
         if d2.m.is_zero() {
-            return Err(Error::DivisionByZero);
+            return if self.is_zero() {
+                Err(Error::InvalidArgument)
+            } else {
+                Err(Error::DivisionByZero)
+            };
         }
 
         if self.m.is_zero() {
@@ -2270,7 +2275,7 @@ mod tests {
             .unwrap()
             .abs()
             .unwrap();
-            d2 = BigFloatNumber::random_normal(p2, d1.get_exponent() - 1, d1.get_exponent() + 1)
+            d2 = BigFloatNumber::random_normal(p2, d1.get_exponent() - 10, d1.get_exponent() + 10)
                 .unwrap()
                 .abs()
                 .unwrap();
