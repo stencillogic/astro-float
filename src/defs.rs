@@ -152,23 +152,23 @@ pub enum Radix {
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum RoundingMode {
     /// Skip rounding operation.
-    None,
+    None = 1,
 
     /// Round half toward positive infinity.
-    Up,
+    Up = 2,
 
     /// Round half toward negative infinity.
-    Down,
+    Down = 4,
 
     /// Round half toward zero.
-    ToZero,
+    ToZero = 8,
 
     /// Round half away from zero.
-    FromZero,
+    FromZero = 16,
 
     /// Round half to even.
-    ToEven,
+    ToEven = 32,
 
     /// Round half to odd.
-    ToOdd,
+    ToOdd = 64,
 }

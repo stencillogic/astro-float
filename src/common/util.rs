@@ -1,6 +1,9 @@
 //! Auxiliary functions.
 
-use crate::defs::{Word, WORD_BIT_SIZE, WORD_MAX, WORD_SIGNIFICANT_BIT};
+use crate::{
+    defs::{Word, WORD_BIT_SIZE, WORD_MAX, WORD_SIGNIFICANT_BIT},
+    RoundingMode,
+};
 
 #[cfg(test)]
 use crate::{BigFloatNumber, Sign, EXPONENT_MIN};
@@ -341,4 +344,15 @@ pub fn random_subnormal(p: usize) -> BigFloatNumber {
     let s = if rand::random::<u8>() & 1 == 0 { Sign::Pos } else { Sign::Neg };
 
     BigFloatNumber::from_raw_parts(&m, n, s, EXPONENT_MIN).unwrap()
+}
+
+// Convert rounding mode for an opposite sign.
+pub fn invert_rm_for_sign(rm: RoundingMode) -> RoundingMode {
+    if rm == RoundingMode::Up {
+        RoundingMode::Down
+    } else if rm == RoundingMode::Down {
+        RoundingMode::Up
+    } else {
+        rm
+    }
 }

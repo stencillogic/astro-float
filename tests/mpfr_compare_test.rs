@@ -2,7 +2,7 @@
 
 use std::ops::Add;
 
-use astro_float::{WORD_BIT_SIZE, BigFloat, EXPONENT_MIN, EXPONENT_MAX, Exponent, RoundingMode, Radix};
+use astro_float::{WORD_BIT_SIZE, BigFloat, EXPONENT_MIN, EXPONENT_MAX, Exponent, RoundingMode, Radix, Consts};
 use rand::random;
 use rug::{Float, float::{exp_min, exp_max}};
 use gmp_mpfr_sys::{mpfr::{self, rnd_t}, gmp::exp_t};
@@ -19,31 +19,40 @@ macro_rules! test_astro_op {
         // println!("\n{:b}\n{}", $n1, $f1.to_string_radix(2, None));
         // println!("\n{:b}\n{}", $n2, $f2.to_string_radix(2, None));
 
-        if n3.is_inf() {
-            let ovf = unsafe { mpfr::overflow_p() };
-            assert!(ovf != 0);
-            if n3.is_positive() {
-                assert!(f3.is_sign_positive());
-            } else {
-                assert!(f3.is_sign_negative());
-            }
-        } else if n3.is_nan() {
-            assert!(f3.is_nan());
-        } else {
-            if n3.is_subnormal() || n3.is_zero() {
-                let unf = unsafe { mpfr::underflow_p() };
-                assert!(unf != 0);
-            } else {
-                assert_float_eq(n3, f3, $p, $op_name);
-            }
-        }
+        assert_float_eq(n3, f3, $p, $op_name);
+    };
+    ($n1:ident, $astro_op:ident, $f1:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_name:literal) => {
+        let n3 = BigFloat::$astro_op(&($n1), $p, $rm);
+
+        let mut f3 = Float::with_val($p as u32, 1);
+
+        unsafe { mpfr::$mpfr_op(f3.as_raw_mut(), ($f1).as_raw(), $rnd) };
+
+        // println!("\n{:b}\n{}", $n1, $f1.to_string_radix(2, None));
+        // println!("\n{:b}\n{}", n3, f3.to_string_radix(2, None));
+
+        assert_float_eq(n3, f3, $p, $op_name);
+    };
+    ($n1:ident, $astro_op:ident, $f1:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_name:literal, $cc:ident) => {
+        let n3 = BigFloat::$astro_op(&($n1), $p, $rm, &mut $cc);
+
+        let mut f3 = Float::with_val($p as u32, 1);
+
+        unsafe { mpfr::$mpfr_op(f3.as_raw_mut(), ($f1).as_raw(), $rnd) };
+
+        // println!("\n{:b}\n{}", $n1, $f1.to_string_radix(2, None));
+        // println!("\n{:b}\n{}", n3, f3.to_string_radix(2, None));
+
+        assert_float_eq(n3, f3, $p, $op_name);
     };
 }
 
 #[test]
 fn mpfr_compare() {
-    let p_rng = 3; //157;    // >~ 10000 bit
+    let p_rng = 32; // 157;    // >~ 10000 bit
     let p_min = 1;
+
+    let mut cc = Consts::new().unwrap();
 
     unsafe {
         mpfr::set_emin(EXPONENT_MIN as exp_t);
@@ -120,7 +129,7 @@ fn mpfr_compare() {
     }
 
     // rem
-    for _ in 0..10000 {
+    for _ in 0..1000 {
         let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p = p1.max(p2);
@@ -150,6 +159,28 @@ fn mpfr_compare() {
 
         assert_float_eq(n3, f3, p, "rem");
     }
+
+    // sqrt, cbrt, ln, log2, log10, asinh
+    for _ in 0..1000 {
+        let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+        let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+
+        let (rm, rnd) = get_random_rnd_pair();
+        // println!("{:?}", rm);
+
+        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, EXPONENT_MAX);
+
+        // println!("{:?}", n1);
+
+        test_astro_op!(n1, sqrt, f1, sqrt, p, rm, rnd, "sqrt");
+        test_astro_op!(n1, cbrt, f1, cbrt, p, rm, rnd, "cbrt");
+
+        test_astro_op!(n1, ln, f1, log, p, rm, rnd, "ln", cc);
+        test_astro_op!(n1, log2, f1, log2, p, rm, rnd, "log2", cc);
+        test_astro_op!(n1, log10, f1, log10, p, rm, rnd, "log10", cc);
+        
+        test_astro_op!(n1, asinh, f1, asinh, p, rm, rnd, "asinh", cc);
+    }
 }
 
 fn get_float_pair(p: usize, emin: Exponent, emax: Exponent) -> (BigFloat, Float) {
@@ -163,10 +194,29 @@ fn get_float_pair(p: usize, emin: Exponent, emax: Exponent) -> (BigFloat, Float)
 }
 
 fn assert_float_eq(n: BigFloat, f: Float, p: usize, op: &str) {
-    let s1 = f.to_string_radix(2, None);
-    let s2 = conv_str_from_mpfr_compat(s1);
-    let n2 = BigFloat::parse(&s2, Radix::Bin, p, RoundingMode::None);
-    assert_eq!(n, n2, "{}", op);
+    if n.is_inf() {
+        // inf
+        let ovf = unsafe { mpfr::overflow_p() };
+        assert!(ovf != 0);
+        if n.is_positive() {
+            assert!(f.is_sign_positive());
+        } else {
+            assert!(f.is_sign_negative());
+        }
+    } else if n.is_nan() {
+        // nan
+        assert!(f.is_nan());
+    } else if n.is_subnormal() || n.is_zero() {
+        // subnormal
+        let unf = unsafe { mpfr::underflow_p() };
+        assert!(unf != 0);
+    } else {
+        // n == f
+        let s1 = f.to_string_radix(2, None);
+        let s2 = conv_str_from_mpfr_compat(s1);
+        let n2 = BigFloat::parse(&s2, Radix::Bin, p, RoundingMode::None);
+        assert_eq!(n, n2, "{}", op);
+    }
 }
 
 fn conv_str_to_mpfr_compat(s: String) -> String {
