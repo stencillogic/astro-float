@@ -19,3 +19,18 @@ impl BigFloatNumber {
         }
     }
 }
+
+
+/// fast compute for small argument (mpfr compatibility)
+#[macro_export(crate)]
+macro_rules! fast_compute_small_arg {
+    ($arg:ident, $factor:literal, $sign_inverse:literal, $p:ident, $rm:ident) => {
+        if $p as isize + 1 < -($arg.get_exponent() as isize) + 2 && $rm as u32 & 0b11110 != 0 {
+            let mut x = $arg.clone()?;
+            x.set_precision($p, RoundingMode::None)?;
+            let mut ret = x.add_correction($sign_inverse)?;
+            ret.set_precision($p, $rm)?;
+            return Ok(ret);
+        }
+    };
+}

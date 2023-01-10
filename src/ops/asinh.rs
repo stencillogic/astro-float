@@ -28,6 +28,11 @@ impl BigFloatNumber {
 
         let mut x = self.clone()?;
 
+        if self.is_zero() {
+            x.set_precision(p, RoundingMode::None)?;
+            return Ok(x);
+        }
+
         if self.get_exponent() as isize >= -(p as isize) / 6 {
             if (self.get_exponent() as isize - 1) / 2 > self.get_mantissa_max_bit_len() as isize + 2
             {
@@ -72,35 +77,37 @@ impl BigFloatNumber {
         } else {
             // short series: x - x^3/6 + 3*x^5/40 - 5*x^7/112
 
-            let mut p_x = p + 4;
+            let p_x = p + 4;
             x.set_precision(p_x, RoundingMode::None)?;
 
             let xx = x.mul(&x, p_x, RoundingMode::None)?;
             let x3 = xx.mul(&x, p_x, RoundingMode::None)?;
             let p1 = x3.div(&SIX, p_x, RoundingMode::None)?;
 
-            let mut ret = if p1.is_zero() && (rm as u32 & 0b11110 != 0) {
-                // since p1 it is too small there need to be an ajustment for flooring and ceiling rounding modes.
-                p_x = x.get_mantissa_max_bit_len() + 1;
-                let mut a = BigFloatNumber::min_positive(p_x)?;
-                a.set_sign(x.get_sign());
-                x.sub(&a, p_x, RoundingMode::None)
+            let mut ret = if p1.is_zero() {
+                if rm as u32 & 0b11110 != 0 {
+                    // since p1 it is too small there need to be an ajustment for flooring and ceiling rounding modes.
+                    x.add_correction(true)
+                } else {
+                    Ok(x)
+                }
             } else {
-                x.sub(&p1, p_x, RoundingMode::None)
-            }?;
+                x = x.sub(&p1, p_x, RoundingMode::None)?;
 
-            let x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
-            let p2 = x5.mul(&THREE, p_x, RoundingMode::None)?;
-            let p2 = p2.div(&FOURTY, p_x, RoundingMode::None)?;
+                let x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
+                let p2 = x5.mul(&THREE, p_x, RoundingMode::None)?;
+                let p2 = p2.div(&FOURTY, p_x, RoundingMode::None)?;
 
-            ret = if p2.is_zero() && (rm as u32 & 0b11110 != 0) {
-                // since p2 it is too small there need to be an ajustment for flooring and ceiling rounding modes.
-                p_x = x.get_mantissa_max_bit_len() + 1;
-                let mut a = BigFloatNumber::min_positive(p_x)?;
-                a.set_sign(x.get_sign());
-                ret.add(&a, p_x, RoundingMode::None)
-            } else {
-                ret.add(&p2, p_x, RoundingMode::None)
+                if p2.is_zero() {
+                    if rm as u32 & 0b11110 != 0 {
+                        // since p2 it is too small there need to be an ajustment for flooring and ceiling rounding modes.
+                        x.add_correction(false)
+                    } else {
+                        Ok(x)
+                    }
+                } else {
+                    x.add(&p2, p_x, RoundingMode::None)
+                }
             }?;
 
             ret.set_precision(p, rm)?;

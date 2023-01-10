@@ -49,7 +49,9 @@ macro_rules! test_astro_op {
 
 #[test]
 fn mpfr_compare() {
-    let p_rng = 32; // 157;    // >~ 10000 bit
+    let run_cnt = 1000;
+
+    let p_rng = 32; //157;    // >~ 10000 bit
     let p_min = 1;
 
     let mut cc = Consts::new().unwrap();
@@ -74,7 +76,7 @@ fn mpfr_compare() {
     return; */
 
     // rounding
-    for _ in 0..1000 {
+    for _ in 0..run_cnt {
         let p1 = (random::<usize>() % p_rng + 3) * WORD_BIT_SIZE;
         let p = p1 - random::<usize>() % WORD_BIT_SIZE;
 
@@ -90,7 +92,7 @@ fn mpfr_compare() {
     }
 
     // add, sub
-    for _ in 0..1000 {
+    for _ in 0..run_cnt {
         let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
@@ -110,7 +112,7 @@ fn mpfr_compare() {
     }
 
     // mul, div
-    for _ in 0..1000 {
+    for _ in 0..run_cnt {
         let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
@@ -129,7 +131,7 @@ fn mpfr_compare() {
     }
 
     // rem
-    for _ in 0..1000 {
+    for _ in 0..run_cnt {
         let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p = p1.max(p2);
@@ -160,26 +162,77 @@ fn mpfr_compare() {
         assert_float_eq(n3, f3, p, "rem");
     }
 
-    // sqrt, cbrt, ln, log2, log10, asinh
-    for _ in 0..1000 {
+    // n1 = -inf..log2(emax): sinh, cosh, tanh, exp
+    assert_eq!(core::mem::size_of::<Exponent>(), 4);
+    for _ in 0..run_cnt {
+        let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+        let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+
+        let (rm, rnd) = get_random_rnd_pair();
+        //println!("{:?}", rm);
+
+        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, 32);
+
+        //println!("{:?}", n1);
+
+        test_astro_op!(n1, exp, f1, exp, p, rm, rnd, "exp", cc);
+        test_astro_op!(n1, sinh, f1, sinh, p, rm, rnd, "sinh", cc);
+        test_astro_op!(n1, cosh, f1, cosh, p, rm, rnd, "cosh", cc);
+        test_astro_op!(n1, tanh, f1, tanh, p, rm, rnd, "tanh", cc);
+    }
+
+    // n1 = 1.0..+inf: acosh
+    for _ in 0..run_cnt {
+        let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+        let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+
+        let (rm, rnd) = get_random_rnd_pair();
+        //println!("{:?}", rm);
+
+        let (n1, f1) = get_float_pair(p1, 1, EXPONENT_MAX);
+
+        //println!("{:?}", n1);
+
+        test_astro_op!(n1, acosh, f1, acosh, p, rm, rnd, "acosh", cc);
+    }
+
+    // n1 = 0..1.0: acos, asin, atanh
+    for _ in 0..run_cnt {
         let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
 
         let (rm, rnd) = get_random_rnd_pair();
         // println!("{:?}", rm);
 
+        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, 0);
+
+        //println!("{:?}\n{:?}", n1, f1.to_string_radix(2, None));
+
+        test_astro_op!(n1, acos, f1, acos, p, rm, rnd, "acos", cc);
+        test_astro_op!(n1, asin, f1, asin, p, rm, rnd, "asin", cc);
+        test_astro_op!(n1, atanh, f1, atanh, p, rm, rnd, "atanh", cc);
+    }
+
+    // n1 = -inf..+inf: sqrt, cbrt, ln, log2, log10, asinh, atan
+    for _ in 0..run_cnt {
+        let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+        let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+
+        let (rm, rnd) = get_random_rnd_pair();
+        //println!("{:?}", rm);
+
         let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, EXPONENT_MAX);
 
-        // println!("{:?}", n1);
+        // println!("{:b}", n1);
+        // println!("{}", f1.to_string_radix(2, None));
 
         test_astro_op!(n1, sqrt, f1, sqrt, p, rm, rnd, "sqrt");
         test_astro_op!(n1, cbrt, f1, cbrt, p, rm, rnd, "cbrt");
-
         test_astro_op!(n1, ln, f1, log, p, rm, rnd, "ln", cc);
         test_astro_op!(n1, log2, f1, log2, p, rm, rnd, "log2", cc);
         test_astro_op!(n1, log10, f1, log10, p, rm, rnd, "log10", cc);
-        
         test_astro_op!(n1, asinh, f1, asinh, p, rm, rnd, "asinh", cc);
+        test_astro_op!(n1, atan, f1, atan, p, rm, rnd, "atan", cc);
     }
 }
 

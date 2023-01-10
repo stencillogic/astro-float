@@ -5,6 +5,7 @@ use crate::common::util::count_leading_ones;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
+use crate::fast_compute_small_arg;
 use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
 
@@ -20,6 +21,13 @@ impl BigFloatNumber {
     pub fn asin(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
         let p = round_p(p);
 
+        let mut x = self.clone()?;
+
+        if self.is_zero() {
+            x.set_precision(p, RoundingMode::None)?;
+            return Ok(x);
+        }
+
         if self.abs_cmp(&ONE) == 0 {
             let mut pi = cc.pi(p, rm)?;
 
@@ -29,12 +37,12 @@ impl BigFloatNumber {
             return Ok(pi);
         }
 
+        fast_compute_small_arg!(self, 2, false, p, rm);
+
         let mut additional_prec = 2;
         if self.get_exponent() == 0 {
             additional_prec += count_leading_ones(self.get_mantissa_digits());
         }
-
-        let mut x = self.clone()?;
 
         let p_x = p + additional_prec;
         x.set_precision(p_x, RoundingMode::None)?;

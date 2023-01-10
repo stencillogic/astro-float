@@ -509,12 +509,17 @@ impl Mantissa {
             m1.copy_from_slice(&self.m[self.m.len() - k..]);
         }
 
-        let (q, _r) = Self::div_unbalanced(&m1, &m2.m)?;
+        let (q, r) = Self::div_unbalanced(&m1, &m2.m)?;
 
         let mut e_shift = if q[q.len() - 1] > 0 { 1 } else { 0 };
 
         let n = q.len() * WORD_BIT_SIZE;
         let mut m3 = Mantissa { m: q, n };
+
+        // sticky
+        if r.iter().any(|&x| x != 0) {
+            m3.m[0] |= 1;
+        }
 
         let _ = Self::maximize(&mut m3.m);
         if m3.round_mantissa((extra_p + 1) * WORD_BIT_SIZE, rm, is_positive) {

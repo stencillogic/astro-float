@@ -71,6 +71,11 @@ impl BigFloatNumber {
         let p = round_p(p);
 
         let mut arg = self.clone()?;
+        if self.is_zero() {
+            arg.set_precision(p, RoundingMode::None)?;
+            return Ok(arg);
+        }
+
         arg.set_precision(p + 1, RoundingMode::None)?;
 
         let arg = arg.reduce_trig_arg(cc, RoundingMode::None)?;

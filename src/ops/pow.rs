@@ -42,6 +42,10 @@ impl BigFloatNumber {
             self.exp_positive_arg(p, cc)
         }?;
 
+        if rm as u32 & 0b11110 != 0 && ret.get_exponent() == 1 && ret.cmp(&ONE) == 0 {
+            ret = ret.add_correction(self.is_negative())?;
+        }
+
         ret.set_precision(p, rm)?;
 
         Ok(ret)
@@ -133,7 +137,7 @@ impl BigFloatNumber {
     fn expf(self, rm: RoundingMode) -> Result<Self, Error> {
         let p = self.get_mantissa_max_bit_len();
 
-        let sh = self.sinh_series(p, rm)?; // faster convergence than direct series
+        let sh = self.sinh_series(p, rm, false)?; // faster convergence than direct series
 
         // e = sh + sqrt(sh^2 + 1)
         let sq = sh.mul(&sh, p, rm)?;

@@ -125,7 +125,7 @@ impl BigFloatNumber {
         let p_ext = p + additional_prec;
         x.set_precision(p_ext, RoundingMode::None)?;
 
-        let p1 = Self::ln_series(x, RoundingMode::None)?;
+        let p1 = Self::ln_series(x, RoundingMode::None, rm as u32 & 0b11110 != 0)?;
 
         let mut ret = if e == 0 {
             p1
@@ -146,7 +146,7 @@ impl BigFloatNumber {
         Ok(ret)
     }
 
-    fn ln_series(mut x: Self, rm: RoundingMode) -> Result<Self, Error> {
+    fn ln_series(mut x: Self, rm: RoundingMode, with_correction: bool) -> Result<Self, Error> {
         let p = x.get_mantissa_max_bit_len();
         let mut polycoeff_gen = AtanhPolycoeffGen::new(p)?;
         let (reduction_times, niter) = series_cost_optimize::<
@@ -172,7 +172,7 @@ impl BigFloatNumber {
         let x_step = z.mul(&z, p, rm)?; // x^2
         let x_first = z.mul(&x_step, p, rm)?; // x^3
 
-        let ret = series_run(z, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
+        let ret = series_run(z, x_first, x_step, niter, &mut polycoeff_gen, with_correction)?;
 
         Self::ln_arg_restore(ret, reduction_times + 1)
     }
@@ -230,7 +230,7 @@ impl BigFloatNumber {
         let p_ext = p + additional_prec;
         x.set_precision(p_ext, RoundingMode::None)?;
 
-        let p1 = Self::ln_series(x, RoundingMode::None)?;
+        let p1 = Self::ln_series(x, RoundingMode::None, rm as u32 & 0b11110 != 0)?;
 
         let p2 = cc.ln_2(p_ext, RoundingMode::None)?;
 

@@ -37,7 +37,7 @@ impl BigFloatNumber {
             } else {
                 let mut x = self.clone()?;
                 x.set_exponent(x.get_exponent() + 1);
-                x.ln(p, RoundingMode::None, cc)
+                x.ln(p, rm, cc)
             }
         } else {
             // ln(x + sqrt(x*x - 1))

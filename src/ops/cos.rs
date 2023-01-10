@@ -110,12 +110,16 @@ impl BigFloatNumber {
     pub fn cos(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
         let p = round_p(p);
 
+        if self.is_zero() {
+            return Self::from_word(1, p);
+        }
+
         let mut arg1 = self.clone()?;
         arg1.set_precision(p + 1 + (-COS_EXP_THRES) as usize, RoundingMode::None)?;
 
         let arg1 = arg1.reduce_trig_arg(cc, RoundingMode::None)?;
 
-        let mut ret = arg1.cos_series(RoundingMode::None)?;
+        let mut ret = arg1.cos_series(RoundingMode::None, rm as u32 & 0b11110 != 0)?;
 
         if ret.get_exponent() < COS_EXP_THRES {
             // argument is close to pi / 2
@@ -128,7 +132,7 @@ impl BigFloatNumber {
 
             let arg2 = arg2.reduce_trig_arg(cc, RoundingMode::None)?;
 
-            ret = arg2.cos_series(RoundingMode::None)?;
+            ret = arg2.cos_series(RoundingMode::None, rm as u32 & 0b11110 != 0)?;
         }
 
         ret.set_precision(p, rm)?;
@@ -137,7 +141,7 @@ impl BigFloatNumber {
     }
 
     /// cosine series
-    pub(super) fn cos_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
+    pub(super) fn cos_series(mut self, rm: RoundingMode, with_correction: bool) -> Result<Self, Error> {
         // cos:  1 - x^2/2! + x^4/4! - x^6/6! + ...
 
         let p = self.get_mantissa_max_bit_len();
@@ -160,7 +164,7 @@ impl BigFloatNumber {
         let x_step = arg.mul(&arg, p_arg, rm)?; // x^2
         let x_first = x_step.clone()?; // x^2
 
-        let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
+        let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, with_correction)?;
 
         if reduction_times > 0 {
             ret.cos_arg_restore(reduction_times, rm)

@@ -25,7 +25,12 @@ impl BigFloatNumber {
 
         let mut x = self.clone()?;
 
-        if self.get_exponent() as isize >= -(p as isize) / 6 {
+        if self.is_zero() {
+            x.set_precision(p, RoundingMode::None)?;
+            return Ok(x);
+        }
+
+        let mut ret = if self.get_exponent() as isize >= -(p as isize) / 6 {
             // (e^(2*x) - 1) / (e^(2*x) + 1)
 
             let mut additional_prec = 2;
@@ -55,11 +60,7 @@ impl BigFloatNumber {
             let d1 = xexp.sub(&ONE, p_x, RoundingMode::None)?;
             let d2 = xexp.add(&ONE, p_x, RoundingMode::None)?;
 
-            let mut ret = d1.div(&d2, p_x, RoundingMode::None)?;
-
-            ret.set_precision(p, rm)?;
-
-            Ok(ret)
+            d1.div(&d2, p_x, RoundingMode::None)?
         } else {
             // short series: x - x^3/3 + 2*x^5/15
 
@@ -70,18 +71,34 @@ impl BigFloatNumber {
             let x3 = xx.mul(&x, p_x, RoundingMode::None)?;
             let p1 = x3.div(&THREE, p_x, RoundingMode::None)?;
 
-            let mut ret = x.sub(&p1, p_x, RoundingMode::None)?;
+            if p1.is_zero() {
+                if rm as u32 & 0b11110 != 0 {
+                    x.add_correction(true)
+                } else {
+                    Ok(x)
+                }
+            } else {
+                let ret = x.sub(&p1, p_x, RoundingMode::None)?;
 
-            let mut x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
-            x5.set_exponent(x5.get_exponent() + 1);
-            let p2 = x5.div(&FIFTEEN, p_x, RoundingMode::None)?;
+                let mut x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
+                x5.set_exponent(x5.get_exponent() + 1);
+                let p2 = x5.div(&FIFTEEN, p_x, RoundingMode::None)?;
 
-            ret = ret.add(&p2, p_x, RoundingMode::None)?;
+                if p2.is_zero() {
+                    if rm as u32 & 0b11110 != 0 {
+                        ret.add_correction(false)
+                    } else {
+                        Ok(ret)
+                    }
+                } else {
+                    ret.add(&p2, p_x, RoundingMode::None)
+                }
+            }?
+        };
 
-            ret.set_precision(p, rm)?;
+        ret.set_precision(p, rm)?;
 
-            Ok(ret)
-        }
+        Ok(ret)
     }
 }
 

@@ -59,16 +59,22 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: when |`self`| > 1, or the precision is incorrect.
     pub fn atanh(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+        let p = round_p(p);
+
+        if self.is_zero() {
+            let mut x = self.clone()?;
+            x.set_precision(p, RoundingMode::None)?;
+            return Ok(x);
+        }
+
         if self.get_exponent() == 1 && self.abs_cmp(&ONE) == 0 {
             return Err(Error::ExponentOverflow(self.get_sign()));
         }
 
-        let p = round_p(p);
-
         let additional_prec = p / 6;
 
         // TODO: tune threshold for choosing between series computation and computation using ln
-        if self.get_exponent() as isize >= -(additional_prec as isize) {
+        let mut ret = if self.get_exponent() as isize >= -(additional_prec as isize) {
             // 0.5 * ln((1 + x) / (1 - x))
 
             let mut x = self.clone()?;
@@ -87,34 +93,32 @@ impl BigFloatNumber {
 
             let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
 
-            ret.set_precision(p, rm)?;
-
             if ret.get_exponent() == EXPONENT_MIN {
                 ret.subnormalize(ret.get_exponent() as isize - 1, rm);
             } else {
                 ret.set_exponent(ret.get_exponent() - 1);
             }
 
-            Ok(ret)
+            ret
         } else {
-            // series
+            // series: x + x^3/3 + x^5/5 + ...
 
             let mut x = self.clone()?;
 
             let p_x = p + 1;
-            x.set_precision(p_x, rm)?;
+            x.set_precision(p_x, RoundingMode::None)?;
 
             let mut polycoeff_gen = AtanhPolycoeffGen::new(p_x)?;
 
-            let x_step = x.mul(&x, p_x, rm)?; // x^2
-            let x_first = x.mul(&x_step, p_x, rm)?; // x^3
+            let x_step = x.mul(&x, p_x, RoundingMode::None)?; // x^2
+            let x_first = x.mul(&x_step, p_x, RoundingMode::None)?; // x^3
 
-            let mut ret = series_run(x, x_first, x_step, 1, &mut polycoeff_gen, rm)?;
+            series_run(x, x_first, x_step, 1, &mut polycoeff_gen, rm as u32 & 0b11110 != 0)?
+        };
 
-            ret.set_precision(p, rm)?;
+        ret.set_precision(p, rm)?;
 
-            Ok(ret)
-        }
+        Ok(ret)
     }
 }
 

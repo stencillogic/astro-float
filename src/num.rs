@@ -241,11 +241,13 @@ impl BigFloatNumber {
 
         Self::p_assertion(p)?;
 
-        if self.m.is_zero() || d2.m.is_zero() {
-            return Self::new(p);
-        }
-
         let s = if self.s == d2.s { Sign::Pos } else { Sign::Neg };
+
+        if self.m.is_zero() || d2.m.is_zero() {
+            let mut ret = Self::new(p)?;
+            ret.set_sign(s);
+            return Ok(ret);
+        }
 
         let (e1, m1_opt) = self.normalize()?;
         let m1_normalized = m1_opt.as_ref().unwrap_or(&self.m);
@@ -261,7 +263,9 @@ impl BigFloatNumber {
         }
         if e < EXPONENT_MIN as isize {
             if !Self::process_subnormal(&mut m3, &mut e, rm, s == Sign::Pos) {
-                return Self::new(p);
+                let mut ret = Self::new(p)?;
+                ret.set_sign(s);
+                return Ok(ret);
             }
         }
 
@@ -292,14 +296,16 @@ impl BigFloatNumber {
             };
         }
 
+        let s = if self.s == d2.s { Sign::Pos } else { Sign::Neg };
+
         if self.m.is_zero() {
-            return Self::new(p); // self / d2 = 0
+            let mut ret = Self::new(p)?; // self / d2 = 0
+            ret.set_sign(s);
+            return Ok(ret);
         }
 
         let p = round_p(p);
         Self::p_assertion(p)?;
-
-        let s = if self.s == d2.s { Sign::Pos } else { Sign::Neg };
 
         let (e1, m1_opt) = self.normalize()?;
         let m1_normalized = m1_opt.as_ref().unwrap_or(&self.m);
@@ -314,7 +320,9 @@ impl BigFloatNumber {
         }
         if e < EXPONENT_MIN as isize {
             if !Self::process_subnormal(&mut m3, &mut e, rm, s == Sign::Pos) {
-                return Self::new(p);
+                let mut ret = Self::new(p)?;
+                ret.set_sign(s);
+                return Ok(ret);
             }
         }
 
@@ -513,7 +521,9 @@ impl BigFloatNumber {
 
             if e < EXPONENT_MIN as isize {
                 if !Self::process_subnormal(&mut m3, &mut e, rm, d3.is_positive()) {
-                    return Self::new(p);
+                    let mut ret = Self::new(p)?;
+                    ret.set_sign(d3.s);
+                    return Ok(ret);
                 }
             }
             d3.e = e as Exponent;
@@ -536,7 +546,9 @@ impl BigFloatNumber {
             }
             if e < EXPONENT_MIN as isize {
                 if !Self::process_subnormal(&mut m3, &mut e, rm, d3.is_positive()) {
-                    return Self::new(p);
+                    let mut ret = Self::new(p)?;
+                    ret.set_sign(d3.s);
+                    return Ok(ret);
                 }
             }
             d3.e = e as Exponent;
@@ -590,6 +602,10 @@ impl BigFloatNumber {
     /// Compares `self` to `d2`.
     /// Returns positive if `self` is greater than `d2`, negative if `self` is smaller than `d2`, 0 otherwise.
     pub fn cmp(&self, d2: &Self) -> SignedWord {
+        if self.is_zero() && d2.is_zero() {
+            return 0;
+        }
+        
         if self.s != d2.s {
             return self.s as SignedWord;
         }
@@ -1263,6 +1279,15 @@ impl BigFloatNumber {
                 s: Sign::Pos,
             })
         }
+    }
+
+    // Add correction to x for flooring and ceiling rounding modes.
+    pub(crate) fn add_correction(&self, inv_corr_sign: bool) -> Result<Self, Error> {
+        let p = self.get_mantissa_max_bit_len() + 1;
+        let mut corr = BigFloatNumber::min_positive(p)?;
+        corr.set_exponent(self.get_exponent());
+        corr.set_sign(if inv_corr_sign { self.get_sign().invert() } else { self.get_sign() });
+        self.add(&corr, p, RoundingMode::None)
     }
 }
 

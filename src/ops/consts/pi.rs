@@ -73,7 +73,7 @@ pub struct PiCache {
 
 impl PiCache {
     fn calc_pi(p: &BigFloatNumber, q: &BigFloatNumber, k: usize) -> Result<BigFloatNumber, Error> {
-        // p*4270934400 / ((p + q*13591409) * sqrt(10005))
+        // q*4270934400 / ((p + q*13591409) * sqrt(10005))
         let n0 = BigFloatNumber::from_word(4270934400, 1)?;
         let n1 = BigFloatNumber::from_word(13591409, 1)?;
 
@@ -100,7 +100,6 @@ impl PiCache {
         let (p01, q01, r01) = pqr(0, 1)?;
 
         let val = Self::calc_pi(&p01, &q01, 1)?;
-
         Ok(PiCache {
             b: 1,
             pk: p01,
@@ -112,7 +111,7 @@ impl PiCache {
 
     /// Return value of PI with precision `k`.
     pub fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
-        let kext = k + 51;
+        let kext = (k + 46 + WORD_BIT_SIZE) / 47;
 
         if self.b <= kext {
             let mut pk;
@@ -126,7 +125,7 @@ impl PiCache {
                 (pk, qk, rk, bb) = pqr_inc(&pk, &qk, &rk, bb)?;
             }
 
-            let mut ret = Self::calc_pi(&pk, &qk, k + WORD_BIT_SIZE)?;
+            let mut ret = Self::calc_pi(&pk, &qk, bb * 47)?;
 
             self.val = ret.clone()?;
 
@@ -136,7 +135,6 @@ impl PiCache {
             self.qk = qk;
             self.rk = rk;
             self.b = bb;
-
             Ok(ret)
         } else {
             let mut ret = self.val.clone()?;

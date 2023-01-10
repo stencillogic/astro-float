@@ -61,6 +61,7 @@ impl ECache {
     }
 
     pub fn new() -> Result<Self, Error> {
+        // initial precision is large enough, as b_factor() requires it.
         let (p01, q01) = pq(0, 64)?;
 
         let val = Self::calc_e(&p01, &q01)?;
@@ -74,9 +75,20 @@ impl ECache {
     }
 
     fn b_factor(x: usize) -> usize {
+        // If we compute n elements of the series 1 + 1/1! + 1/2! + ... 
+        // then 1/(n!) is greater than the remaining part: sum(1/(k!)), k = n+1 .. +inf 
+        // (we can see it if we divide sum(1/(k!)) by 1/(n!)).
+        // So, for n parts the error is less than 1/(n!).
+        // Let p be the precision we need.
+        // From Stirling's approximation: 1/(n!) < (e/n)^n.
+        // From (e/n)^n < 1/(2^p) follows simplified, but more strict, inequality n*(log2(n) - 2) > p.
+        // Assume n = p / log2(p) - log2(log2(p)), and substitute in the inequality above, 
+        // then for large enough p the inequality is true.
         let ln = log2_floor(x);
         let lln = log2_floor(ln);
 
+        // to give higher estimate log2_floor is used, 
+        // and 3 is an empirical adjustment.
         x / (ln - lln - 3)
     }
 

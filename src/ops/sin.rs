@@ -108,11 +108,17 @@ impl BigFloatNumber {
         let p = round_p(p);
 
         let mut arg = self.clone()?;
+
+        if self.is_zero() {
+            arg.set_precision(p, RoundingMode::None)?;
+            return Ok(arg);
+        }
+        
         arg.set_precision(p + 1, RoundingMode::None)?;
 
         let arg = arg.reduce_trig_arg(cc, RoundingMode::None)?;
 
-        let mut ret = arg.sin_series(RoundingMode::None)?;
+        let mut ret = arg.sin_series(RoundingMode::None, rm as u32 & 0b11110 != 0)?;
 
         ret.set_precision(p, rm)?;
 
@@ -120,7 +126,7 @@ impl BigFloatNumber {
     }
 
     /// sine using series
-    pub(super) fn sin_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
+    pub fn sin_series(mut self, rm: RoundingMode, with_correction: bool) -> Result<Self, Error> {
         // sin:  x - x^3/3! + x^5/5! - x^7/7! + ...
 
         let p = self.get_mantissa_max_bit_len();
@@ -144,7 +150,7 @@ impl BigFloatNumber {
         let x_step = arg.mul(&arg, p_arg, rm)?; // x^2
         let x_first = arg.mul(&x_step, p_arg, rm)?; // x^3
 
-        let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
+        let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, with_correction)?;
 
         if reduction_times > 0 {
             ret.sin_arg_restore(reduction_times, rm)

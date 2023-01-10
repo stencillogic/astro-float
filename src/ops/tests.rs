@@ -17,19 +17,16 @@ fn ttt() {
 
     let _z = n.add(&m, 192, RoundingMode::None).unwrap();
 
-    //let mut cc = Consts::new().unwrap();
-    let s = "1.1011001110100011101100010111101011110001010010111111010101111100010100011100111000010011011011010000001001001010001110101110001011110001101111101100101011001011001000110101100000101011000100111111101101101100011111110111010010101011111101100011000001010000110000011111100111011110100000011001101001010100000011001010111e+0";
-    let n1 = BigFloatNumber::parse(s, crate::Radix::Bin, 320, RoundingMode::None).unwrap();
+    let mut cc = Consts::new().unwrap();
+    let s = "";
+    let n1 = BigFloatNumber::parse(s, crate::Radix::Bin, 2000, RoundingMode::None).unwrap();
     let s = "-1.101110101111000000011101000010110111011100110000010011011000001e+0";
     let n2 = BigFloatNumber::parse(s, crate::Radix::Bin, 64, RoundingMode::None).unwrap();
 
-    println!("{:?}", n1);
-    println!("{:?}", n2);
+    let v = cc.pi(1984, RoundingMode::ToEven).unwrap(); 
+    //let v = n1.atan(2000, RoundingMode::ToEven, &mut cc).unwrap();
 
-    let v = n1.div(&n2, WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
-
-    println!("{:?}", v);
-    println!("{}", v.format(crate::Radix::Dec, RoundingMode::None).unwrap());
+    println!("{}", v.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 } */
 
 #[test]

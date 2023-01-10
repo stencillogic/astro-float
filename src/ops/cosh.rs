@@ -94,9 +94,15 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: the precision is incorrect.
     pub fn cosh(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
+        let p = round_p(p);
+
         let mut arg = self.clone()?;
 
-        if self.get_exponent() > 0 {
+        if arg.is_zero() {
+            return Self::from_word(1, p);
+        }
+
+        let mut ret = if self.get_exponent() > 0 {
             arg.set_sign(Sign::Pos);
 
             let mut ret = if (self.get_exponent() as isize - 1) / 2
@@ -120,20 +126,19 @@ impl BigFloatNumber {
             }?;
 
             ret.set_exponent(ret.get_exponent() - 1);
-            ret.set_precision(p, rm)?;
 
-            Ok(ret)
+            ret
         } else {
-            let mut ret = arg.cosh_series(p, RoundingMode::None)?;
+            arg.cosh_series(p, RoundingMode::None, rm as u32 & 0b11110 != 0)?
+        };
 
-            ret.set_precision(p, rm)?;
+        ret.set_precision(p, rm)?;
 
-            Ok(ret)
-        }
+        Ok(ret)
     }
 
     /// cosh using series, for |x| < 1
-    pub(super) fn cosh_series(mut self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
+    pub(super) fn cosh_series(mut self, p: usize, rm: RoundingMode, with_correction: bool) -> Result<Self, Error> {
         let p = round_p(p);
 
         // cosh:  1 + x^2/2! + x^4/4! + x^6/6! + ...
@@ -157,7 +162,7 @@ impl BigFloatNumber {
         let x_step = arg.mul(&arg, p_arg, rm)?; // x^2
         let x_first = x_step.clone()?; // x^2
 
-        let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, rm)?;
+        let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, with_correction)?;
 
         if reduction_times > 0 {
             ret.cosh_arg_restore(reduction_times, rm)

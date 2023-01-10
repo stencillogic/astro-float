@@ -87,24 +87,16 @@ pub fn series_run<T: PolycoeffGen>(
     x_step: BigFloatNumber,
     niter: usize,
     polycoeff_gen: &mut T,
-    rm: RoundingMode,
+    with_correction: bool,
 ) -> Result<BigFloatNumber, Error> {
-    if x_first.is_zero() {
-        Ok(acc)
-    } else if x_step.is_zero() {
-        let p = acc
-            .get_mantissa_max_bit_len()
-            .max(x_first.get_mantissa_max_bit_len());
-        let is_div = polycoeff_gen.is_div();
-        let coeff = polycoeff_gen.next(rm)?;
-        let part = if is_div { x_first.div(coeff, p, rm) } else { x_first.mul(coeff, p, rm) }?;
-        acc.add(&part, p, rm)
+    if x_first.is_zero() || x_step.is_zero() {
+        series_compute_fast(acc, x_first, polycoeff_gen, with_correction)
     } else if niter >= RECT_ITER_THRESHOLD {
-        series_rectangular(niter, acc, x_first, x_step, polycoeff_gen, rm)
+        series_rectangular(niter, acc, x_first, x_step, polycoeff_gen, with_correction)
     } else if polycoeff_gen.is_div() {
-        series_linear(acc, x_first, x_step, polycoeff_gen, rm)
+        series_linear(acc, x_first, x_step, polycoeff_gen, with_correction)
     } else {
-        series_horner(acc, x_first, x_step, polycoeff_gen, rm)
+        series_horner(acc, x_first, x_step, polycoeff_gen, with_correction)
     }
 }
 
@@ -142,6 +134,59 @@ fn series_cost<T: PolycoeffGen>(niter: usize, p: usize, polycoeff_gen: &T) -> us
     }
 }
 
+// x_first or x_step is zero
+fn series_compute_fast<T: PolycoeffGen>(
+    acc: BigFloatNumber,
+    x_first: BigFloatNumber,
+    polycoeff_gen: &mut T,
+    with_correction: bool,
+) -> Result<BigFloatNumber, Error> {
+    if x_first.is_zero() {
+        if with_correction {
+            // add a small value representing inexactly the next-and-last part of the series;
+            // this plays role in rounding modes with ceiling or flooring.
+
+            let coeff = polycoeff_gen.next(RoundingMode::None)?;
+            let next_sign = coeff.mul(&x_first, 1, RoundingMode::None)?;
+
+            acc.add_correction(acc.get_sign() != next_sign.get_sign())
+        } else {
+            Ok(acc)
+        }
+    } else {
+        let p = acc
+            .get_mantissa_max_bit_len()
+            .max(x_first.get_mantissa_max_bit_len());
+
+        let is_div = polycoeff_gen.is_div();
+
+        let coeff = polycoeff_gen.next(RoundingMode::None)?;
+
+        let part = if is_div {
+            x_first.div(coeff, p, RoundingMode::None)
+        } else {
+            x_first.mul(coeff, p, RoundingMode::None)
+        }?;
+
+        if part.is_zero() {
+            if with_correction {
+                // add a small value representing inexactly the next-and-last part of the series
+                acc.add_correction(part.get_sign() != acc.get_sign())
+            } else {
+                Ok(acc)
+            }
+        } else {
+            let x = acc.add(&part, p, RoundingMode::None)?;
+            if with_correction && x.cmp(&acc) == 0 {
+                // add a small value representing inexactly the next-and-last part of the series
+                x.add_correction(part.get_sign() != acc.get_sign())
+            } else {
+                Ok(x)
+            }
+        }
+    }
+}
+
 // Rectangular series.
 // p is the result precision
 // niter is the estimated number of iterations
@@ -156,7 +201,7 @@ fn series_rectangular<T: PolycoeffGen>(
     x_first: BigFloatNumber,
     x_step: BigFloatNumber,
     polycoeff_gen: &mut T,
-    rm: RoundingMode,
+    with_correction: bool,
 ) -> Result<BigFloatNumber, Error> {
     debug_assert!(niter >= 4);
 
@@ -178,20 +223,20 @@ fn series_rectangular<T: PolycoeffGen>(
 
     for _ in 0..cache_sz {
         cache.push(x_pow.clone()?);
-        x_pow = x_pow.mul(&x_step, p, rm)?;
+        x_pow = x_pow.mul(&x_step, p, RoundingMode::None)?;
     }
 
     // run computation
-    let poly_val = compute_row(p, &cache, polycoeff_gen, rm)?;
-    acc = acc.add(&poly_val, p, rm)?;
+    let poly_val = compute_row(p, &cache, polycoeff_gen)?;
+    acc = acc.add(&poly_val, p, RoundingMode::None)?;
     let mut terminal_pow = x_pow.clone()?;
     niter -= cache_sz;
 
     loop {
-        let poly_val = compute_row(p, &cache, polycoeff_gen, rm)?;
-        let part = poly_val.mul(&terminal_pow, p, rm)?;
-        acc = acc.add(&part, p, rm)?;
-        terminal_pow = terminal_pow.mul(&x_pow, p, rm)?;
+        let poly_val = compute_row(p, &cache, polycoeff_gen)?;
+        let part = poly_val.mul(&terminal_pow, p, RoundingMode::None)?;
+        acc = acc.add(&part, p, RoundingMode::None)?;
+        terminal_pow = terminal_pow.mul(&x_pow, p, RoundingMode::None)?;
         niter -= cache_sz;
 
         if niter < cache_sz {
@@ -200,15 +245,15 @@ fn series_rectangular<T: PolycoeffGen>(
     }
     drop(cache);
 
-    acc = acc.mul(&x_first, p, rm)?;
-    terminal_pow = terminal_pow.mul(&x_first, p, rm)?;
-    acc = acc.add(&add, p, rm)?;
+    acc = acc.mul(&x_first, p, RoundingMode::None)?;
+    terminal_pow = terminal_pow.mul(&x_first, p, RoundingMode::None)?;
+    acc = acc.add(&add, p, RoundingMode::None)?;
 
     acc = if niter < MAX_CACHE * 10 && !polycoeff_gen.is_div() {
         // probably not too many iterations left
-        series_horner(acc, terminal_pow, x_step, polycoeff_gen, rm)
+        series_horner(acc, terminal_pow, x_step, polycoeff_gen, with_correction)
     } else {
-        series_linear(acc, terminal_pow, x_step, polycoeff_gen, rm)
+        series_linear(acc, terminal_pow, x_step, polycoeff_gen, with_correction)
     }?;
 
     Ok(acc)
@@ -221,7 +266,7 @@ fn series_linear<T: PolycoeffGen>(
     x_first: BigFloatNumber,
     x_step: BigFloatNumber,
     polycoeff_gen: &mut T,
-    rm: RoundingMode,
+    with_correction: bool,
 ) -> Result<BigFloatNumber, Error> {
     let p = acc
         .get_mantissa_max_bit_len()
@@ -232,17 +277,30 @@ fn series_linear<T: PolycoeffGen>(
     let mut x_pow = x_first;
 
     loop {
-        let coeff = polycoeff_gen.next(rm)?;
-        let part = if is_div { x_pow.div(coeff, p, rm) } else { x_pow.mul(coeff, p, rm) }?;
+        let coeff = polycoeff_gen.next(RoundingMode::None)?;
+        let part = if is_div { x_pow.div(coeff, p, RoundingMode::None) } else { x_pow.mul(coeff, p, RoundingMode::None) }?;
+
+        if part.is_zero() {
+            if with_correction {
+                // add a small value representing inexactly the next-and-last part of the series
+                acc = acc.add_correction(acc.get_sign() != part.get_sign())?;
+            }
+            break;
+        } else {
+            acc = acc.add(&part, p, RoundingMode::None)?;
+        }
 
         if part.get_exponent() as isize
             <= acc.get_exponent() as isize - acc.get_mantissa_max_bit_len() as isize
         {
+            if with_correction {
+                // add a small value representing inexactly the next-and-last part of the series
+                acc = acc.add_correction(acc.get_sign() != part.get_sign())?;
+            }
             break;
         }
 
-        acc = acc.add(&part, p, rm)?;
-        x_pow = x_pow.mul(&x_step, p, rm)?;
+        x_pow = x_pow.mul(&x_step, p, RoundingMode::None)?;
     }
 
     Ok(acc)
@@ -253,23 +311,22 @@ fn compute_row<T: PolycoeffGen>(
     p: usize,
     cache: &[BigFloatNumber],
     polycoeff_gen: &mut T,
-    rm: RoundingMode,
 ) -> Result<BigFloatNumber, Error> {
     let is_div = polycoeff_gen.is_div();
 
     let mut acc = BigFloatNumber::new(p)?;
-    let coeff = polycoeff_gen.next(rm)?;
+    let coeff = polycoeff_gen.next(RoundingMode::None)?;
     if is_div {
-        let r = coeff.reciprocal(p, rm)?;
-        acc = acc.add(&r, p, rm)?;
+        let r = coeff.reciprocal(p, RoundingMode::None)?;
+        acc = acc.add(&r, p, RoundingMode::None)?;
     } else {
-        acc = acc.add(coeff, p, rm)?;
+        acc = acc.add(coeff, p, RoundingMode::None)?;
     }
 
     for x_pow in cache {
-        let coeff = polycoeff_gen.next(rm)?;
-        let add = if is_div { x_pow.div(coeff, p, rm) } else { x_pow.mul(coeff, p, rm) }?;
-        acc = acc.add(&add, p, rm)?;
+        let coeff = polycoeff_gen.next(RoundingMode::None)?;
+        let add = if is_div { x_pow.div(coeff, p, RoundingMode::None) } else { x_pow.mul(coeff, p, RoundingMode::None) }?;
+        acc = acc.add(&add, p, RoundingMode::None)?;
     }
 
     Ok(acc)
@@ -282,7 +339,7 @@ fn series_horner<T: PolycoeffGen>(
     x_first: BigFloatNumber,
     x_step: BigFloatNumber,
     polycoeff_gen: &mut T,
-    rm: RoundingMode,
+    with_correction: bool,
 ) -> Result<BigFloatNumber, Error> {
     debug_assert!(x_first.e <= 0);
     debug_assert!(x_step.e <= 0);
@@ -299,24 +356,38 @@ fn series_horner<T: PolycoeffGen>(
     let mut coef_p = 0;
 
     while x_p + coef_p < p as isize - add.get_exponent() as isize {
-        let coeff = polycoeff_gen.next(rm)?;
+        let coeff = polycoeff_gen.next(RoundingMode::None)?;
         coef_p = (-coeff.e) as isize;
         x_p += (-x_step.e) as isize;
         cache.push(coeff.clone()?);
     }
 
-    let last_coeff = polycoeff_gen.next(rm)?;
+    let last_coeff = polycoeff_gen.next(RoundingMode::None)?;
     let mut acc = last_coeff.clone()?;
 
     for coeff in cache.iter().rev() {
-        acc = acc.mul(&x_step, p, rm)?;
-        acc = acc.add(coeff, p, rm)?;
+        acc = acc.mul(&x_step, p, RoundingMode::None)?;
+        acc = acc.add(coeff, p, RoundingMode::None)?;
     }
 
-    acc = acc.mul(&x_first, p, rm)?;
-    acc = acc.add(&add, p, rm)?;
+    acc = acc.mul(&x_first, p, RoundingMode::None)?;
 
-    Ok(acc)
+    if acc.is_zero() {
+        if  with_correction {
+            // add a small value representing inexactly the next-and-last part of the series
+            add.add_correction(add.get_sign() != acc.get_sign())
+        } else {
+            Ok(add)
+        }
+    } else {
+        let x = add.add(&acc, p, RoundingMode::None)?;
+        if with_correction && x.cmp(&add) == 0 {
+            // add a small value representing inexactly the next-and-last part of the series
+            x.add_correction(add.get_sign() != acc.get_sign())
+        } else {
+            Ok(x)
+        }
+    }
 }
 
 // Is it possbile to make it more effective than series_rect?
@@ -335,7 +406,7 @@ fn ndim_series<T: PolycoeffGen>(
     x_factor: BigFloatNumber,
     x_step: BigFloatNumber,
     polycoeff_gen: &mut T,
-    rm: RoundingMode,
+    with_correction: bool,
 ) -> Result<BigFloatNumber, Error> {
     debug_assert!((2..=8).contains(&n));
 
@@ -357,7 +428,7 @@ fn ndim_series<T: PolycoeffGen>(
 
         for _ in 0..cache_dim_sz {
             cache.push(x_pow.clone()?);
-            x_pow = x_pow.mul(&cache_step, p, rm)?;
+            x_pow = x_pow.mul(&cache_step, p, RoundingMode::None)?;
         }
     }
 
@@ -365,32 +436,30 @@ fn ndim_series<T: PolycoeffGen>(
     let poly_val = compute_cube(
         acc.get_mantissa_max_bit_len(),
         n - 1,
-        rm,
         &cache,
         cache_dim_sz,
         polycoeff_gen,
     )?;
-    acc = acc.add(&poly_val, p, rm)?;
+    acc = acc.add(&poly_val, p, RoundingMode::None)?;
     let mut terminal_pow = x_pow.clone()?;
 
     for _ in 1..cache_dim_sz {
         let poly_val = compute_cube(
             acc.get_mantissa_max_bit_len(),
             n - 1,
-            rm,
             &cache,
             cache_dim_sz,
             polycoeff_gen,
         )?;
-        let part = poly_val.mul(&terminal_pow, p, rm)?;
-        acc = acc.add(&part, p, rm)?;
-        terminal_pow = terminal_pow.mul(&x_pow, p, rm)?;
+        let part = poly_val.mul(&terminal_pow, p, RoundingMode::None)?;
+        acc = acc.add(&part, p, RoundingMode::None)?;
+        terminal_pow = terminal_pow.mul(&x_pow, p, RoundingMode::None)?;
     }
 
-    acc = acc.mul(&x_factor, p, rm)?;
-    terminal_pow = terminal_pow.mul(&x_factor, p, rm)?;
-    acc = acc.add(&add, p, rm)?;
-    acc = series_linear(acc, terminal_pow, x_step, polycoeff_gen, rm)?;
+    acc = acc.mul(&x_factor, p, RoundingMode::None)?;
+    terminal_pow = terminal_pow.mul(&x_factor, p, RoundingMode::None)?;
+    acc = acc.add(&add, p, RoundingMode::None)?;
+    acc = series_linear(acc, terminal_pow, x_step, polycoeff_gen, with_correction)?;
 
     Ok(acc)
 }
@@ -399,7 +468,6 @@ fn ndim_series<T: PolycoeffGen>(
 fn compute_cube<T: PolycoeffGen>(
     p: usize,
     n: usize,
-    rm: RoundingMode,
     cache: &[BigFloatNumber],
     cache_dim_sz: usize,
     polycoeff_gen: &mut T,
@@ -408,18 +476,18 @@ fn compute_cube<T: PolycoeffGen>(
         let mut acc = BigFloatNumber::new(p)?;
         let cache_dim_sz = cache_dim_sz;
         // no need to multityply the returned coefficient of the first cube by 1.
-        let poly_val = compute_cube(p, n - 1, rm, cache, cache_dim_sz, polycoeff_gen)?;
-        acc = acc.add(&poly_val, p, rm)?;
+        let poly_val = compute_cube(p, n - 1, cache, cache_dim_sz, polycoeff_gen)?;
+        acc = acc.add(&poly_val, p, RoundingMode::None)?;
 
         // the remaining require multiplication
         for x_pow in &cache[cache_dim_sz * (n - 1)..cache_dim_sz * n] {
-            let poly_val = compute_cube(p, n - 1, rm, cache, cache_dim_sz, polycoeff_gen)?;
-            let add = x_pow.mul(&poly_val, p, rm)?;
-            acc = acc.add(&add, p, rm)?;
+            let poly_val = compute_cube(p, n - 1, cache, cache_dim_sz, polycoeff_gen)?;
+            let add = x_pow.mul(&poly_val, p, RoundingMode::None)?;
+            acc = acc.add(&add, p, RoundingMode::None)?;
         }
 
         Ok(acc)
     } else {
-        compute_row(p, &cache[..cache_dim_sz], polycoeff_gen, rm)
+        compute_row(p, &cache[..cache_dim_sz], polycoeff_gen)
     }
 }
