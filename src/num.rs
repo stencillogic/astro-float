@@ -605,7 +605,7 @@ impl BigFloatNumber {
         if self.is_zero() && d2.is_zero() {
             return 0;
         }
-        
+
         if self.s != d2.s {
             return self.s as SignedWord;
         }

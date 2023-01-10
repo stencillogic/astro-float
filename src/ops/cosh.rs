@@ -138,7 +138,12 @@ impl BigFloatNumber {
     }
 
     /// cosh using series, for |x| < 1
-    pub(super) fn cosh_series(mut self, p: usize, rm: RoundingMode, with_correction: bool) -> Result<Self, Error> {
+    pub(super) fn cosh_series(
+        mut self,
+        p: usize,
+        rm: RoundingMode,
+        with_correction: bool,
+    ) -> Result<Self, Error> {
         let p = round_p(p);
 
         // cosh:  1 + x^2/2! + x^4/4! + x^6/6! + ...
@@ -162,7 +167,14 @@ impl BigFloatNumber {
         let x_step = arg.mul(&arg, p_arg, rm)?; // x^2
         let x_first = x_step.clone()?; // x^2
 
-        let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, with_correction)?;
+        let ret = series_run(
+            acc,
+            x_first,
+            x_step,
+            niter,
+            &mut polycoeff_gen,
+            with_correction,
+        )?;
 
         if reduction_times > 0 {
             ret.cosh_arg_restore(reduction_times, rm)

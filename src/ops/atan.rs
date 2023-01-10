@@ -117,7 +117,11 @@ impl BigFloatNumber {
     }
 
     /// arctan using series
-    pub(super) fn atan_series(mut self, rm: RoundingMode, with_correction: bool) -> Result<Self, Error> {
+    pub(super) fn atan_series(
+        mut self,
+        rm: RoundingMode,
+        with_correction: bool,
+    ) -> Result<Self, Error> {
         // atan:  x - x^3/3 + x^5/5 - x^7/7 + ...
 
         let p = self.get_mantissa_max_bit_len();
@@ -140,7 +144,14 @@ impl BigFloatNumber {
         let x_step = arg.mul(&arg, p_arg, rm)?; // x^2
         let x_first = arg.mul(&x_step, p_arg, rm)?; // x^3
 
-        let mut ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, with_correction)?;
+        let mut ret = series_run(
+            acc,
+            x_first,
+            x_step,
+            niter,
+            &mut polycoeff_gen,
+            with_correction,
+        )?;
 
         if reduction_times > 0 {
             ret.set_exponent(ret.get_exponent() + reduction_times as Exponent);

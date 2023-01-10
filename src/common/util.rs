@@ -323,7 +323,6 @@ pub fn round_p(p: usize) -> usize {
 /// Returns random subnormal number.
 #[cfg(test)]
 pub fn random_subnormal(p: usize) -> BigFloatNumber {
-
     let p = round_p(if p < 3 * WORD_BIT_SIZE { 3 * WORD_BIT_SIZE } else { p });
     let n = p - rand::random::<usize>() % (2 * WORD_BIT_SIZE) - 1;
     let mut m = Vec::with_capacity(p / WORD_BIT_SIZE);

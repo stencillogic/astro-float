@@ -278,7 +278,11 @@ fn series_linear<T: PolycoeffGen>(
 
     loop {
         let coeff = polycoeff_gen.next(RoundingMode::None)?;
-        let part = if is_div { x_pow.div(coeff, p, RoundingMode::None) } else { x_pow.mul(coeff, p, RoundingMode::None) }?;
+        let part = if is_div {
+            x_pow.div(coeff, p, RoundingMode::None)
+        } else {
+            x_pow.mul(coeff, p, RoundingMode::None)
+        }?;
 
         if part.is_zero() {
             if with_correction {
@@ -325,7 +329,11 @@ fn compute_row<T: PolycoeffGen>(
 
     for x_pow in cache {
         let coeff = polycoeff_gen.next(RoundingMode::None)?;
-        let add = if is_div { x_pow.div(coeff, p, RoundingMode::None) } else { x_pow.mul(coeff, p, RoundingMode::None) }?;
+        let add = if is_div {
+            x_pow.div(coeff, p, RoundingMode::None)
+        } else {
+            x_pow.mul(coeff, p, RoundingMode::None)
+        }?;
         acc = acc.add(&add, p, RoundingMode::None)?;
     }
 
@@ -373,7 +381,7 @@ fn series_horner<T: PolycoeffGen>(
     acc = acc.mul(&x_first, p, RoundingMode::None)?;
 
     if acc.is_zero() {
-        if  with_correction {
+        if with_correction {
             // add a small value representing inexactly the next-and-last part of the series
             add.add_correction(add.get_sign() != acc.get_sign())
         } else {

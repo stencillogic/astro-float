@@ -20,7 +20,6 @@ impl BigFloatNumber {
     }
 }
 
-
 /// fast compute for small argument (mpfr compatibility)
 #[macro_export(crate)]
 macro_rules! fast_compute_small_arg {

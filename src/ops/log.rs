@@ -172,7 +172,14 @@ impl BigFloatNumber {
         let x_step = z.mul(&z, p, rm)?; // x^2
         let x_first = z.mul(&x_step, p, rm)?; // x^3
 
-        let ret = series_run(z, x_first, x_step, niter, &mut polycoeff_gen, with_correction)?;
+        let ret = series_run(
+            z,
+            x_first,
+            x_step,
+            niter,
+            &mut polycoeff_gen,
+            with_correction,
+        )?;
 
         Self::ln_arg_restore(ret, reduction_times + 1)
     }

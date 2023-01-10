@@ -147,7 +147,12 @@ impl BigFloatNumber {
     }
 
     /// sinh using series, for |x| < 1
-    pub(super) fn sinh_series(mut self, p: usize, rm: RoundingMode, with_correction: bool) -> Result<Self, Error> {
+    pub(super) fn sinh_series(
+        mut self,
+        p: usize,
+        rm: RoundingMode,
+        with_correction: bool,
+    ) -> Result<Self, Error> {
         // sinh:  x + x^3/3! + x^5/5! + x^7/7! + ...
 
         let mut polycoeff_gen = SinhPolycoeffGen::new(p)?;
@@ -169,7 +174,14 @@ impl BigFloatNumber {
         let x_step = arg.mul(&arg, p_arg, rm)?; // x^2
         let x_first = arg.mul(&x_step, p_arg, rm)?; // x^3
 
-        let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, with_correction)?;
+        let ret = series_run(
+            acc,
+            x_first,
+            x_step,
+            niter,
+            &mut polycoeff_gen,
+            with_correction,
+        )?;
 
         if reduction_times > 0 {
             ret.sinh_arg_restore(reduction_times, rm)

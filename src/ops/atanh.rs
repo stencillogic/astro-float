@@ -113,7 +113,14 @@ impl BigFloatNumber {
             let x_step = x.mul(&x, p_x, RoundingMode::None)?; // x^2
             let x_first = x.mul(&x_step, p_x, RoundingMode::None)?; // x^3
 
-            series_run(x, x_first, x_step, 1, &mut polycoeff_gen, rm as u32 & 0b11110 != 0)?
+            series_run(
+                x,
+                x_first,
+                x_step,
+                1,
+                &mut polycoeff_gen,
+                rm as u32 & 0b11110 != 0,
+            )?
         };
 
         ret.set_precision(p, rm)?;

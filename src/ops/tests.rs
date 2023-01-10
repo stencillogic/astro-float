@@ -23,7 +23,7 @@ fn ttt() {
     let s = "-1.101110101111000000011101000010110111011100110000010011011000001e+0";
     let n2 = BigFloatNumber::parse(s, crate::Radix::Bin, 64, RoundingMode::None).unwrap();
 
-    let v = cc.pi(1984, RoundingMode::ToEven).unwrap(); 
+    let v = cc.pi(1984, RoundingMode::ToEven).unwrap();
     //let v = n1.atan(2000, RoundingMode::ToEven, &mut cc).unwrap();
 
     println!("{}", v.format(crate::Radix::Bin, RoundingMode::None).unwrap());

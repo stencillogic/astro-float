@@ -113,7 +113,7 @@ impl BigFloatNumber {
             arg.set_precision(p, RoundingMode::None)?;
             return Ok(arg);
         }
-        
+
         arg.set_precision(p + 1, RoundingMode::None)?;
 
         let arg = arg.reduce_trig_arg(cc, RoundingMode::None)?;
@@ -150,7 +150,14 @@ impl BigFloatNumber {
         let x_step = arg.mul(&arg, p_arg, rm)?; // x^2
         let x_first = arg.mul(&x_step, p_arg, rm)?; // x^3
 
-        let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen, with_correction)?;
+        let ret = series_run(
+            acc,
+            x_first,
+            x_step,
+            niter,
+            &mut polycoeff_gen,
+            with_correction,
+        )?;
 
         if reduction_times > 0 {
             ret.sin_arg_restore(reduction_times, rm)
