@@ -2054,7 +2054,7 @@ mod tests {
                 )
         );
 
-        let neg= BigFloat::from_i8(-3, WORD_BIT_SIZE);
+        let neg = BigFloat::from_i8(-3, WORD_BIT_SIZE);
         let pos = BigFloat::from_i8(5, WORD_BIT_SIZE);
 
         assert!(pos > neg);
@@ -2095,6 +2095,28 @@ mod tests {
         assert!(!(NAN < neg));
         assert!(!(NAN > pos));
         assert!(!(NAN < pos));
+
+        assert!(!(NAN == NAN));
+        assert!(!(NAN == INF_POS));
+        assert!(!(NAN == INF_NEG));
+        assert!(!(INF_POS == NAN));
+        assert!(!(INF_NEG == NAN));
+        assert!(!(INF_NEG == INF_POS));
+        assert!(!(INF_POS == INF_NEG));
+        assert!(!(INF_POS == neg));
+        assert!(!(INF_POS == pos));
+        assert!(!(INF_NEG == neg));
+        assert!(!(INF_NEG == pos));
+        assert!(!(neg == INF_POS));
+        assert!(!(pos == INF_POS));
+        assert!(!(neg == INF_NEG));
+        assert!(!(pos == INF_NEG));
+        assert!(!(pos == neg));
+        assert!(!(neg == pos));
+        assert!(neg == neg);
+        assert!(pos == pos);
+        assert!(INF_NEG == INF_NEG);
+        assert!(INF_POS == INF_POS);
     }
 }
 
