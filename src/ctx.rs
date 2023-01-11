@@ -81,9 +81,9 @@ impl Context {
         self.value.clone()
     }
 
-    /// Returns `self` to the power of `i`.
-    pub fn powi(&mut self, i: usize) -> &mut Self {
-        let val = self.value.powi(i, self.p, self.rm);
+    /// Returns `self` to the power of `n`.
+    pub fn powi(&mut self, n: usize) -> &mut Self {
+        let val = self.value.powi(n, self.p, self.rm);
         self.value(val);
         self
     }

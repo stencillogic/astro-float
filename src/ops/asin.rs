@@ -5,9 +5,9 @@ use crate::common::util::count_leading_ones;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
-use crate::fast_compute_small_arg;
 use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
+use crate::ops::util::fast_compute_small_arg;
 
 impl BigFloatNumber {
     /// Computes the arcsine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
