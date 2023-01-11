@@ -37,7 +37,7 @@
 //!
 //! `BigFloatNumber` is a data type provided for backward compatibility.
 //! It represents the finite number, i.e. it has mantissa, sign, and exponent, and can't be `Inf` or `NaN`.
-//! `BigFloat` uses `BigFloatNumber` internally.
+//! `BigFloat` uses `BigFloatNumber` internally. It is advisable to use `BigFloat` instead of `BigFloatNumber`.
 //!
 //! **Constants**
 //!

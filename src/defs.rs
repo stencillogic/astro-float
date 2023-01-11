@@ -39,7 +39,7 @@ pub const WORD_MAX: Word = Word::MAX;
 /// Base of words.
 pub const WORD_BASE: DoubleWord = WORD_MAX as DoubleWord + 1;
 
-/// Size of a word in bits. Precision is rounded according to word size.
+/// Size of a word in bits.
 pub const WORD_BIT_SIZE: usize = core::mem::size_of::<Word>() * 8;
 
 /// Word with the most significant bit set.
