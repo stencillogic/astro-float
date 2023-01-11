@@ -47,11 +47,32 @@ macro_rules! test_astro_op {
     };
 }
 
+// test constant value match
+macro_rules! test_astro_const {
+    ($astro_const:ident, $mpfr_const:ident, $p:ident, $rm:ident, $rnd:ident, $op_name:literal, $cc:ident) => {
+        let n1: BigFloat = $cc.$astro_const($p, $rm).unwrap().into();
+
+        let mut f1 = Float::with_val($p as u32, 1);
+
+        unsafe { mpfr::$mpfr_const(f1.as_raw_mut(), $rnd); }
+
+        assert_float_eq(n1, f1, $p, $op_name);
+    };
+}
+
+const fn get_prec_rng() -> usize {
+    #[cfg(not(debug_assertions))]
+    {157}
+
+    #[cfg(debug_assertions)]
+    {32}
+}
+
 #[test]
 fn mpfr_compare() {
     let run_cnt = 1000;
 
-    let p_rng = 157;    // >~ 10000 bit
+    let p_rng = get_prec_rng();
     let p_min = 1;
 
     let mut cc = Consts::new().unwrap();
@@ -309,6 +330,61 @@ fn mpfr_compare() {
         test_astro_op!(n1, log10, f1, log10, p, rm, rnd, "log10", cc);
         test_astro_op!(n1, asinh, f1, asinh, p, rm, rnd, "asinh", cc);
         test_astro_op!(n1, atan, f1, atan, p, rm, rnd, "atan", cc);
+    }
+}
+
+// constants computation
+#[test]
+fn mpfr_compare_const() {
+    let repeat_cnt = 100;
+    let run_cnt = 500;
+
+    let p_rng = get_prec_rng();
+
+    let p_min = 1;
+
+    let p_max = (p_rng + p_min) * WORD_BIT_SIZE;
+
+    unsafe {
+        mpfr::set_emin(EXPONENT_MIN as exp_t);
+        mpfr::set_emax(EXPONENT_MAX as exp_t);
+    }
+
+    assert_eq!(EXPONENT_MIN, exp_min());
+    assert_eq!(EXPONENT_MAX, exp_max());
+
+    let mut mpfr_e = Float::with_val((p_max + WORD_BIT_SIZE) as u32, 1);
+    unsafe { mpfr::exp(mpfr_e.as_raw_mut(), Float::with_val(1, 1).as_raw(), rnd_t::RNDN); }
+
+    let mut mpfr_ln10= Float::with_val((p_max + WORD_BIT_SIZE) as u32, 1);
+    unsafe { mpfr::log(mpfr_ln10.as_raw_mut(), Float::with_val(32, 10).as_raw(), rnd_t::RNDN); }
+
+    for _ in 0..repeat_cnt {
+        let mut cc = Consts::new().unwrap();
+
+        for _ in 0..run_cnt {
+            let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+
+            let (rm, rnd) = get_random_rnd_pair();
+
+            // pi, ln(2)
+            test_astro_const!(pi, const_pi, p, rm, rnd, "const pi", cc);
+            test_astro_const!(ln_2, const_log2, p, rm, rnd, "const ln(2)", cc);
+
+            // e
+            let n1 = cc.e(p, rm).unwrap().into();
+            let mut f1 = mpfr_e.clone();
+            unsafe { mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd); }
+
+            assert_float_eq(n1, f1, p, "const e");
+
+            // ln(10)
+            let n1 = cc.ln_10(p, rm).unwrap().into();
+            f1 = mpfr_ln10.clone();
+            unsafe { mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd); }
+
+            assert_float_eq(n1, f1, p, "const ln(10)");
+        }
     }
 }
 

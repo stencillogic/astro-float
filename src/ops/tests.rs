@@ -29,9 +29,21 @@ fn ttt() {
     println!("{}", v.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 } */
 
+const fn get_prec_rng() -> usize {
+    #[cfg(not(debug_assertions))]
+    {
+        157
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        32
+    }
+}
+
 #[test]
 fn test_ln_exp() {
-    let prec_rng = 32;
+    let prec_rng = get_prec_rng();
     let mut eps = ONE.clone().unwrap();
 
     let mut cc = Consts::new().unwrap();
@@ -106,7 +118,7 @@ fn test_ln_exp() {
 
 #[test]
 fn test_powi() {
-    let prec_rng = 32;
+    let prec_rng = get_prec_rng();
 
     for _ in 0..1000 {
         let i = random::<usize>() % 1000 + 1;
@@ -143,7 +155,7 @@ fn test_powi() {
 
 #[test]
 fn test_log2_log10_pow() {
-    let prec_rng = 32;
+    let prec_rng = get_prec_rng();
     let mut eps = ONE.clone().unwrap();
 
     let mut cc = Consts::new().unwrap();
@@ -238,7 +250,7 @@ fn test_log2_log10_pow() {
 
 #[test]
 fn test_log_pow() {
-    let prec_rng = 32;
+    let prec_rng = get_prec_rng();
     let mut eps = ONE.clone().unwrap();
 
     let mut cc = Consts::new().unwrap();
@@ -329,7 +341,7 @@ fn test_log_pow() {
 
 #[test]
 fn test_sin_asin() {
-    let prec_rng = 32;
+    let prec_rng = get_prec_rng();
     let mut eps = ONE.clone().unwrap();
     let mut thres = ONE.clone().unwrap();
     let thres_exp = -8;
@@ -486,7 +498,7 @@ fn test_sin_asin() {
 
 #[test]
 fn test_cos_acos() {
-    let prec_rng = 32;
+    let prec_rng = get_prec_rng();
     let mut eps = ONE.clone().unwrap();
 
     let mut cc = Consts::new().unwrap();
@@ -591,7 +603,7 @@ fn test_cos_acos() {
 
 #[test]
 fn test_tan_atan() {
-    let prec_rng = 32;
+    let prec_rng = get_prec_rng();
     let mut eps = ONE.clone().unwrap();
 
     let mut cc = Consts::new().unwrap();
@@ -669,7 +681,7 @@ fn test_tan_atan() {
 
 #[test]
 fn test_sinh_asinh() {
-    let prec_rng = 32;
+    let prec_rng = get_prec_rng();
     let mut eps = ONE.clone().unwrap();
 
     let mut cc = Consts::new().unwrap();
@@ -731,7 +743,7 @@ fn test_sinh_asinh() {
 
 #[test]
 fn test_cosh_acosh() {
-    let prec_rng = 32;
+    let prec_rng = get_prec_rng();
     let mut eps = ONE.clone().unwrap();
 
     let mut cc = Consts::new().unwrap();
@@ -788,7 +800,7 @@ fn test_cosh_acosh() {
 
 #[test]
 fn test_tanh_atanh() {
-    let prec_rng = 32;
+    let prec_rng = get_prec_rng();
     let mut eps = ONE.clone().unwrap();
 
     let mut cc = Consts::new().unwrap();
