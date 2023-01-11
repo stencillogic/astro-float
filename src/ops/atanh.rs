@@ -74,7 +74,7 @@ impl BigFloatNumber {
         let additional_prec = p / 6;
 
         // TODO: tune threshold for choosing between series computation and computation using ln
-        let mut ret = if self.get_exponent() as isize >= -(additional_prec as isize) {
+        if self.get_exponent() as isize >= -(additional_prec as isize) {
             // 0.5 * ln((1 + x) / (1 - x))
 
             let mut x = self.clone()?;
@@ -91,7 +91,7 @@ impl BigFloatNumber {
 
             let d3 = d1.div(&d2, p_x, RoundingMode::None)?;
 
-            let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
+            let mut ret = d3.ln(p, rm, cc)?;
 
             if ret.get_exponent() == EXPONENT_MIN {
                 ret.subnormalize(ret.get_exponent() as isize - 1, rm);
@@ -99,7 +99,7 @@ impl BigFloatNumber {
                 ret.set_exponent(ret.get_exponent() - 1);
             }
 
-            ret
+            Ok(ret)
         } else {
             // series: x + x^3/3 + x^5/5 + ...
 
@@ -113,19 +113,19 @@ impl BigFloatNumber {
             let x_step = x.mul(&x, p_x, RoundingMode::None)?; // x^2
             let x_first = x.mul(&x_step, p_x, RoundingMode::None)?; // x^3
 
-            series_run(
+            let mut ret = series_run(
                 x,
                 x_first,
                 x_step,
                 1,
                 &mut polycoeff_gen,
                 rm as u32 & 0b11110 != 0,
-            )?
-        };
+            )?;
 
-        ret.set_precision(p, rm)?;
+            ret.set_precision(p, rm)?;
 
-        Ok(ret)
+            Ok(ret)
+        }
     }
 }
 

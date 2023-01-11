@@ -53,11 +53,7 @@ impl BigFloatNumber {
         let s = t.sqrt(p_x, RoundingMode::None)?;
         let d = x.div(&s, p_x, RoundingMode::None)?;
 
-        let mut ret = d.atan(p_x, RoundingMode::None, cc)?;
-
-        ret.set_precision(p, rm)?;
-
-        Ok(ret)
+        d.atan(p, rm, cc)
     }
 }
 

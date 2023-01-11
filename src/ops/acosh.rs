@@ -60,11 +60,7 @@ impl BigFloatNumber {
 
             let d3 = d2.add(&x, p_x, RoundingMode::None)?;
 
-            let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
-
-            ret.set_precision(p, rm)?;
-
-            Ok(ret)
+            d3.ln(p, rm, cc)
         }
     }
 }

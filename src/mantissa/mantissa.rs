@@ -269,7 +269,7 @@ impl Mantissa {
         let mut c = 0;
 
         let l2 = (m2_shift + WORD_BIT_SIZE - 2) / WORD_BIT_SIZE;
-        let (mut m3, mut shift) = if l2 > p && l2 > self.len() && !full_prec {
+        let mut m3 = if l2 > p && l2 > self.len() && !full_prec {
             // m2 lays outside of m1's mantissa range and outside the desired precision
             //
             // m1 1XXXX00000000   - m1 and trailing zeroes
@@ -296,9 +296,7 @@ impl Mantissa {
                 }
             }
 
-            debug_assert!(c == 0);
-
-            (m3, 0)
+            m3
         } else {
             // m2_shift is smaller than the precision of m1
             // or m2_shift is smaller than the desired precision
@@ -320,12 +318,12 @@ impl Mantissa {
                 c = sub_borrow(*a, b, c, d);
             }
 
-            debug_assert!(c == 0);
-
-            let shift = Self::maximize(&mut m3.m);
-
-            (m3, shift)
+            m3
         };
+
+        debug_assert!(c == 0);
+
+        let mut shift = Self::maximize(&mut m3.m);
 
         if full_prec {
             m3.m.trunc_trailing_zeroes();

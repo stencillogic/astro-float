@@ -11,21 +11,21 @@ use rand::random;
 // test for debugging
 /* #[test]
 fn ttt() {
-
     let n = BigFloatNumber::from_raw_parts(&[], 0, Sign::Pos, 0).unwrap();
     let m = BigFloatNumber::from_raw_parts(&[], 0, Sign::Pos, 0).unwrap();
 
     let _z = n.add(&m, 192, RoundingMode::None).unwrap();
 
     let mut cc = Consts::new().unwrap();
-    let s = "";
-    let n1 = BigFloatNumber::parse(s, crate::Radix::Bin, 2000, RoundingMode::None).unwrap();
+    let s = "-1.101001010111011110101111111010101001101110111011100101111100000e-110001111001001101100110000000";
+    let n1 = BigFloatNumber::parse(s, crate::Radix::Bin, 128, RoundingMode::None).unwrap();
     let s = "-1.101110101111000000011101000010110111011100110000010011011000001e+0";
     let n2 = BigFloatNumber::parse(s, crate::Radix::Bin, 64, RoundingMode::None).unwrap();
 
-    let v = cc.pi(1984, RoundingMode::ToEven).unwrap();
-    //let v = n1.atan(2000, RoundingMode::ToEven, &mut cc).unwrap();
+    //let v = cc.pi(1984, RoundingMode::ToEven).unwrap();
+    let v = n1.cos(128, RoundingMode::ToEven, &mut cc).unwrap();
 
+    println!("{:?}", v);
     println!("{}", v.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 } */
 

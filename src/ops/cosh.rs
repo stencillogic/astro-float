@@ -15,6 +15,7 @@ use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::PolycoeffGen;
 use crate::Consts;
 use crate::Sign;
+use crate::EXPONENT_MIN;
 
 // Polynomial coefficient generator.
 struct CoshPolycoeffGen {
@@ -102,7 +103,7 @@ impl BigFloatNumber {
             return Self::from_word(1, p);
         }
 
-        let mut ret = if self.get_exponent() > 0 {
+        if self.get_exponent() > 0 {
             arg.set_sign(Sign::Pos);
 
             let mut ret = if (self.get_exponent() as isize - 1) / 2
@@ -122,19 +123,23 @@ impl BigFloatNumber {
 
                 let xe = ex.reciprocal(p_arg, RoundingMode::None)?;
 
-                ex.add(&xe, p_arg, RoundingMode::None)
+                ex.add(&xe, p, rm)
             }?;
 
-            ret.set_exponent(ret.get_exponent() - 1);
+            if ret.get_exponent() == EXPONENT_MIN {
+                ret.subnormalize(ret.get_exponent() as isize - 1, rm);
+            } else {
+                ret.set_exponent(ret.get_exponent() - 1);
+            }
 
-            ret
+            Ok(ret)
         } else {
-            arg.cosh_series(p, RoundingMode::None, rm as u32 & 0b11110 != 0)?
-        };
+            let mut ret = arg.cosh_series(p, rm, rm as u32 & 0b11110 != 0)?;
 
-        ret.set_precision(p, rm)?;
+            ret.set_precision(p, rm)?;
 
-        Ok(ret)
+            Ok(ret)
+        }
     }
 
     /// cosh using series, for |x| < 1

@@ -30,7 +30,7 @@ impl BigFloatNumber {
             return Ok(x);
         }
 
-        let mut ret = if self.get_exponent() as isize >= -(p as isize) / 6 {
+        if self.get_exponent() as isize >= -(p as isize) / 6 {
             // (e^(2*x) - 1) / (e^(2*x) + 1)
 
             let mut additional_prec = 2;
@@ -60,7 +60,7 @@ impl BigFloatNumber {
             let d1 = xexp.sub(&ONE, p_x, RoundingMode::None)?;
             let d2 = xexp.add(&ONE, p_x, RoundingMode::None)?;
 
-            d1.div(&d2, p_x, RoundingMode::None)?
+            d1.div(&d2, p, rm)
         } else {
             // short series: x - x^3/3 + 2*x^5/15
 
@@ -71,11 +71,11 @@ impl BigFloatNumber {
             let x3 = xx.mul(&x, p_x, RoundingMode::None)?;
             let p1 = x3.div(&THREE, p_x, RoundingMode::None)?;
 
-            if p1.is_zero() {
+            let mut ret = if p1.is_zero() {
                 if rm as u32 & 0b11110 != 0 {
-                    x.add_correction(true)
+                    x.add_correction(true)?
                 } else {
-                    Ok(x)
+                    x
                 }
             } else {
                 let ret = x.sub(&p1, p_x, RoundingMode::None)?;
@@ -86,19 +86,19 @@ impl BigFloatNumber {
 
                 if p2.is_zero() {
                     if rm as u32 & 0b11110 != 0 {
-                        ret.add_correction(false)
+                        ret.add_correction(false)?
                     } else {
-                        Ok(ret)
+                        ret
                     }
                 } else {
-                    ret.add(&p2, p_x, RoundingMode::None)
+                    ret.add(&p2, p_x, RoundingMode::None)?
                 }
-            }?
-        };
+            };
 
-        ret.set_precision(p, rm)?;
+            ret.set_precision(p, rm)?;
 
-        Ok(ret)
+            Ok(ret)
+        }
     }
 }
 

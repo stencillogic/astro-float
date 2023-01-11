@@ -51,7 +51,7 @@ macro_rules! test_astro_op {
 fn mpfr_compare() {
     let run_cnt = 1000;
 
-    let p_rng = 32; //157;    // >~ 10000 bit
+    let p_rng = 157;    // >~ 10000 bit
     let p_min = 1;
 
     let mut cc = Consts::new().unwrap();
@@ -160,6 +160,24 @@ fn mpfr_compare() {
         // println!("\nn3 f3\n{:b}\n{}", n3, f3.to_string_radix(2, None));
 
         assert_float_eq(n3, f3, p, "rem");
+    }
+
+    // n1 = -inf..2: sin, cos, tan
+    assert_eq!(core::mem::size_of::<Exponent>(), 4);
+    for _ in 0..run_cnt {
+        let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+        let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+
+        let (rm, rnd) = get_random_rnd_pair();
+        //println!("{:?}", rm);
+
+        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, 2);
+
+        //println!("{:?}", n1);
+
+        test_astro_op!(n1, sin, f1, sin, p, rm, rnd, "sin", cc);
+        test_astro_op!(n1, cos, f1, cos, p, rm, rnd, "cos", cc);
+        test_astro_op!(n1, tan, f1, tan, p, rm, rnd, "tan", cc);
     }
 
     // n1 = -inf..log2(emax): sinh, cosh, tanh, exp

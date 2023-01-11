@@ -7,6 +7,7 @@ use crate::common::util::get_mul_cost;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
+use crate::fast_compute_small_arg;
 use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
 use crate::ops::series::series_cost_optimize;
@@ -70,11 +71,15 @@ impl BigFloatNumber {
     pub fn tan(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
         let p = round_p(p);
 
-        let mut arg = self.clone()?;
         if self.is_zero() {
-            arg.set_precision(p, RoundingMode::None)?;
-            return Ok(arg);
+            let mut ret = self.clone()?;
+            ret.set_precision(p, RoundingMode::None)?;
+            return Ok(ret);
         }
+
+        fast_compute_small_arg!(self, 1, false, p, rm);
+
+        let mut arg = self.clone()?;
 
         arg.set_precision(p + 1, RoundingMode::None)?;
 
