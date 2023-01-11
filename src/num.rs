@@ -15,7 +15,6 @@ use crate::defs::WORD_SIGNIFICANT_BIT;
 use crate::mantissa::Mantissa;
 
 /// A finite floating point number with mantissa of an arbitrary size, an exponent, and the sign.
-#[deprecated]
 #[derive(Debug)]
 pub struct BigFloatNumber {
     pub(super) e: Exponent,
