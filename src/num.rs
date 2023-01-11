@@ -991,6 +991,7 @@ impl BigFloatNumber {
     /// ## Examples
     ///
     /// ```
+    /// #![allow(deprecated)]
     /// use astro_float::BigFloatNumber;
     /// use astro_float::EXPONENT_MIN;
     ///

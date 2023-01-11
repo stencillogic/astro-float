@@ -1397,7 +1397,7 @@ pub mod ops {
 mod tests {
 
     use super::*;
-    use crate::defs::RoundingMode;
+    use crate::{defs::RoundingMode, WORD_BIT_SIZE};
 
     #[cfg(feature = "std")]
     use std::str::FromStr;
@@ -2053,6 +2053,48 @@ mod tests {
                     rm
                 )
         );
+
+        let neg= BigFloat::from_i8(-3, WORD_BIT_SIZE);
+        let pos = BigFloat::from_i8(5, WORD_BIT_SIZE);
+
+        assert!(pos > neg);
+        assert!(neg < pos);
+        assert!(!(pos < neg));
+        assert!(!(neg > pos));
+        assert!(INF_NEG < neg);
+        assert!(INF_NEG < pos);
+        assert!(INF_NEG < INF_POS);
+        assert!(!(INF_NEG > neg));
+        assert!(!(INF_NEG > pos));
+        assert!(!(INF_NEG > INF_POS));
+        assert!(INF_POS > neg);
+        assert!(INF_POS > pos);
+        assert!(INF_POS > INF_NEG);
+        assert!(!(INF_POS < neg));
+        assert!(!(INF_POS < pos));
+        assert!(!(INF_POS < INF_NEG));
+        assert!(!(INF_POS > INF_POS));
+        assert!(!(INF_POS < INF_POS));
+        assert!(!(INF_NEG > INF_NEG));
+        assert!(!(INF_NEG < INF_NEG));
+        assert!(!(INF_POS > NAN));
+        assert!(!(INF_POS < NAN));
+        assert!(!(INF_NEG > NAN));
+        assert!(!(INF_NEG < NAN));
+        assert!(!(NAN > INF_POS));
+        assert!(!(NAN < INF_POS));
+        assert!(!(NAN > INF_NEG));
+        assert!(!(NAN < INF_NEG));
+        assert!(!(NAN > NAN));
+        assert!(!(NAN < NAN));
+        assert!(!(neg > NAN));
+        assert!(!(neg < NAN));
+        assert!(!(pos > NAN));
+        assert!(!(pos < NAN));
+        assert!(!(NAN > neg));
+        assert!(!(NAN < neg));
+        assert!(!(NAN > pos));
+        assert!(!(NAN < pos));
     }
 }
 

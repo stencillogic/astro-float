@@ -36,6 +36,7 @@ impl BigFloatNumber {
     /// Code below converts `-0.1234567₈ × 10₈^3₈` given in radix 8 to BigFloatNumber.
     ///
     /// ``` rust
+    /// #![allow(deprecated)]
     /// use astro_float::{BigFloatNumber, Sign, RoundingMode, Radix};
     ///
     /// let g = BigFloatNumber::convert_from_radix(
@@ -327,6 +328,7 @@ impl BigFloatNumber {
     /// ## Examples
     ///
     /// ``` rust
+    /// #![allow(deprecated)]
     /// use astro_float::{BigFloatNumber, Sign, RoundingMode, Radix};
     ///
     /// let n = BigFloatNumber::from_f64(64, 0.00012345678f64).unwrap();
