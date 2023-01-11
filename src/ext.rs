@@ -413,23 +413,19 @@ impl BigFloat {
         }
     }
 
-    /// Compute the power of `self` to the integer `i` with precision `p`. The result is rounded using the rounding mode `rm`.
+    /// Compute the power of `self` to the integer `n` with precision `p`. The result is rounded using the rounding mode `rm`.
     /// Precision is rounded upwards to the word size.
-    pub fn powi(&self, i: usize, p: usize, rm: RoundingMode) -> Self {
+    pub fn powi(&self, n: usize, p: usize, rm: RoundingMode) -> Self {
         match &self.inner {
-            Flavor::Value(v1) => Self::result_to_ext(v1.powi(i, p, rm), false, true),
+            Flavor::Value(v1) => Self::result_to_ext(v1.powi(n, p, rm), false, true),
             Flavor::Inf(s1) => {
                 // inf ^ v2
-                if i == 0 {
+                if n == 0 {
                     Self::from_u8(1, p)
-                } else if i > 0 {
-                    if s1.is_negative() && i & 1 == 1 {
-                        INF_NEG
-                    } else {
-                        INF_POS
-                    }
+                } else if s1.is_negative() && (n & 1 == 1) {
+                    INF_NEG
                 } else {
-                    Self::new(p)
+                    INF_POS
                 }
             }
             Flavor::NaN(err) => Self::nan(err.clone()),

@@ -81,7 +81,7 @@ impl BigFloatNumber {
         e_int.mul(&e_fract, p_work, RoundingMode::None)
     }
 
-    /// Compute the power of `self` to the integer `i` with precision `p`. The result is rounded using the rounding mode `rm`.
+    /// Compute the power of `self` to the integer `n` with precision `p`. The result is rounded using the rounding mode `rm`.
     /// Precision is rounded upwards to the word size.
     ///
     /// ## Errors
@@ -89,7 +89,8 @@ impl BigFloatNumber {
     ///  - ExponentOverflow: the result is too large or too small number.
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: the precision is incorrect.
-    pub fn powi(&self, mut i: usize, p: usize, rm: RoundingMode) -> Result<Self, Error> {
+    pub fn powi(&self, n: usize, p: usize, rm: RoundingMode) -> Result<Self, Error> {
+        let mut i = n;
         if self.is_zero() || i == 1 {
             let mut ret = self.clone()?;
             ret.set_precision(p, rm)?;
@@ -113,20 +114,35 @@ impl BigFloatNumber {
 
         let p = round_p(p);
 
-        let mut ret = self.clone()?;
+        let mut x = self.clone()?;
 
-        let p_ret = p + bit_pos * 2;
-        ret.set_precision(p_ret, RoundingMode::None)?;
+        let p_x = p + bit_pos * 2;
+        x.set_precision(p_x, RoundingMode::None)?;
 
-        // TODO: consider windowing and precomputed values.
-        while bit_pos > 0 {
-            bit_pos -= 1;
-            ret = ret.mul(&ret, p_ret, RoundingMode::None)?;
-            if i & WORD_SIGNIFICANT_BIT as usize != 0 {
-                ret = ret.mul(self, p_ret, RoundingMode::None)?;
+        let mut ret = || -> Result<Self, Error> {
+            // TODO: consider windowing and precomputed values.
+            while bit_pos > 0 {
+                bit_pos -= 1;
+                x = x.mul(&x, p_x, RoundingMode::None)?;
+                if i & WORD_SIGNIFICANT_BIT as usize != 0 {
+                    x = x.mul(self, p_x, RoundingMode::None)?;
+                }
+                i <<= 1;
             }
-            i <<= 1;
-        }
+
+            Ok(x)
+        }()
+        .map_err(|e| -> Error {
+            if let Error::ExponentOverflow(_) = e {
+                Error::ExponentOverflow(if self.is_negative() && (n & 1 == 1) {
+                    Sign::Neg
+                } else {
+                    Sign::Pos
+                })
+            } else {
+                e
+            }
+        })?;
 
         ret.set_precision(p, rm)?;
 
@@ -207,11 +223,7 @@ impl BigFloatNumber {
             },
         }?;
 
-        let mut ret = m.exp(p_ext, RoundingMode::None, cc)?;
-
-        ret.set_precision(p, rm)?;
-
-        Ok(ret)
+        m.exp(p, rm, cc)
     }
 }
 
