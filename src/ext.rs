@@ -14,6 +14,9 @@ use core::fmt::Write;
 use core::num::FpCategory;
 use lazy_static::lazy_static;
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 /// Not a number.
 pub const NAN: BigFloat = BigFloat {
     inner: Flavor::NaN(None),
@@ -956,11 +959,11 @@ impl BigFloat {
     ///
     /// assert!(n.cmp(&g) == Some(0));
     /// ```
-    /// 
+    ///
     /// ## Errors
     ///
     /// On error, the function returns NaN with the following associated error:
-    /// 
+    ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
     ///  - InvalidArgument: the precision is incorrect, or `digits` contains unacceptable digits for given radix.
@@ -972,7 +975,11 @@ impl BigFloat {
         p: usize,
         rm: RoundingMode,
     ) -> Self {
-        Self::result_to_ext(BigFloatNumber::convert_from_radix(sign, digits, e, rdx, p, rm), false, true)
+        Self::result_to_ext(
+            BigFloatNumber::convert_from_radix(sign, digits, e, rdx, p, rm),
+            false,
+            true,
+        )
     }
 
     /// Converts `self` to radix `rdx` using rounding mode `rm`.
@@ -2055,13 +2062,24 @@ mod tests {
         assert!(!BigFloat::max_value(DEFAULT_P).is_subnormal());
         assert!(!BigFloat::min_value(DEFAULT_P).is_subnormal());
 
-        let n1 = BigFloat::convert_from_radix(Sign::Pos, &[], 0, Radix::Dec, usize::MAX, RoundingMode::None);
+        let n1 = BigFloat::convert_from_radix(
+            Sign::Pos,
+            &[],
+            0,
+            Radix::Dec,
+            usize::MAX,
+            RoundingMode::None,
+        );
         assert!(n1.is_nan());
         assert!(n1.get_err() == Some(Error::InvalidArgument));
 
         assert!(n1.convert_to_radix(Radix::Dec, RoundingMode::None) == Err(Error::InvalidArgument));
-        assert!(INF_POS.convert_to_radix(Radix::Dec, RoundingMode::None) == Err(Error::InvalidArgument));
-        assert!(INF_NEG.convert_to_radix(Radix::Dec, RoundingMode::None) == Err(Error::InvalidArgument));
+        assert!(
+            INF_POS.convert_to_radix(Radix::Dec, RoundingMode::None) == Err(Error::InvalidArgument)
+        );
+        assert!(
+            INF_NEG.convert_to_radix(Radix::Dec, RoundingMode::None) == Err(Error::InvalidArgument)
+        );
     }
 
     #[test]
