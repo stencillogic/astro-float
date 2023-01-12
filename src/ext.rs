@@ -2054,6 +2054,14 @@ mod tests {
         assert!(!BigFloat::min_positive_normal(DEFAULT_P).is_subnormal());
         assert!(!BigFloat::max_value(DEFAULT_P).is_subnormal());
         assert!(!BigFloat::min_value(DEFAULT_P).is_subnormal());
+
+        let n1 = BigFloat::convert_from_radix(Sign::Pos, &[], 0, Radix::Dec, usize::MAX, RoundingMode::None);
+        assert!(n1.is_nan());
+        assert!(n1.get_err() == Some(Error::InvalidArgument));
+
+        assert!(n1.convert_to_radix(Radix::Dec, RoundingMode::None) == Err(Error::InvalidArgument));
+        assert!(INF_POS.convert_to_radix(Radix::Dec, RoundingMode::None) == Err(Error::InvalidArgument));
+        assert!(INF_NEG.convert_to_radix(Radix::Dec, RoundingMode::None) == Err(Error::InvalidArgument));
     }
 
     #[test]
