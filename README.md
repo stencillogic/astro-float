@@ -55,7 +55,6 @@ println!("{}", pi);
 
 The source code contains [integration tests](https://github.com/stencillogic/astro-float/tree/main/tests) for many operations, including arithmetic operations, rounding, mathematical functions, constants, and other, which check whether these computations produce identical results with [rug](https://crates.io/crates/rug) (MPFR).
 
-
 ## Performance
 
 Benchmark can be found here: https://github.com/stencillogic/bigfloat-bench.

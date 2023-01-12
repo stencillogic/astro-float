@@ -930,6 +930,86 @@ impl BigFloat {
             None
         }
     }
+
+    /// Converts an array of digits in radix `rdx` to BigFloat with precision `p`.
+    /// `digits` represents mantissa and is interpreted as a number smaller than 1 and greater or equal to 1/`rdx`.
+    /// The first element in `digits` is the most significant digit.
+    /// `e` is the exponent part of the number, such that the number can be represented as `digits` * `rdx` ^ `e`.
+    /// Precision is rounded upwards to the word size.
+    ///
+    /// ## Examples
+    ///
+    /// Code below converts `-0.1234567₈ × 10₈^3₈` given in radix 8 to BigFloat.
+    ///
+    /// ``` rust
+    /// use astro_float::{BigFloat, Sign, RoundingMode, Radix};
+    ///
+    /// let g = BigFloat::convert_from_radix(
+    ///     Sign::Neg,
+    ///     &[1, 2, 3, 4, 5, 6, 7, 0],
+    ///     3,
+    ///     Radix::Oct,
+    ///     64,
+    ///     RoundingMode::None);
+    ///
+    /// let n = BigFloat::from_f64(-83.591552734375, 64);
+    ///
+    /// assert!(n.cmp(&g) == Some(0));
+    /// ```
+    /// 
+    /// ## Errors
+    ///
+    /// On error, the function returns NaN with the following associated error:
+    /// 
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
+    ///  - InvalidArgument: the precision is incorrect, or `digits` contains unacceptable digits for given radix.
+    pub fn convert_from_radix(
+        sign: Sign,
+        digits: &[u8],
+        e: Exponent,
+        rdx: Radix,
+        p: usize,
+        rm: RoundingMode,
+    ) -> Self {
+        Self::result_to_ext(BigFloatNumber::convert_from_radix(sign, digits, e, rdx, p, rm), false, true)
+    }
+
+    /// Converts `self` to radix `rdx` using rounding mode `rm`.
+    /// The function returns sign, mantissa digits in radix `rdx`, and exponent such that the converted number
+    /// can be represented as `mantissa digits` * `rdx` ^ `exponent`.
+    /// The first element in the mantissa is the most significant digit.
+    ///
+    /// ## Examples
+    ///
+    /// ``` rust
+    /// use astro_float::{BigFloat, Sign, RoundingMode, Radix};
+    ///
+    /// let n = BigFloat::from_f64(0.00012345678f64, 64);
+    ///
+    /// let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).unwrap();
+    ///
+    /// assert_eq!(s, Sign::Pos);
+    /// assert_eq!(m, [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4, 2]);
+    /// assert_eq!(e, -3);
+    /// ```
+    ///
+    /// ## Errors
+    ///
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
+    ///  - InvalidArgument: `self` is Inf or NaN.
+    pub fn convert_to_radix(
+        &self,
+        rdx: Radix,
+        rm: RoundingMode,
+    ) -> Result<(Sign, Vec<u8>, Exponent), Error> {
+        match &self.inner {
+            Flavor::Value(v) => v.convert_to_radix(rdx, rm),
+            Flavor::NaN(_) => Err(Error::InvalidArgument),
+            Flavor::Inf(_) => Err(Error::InvalidArgument),
+        }
+    }
 }
 
 impl Clone for BigFloat {
