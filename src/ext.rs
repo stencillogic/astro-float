@@ -1428,42 +1428,6 @@ pub mod ops {
         }
     }
 
-    impl From<f64> for BigFloat {
-        fn from(f: f64) -> Self {
-            BigFloat::from_f64(f, DEFAULT_P)
-        }
-    }
-
-    impl From<f32> for BigFloat {
-        fn from(f: f32) -> Self {
-            BigFloat::from_f32(f, DEFAULT_P)
-        }
-    }
-
-    impl Display for BigFloat {
-        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-            self.write_str(f, Radix::Dec, DEFAULT_RM)
-        }
-    }
-
-    impl Binary for BigFloat {
-        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-            self.write_str(f, Radix::Bin, DEFAULT_RM)
-        }
-    }
-
-    impl Octal for BigFloat {
-        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-            self.write_str(f, Radix::Oct, DEFAULT_RM)
-        }
-    }
-
-    impl UpperHex for BigFloat {
-        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-            self.write_str(f, Radix::Hex, DEFAULT_RM)
-        }
-    }
-
     impl Default for BigFloat {
         fn default() -> BigFloat {
             BigFloat::new(DEFAULT_P)
@@ -1478,12 +1442,51 @@ pub mod ops {
             Ok(BigFloat::parse(src, Radix::Dec, DEFAULT_P, DEFAULT_RM))
         }
     }
+
+    macro_rules! impl_from {
+        ($tt:ty, $fn:ident) => {
+            impl From<$tt> for BigFloat {
+                fn from(v: $tt) -> Self {
+                    BigFloat::$fn(v, DEFAULT_P)
+                }
+            }
+        };
+    }
+
+    impl_from!(f32, from_f32);
+    impl_from!(f64, from_f64);
+    impl_from!(i8, from_i8);
+    impl_from!(i16, from_i16);
+    impl_from!(i32, from_i32);
+    impl_from!(i64, from_i64);
+    impl_from!(i128, from_i128);
+    impl_from!(u8, from_u8);
+    impl_from!(u16, from_u16);
+    impl_from!(u32, from_u32);
+    impl_from!(u64, from_u64);
+    impl_from!(u128, from_u128);
+
+    macro_rules! impl_format_rdx {
+        ($trait:ty, $rdx:path) => {
+            impl $trait for BigFloat {
+                fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
+                    self.write_str(f, $rdx, DEFAULT_RM)
+                }
+            }
+        };
+    }
+
+    impl_format_rdx!(Binary, Radix::Bin);
+    impl_format_rdx!(Octal, Radix::Oct);
+    impl_format_rdx!(Display, Radix::Dec);
+    impl_format_rdx!(UpperHex, Radix::Hex);
 }
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
+    use crate::common::util::rand_p;
     use crate::{defs::RoundingMode, WORD_BIT_SIZE};
 
     #[cfg(feature = "std")]
@@ -1494,11 +1497,6 @@ mod tests {
 
     #[cfg(not(feature = "std"))]
     use alloc::format;
-
-    #[inline]
-    fn rand_p() -> usize {
-        rand::random::<usize>() % 1000 + DEFAULT_P
-    }
 
     #[test]
     fn test_ext() {

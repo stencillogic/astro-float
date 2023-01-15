@@ -50,6 +50,7 @@ fn pqr_inc(
 }
 
 /// Holds value of currently computed ln(10).
+#[derive(Debug)]
 pub struct Ln10Cache {
     b: usize,
     pk: BigFloatNumber,

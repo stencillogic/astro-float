@@ -13,6 +13,7 @@ use crate::Error;
 use crate::RoundingMode;
 
 /// Constants cache contains arbitrary-precision mathematical constants.
+#[derive(Debug)]
 pub struct Consts {
     pi: PiCache,
     e: ECache,

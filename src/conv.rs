@@ -182,7 +182,7 @@ impl BigFloatNumber {
                     m.set_length(p)?;
                     return Ok(BigFloatNumber { m, e: 0, s: sign });
                 } else {
-                    start_bit = (EXPONENT_MIN as isize - e as isize) as usize;
+                    start_bit = (EXPONENT_MIN as isize - e) as usize;
                     e = EXPONENT_MIN as isize;
                 }
             }
@@ -290,7 +290,7 @@ impl BigFloatNumber {
 
         let ten = Self::from_word(10, 4)?;
 
-        let mut nabs = n.unsigned_abs() as usize;
+        let mut nabs = n.unsigned_abs();
         if nabs > nmax {
             let fpnmax = ten.powi(nmax, pf.max(p), RoundingMode::None)?;
 
@@ -364,7 +364,7 @@ impl BigFloatNumber {
         // then resulting number is F = f * rdx^n
 
         let n = self.get_exponent().unsigned_abs() as usize * 3010299957 / 10000000000;
-        let l = self.get_mantissa_max_bit_len() as usize * 3010299957 / 10000000000 + 1;
+        let l = self.get_mantissa_max_bit_len() * 3010299957 / 10000000000 + 1;
 
         let (digits, e_shift) = if n == 0 {
             self.conv_mantissa(l, Radix::Dec, rm)
@@ -408,11 +408,9 @@ impl BigFloatNumber {
         let mut e = self.get_exponent();
         let mut e_shift = e.unsigned_abs() as usize % shift;
         e /= shift as Exponent;
-        if e_shift != 0 {
-            if self.get_exponent() > 0 {
-                e_shift = shift - e_shift;
-                e += 1;
-            }
+        if e_shift != 0 && self.get_exponent() > 0 {
+            e_shift = shift - e_shift;
+            e += 1;
         }
 
         let mut ret = Vec::new();

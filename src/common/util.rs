@@ -8,6 +8,7 @@ use crate::{
 #[cfg(test)]
 use crate::{BigFloatNumber, Sign, EXPONENT_MIN};
 
+#[cfg(test)]
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
@@ -320,6 +321,17 @@ pub fn round_p(p: usize) -> usize {
     ((p.saturating_add(WORD_BIT_SIZE - 1)) / WORD_BIT_SIZE) * WORD_BIT_SIZE
 }
 
+// Convert rounding mode for an opposite sign.
+pub fn invert_rm_for_sign(rm: RoundingMode) -> RoundingMode {
+    if rm == RoundingMode::Up {
+        RoundingMode::Down
+    } else if rm == RoundingMode::Down {
+        RoundingMode::Up
+    } else {
+        rm
+    }
+}
+
 /// Returns random subnormal number.
 #[cfg(test)]
 pub fn random_subnormal(p: usize) -> BigFloatNumber {
@@ -346,13 +358,8 @@ pub fn random_subnormal(p: usize) -> BigFloatNumber {
     BigFloatNumber::from_raw_parts(&m, n, s, EXPONENT_MIN).unwrap()
 }
 
-// Convert rounding mode for an opposite sign.
-pub fn invert_rm_for_sign(rm: RoundingMode) -> RoundingMode {
-    if rm == RoundingMode::Up {
-        RoundingMode::Down
-    } else if rm == RoundingMode::Down {
-        RoundingMode::Up
-    } else {
-        rm
-    }
+#[cfg(test)]
+#[inline]
+pub fn rand_p() -> usize {
+    rand::random::<usize>() % 1000 + crate::defs::DEFAULT_P
 }

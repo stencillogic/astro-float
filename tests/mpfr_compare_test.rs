@@ -69,7 +69,7 @@ const fn get_prec_rng() -> usize {
 }
 
 #[test]
-fn mpfr_compare() {
+fn mpfr_compare_ops() {
     let run_cnt = 1000;
 
     let p_rng = get_prec_rng();
@@ -250,7 +250,7 @@ fn mpfr_compare() {
         let (rm, rnd) = get_random_rnd_pair();
         //println!("{:?}", rm);
 
-        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, 2);
+        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, 256);
 
         //println!("{:?}", n1);
 
@@ -391,7 +391,7 @@ fn mpfr_compare_const() {
 fn get_float_pair(p: usize, emin: Exponent, emax: Exponent) -> (BigFloat, Float) {
     let n = BigFloat::random_normal(p, emin, emax);
     let s1 = conv_str_to_mpfr_compat(format!("{:b}", n));
-    let f = Float::with_val(p as u32, Float::parse_radix(&s1, 2).unwrap());
+    let f = Float::with_val(p as u32, Float::parse_radix(s1, 2).unwrap());
     let s2 = conv_str_from_mpfr_compat(f.to_string_radix(2, None));
     //println!("\n{}\n{}", s1, s2);
     assert_eq!(n, BigFloat::parse(&s2, Radix::Bin, p, RoundingMode::None));

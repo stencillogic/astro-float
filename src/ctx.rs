@@ -1,4 +1,4 @@
-//! All operations on numbers are performed in some context.
+//! Context for operations on BigFloat.
 
 use crate::defs::DEFAULT_P;
 use crate::defs::DEFAULT_RM;
@@ -13,8 +13,45 @@ use alloc::rc::Rc;
 #[cfg(feature = "std")]
 use std::rc::Rc;
 
-/// Context contains default parameters for all operations.
-#[derive(Clone)]
+/// Context allows to perform operations using predefined parameters.
+///
+/// Context can be used to pass arguments, like precision and rounding mode, to each operation indirectly.
+///
+/// ## Examples
+///
+/// ``` rust
+/// use astro_float::with_consts;
+/// use astro_float::Consts;
+/// use astro_float::RoundingMode;
+/// use astro_float::BigFloat;
+/// use std::rc::Rc;
+/// use std::cell::RefCell;
+///
+/// // Shared constants cache.
+/// let cc = Rc::new(RefCell::new(Consts::new().unwrap()));
+///
+/// // Create context with precision 1024+8, rounding mode RoundingMode::ToEven,
+/// // constant cache cc, and default value 0.
+/// let mut ctx = with_consts(cc.clone())
+///     .precision(1024 + 8)
+///     .rounding_mode(RoundingMode::ToEven);
+///
+/// // Compute pi: pi = 6*arctan(1/sqrt(3))
+/// let mut pi = ctx.add(&3u8.into())
+///     .sqrt()
+///     .reciprocal()
+///     .atan()
+///     .mul(&6u8.into())
+///     .get_value().clone();       // return the value
+///
+/// pi.set_precision(1024, RoundingMode::ToEven).unwrap();
+///
+/// // Use library's constant for verifying the result
+/// let pi_lib: BigFloat = cc.borrow_mut().pi(1024, RoundingMode::ToEven).unwrap().into();
+///
+/// assert_eq!(pi_lib, pi);
+/// ```
+#[derive(Clone, Debug)]
 pub struct Context {
     cc: Rc<RefCell<Consts>>,
     p: usize,
@@ -27,7 +64,7 @@ impl Context {
     ///
     /// ## Panics
     ///
-    /// The function call panics if memory allocation failed.
+    /// The function call panics if memory allocation for constants cache has failed.
     pub fn new() -> Self {
         Context {
             cc: Rc::new(RefCell::new(Consts::new().expect("Memory allocation"))),
@@ -37,28 +74,48 @@ impl Context {
         }
     }
 
-    /// Sets the precision of the context.
-    pub fn precision(&mut self, p: usize) -> &mut Self {
-        self.p = p;
+    /// Sets the precision of the context and returns the modified context.
+    pub fn precision(mut self, p: usize) -> Self {
+        self.set_precision(p);
         self
+    }
+
+    /// Sets the rounding mode of the context and returns the modified context.
+    pub fn rounding_mode(mut self, rm: RoundingMode) -> Self {
+        self.set_rounding_mode(rm);
+        self
+    }
+
+    /// Sets the constant cache of the context and returns the modified context.
+    pub fn consts(mut self, cc: Rc<RefCell<Consts>>) -> Self {
+        self.set_consts(cc);
+        self
+    }
+
+    /// Sets the current value of the context and returns the modified context.
+    pub fn value(mut self, value: BigFloat) -> Self {
+        self.set_value(value);
+        self
+    }
+
+    /// Sets the precision of the context.
+    pub fn set_precision(&mut self, p: usize) {
+        self.p = p;
     }
 
     /// Sets the rounding mode of the context.
-    pub fn rounding_mode(&mut self, rm: RoundingMode) -> &mut Self {
+    pub fn set_rounding_mode(&mut self, rm: RoundingMode) {
         self.rm = rm;
-        self
     }
 
     /// Sets the constant cache of the context.
-    pub fn constant_cache(&mut self, cc: Rc<RefCell<Consts>>) -> &mut Self {
+    pub fn set_consts(&mut self, cc: Rc<RefCell<Consts>>) {
         self.cc = cc;
-        self
     }
 
-    /// Sets the current value of the context.
-    pub fn value(&mut self, value: BigFloat) -> &mut Self {
+    /// Sets the current value of the context and returns context.
+    pub fn set_value(&mut self, value: BigFloat) {
         self.value = value;
-        self
     }
 
     /// Returns the precision of the context.
@@ -77,49 +134,68 @@ impl Context {
     }
 
     /// Returns the current value of the context.
-    pub fn get_value(&self) -> BigFloat {
-        self.value.clone()
+    pub fn get_value(&self) -> &BigFloat {
+        &self.value
     }
 
     /// Returns `self` to the power of `n`.
     pub fn powi(&mut self, n: usize) -> &mut Self {
         let val = self.value.powi(n, self.p, self.rm);
-        self.value(val);
+        self.set_value(val);
+        self
+    }
+
+    /// Returns the remainder of division of the current value of the context by a given BigFloat.
+    pub fn rem(&mut self, arg: &BigFloat) -> &mut Self {
+        let val = self.value.rem(arg);
+        self.set_value(val);
         self
     }
 }
 
 macro_rules! impl_fun_rm {
-    // unwrap error, function requires self as argument
     ($comment:literal, $fname:ident) => {
         #[doc=$comment]
         pub fn $fname(&mut self) -> &mut Self {
-            let val = self.value.$fname(self.rm);
-            self.value(val);
+            let val = self.value.$fname(self.p, self.rm);
+            self.set_value(val);
             self
         }
     };
 }
 
 macro_rules! impl_fun_rm_cc {
-    // unwrap error, function requires self as argument
     ($comment:literal, $fname:ident) => {
         #[doc=$comment]
         pub fn $fname(&mut self) -> &mut Self {
-            let val = self.value.$fname(self.rm, &mut self.cc.borrow_mut());
-            self.value(val);
+            let val = self
+                .value
+                .$fname(self.p, self.rm, &mut self.cc.borrow_mut());
+            self.set_value(val);
             self
         }
     };
 }
 
 macro_rules! impl_fun_arg_rm_cc {
-    // unwrap error, function requires self as argument
     ($comment:literal, $fname:ident) => {
         #[doc=$comment]
         pub fn $fname(&mut self, arg: &BigFloat) -> &mut Self {
-            let val = self.value.$fname(arg, self.rm, &mut self.cc.borrow_mut());
-            self.value(val);
+            let val = self
+                .value
+                .$fname(arg, self.p, self.rm, &mut self.cc.borrow_mut());
+            self.set_value(val);
+            self
+        }
+    };
+}
+
+macro_rules! impl_fun_arg_rm_p {
+    ($comment:literal, $fname:ident) => {
+        #[doc=$comment]
+        pub fn $fname(&mut self, arg: &BigFloat) -> &mut Self {
+            let val = self.value.$fname(arg, self.p, self.rm);
+            self.set_value(val);
             self
         }
     };
@@ -132,14 +208,30 @@ macro_rules! impl_fun_rm_p_cc {
         pub fn $fname(&mut self) -> &mut Self {
             let val = self
                 .value
-                .$fname(self.rm, self.p, &mut self.cc.borrow_mut());
-            self.value(val);
+                .$fname(self.p, self.rm, &mut self.cc.borrow_mut());
+            self.set_value(val);
             self
         }
     };
 }
 
 impl Context {
+    impl_fun_arg_rm_p!("Adds BigFloat to the current value of the context.", add);
+    impl_fun_arg_rm_p!(
+        "Subtracts BigFloat from the current value of the context.",
+        sub
+    );
+    impl_fun_arg_rm_p!(
+        "Multiplies BigFloat by the current value of the context.",
+        mul
+    );
+    impl_fun_arg_rm_p!(
+        "Divides the current value of the context by the BigFloat.",
+        div
+    );
+
+    impl_fun_rm!("Returns the reciprocal of a number.", reciprocal);
+
     impl_fun_rm!("Returns the square root of a number.", sqrt);
     impl_fun_rm!("Returns the cube root of a number.", cbrt);
     impl_fun_rm_cc!("Returns the natural logarithm of a number.", ln);
@@ -156,9 +248,9 @@ impl Context {
     impl_fun_rm_cc!("Returns the tangent of a number.", tan);
     impl_fun_rm_p_cc!("Returns the arctangent of a number.", atan);
 
-    impl_fun_rm!("Returns the hyperbolic cosine of a number.", cosh);
+    impl_fun_rm_cc!("Returns the hyperbolic cosine of a number.", cosh);
     impl_fun_rm_cc!("Returns the hyperbolic arccosine of a number.", acosh);
-    impl_fun_rm!("Returns the hyperbolic sine of a number.", sinh);
+    impl_fun_rm_cc!("Returns the hyperbolic sine of a number.", sinh);
     impl_fun_rm_cc!("Returns the hyperbolic arcsine of a number.", asinh);
     impl_fun_rm_p_cc!("Returns the hyperbolic tangent of a number.", tanh);
     impl_fun_rm_cc!("Returns the hyperbolic arctangent of a number.", atanh);
@@ -214,62 +306,73 @@ pub fn with_value(value: BigFloat) -> Context {
 
 pub mod ops {
 
-    use super::{with_value, Context, DEFAULT_P, DEFAULT_RM};
-    use crate::{BigFloat, Radix, NAN};
+    use super::{with_value, Context};
+    use crate::BigFloat;
 
     use core::{
-        cmp::Ordering, cmp::PartialEq, cmp::PartialOrd, fmt::Display, fmt::Formatter,
-        iter::Product, iter::Sum, ops::Add, ops::AddAssign, ops::Div, ops::DivAssign, ops::Mul,
-        ops::MulAssign, ops::Neg, ops::Rem, ops::Sub, ops::SubAssign, str::FromStr,
+        cmp::Ordering,
+        cmp::PartialEq,
+        cmp::PartialOrd,
+        fmt::Display,
+        fmt::{Binary, Formatter, Octal, UpperHex},
+        ops::Add,
+        ops::AddAssign,
+        ops::Div,
+        ops::Mul,
+        ops::MulAssign,
+        ops::Neg,
+        ops::Rem,
+        ops::Sub,
+        ops::SubAssign,
+        ops::{DivAssign, RemAssign},
+        str::FromStr,
     };
 
     //
     // ops traits
     //
 
-    impl Add<BigFloat> for Context {
+    impl Rem<BigFloat> for &mut Context {
         type Output = Self;
-        fn add(self, rhs: BigFloat) -> Self::Output {
-            with_value(BigFloat::add(&self.value, &rhs, self.rm))
+        fn rem(self, rhs: BigFloat) -> Self::Output {
+            self.set_value(BigFloat::rem(&self.value, &rhs));
+            self
         }
     }
 
-    impl AddAssign<BigFloat> for Context {
-        fn add_assign(&mut self, rhs: BigFloat) {
-            self.value(BigFloat::add(&self.value, &rhs, self.rm));
-        }
-    }
-
-    impl Div<BigFloat> for Context {
+    impl Rem<&BigFloat> for &mut Context {
         type Output = Self;
-        fn div(self, rhs: BigFloat) -> Self::Output {
-            with_value(BigFloat::div(&self.value, &rhs, self.rm))
-        }
-    }
-
-    impl DivAssign<BigFloat> for Context {
-        fn div_assign(&mut self, rhs: BigFloat) {
-            self.value(BigFloat::div(&self.value, &rhs, self.rm));
+        fn rem(self, rhs: &BigFloat) -> Self::Output {
+            self.set_value(BigFloat::rem(&self.value, rhs));
+            self
         }
     }
 
     impl Rem<BigFloat> for Context {
         type Output = Self;
         fn rem(self, rhs: BigFloat) -> Self::Output {
-            with_value(BigFloat::rem(&self.value, &rhs, self.rm))
+            let val = BigFloat::rem(&self.value, &rhs);
+            self.value(val)
         }
     }
 
-    impl Mul<BigFloat> for Context {
+    impl Rem<&BigFloat> for Context {
         type Output = Self;
-        fn mul(self, rhs: BigFloat) -> Self::Output {
-            with_value(BigFloat::mul(&self.value, &rhs, self.rm))
+        fn rem(self, rhs: &BigFloat) -> Self::Output {
+            let val = BigFloat::rem(&self.value, rhs);
+            self.value(val)
         }
     }
 
-    impl MulAssign<BigFloat> for Context {
-        fn mul_assign(&mut self, rhs: BigFloat) {
-            self.value(BigFloat::mul(&self.value, &rhs, self.rm));
+    impl RemAssign<BigFloat> for Context {
+        fn rem_assign(&mut self, rhs: BigFloat) {
+            self.set_value(BigFloat::rem(&self.value, &rhs));
+        }
+    }
+
+    impl RemAssign<&BigFloat> for Context {
+        fn rem_assign(&mut self, rhs: &BigFloat) {
+            self.set_value(BigFloat::rem(&self.value, rhs));
         }
     }
 
@@ -289,70 +392,69 @@ pub mod ops {
         }
     }
 
-    impl Sub<BigFloat> for Context {
-        type Output = Self;
-        fn sub(self, rhs: BigFloat) -> Self::Output {
-            with_value(BigFloat::sub(&self.value, &rhs, self.rm))
-        }
+    macro_rules! impl_arith_op {
+        ($trait:ty, $rhs:ty, $fn:ident, $ct:ty) => {
+            impl $trait for $ct {
+                type Output = Self;
+                fn $fn(self, rhs: $rhs) -> Self::Output {
+                    self.set_value(BigFloat::$fn(&self.value, &rhs, self.p, self.rm));
+                    self
+                }
+            }
+        };
     }
 
-    impl SubAssign<BigFloat> for Context {
-        fn sub_assign(&mut self, rhs: BigFloat) {
-            self.value(BigFloat::sub(&self.value, &rhs, self.rm));
-        }
+    macro_rules! impl_arith_op2 {
+        ($trait:ty, $rhs:ty, $fn:ident, $ct:ty) => {
+            impl $trait for $ct {
+                type Output = Self;
+                fn $fn(self, rhs: $rhs) -> Self::Output {
+                    let val = self.value.$fn(&rhs, self.p, self.rm);
+                    self.value(val)
+                }
+            }
+        };
     }
 
-    impl Add<&BigFloat> for Context {
-        type Output = Self;
-        fn add(self, rhs: &BigFloat) -> Self::Output {
-            with_value(BigFloat::add(&self.value, rhs, self.rm))
-        }
+    impl_arith_op!(Add<BigFloat>, BigFloat, add, &mut Context);
+    impl_arith_op!(Sub<BigFloat>, BigFloat, sub, &mut Context);
+    impl_arith_op!(Mul<BigFloat>, BigFloat, mul, &mut Context);
+    impl_arith_op!(Div<BigFloat>, BigFloat, div, &mut Context);
+
+    impl_arith_op!(Add<&BigFloat>, &BigFloat, add, &mut Context);
+    impl_arith_op!(Sub<&BigFloat>, &BigFloat, sub, &mut Context);
+    impl_arith_op!(Mul<&BigFloat>, &BigFloat, mul, &mut Context);
+    impl_arith_op!(Div<&BigFloat>, &BigFloat, div, &mut Context);
+
+    impl_arith_op2!(Add<BigFloat>, BigFloat, add, Context);
+    impl_arith_op2!(Sub<BigFloat>, BigFloat, sub, Context);
+    impl_arith_op2!(Mul<BigFloat>, BigFloat, mul, Context);
+    impl_arith_op2!(Div<BigFloat>, BigFloat, div, Context);
+
+    impl_arith_op2!(Add<&BigFloat>, &BigFloat, add, Context);
+    impl_arith_op2!(Sub<&BigFloat>, &BigFloat, sub, Context);
+    impl_arith_op2!(Mul<&BigFloat>, &BigFloat, mul, Context);
+    impl_arith_op2!(Div<&BigFloat>, &BigFloat, div, Context);
+
+    macro_rules! impl_arith_assign_op {
+        ($trait:ty, $rhs:ty, $op:ident, $fn:ident, $ct:ty) => {
+            impl $trait for $ct {
+                fn $op(&mut self, rhs: $rhs) {
+                    self.set_value(BigFloat::$fn(&self.value, &rhs, self.p, self.rm));
+                }
+            }
+        };
     }
 
-    impl AddAssign<&BigFloat> for Context {
-        fn add_assign(&mut self, rhs: &BigFloat) {
-            self.value(BigFloat::add(&self.value, rhs, self.rm));
-        }
-    }
+    impl_arith_assign_op!(AddAssign<BigFloat>, BigFloat, add_assign, add, Context);
+    impl_arith_assign_op!(SubAssign<BigFloat>, BigFloat, sub_assign, sub, Context);
+    impl_arith_assign_op!(MulAssign<BigFloat>, BigFloat, mul_assign, mul, Context);
+    impl_arith_assign_op!(DivAssign<BigFloat>, BigFloat, div_assign, div, Context);
 
-    impl Div<&BigFloat> for Context {
-        type Output = Self;
-        fn div(self, rhs: &BigFloat) -> Self::Output {
-            with_value(BigFloat::div(&self.value, rhs, self.rm))
-        }
-    }
-
-    impl DivAssign<&BigFloat> for Context {
-        fn div_assign(&mut self, rhs: &BigFloat) {
-            self.value(BigFloat::div(&self.value, rhs, self.rm));
-        }
-    }
-
-    impl Mul<&BigFloat> for Context {
-        type Output = Self;
-        fn mul(self, rhs: &BigFloat) -> Self::Output {
-            with_value(BigFloat::mul(&self.value, rhs, self.rm))
-        }
-    }
-
-    impl MulAssign<&BigFloat> for Context {
-        fn mul_assign(&mut self, rhs: &BigFloat) {
-            self.value(BigFloat::mul(&self.value, rhs, self.rm));
-        }
-    }
-
-    impl Sub<&BigFloat> for Context {
-        type Output = Self;
-        fn sub(self, rhs: &BigFloat) -> Self::Output {
-            with_value(BigFloat::sub(&self.value, rhs, self.rm))
-        }
-    }
-
-    impl SubAssign<&BigFloat> for Context {
-        fn sub_assign(&mut self, rhs: &BigFloat) {
-            self.value(BigFloat::sub(&self.value, rhs, self.rm));
-        }
-    }
+    impl_arith_assign_op!(AddAssign<&BigFloat>, &BigFloat, add_assign, add, Context);
+    impl_arith_assign_op!(SubAssign<&BigFloat>, &BigFloat, sub_assign, sub, Context);
+    impl_arith_assign_op!(MulAssign<&BigFloat>, &BigFloat, mul_assign, mul, Context);
+    impl_arith_assign_op!(DivAssign<&BigFloat>, &BigFloat, div_assign, div, Context);
 
     //
     // ordering traits
@@ -383,23 +485,20 @@ pub mod ops {
         }
     }
 
-    impl From<f64> for Context {
-        fn from(f: f64) -> Self {
-            with_value(BigFloat::from_f64(f, DEFAULT_P))
-        }
+    macro_rules! impl_format_rdx {
+        ($trait:ty, $trait_fun:path, $rdx:path) => {
+            impl $trait for Context {
+                fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
+                    $trait_fun(&self.value, f)
+                }
+            }
+        };
     }
 
-    impl From<f32> for Context {
-        fn from(f: f32) -> Self {
-            with_value(BigFloat::from_f32(f, DEFAULT_P))
-        }
-    }
-
-    impl Display for Context {
-        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-            self.value.write_str(f, Radix::Dec, self.rm)
-        }
-    }
+    impl_format_rdx!(Binary, Binary::fmt, Radix::Bin);
+    impl_format_rdx!(Octal, Octal::fmt, Radix::Oct);
+    impl_format_rdx!(Display, Display::fmt, Radix::Dec);
+    impl_format_rdx!(UpperHex, UpperHex::fmt, Radix::Hex);
 
     impl Default for Context {
         fn default() -> Self {
@@ -408,69 +507,11 @@ pub mod ops {
     }
 
     impl FromStr for Context {
-        type Err = Context;
+        type Err = ();
 
         /// Returns parsed number or NAN in case of error.
         fn from_str(src: &str) -> Result<Context, Self::Err> {
-            BigFloat::parse(src, Radix::Dec, DEFAULT_P, DEFAULT_RM)
-                .map(with_value)
-                .ok_or_else(|| -> Context { with_value(NAN) })
-        }
-    }
-
-    impl Product<BigFloat> for Context {
-        fn product<I: Iterator<Item = BigFloat>>(mut iter: I) -> Self {
-            if let Some(v) = iter.next() {
-                let mut ctx = with_value(v);
-                for v in iter {
-                    ctx *= v;
-                }
-                ctx
-            } else {
-                Context::new()
-            }
-        }
-    }
-
-    impl Sum<BigFloat> for Context {
-        fn sum<I: Iterator<Item = BigFloat>>(mut iter: I) -> Self {
-            if let Some(v) = iter.next() {
-                let mut ctx = with_value(v);
-                for v in iter {
-                    ctx += v;
-                }
-                ctx
-            } else {
-                Context::new()
-            }
-        }
-    }
-
-    impl<'a> Product<&'a BigFloat> for Context {
-        fn product<I: Iterator<Item = &'a BigFloat>>(mut iter: I) -> Self {
-            if let Some(v) = iter.next() {
-                let mut ctx = with_value(v.clone());
-                for v in iter {
-                    ctx *= v;
-                }
-                ctx
-            } else {
-                Context::new()
-            }
-        }
-    }
-
-    impl<'a> Sum<&'a BigFloat> for Context {
-        fn sum<I: Iterator<Item = &'a BigFloat>>(mut iter: I) -> Self {
-            if let Some(v) = iter.next() {
-                let mut ctx = with_value(v.clone());
-                for v in iter {
-                    ctx += v;
-                }
-                ctx
-            } else {
-                Context::new()
-            }
+            BigFloat::from_str(src).map(with_value)
         }
     }
 }
@@ -480,29 +521,31 @@ mod tests {
 
     use core::ops::{Add, Div, Mul, Neg, Sub};
 
+    use crate::common::util::rand_p;
+
     use super::*;
 
     #[test]
     fn test_ctx() {
         // context building
-        let p = 256;
+        let p = rand_p();
         let rm = RoundingMode::ToZero;
         let cc = Rc::new(RefCell::new(Consts::new().unwrap()));
         let val = BigFloat::from_i8(123, DEFAULT_P);
 
-        let mut ctx = Context::new();
-        ctx.precision(p)
+        let mut ctx = Context::new()
+            .precision(p)
             .rounding_mode(rm)
-            .constant_cache(cc.clone())
+            .consts(cc.clone())
             .value(val.clone());
 
         assert_eq!(ctx.get_precision(), p);
         assert_eq!(ctx.get_rounding_mode(), rm);
         assert_eq!(Rc::strong_count(&ctx.get_consts()), Rc::strong_count(&cc));
-        assert_eq!(ctx.get_value(), val);
+        assert_eq!(ctx.get_value(), &val);
 
         // functions
-        let refval = ctx.get_value();
+        let refval = ctx.get_value().clone();
         let logbase = BigFloat::from_i8(3, DEFAULT_P);
         let powi = 2;
 
@@ -528,35 +571,38 @@ mod tests {
             .asinh()
             .tanh()
             .atanh()
-            .get_value();
+            .get_value()
+            .clone();
 
-        let refval =
-            refval
-                .powi(powi, p, rm)
-                .sqrt(rm)
-                .cbrt(rm)
-                .pow(&logbase, rm, &mut cc.borrow_mut());
-        let refval = refval.ln(rm, &mut cc.borrow_mut());
-        let refval = refval.log2(rm, &mut cc.borrow_mut());
-        let refval = refval.exp(rm, &mut cc.borrow_mut());
-        let refval = refval.log10(rm, &mut cc.borrow_mut());
-        let refval = refval.log(&logbase, rm, &mut cc.borrow_mut());
-        let refval = refval.cos(rm, &mut cc.borrow_mut());
-        let refval = refval.acos(rm, &mut cc.borrow_mut());
-        let refval = refval.sin(rm, &mut cc.borrow_mut());
-        let refval = refval.asin(rm, &mut cc.borrow_mut());
-        let refval = refval.tan(rm, &mut cc.borrow_mut());
-        let refval = refval.atan(rm, p, &mut cc.borrow_mut()).cosh(rm);
-        let refval = refval.acosh(rm, &mut cc.borrow_mut()).sinh(rm);
-        let refval = refval.asinh(rm, &mut cc.borrow_mut());
-        let refval = refval.tanh(rm, p, &mut cc.borrow_mut());
-        let refval = refval.atanh(rm, &mut cc.borrow_mut());
+        let refval = refval.powi(powi, p, rm).sqrt(p, rm).cbrt(p, rm).pow(
+            &logbase,
+            p,
+            rm,
+            &mut cc.borrow_mut(),
+        );
+        let refval = refval.ln(p, rm, &mut cc.borrow_mut());
+        let refval = refval.log2(p, rm, &mut cc.borrow_mut());
+        let refval = refval.exp(p, rm, &mut cc.borrow_mut());
+        let refval = refval.log10(p, rm, &mut cc.borrow_mut());
+        let refval = refval.log(&logbase, p, rm, &mut cc.borrow_mut());
+        let refval = refval.cos(p, rm, &mut cc.borrow_mut());
+        let refval = refval.acos(p, rm, &mut cc.borrow_mut());
+        let refval = refval.sin(p, rm, &mut cc.borrow_mut());
+        let refval = refval.asin(p, rm, &mut cc.borrow_mut());
+        let refval = refval.tan(p, rm, &mut cc.borrow_mut());
+        let refval = refval.atan(p, rm, &mut cc.borrow_mut());
+        let refval = refval.cosh(p, rm, &mut cc.borrow_mut());
+        let refval = refval.acosh(p, rm, &mut cc.borrow_mut());
+        let refval = refval.sinh(p, rm, &mut cc.borrow_mut());
+        let refval = refval.asinh(p, rm, &mut cc.borrow_mut());
+        let refval = refval.tanh(p, rm, &mut cc.borrow_mut());
+        let refval = refval.atanh(p, rm, &mut cc.borrow_mut());
 
         assert_eq!(refval, ret);
 
         // ops by ref
         let rhs = BigFloat::from_i8(10, DEFAULT_P);
-        ctx = ctx.add(&rhs).mul(&rhs).sub(&rhs).div(&rhs);
+        let mut ctx = ctx.add(&rhs).mul(&rhs).sub(&rhs).div(&rhs);
         ctx += &rhs;
         ctx -= &rhs;
         ctx *= &rhs;
@@ -565,25 +611,29 @@ mod tests {
         let mut ctxref = &mut ctx;
         ctxref = ctxref.neg();
 
-        let refval = BigFloat::add(&refval, &rhs, rm);
-        let refval = BigFloat::mul(&refval, &rhs, rm);
-        let refval = BigFloat::sub(&refval, &rhs, rm);
-        let refval = BigFloat::div(&refval, &rhs, rm);
+        let refval = BigFloat::add(&refval, &rhs, p, rm);
+        let refval = BigFloat::mul(&refval, &rhs, p, rm);
+        let refval = BigFloat::sub(&refval, &rhs, p, rm);
+        let refval = BigFloat::div(&refval, &rhs, p, rm);
+        let refval = BigFloat::add(&refval, &rhs, p, rm);
+        let refval = BigFloat::sub(&refval, &rhs, p, rm);
+        let refval = BigFloat::mul(&refval, &rhs, p, rm);
+        let refval = BigFloat::div(&refval, &rhs, p, rm);
         let refval = refval.neg();
 
         assert_eq!(refval, ctxref.get_value());
 
         // ops by val
-        ctx = ctx
+        let ctx = ctx
             .add(rhs.clone())
             .mul(rhs.clone())
             .sub(rhs.clone())
             .div(rhs.clone());
 
-        let refval = BigFloat::add(&refval, &rhs, rm);
-        let refval = BigFloat::mul(&refval, &rhs, rm);
-        let refval = BigFloat::sub(&refval, &rhs, rm);
-        let refval = BigFloat::div(&refval, &rhs, rm);
+        let refval = BigFloat::add(&refval, &rhs, p, rm);
+        let refval = BigFloat::mul(&refval, &rhs, p, rm);
+        let refval = BigFloat::sub(&refval, &rhs, p, rm);
+        let refval = BigFloat::div(&refval, &rhs, p, rm);
 
         assert_eq!(refval, ctx.get_value());
     }

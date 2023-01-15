@@ -63,6 +63,7 @@ fn pqr_inc(
 }
 
 /// Holds value of currently computed PI.
+#[derive(Debug)]
 pub struct PiCache {
     b: usize,
     pk: BigFloatNumber,

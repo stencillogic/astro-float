@@ -49,7 +49,7 @@ pub const WORD_SIGNIFICANT_BIT: Word = WORD_MAX << (WORD_BIT_SIZE - 1);
 pub const DEFAULT_RM: RoundingMode = RoundingMode::ToEven;
 
 /// Default precision.
-pub const DEFAULT_P: usize = WORD_BIT_SIZE * 2;
+pub const DEFAULT_P: usize = 128;
 
 /// Sign.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -107,7 +107,7 @@ pub enum Error {
 impl Clone for Error {
     fn clone(&self) -> Self {
         match self {
-            Self::ExponentOverflow(arg) => Self::ExponentOverflow(arg.clone()),
+            Self::ExponentOverflow(arg) => Self::ExponentOverflow(*arg),
             Self::DivisionByZero => Self::DivisionByZero,
             Self::InvalidArgument => Self::InvalidArgument,
             Self::MemoryAllocation(arg) => Self::MemoryAllocation(match arg {

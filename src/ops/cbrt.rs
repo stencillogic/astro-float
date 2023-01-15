@@ -42,7 +42,7 @@ impl BigFloatNumber {
 
         ret.set_precision(p, rm)?;
 
-        let mut e_corr = ret.get_exponent() as isize + ((e as isize - e_shift as isize) / 3);
+        let mut e_corr = ret.get_exponent() as isize + (e - e_shift) / 3;
 
         if e_corr < EXPONENT_MIN as isize {
             let is_positive = ret.is_positive();

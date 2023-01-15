@@ -132,7 +132,7 @@ fn test_powi() {
         .unwrap();
         d1.set_sign(Sign::Pos);
 
-        let d2 = d1.powi(i as usize, prec, RoundingMode::ToEven).unwrap();
+        let d2 = d1.powi(i, prec, RoundingMode::ToEven).unwrap();
 
         let mut d3 = d1.clone().unwrap();
         d3.set_precision(prec + core::mem::size_of::<usize>(), RoundingMode::None)

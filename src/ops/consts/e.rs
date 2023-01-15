@@ -43,6 +43,7 @@ fn pqr_inc(
 }
 
 /// Holds value of currently computed e.
+#[derive(Debug)]
 pub struct ECache {
     b: usize,
     pk: BigFloatNumber,

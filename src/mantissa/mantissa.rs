@@ -509,7 +509,7 @@ impl Mantissa {
 
         let (q, r) = Self::div_unbalanced(&m1, &m2.m)?;
 
-        let mut e_shift = if q[q.len() - 1] > 0 { 1 } else { 0 };
+        let mut e_shift = isize::from(q[q.len() - 1] > 0);
 
         let n = q.len() * WORD_BIT_SIZE;
         let mut m3 = Mantissa { m: q, n };
