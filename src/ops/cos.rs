@@ -114,8 +114,14 @@ impl BigFloatNumber {
             return Self::from_word(1, p);
         }
 
+        let p_wrk = if p > self.get_mantissa_max_bit_len() {
+            p
+        } else {
+            self.get_mantissa_max_bit_len()
+        };
+
         let mut arg1 = self.clone()?;
-        arg1.set_precision(p + 1 + (-COS_EXP_THRES) as usize, RoundingMode::None)?;
+        arg1.set_precision(p_wrk + 1 + (-COS_EXP_THRES) as usize, RoundingMode::None)?;
 
         let arg1 = arg1.reduce_trig_arg(cc, RoundingMode::None)?;
 
@@ -126,7 +132,7 @@ impl BigFloatNumber {
 
             let mut arg2 = self.clone()?;
             arg2.set_precision(
-                p + 1 + ret.get_exponent().unsigned_abs() as usize,
+                p_wrk + 1 + ret.get_exponent().unsigned_abs() as usize,
                 RoundingMode::None,
             )?;
 

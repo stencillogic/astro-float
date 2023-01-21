@@ -126,16 +126,16 @@ fn mpfr_compare_special() {
             test_astro_op!(false, n, atan, f, atan, p, rm, rnd, "atan", cc);
 
             let mut n_trig = n.clone();
-            let _f_trig = if n.get_exponent().unwrap() > 128 {
+            let f_trig = if n.get_exponent().unwrap() > 128 {
                 n_trig.set_exponent(128);    // large exponent causes very long computation.
                 conv_to_mpfr(p1, &n_trig)
             } else {
                 f.clone()
             };
 
-            //test_astro_op!(false, n_trig, sin, f_trig, sin, p, rm, rnd, "sin", cc);
-            //test_astro_op!(false, n_trig, cos, f_trig, cos, p, rm, rnd, "cos", cc);
-            //test_astro_op!(false, n_trig, tan, f_trig, tan, p, rm, rnd, "tan", cc);
+            test_astro_op!(false, n_trig, sin, f_trig, sin, p, rm, rnd, "sin", cc);
+            test_astro_op!(false, n_trig, cos, f_trig, cos, p, rm, rnd, "cos", cc);
+            test_astro_op!(false, n_trig, tan, f_trig, tan, p, rm, rnd, "tan", cc);
 
             test_astro_op!(false, n, exp, f, exp, p, rm, rnd, "exp", cc);
             test_astro_op!(false, n, sinh, f, sinh, p, rm, rnd, "sinh", cc);

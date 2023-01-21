@@ -81,7 +81,13 @@ impl BigFloatNumber {
 
         let mut arg = self.clone()?;
 
-        arg.set_precision(p + 1, RoundingMode::None)?;
+        let p_wrk = if p > self.get_mantissa_max_bit_len() {
+            p
+        } else {
+            self.get_mantissa_max_bit_len()
+        };
+
+        arg.set_precision(p_wrk + 1, RoundingMode::None)?;
 
         let arg = arg.reduce_trig_arg(cc, RoundingMode::None)?;
 
