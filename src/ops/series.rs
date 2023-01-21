@@ -46,9 +46,9 @@ pub trait ArgReductionEstimator {
 /// m is the negative exponent of the number.
 /// pwr_step - increment of power of x in each iteration
 /// ext - if true use series step cost directly
-pub fn series_cost_optimize<T: PolycoeffGen, S: ArgReductionEstimator>(
+pub fn series_cost_optimize<S: ArgReductionEstimator>(
     p: usize,
-    polycoeff_gen: &T,
+    polycoeff_gen: &impl PolycoeffGen,
     m: isize,
     pwr_step: usize,
     ext: bool,

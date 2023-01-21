@@ -442,7 +442,12 @@ impl BigFloat {
         match &self.inner {
             Flavor::Value(v1) => {
                 match &n.inner {
-                    Flavor::Value(v2) => Self::result_to_ext(v1.log(v2, p, rm, cc), false, true),
+                    Flavor::Value(v2) => {
+                        if v2.is_zero() {
+                            return INF_NEG;
+                        }
+                        Self::result_to_ext(v1.log(v2, p, rm, cc), false, true)
+                    }
                     Flavor::Inf(s2) => {
                         // v1.log(inf)
                         if s2.is_positive() {
@@ -1081,6 +1086,24 @@ macro_rules! gen_wrapper_arg_rm_cc {
     };
 }
 
+macro_rules! gen_wrapper_log {
+    ($comment:literal, $fname:ident, $ret:ty, $pos_inf:block, $neg_inf:block, $($arg:ident, $arg_type:ty),*) => {
+        #[doc=$comment]
+        pub fn $fname(&self$(,$arg: $arg_type)*, rm: RoundingMode, cc: &mut Consts) -> $ret {
+            match &self.inner {
+                Flavor::Value(v) => {
+                    if v.is_zero() {
+                        return INF_NEG;
+                    }
+                    Self::result_to_ext(v.$fname($($arg,)* rm, cc), v.is_zero(), true)
+                },
+                Flavor::Inf(s) => if s.is_positive() $pos_inf else $neg_inf,
+                Flavor::NaN(err) => Self::nan(err.clone()),
+            }
+        }
+    };
+}
+
 impl BigFloat {
     gen_wrapper_arg!(
         "Returns the absolute value of `self`.",
@@ -1141,7 +1164,7 @@ impl BigFloat {
         p,
         usize
     );
-    gen_wrapper_arg_rm_cc!(
+    gen_wrapper_log!(
         "Computes the natural logarithm of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
         Precision is rounded upwards to the word size.",
@@ -1152,7 +1175,7 @@ impl BigFloat {
         p,
         usize
     );
-    gen_wrapper_arg_rm_cc!(
+    gen_wrapper_log!(
         "Computes the logarithm base 2 of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
         Precision is rounded upwards to the word size.",
@@ -1163,7 +1186,7 @@ impl BigFloat {
         p,
         usize
     );
-    gen_wrapper_arg_rm_cc!(
+    gen_wrapper_log!(
         "Computes the logarithm base 10 of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
         Precision is rounded upwards to the word size.",

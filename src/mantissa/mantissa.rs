@@ -120,6 +120,11 @@ impl Mantissa {
         self.n = n;
     }
 
+    pub fn update_bit_len(&mut self) {
+        let n = Self::find_bit_len(&self.m);
+        self.n = n;
+    }
+
     /// Shift right by n bits.
     pub fn shift_right(&mut self, n: usize) {
         shift_slice_right(&mut self.m, n)
@@ -260,7 +265,7 @@ impl Mantissa {
         rm: RoundingMode,
         is_positive: bool,
         full_prec: bool,
-    ) -> Result<(usize, Self), Error> {
+    ) -> Result<(isize, Self), Error> {
         // Input is expected to be normalized.
         debug_assert!(self.m[self.len() - 1] & WORD_SIGNIFICANT_BIT != 0);
         debug_assert!(m2.m[m2.len() - 1] & WORD_SIGNIFICANT_BIT != 0);
@@ -275,7 +280,7 @@ impl Mantissa {
             // m1 1XXXX00000000   - m1 and trailing zeroes
             // m2 000000001XXXX   - m2_shift, m2
 
-            let m3l = self.len().max(p + 1);
+            let m3l = self.len().max(p) + 1;
             let mut m3 = Mantissa::new(m3l * WORD_BIT_SIZE)?;
 
             // subtract 1
@@ -323,7 +328,7 @@ impl Mantissa {
 
         debug_assert!(c == 0);
 
-        let mut shift = Self::maximize(&mut m3.m);
+        let mut shift = Self::maximize(&mut m3.m) as isize;
 
         if full_prec {
             m3.m.trunc_trailing_zeroes();
@@ -343,7 +348,7 @@ impl Mantissa {
         Ok((shift, m3))
     }
 
-    /// Returns carry flag, and self + m2.
+    /// Returns exponent shift, and self + m2.
     pub fn abs_add(
         &self,
         m2: &Self,
@@ -352,7 +357,7 @@ impl Mantissa {
         rm: RoundingMode,
         is_positive: bool,
         full_prec: bool,
-    ) -> Result<(bool, Self), Error> {
+    ) -> Result<(isize, Self), Error> {
         debug_assert!(self.m[self.len() - 1] & WORD_SIGNIFICANT_BIT != 0);
         debug_assert!(m2.m[m2.len() - 1] & WORD_SIGNIFICANT_BIT != 0);
 
@@ -429,6 +434,8 @@ impl Mantissa {
             }
         };
 
+        let mut shift = -(c as isize);
+
         if full_prec {
             m3.m.trunc_trailing_zeroes();
         } else if m3.len() < p {
@@ -436,14 +443,15 @@ impl Mantissa {
             m3.m.try_extend(p * WORD_BIT_SIZE)?;
             m3.m[..p - n].fill(0);
         } else if m3.len() > p {
-            let rndres = m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive); // it is not possible that rounding overflows, and c > 0 at the same time.
-            debug_assert!(!rndres);
+            if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive) {
+                shift -= 1;
+            }
             m3.m.trunc_to(p * WORD_BIT_SIZE);
         }
 
         m3.n = m3.max_bit_len();
 
-        Ok((c > 0, m3))
+        Ok((shift, m3))
     }
 
     /// Multiply two mantissas, return result and exponent shift as positive value.
@@ -495,8 +503,9 @@ impl Mantissa {
     ) -> Result<(isize, Self), Error> {
         let p = Self::bit_len_to_word_len(p);
 
-        let extra_p = 1;
-        let k = extra_p + p + m2.len();
+        let k = (p + m2.len()).max(self.len()) + 1;
+
+        let mut e_shift = (m2.len() as isize - k as isize) * WORD_BIT_SIZE as isize;
 
         let mut m1 = Self::reserve_new(k)?;
         if k > self.len() {
@@ -504,30 +513,39 @@ impl Mantissa {
             m1[l..].copy_from_slice(&self.m);
             m1[..l].fill(0);
         } else {
-            m1.copy_from_slice(&self.m[self.m.len() - k..]);
+            m1.copy_from_slice(&self.m);
         }
 
         let (q, r) = Self::div_unbalanced(&m1, &m2.m)?;
 
-        let mut e_shift = isize::from(q[q.len() - 1] > 0);
+        e_shift += q.len() as isize * WORD_BIT_SIZE as isize;
 
-        let n = q.len() * WORD_BIT_SIZE;
-        let mut m3 = Mantissa { m: q, n };
+        let mut m3 = Mantissa { m: q, n: 0 };
 
-        // sticky
-        if r.iter().any(|&x| x != 0) {
-            m3.m[0] |= 1;
+        let r_stricky = r.iter().any(|&x| x != 0);
+
+        // rounding
+        if r_stricky {
+            if rm as u32 & 0b1100000 != 0 {
+                m3.m[0] |= 1;
+            } else if rm == RoundingMode::FromZero ||
+                (is_positive && rm == RoundingMode::Up) ||
+                (!is_positive && rm == RoundingMode::Down) {
+                if m3.add_ulp() {
+                    let m3l = m3.len() - 1;
+                    m3.m[m3l] = WORD_SIGNIFICANT_BIT;
+                    e_shift += 1;
+                }
+            }
         }
 
-        let _ = Self::maximize(&mut m3.m);
-        if m3.round_mantissa((extra_p + 1) * WORD_BIT_SIZE, rm, is_positive) {
-            e_shift -= 1;
+        e_shift -= Self::maximize(&mut m3.m) as isize;
+        if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive) {
+            e_shift += 1;
         }
 
         m3.m.trunc_to(p * WORD_BIT_SIZE);
         m3.n = m3.max_bit_len();
-
-        debug_assert!(e_shift >= -1 && e_shift <= 1);
 
         Ok((e_shift, m3))
     }
@@ -1019,5 +1037,17 @@ impl Mantissa {
         } else {
             false
         }
+    }
+
+    // Add 1 ulp to mantissa, return true if carry occures
+    fn add_ulp(&mut self) -> bool {
+        let mut c = 1;
+        for v in self.m.iter_mut() {
+            c = add_carry(*v, 0, c, v);
+            if c == 0 {
+                break;
+            }
+        }
+        c > 0
     }
 }

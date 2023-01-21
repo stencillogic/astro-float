@@ -20,15 +20,15 @@ impl BigFloatNumber {
     ///  - InvalidArgument: argument is negative, or the precision is incorrect.
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn sqrt(&self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
-        if self.is_negative() {
-            return Err(Error::InvalidArgument);
-        }
-
+        let p = round_p(p);
+        
         if self.is_zero() {
             return Self::new(p);
         }
 
-        let p = round_p(p);
+        if self.is_negative() {
+            return Err(Error::InvalidArgument);
+        }
 
         let mut err = 1;
 

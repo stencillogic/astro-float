@@ -150,10 +150,7 @@ impl BigFloatNumber {
 
         let p = self.get_mantissa_max_bit_len();
         let mut polycoeff_gen = CosPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<
-            CosPolycoeffGen,
-            CosArgReductionEstimator,
-        >(p, &polycoeff_gen, -(self.e as isize), 2, false);
+        let (reduction_times, niter) = series_cost_optimize::<CosArgReductionEstimator>(p, &polycoeff_gen, -(self.e as isize), 2, false);
 
         let p_arg = p + niter * 4 + reduction_times * 3;
         self.set_precision(p_arg, rm)?;

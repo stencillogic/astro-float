@@ -149,10 +149,7 @@ impl BigFloatNumber {
     fn ln_series(mut x: Self, rm: RoundingMode, with_correction: bool) -> Result<Self, Error> {
         let p = x.get_mantissa_max_bit_len();
         let mut polycoeff_gen = AtanhPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<
-            AtanhPolycoeffGen,
-            LnArgReductionEstimator,
-        >(p, &polycoeff_gen, 0, 2, false);
+        let (reduction_times, niter) = series_cost_optimize::<LnArgReductionEstimator>(p, &polycoeff_gen, 0, 2, false);
 
         let err = reduction_times + 4;
         let p = x.get_mantissa_max_bit_len() + err;

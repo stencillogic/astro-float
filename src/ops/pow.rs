@@ -91,14 +91,15 @@ impl BigFloatNumber {
     ///  - InvalidArgument: the precision is incorrect.
     pub fn powi(&self, n: usize, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         let mut i = n;
+
+        if i == 0 {
+            return Self::from_word(1, p);
+        }
+
         if self.is_zero() || i == 1 {
             let mut ret = self.clone()?;
             ret.set_precision(p, rm)?;
             return Ok(ret);
-        }
-
-        if i == 0 {
-            return Self::from_word(1, p);
         }
 
         let mut bit_pos = WORD_BIT_SIZE;
@@ -178,16 +179,16 @@ impl BigFloatNumber {
         rm: RoundingMode,
         cc: &mut Consts,
     ) -> Result<Self, Error> {
-        if self.is_negative() {
-            return Err(Error::InvalidArgument);
-        } else if self.is_zero() {
-            return if n.is_negative() {
-                Err(Error::ExponentOverflow(Sign::Pos))
-            } else if n.is_zero() {
+        if self.is_zero() {
+            return if n.is_zero() {
                 Self::from_word(1, p)
+            } else if n.is_negative() {
+                Err(Error::ExponentOverflow(Sign::Pos))
             } else {
                 Self::new(p)
             };
+        } else if self.is_negative() {
+            return Err(Error::InvalidArgument);
         } else if self.get_exponent() == 1 && self.cmp(&ONE) == 0 {
             return Self::from_word(1, p);
         } else if n.get_exponent() == 1 && n.abs_cmp(&ONE) == 0 {

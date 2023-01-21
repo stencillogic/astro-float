@@ -223,14 +223,16 @@ impl BigFloatNumber {
             }
 
             m.set_bit_len(m.max_bit_len() - start_bit);
-            m.round_mantissa(WORD_BIT_SIZE, rm, sign.is_positive());
-            m.set_length(p)?;
 
-            Ok(BigFloatNumber {
+            let mut ret = BigFloatNumber {
                 m,
                 e: e as Exponent,
                 s: sign,
-            })
+            };
+
+            ret.set_precision(p, rm)?;
+
+            Ok(ret)
         }
     }
 

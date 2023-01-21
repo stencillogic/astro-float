@@ -298,6 +298,9 @@ impl BigFloatNumber {
             };
         }
 
+        let p = round_p(p);
+        Self::p_assertion(p)?;
+
         let s = if self.s == d2.s { Sign::Pos } else { Sign::Neg };
 
         if self.m.is_zero() {
@@ -305,9 +308,6 @@ impl BigFloatNumber {
             ret.set_sign(s);
             return Ok(ret);
         }
-
-        let p = round_p(p);
-        Self::p_assertion(p)?;
 
         let (e1, m1_opt) = self.normalize()?;
         let m1_normalized = m1_opt.as_ref().unwrap_or(&self.m);
@@ -341,17 +341,12 @@ impl BigFloatNumber {
     ///
     /// ## Errors
     ///
-    ///  - DivisionByZero: `d2` is zero.
     ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    ///  - InvalidArgument: both `self` and `d2` are zero.
+    ///  - InvalidArgument: `d2` is zero.
     pub fn rem(&self, d2: &Self) -> Result<Self, Error> {
         if d2.m.is_zero() {
-            return if self.is_zero() {
-                Err(Error::InvalidArgument)
-            } else {
-                Err(Error::DivisionByZero)
-            };
+            return Err(Error::InvalidArgument);
         }
 
         if self.m.is_zero() {
@@ -503,59 +498,49 @@ impl BigFloatNumber {
         let m2 = m2_opt.as_ref().unwrap_or(&d2.m);
 
         let mut e;
-        if (self.s != d2.s && op >= 0) || (op < 0 && self.s == d2.s) {
+        let (shift, mut m3) = if (self.s != d2.s && op >= 0) || (op < 0 && self.s == d2.s) {
             // subtract
             let cmp = self.abs_cmp(d2);
-            let (shift, mut m3) = if cmp > 0 {
+            if cmp > 0 {
                 d3.s = self.s;
                 e = e1;
-                m1.abs_sub(m2, p, (e1 - e2) as usize, rm, d3.is_positive(), full_prec)?
+                m1.abs_sub(m2, p, (e1 - e2) as usize, rm, d3.is_positive(), full_prec)
             } else if cmp < 0 {
                 d3.s = if op >= 0 { d2.s } else { d2.s.invert() };
                 e = e2;
-                m2.abs_sub(m1, p, (e2 - e1) as usize, rm, d3.is_positive(), full_prec)?
+                m2.abs_sub(m1, p, (e2 - e1) as usize, rm, d3.is_positive(), full_prec)
             } else {
                 return Self::new(p);
-            };
-
-            debug_assert!(shift as isize <= isize::MAX / 2 && e >= isize::MIN / 2);
-            e -= shift as isize;
-
-            if e < EXPONENT_MIN as isize {
-                if !Self::process_subnormal(&mut m3, &mut e, rm, d3.is_positive()) {
-                    let mut ret = Self::new(p)?;
-                    ret.set_sign(d3.s);
-                    return Ok(ret);
-                }
             }
-            d3.e = e as Exponent;
-            d3.m = m3;
         } else {
             // add
             d3.s = self.s;
-            let (c, mut m3) = if e1 >= e2 {
+            if e1 >= e2 {
                 e = e1;
                 m1.abs_add(m2, p, (e1 - e2) as usize, rm, d3.is_positive(), full_prec)
             } else {
                 e = e2;
                 m2.abs_add(m1, p, (e2 - e1) as usize, rm, d3.is_positive(), full_prec)
-            }?;
-            if c {
-                if e == EXPONENT_MAX as isize {
-                    return Err(Error::ExponentOverflow(self.s));
-                }
-                e += 1;
             }
-            if e < EXPONENT_MIN as isize {
-                if !Self::process_subnormal(&mut m3, &mut e, rm, d3.is_positive()) {
-                    let mut ret = Self::new(p)?;
-                    ret.set_sign(d3.s);
-                    return Ok(ret);
-                }
-            }
-            d3.e = e as Exponent;
-            d3.m = m3;
+        }?;
+
+        debug_assert!(shift as isize <= isize::MAX / 2 && e >= isize::MIN / 2);
+        e -= shift as isize;
+
+        if e > EXPONENT_MAX as isize {
+            return Err(Error::ExponentOverflow(d3.s));
         }
+
+        if e < EXPONENT_MIN as isize {
+            if !Self::process_subnormal(&mut m3, &mut e, rm, d3.is_positive()) {
+                let mut ret = Self::new(p)?;
+                ret.set_sign(d3.s);
+                return Ok(ret);
+            }
+        }
+
+        d3.e = e as Exponent;
+        d3.m = m3;
 
         Ok(d3)
     }
@@ -1062,6 +1047,9 @@ impl BigFloatNumber {
                 if ret.m.is_all_zero() {
                     return Self::new(self.get_mantissa_max_bit_len());
                 }
+                if ret.m.is_subnormal() {
+                    ret.m.update_bit_len();
+                }
             }
         }
         Ok(ret)
@@ -1126,6 +1114,8 @@ impl BigFloatNumber {
             } else if self.m.is_all_zero() {
                 self.m.set_zero();
                 self.e = 0;
+            } else if self.is_subnormal() {
+                self.m.update_bit_len();
             }
         }
 
@@ -1143,6 +1133,10 @@ impl BigFloatNumber {
     pub fn reciprocal(&self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         let p = round_p(p);
         Self::p_assertion(p)?;
+
+        if self.is_zero() {
+            return Err(Error::ExponentOverflow(self.get_sign()));
+        }
 
         let mut err = 1;
 
