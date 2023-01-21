@@ -528,9 +528,10 @@ impl Mantissa {
         if r_stricky {
             if rm as u32 & 0b1100000 != 0 {
                 m3.m[0] |= 1;
-            } else if rm == RoundingMode::FromZero ||
-                (is_positive && rm == RoundingMode::Up) ||
-                (!is_positive && rm == RoundingMode::Down) {
+            } else if rm == RoundingMode::FromZero
+                || (is_positive && rm == RoundingMode::Up)
+                || (!is_positive && rm == RoundingMode::Down)
+            {
                 if m3.add_ulp() {
                     let m3l = m3.len() - 1;
                     m3.m[m3l] = WORD_SIGNIFICANT_BIT;

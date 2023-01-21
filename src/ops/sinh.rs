@@ -162,7 +162,13 @@ impl BigFloatNumber {
         // sinh:  x + x^3/3! + x^5/5! + x^7/7! + ...
 
         let mut polycoeff_gen = SinhPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<SinhArgReductionEstimator>(p, &polycoeff_gen, -(self.e as isize), 2, false);
+        let (reduction_times, niter) = series_cost_optimize::<SinhArgReductionEstimator>(
+            p,
+            &polycoeff_gen,
+            -(self.e as isize),
+            2,
+            false,
+        );
 
         let p_arg = p + 1 + reduction_times * 3;
         self.set_precision(p_arg, rm)?;

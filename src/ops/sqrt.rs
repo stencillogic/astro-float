@@ -21,7 +21,7 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn sqrt(&self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         let p = round_p(p);
-        
+
         if self.is_zero() {
             return Self::new(p);
         }

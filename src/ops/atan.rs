@@ -126,7 +126,13 @@ impl BigFloatNumber {
 
         let p = self.get_mantissa_max_bit_len();
         let mut polycoeff_gen = AtanPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<AtanArgReductionEstimator>(p, &polycoeff_gen, -(self.e as isize), 2, false);
+        let (reduction_times, niter) = series_cost_optimize::<AtanArgReductionEstimator>(
+            p,
+            &polycoeff_gen,
+            -(self.e as isize),
+            2,
+            false,
+        );
 
         let p_arg = self.get_mantissa_max_bit_len() + 1 + reduction_times * 3;
         self.set_precision(p_arg, rm)?;

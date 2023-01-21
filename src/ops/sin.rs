@@ -132,7 +132,13 @@ impl BigFloatNumber {
         let p = self.get_mantissa_max_bit_len();
 
         let mut polycoeff_gen = SinPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<SinArgReductionEstimator>(p, &polycoeff_gen, -(self.e as isize), 2, false);
+        let (reduction_times, niter) = series_cost_optimize::<SinArgReductionEstimator>(
+            p,
+            &polycoeff_gen,
+            -(self.e as isize),
+            2,
+            false,
+        );
 
         let p_arg = p + 1 + reduction_times * 3;
         self.set_precision(p_arg, rm)?;

@@ -154,7 +154,13 @@ impl BigFloatNumber {
         // cosh:  1 + x^2/2! + x^4/4! + x^6/6! + ...
 
         let mut polycoeff_gen = CoshPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<CoshArgReductionEstimator>(p, &polycoeff_gen, -(self.e as isize), 2, false);
+        let (reduction_times, niter) = series_cost_optimize::<CoshArgReductionEstimator>(
+            p,
+            &polycoeff_gen,
+            -(self.e as isize),
+            2,
+            false,
+        );
 
         let p_arg = p + 1 + reduction_times * 6;
         self.set_precision(p_arg, rm)?;

@@ -34,11 +34,11 @@ impl BigFloatNumber {
         }
 
         if self.get_exponent() as isize >= -(p as isize) / 6 {
-
             x.set_sign(Sign::Pos);
             let rm = if self.is_negative() { invert_rm_for_sign(rm) } else { rm };
 
-            let mut ret = if (self.get_exponent() as isize - 1) / 2 > self.get_mantissa_max_bit_len() as isize + 2
+            let mut ret = if (self.get_exponent() as isize - 1) / 2
+                > self.get_mantissa_max_bit_len() as isize + 2
             {
                 // asinh(x) = ln(2 * |x|) * signum(x)
 
@@ -50,7 +50,6 @@ impl BigFloatNumber {
                     let ln2 = cc.ln_2(p + 1, RoundingMode::None)?;
 
                     ln2.add(&lnx, p, rm)
-
                 } else {
                     x.set_exponent(x.get_exponent() + 1);
 
@@ -169,7 +168,7 @@ mod tests {
         );
 
         let mut d4 = d1.asinh(p, rm, &mut cc).unwrap();
-        // avoid overflow using sinh(x) = 2 * sinh(x/2)^2 
+        // avoid overflow using sinh(x) = 2 * sinh(x/2)^2
         d4.set_exponent(d4.get_exponent() - 1);
         let tmp = d4.sinh(p + 1, RoundingMode::None, &mut cc).unwrap();
         let mut d5 = tmp.mul(&tmp, p, rm).unwrap();
@@ -185,7 +184,7 @@ mod tests {
         );
 
         let mut d4 = d2.asinh(p, rm, &mut cc).unwrap();
-        // avoid overflow using sinh(x) = 2 * sinh(x/2)^2 
+        // avoid overflow using sinh(x) = 2 * sinh(x/2)^2
         d4.set_exponent(d4.get_exponent() - 1);
         let tmp = d4.sinh(p + 1, RoundingMode::None, &mut cc).unwrap();
         let mut d5 = tmp.mul(&tmp, p, rm).unwrap();
