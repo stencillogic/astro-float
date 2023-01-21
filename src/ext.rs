@@ -98,6 +98,15 @@ impl BigFloat {
         matches!(self.inner, Flavor::NaN(_))
     }
 
+    /// Return true if `self` is an integer number.
+    pub fn is_int(&self) -> bool {
+        match &self.inner {
+            Flavor::Value(v) => v.is_int(),
+            Flavor::NaN(_) => false,
+            Flavor::Inf(_) => false,
+        }
+    }
+
     /// Returns the associated with `NaN` error, if any.
     pub fn get_err(&self) -> Option<Error> {
         match &self.inner {

@@ -3,11 +3,11 @@
 
 use std::ops::Add;
 
-use crate::mpfr::common::{test_astro_op, get_prec_rng};
 use crate::mpfr::common::{
     assert_float_close, conv_to_mpfr, get_oned_sides, get_oned_zeroed, get_periodic,
     get_random_rnd_pair,
 };
+use crate::mpfr::common::{get_prec_rng, test_astro_op};
 use astro_float::{BigFloat, Consts, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
 use gmp_mpfr_sys::{gmp::exp_t, mpfr};
 use rand::random;
@@ -93,7 +93,7 @@ fn mpfr_compare_special() {
                 test_astro_op!(true, n, n1, mul, f, f1, mul, p, rm, rnd, "mul");
                 test_astro_op!(true, n, n1, div, f, f1, div, p, rm, rnd, "div");
 
-                //test_astro_op!(false, n, n1, pow, f, f1, pow, p, rm, rnd, "pow", cc);
+                test_astro_op!(false, n, n1, pow, f, f1, pow, p, rm, rnd, "pow", cc);
 
                 // rem
                 let p = p1.max(p2);
@@ -127,7 +127,7 @@ fn mpfr_compare_special() {
 
             let mut n_trig = n.clone();
             let f_trig = if n.get_exponent().unwrap() > 128 {
-                n_trig.set_exponent(128);    // large exponent causes very long computation.
+                n_trig.set_exponent(128); // large exponent causes very long computation.
                 conv_to_mpfr(p1, &n_trig)
             } else {
                 f.clone()

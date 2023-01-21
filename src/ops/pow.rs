@@ -64,7 +64,13 @@ impl BigFloatNumber {
         let p_work = p + 4;
 
         // compute separately for int and fract parts, then combine the results.
-        let int = self.get_int_as_usize()?;
+        let int = self.get_int_as_usize().map_err(|e| {
+            if matches!(e, Error::InvalidArgument) {
+                Error::ExponentOverflow(Sign::Pos)
+            } else {
+                e
+            }
+        })?;
         let e_int = if int > 0 {
             let e_const = cc.e(p_work, RoundingMode::None)?;
 
@@ -171,7 +177,7 @@ impl BigFloatNumber {
     ///
     ///  - ExponentOverflow: the result is too large or too small number.
     ///  - MemoryAllocation: failed to allocate memory.
-    ///  - InvalidArgument: `self` is negative, or the precision is incorrect.
+    ///  - InvalidArgument: `self` is negative, and `n` is not an integer number; the precision is incorrect.
     pub fn pow(
         &self,
         n: &Self,
@@ -179,18 +185,57 @@ impl BigFloatNumber {
         rm: RoundingMode,
         cc: &mut Consts,
     ) -> Result<Self, Error> {
-        if self.is_zero() {
-            return if n.is_zero() {
-                Self::from_word(1, p)
-            } else if n.is_negative() {
-                Err(Error::ExponentOverflow(Sign::Pos))
+        if n.is_zero() {
+            return Self::from_word(1, p);
+        } else if self.is_zero() {
+            return if n.is_negative() {
+                if n.is_odd_int() {
+                    Err(Error::ExponentOverflow(self.get_sign()))
+                } else {
+                    Err(Error::ExponentOverflow(Sign::Pos))
+                }
             } else {
-                Self::new(p)
+                let mut ret = Self::new(p)?;
+                if n.is_odd_int() {
+                    ret.set_sign(self.get_sign());
+                }
+                Ok(ret)
+            };
+        } else if self.get_exponent() == 1 && self.abs_cmp(&ONE) == 0 {
+            return if n.is_odd_int() {
+                Self::from_i8(self.get_sign().as_int(), p)
+            } else {
+                if self.is_positive() || n.is_int() {
+                    Self::from_word(1, p)
+                } else {
+                    return Err(Error::InvalidArgument);
+                }
             };
         } else if self.is_negative() {
-            return Err(Error::InvalidArgument);
-        } else if self.get_exponent() == 1 && self.cmp(&ONE) == 0 {
-            return Self::from_word(1, p);
+            if n.is_int() {
+                let sign = if n.is_odd_int() { Sign::Neg } else { Sign::Pos };
+
+                let int = n.get_int_as_usize().map_err(|e| {
+                    if matches!(e, Error::InvalidArgument) {
+                        Error::ExponentOverflow(sign)
+                    } else {
+                        e
+                    }
+                })?;
+
+                let mut ret = if n.is_positive() {
+                    self.powi(int, p, rm)
+                } else {
+                    let x = self.powi(int, p + 1, RoundingMode::None)?;
+                    x.reciprocal(p, rm)
+                }?;
+
+                ret.set_sign(sign);
+
+                return Ok(ret);
+            } else {
+                return Err(Error::InvalidArgument);
+            }
         } else if n.get_exponent() == 1 && n.abs_cmp(&ONE) == 0 {
             if n.is_positive() {
                 let mut ret = self.clone()?;

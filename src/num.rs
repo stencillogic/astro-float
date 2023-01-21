@@ -950,6 +950,19 @@ impl BigFloatNumber {
         }
     }
 
+    /// Returns true if `self` is an integer number.
+    pub fn is_int(&self) -> bool {
+        if self.e > 0 {
+            if (self.e as usize) < self.m.max_bit_len() {
+                self.m.find_one_from(self.e as usize).is_none()
+            } else {
+                true
+            }
+        } else {
+            self.is_zero()
+        }
+    }
+
     /// Returns integer part of a number as built-in integer.
     pub(super) fn get_int_as_usize(&self) -> Result<usize, Error> {
         if self.e > 0 {
