@@ -4,12 +4,12 @@ mod ln2;
 mod pi;
 
 use crate::common::util::round_p;
+use crate::num::BigFloatNumber;
 use crate::ops::consts::e::ECache;
 use crate::ops::consts::ln10::Ln10Cache;
 use crate::ops::consts::ln2::Ln2Cache;
 use crate::ops::consts::pi::PiCache;
 use crate::BigFloat;
-use crate::num::BigFloatNumber;
 use crate::Error;
 use crate::RoundingMode;
 

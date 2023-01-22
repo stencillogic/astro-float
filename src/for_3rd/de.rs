@@ -78,24 +78,15 @@ mod tests {
 
     #[test]
     fn from_json() {
-        assert_eq!(
-            "0.0",
-            format!("{}", from_str::<BigFloat>("-0").unwrap())
-        );
-        assert_eq!(
-            "0.0",
-            format!("{}", from_str::<BigFloat>("0.0")
-                .unwrap())
-        );
+        assert_eq!("0.0", format!("{}", from_str::<BigFloat>("-0").unwrap()));
+        assert_eq!("0.0", format!("{}", from_str::<BigFloat>("0.0").unwrap()));
         assert_eq!(
             "2.99999999999999988897e-1",
-            format!("{}", from_str::<BigFloat>("0.3")
-                .unwrap())
+            format!("{}", from_str::<BigFloat>("0.3").unwrap())
         );
         assert_eq!(
             "2.99999999999999999983e-1",
-            format!("{}", from_str::<BigFloat>("\"0.3\"")
-                .unwrap())
+            format!("{}", from_str::<BigFloat>("\"0.3\"").unwrap())
         );
     }
 }

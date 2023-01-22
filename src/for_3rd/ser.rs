@@ -21,10 +21,7 @@ mod tests {
 
     #[test]
     fn to_json() {
-        assert_eq!(
-            to_string(&BigFloat::new(0)).unwrap(),
-            "\"0.0\""
-        );
+        assert_eq!(to_string(&BigFloat::new(0)).unwrap(), "\"0.0\"");
         assert_eq!(
             to_string(&BigFloat::from_f32(0.3, 64 + 1)).unwrap(),
             "\"3.00000011920928955078125e-1\""
