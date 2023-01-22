@@ -51,12 +51,6 @@ assert_eq!(pi.cmp(&pi_lib), Some(0));
 println!("{}", pi);
 ```
 
-## Correctness
-
-Currently, arithmetic operations (add, sub, mul, div, rem), rounding, and constants produce identical results with [rug](https://crates.io/crates/rug) (MPFR), while other operations produce results that may differ by 1 ulp.
-
-The source code contains corresponding [integration tests](https://github.com/stencillogic/astro-float/tree/main/tests).
-
 ## Performance
 
 Benchmark can be found here: https://github.com/stencillogic/bigfloat-bench.

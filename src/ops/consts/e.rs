@@ -94,7 +94,7 @@ impl ECache {
     }
 
     /// Return value of e with precision k.
-    pub fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
+    pub(crate) fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
         let kext = Self::b_factor(k);
 
         if self.b <= kext {

@@ -31,27 +31,6 @@ impl BigFloatNumber {
     /// `e` is the exponent part of the number, such that the number can be represented as `digits` * `rdx` ^ `e`.
     /// Precision is rounded upwards to the word size.
     ///
-    /// ## Examples
-    ///
-    /// Code below converts `-0.1234567₈ × 10₈^3₈` given in radix 8 to BigFloatNumber.
-    ///
-    /// ``` rust
-    /// #![allow(deprecated)]
-    /// use astro_float::{BigFloatNumber, Sign, RoundingMode, Radix};
-    ///
-    /// let g = BigFloatNumber::convert_from_radix(
-    ///     Sign::Neg,
-    ///     &[1, 2, 3, 4, 5, 6, 7, 0],
-    ///     3,
-    ///     Radix::Oct,
-    ///     64,
-    ///     RoundingMode::None).unwrap();
-    ///
-    /// let n = BigFloatNumber::from_f64(64, -83.591552734375).unwrap();
-    ///
-    /// assert!(n.cmp(&g) == 0);
-    /// ```
-    ///
     /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
@@ -326,21 +305,6 @@ impl BigFloatNumber {
     /// The function returns sign, mantissa digits in radix `rdx`, and exponent such that the converted number
     /// can be represented as `mantissa digits` * `rdx` ^ `exponent`.
     /// The first element in the mantissa is the most significant digit.
-    ///
-    /// ## Examples
-    ///
-    /// ``` rust
-    /// #![allow(deprecated)]
-    /// use astro_float::{BigFloatNumber, Sign, RoundingMode, Radix};
-    ///
-    /// let n = BigFloatNumber::from_f64(64, 0.00012345678f64).unwrap();
-    ///
-    /// let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).unwrap();
-    ///
-    /// assert_eq!(s, Sign::Pos);
-    /// assert_eq!(m, [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4, 2]);
-    /// assert_eq!(e, -3);
-    /// ```
     ///
     /// ## Errors
     ///

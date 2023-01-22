@@ -33,17 +33,16 @@
 //! In case of an error, such as memory allocation error, `BigFloat` takes the value `NaN`.
 //! `BigFloat::get_err()` can be used to get the associated error in this situation.
 //!
-//! **BigFloatNumber**
-//!
-//! `BigFloatNumber` is a data type provided for backward compatibility.
-//! It represents the finite number, i.e. it has mantissa, sign, and exponent, and can't be `Inf` or `NaN`.
-//! `BigFloat` uses `BigFloatNumber` internally. It is advisable to use `BigFloat` instead of `BigFloatNumber`.
-//!
 //! **Constants**
 //!
 //! Constants such as pi or the Euler number have arbitrary precision and are evaluated lazily and then cached in the constants cache.
 //! Some functions expect constants cache as parameter because the library does not maintain global state.
-//!
+//! 
+//! **Correctness**
+//! 
+//! Currently, arithmetic operations produce correctly-rounded results, 
+//! while other mathematical functions do not guarantee correctly-rounded results.
+//! 
 //!  
 //! ## Examples
 //!
@@ -92,11 +91,10 @@
 //!
 //! ``` toml
 //! [dependencies]
-//! astro-float = { version = "0.4.1", default-features = false }
+//! astro-float = { version = "0.4.2", default-features = false }
 //! ```
 //!
 
-#![allow(deprecated)] // remove when BigFloatNumber is not public
 #![deny(missing_docs)]
 #![deny(clippy::suspicious)]
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -131,7 +129,6 @@ pub use crate::ext::BigFloat;
 pub use crate::ext::INF_NEG;
 pub use crate::ext::INF_POS;
 pub use crate::ext::NAN;
-pub use crate::num::BigFloatNumber;
 pub use crate::ops::consts::Consts;
 
 pub use crate::defs::EXPONENT_MAX;

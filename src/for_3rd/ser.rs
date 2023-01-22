@@ -1,19 +1,12 @@
 //! Serialization of BigFloatNumber.
 //! Serialization to a string uses decimal radix.
 
-use crate::{BigFloatNumber, Radix, RoundingMode};
-use serde::ser::Error;
+use crate::BigFloat;
 use serde::{Serialize, Serializer};
 
-#[cfg(not(feature = "std"))]
-use alloc::format;
-
-impl Serialize for BigFloatNumber {
+impl Serialize for BigFloat {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self.format(Radix::Dec, RoundingMode::None) {
-            Ok(s) => serializer.serialize_str(&s),
-            Err(e) => Err(Error::custom(format!("{e:?}"))),
-        }
+        serializer.serialize_str(&self.to_string())
     }
 }
 
@@ -21,16 +14,16 @@ impl Serialize for BigFloatNumber {
 mod tests {
     use serde_json::to_string;
 
-    use crate::BigFloatNumber;
+    use crate::BigFloat;
 
     #[test]
     fn to_json() {
         assert_eq!(
-            to_string(&BigFloatNumber::new(0).unwrap()).unwrap(),
+            to_string(&BigFloat::new(0)).unwrap(),
             "\"0.0\""
         );
         assert_eq!(
-            to_string(&BigFloatNumber::from_f32(64 + 1, 0.3).unwrap()).unwrap(),
+            to_string(&BigFloat::from_f32(0.3, 64 + 1)).unwrap(),
             "\"3.00000011920928955078125e-1\""
         );
     }

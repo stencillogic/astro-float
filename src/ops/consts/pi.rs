@@ -111,7 +111,7 @@ impl PiCache {
     }
 
     /// Return value of PI with precision `k`.
-    pub fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
+    pub(crate) fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
         let kext = (k + 46 + WORD_BIT_SIZE) / 47;
 
         if self.b <= kext {

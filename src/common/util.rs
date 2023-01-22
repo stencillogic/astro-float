@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[cfg(test)]
-use crate::{BigFloatNumber, Sign, EXPONENT_MIN};
+use crate::{num::BigFloatNumber, Sign, EXPONENT_MIN};
 
 #[cfg(test)]
 #[cfg(not(feature = "std"))]
@@ -334,7 +334,7 @@ pub fn invert_rm_for_sign(rm: RoundingMode) -> RoundingMode {
 
 /// Returns random subnormal number.
 #[cfg(test)]
-pub fn random_subnormal(p: usize) -> BigFloatNumber {
+pub(crate) fn random_subnormal(p: usize) -> BigFloatNumber {
     let p = round_p(if p < 3 * WORD_BIT_SIZE { 3 * WORD_BIT_SIZE } else { p });
     let n = p - rand::random::<usize>() % (2 * WORD_BIT_SIZE) - 1;
     let mut m = Vec::with_capacity(p / WORD_BIT_SIZE);

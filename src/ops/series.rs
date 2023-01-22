@@ -18,7 +18,7 @@ const RECT_ITER_THRESHOLD: usize = MAX_CACHE / 10 * 9;
 //
 
 /// Generator of polynomial coefficients.
-pub trait PolycoeffGen {
+pub(crate) trait PolycoeffGen {
     /// Returns the next polynomial coefficient value.
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error>;
 
@@ -46,7 +46,7 @@ pub trait ArgReductionEstimator {
 /// m is the negative exponent of the number.
 /// pwr_step - increment of power of x in each iteration
 /// ext - if true use series step cost directly
-pub fn series_cost_optimize<S: ArgReductionEstimator>(
+pub(crate) fn series_cost_optimize<S: ArgReductionEstimator>(
     p: usize,
     polycoeff_gen: &impl PolycoeffGen,
     m: isize,
@@ -81,7 +81,7 @@ pub fn series_cost_optimize<S: ArgReductionEstimator>(
     }
 }
 
-pub fn series_run<T: PolycoeffGen>(
+pub(crate) fn series_run<T: PolycoeffGen>(
     acc: BigFloatNumber,
     x_first: BigFloatNumber,
     x_step: BigFloatNumber,

@@ -9,7 +9,7 @@ use crate::ops::consts::ln10::Ln10Cache;
 use crate::ops::consts::ln2::Ln2Cache;
 use crate::ops::consts::pi::PiCache;
 use crate::BigFloat;
-use crate::BigFloatNumber;
+use crate::num::BigFloatNumber;
 use crate::Error;
 use crate::RoundingMode;
 

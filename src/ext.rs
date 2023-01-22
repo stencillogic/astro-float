@@ -2,7 +2,7 @@
 
 use crate::defs::SignedWord;
 use crate::defs::DEFAULT_P;
-use crate::BigFloatNumber;
+use crate::num::BigFloatNumber;
 use crate::Consts;
 use crate::Error;
 use crate::Exponent;
