@@ -16,9 +16,8 @@ use crate::mantissa::Mantissa;
 
 /// A finite floating point number with mantissa of an arbitrary size, an exponent, and the sign.
 /// (BigFloatNumber will be removed in the future. BigFloat should be used instead).
-#[deprecated]
 #[derive(Debug)]
-pub struct BigFloatNumber {
+pub(crate) struct BigFloatNumber {
     pub(super) e: Exponent,
     pub(super) s: Sign,
     pub(super) m: Mantissa,
@@ -981,29 +980,6 @@ impl BigFloatNumber {
 
     /// Sets the exponent of `self`.
     /// Note that if `self` is subnormal, the exponent may not change, but the mantissa will shift instead.
-    /// See example below.
-    ///
-    /// ## Examples
-    ///
-    /// ```
-    /// #![allow(deprecated)]
-    /// use astro_float::BigFloatNumber;
-    /// use astro_float::EXPONENT_MIN;
-    ///
-    /// // construct a subnormal value.
-    /// let mut n = BigFloatNumber::min_positive(128).unwrap();
-    ///
-    /// assert_eq!(n.get_exponent(), EXPONENT_MIN);
-    /// assert_eq!(n.get_precision(), 1);
-    ///
-    /// // increase exponent.
-    /// n.set_exponent(n.get_exponent() + 1);
-    ///
-    /// // the outcome for subnormal number.
-    /// assert_eq!(n.get_exponent(), EXPONENT_MIN);
-    /// assert_eq!(n.get_precision(), 2);
-    /// ```
-    #[inline]
     pub fn set_exponent(&mut self, e: Exponent) {
         if !self.is_zero() {
             if self.is_subnormal() && e > EXPONENT_MIN {

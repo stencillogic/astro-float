@@ -2,7 +2,8 @@
 
 use core::fmt::Formatter;
 
-use crate::{BigFloatNumber, Radix, RoundingMode};
+use crate::num::BigFloatNumber;
+use crate::{BigFloat, Radix, RoundingMode};
 use serde::de::Error;
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer};
@@ -12,14 +13,14 @@ use {alloc::format, alloc::string::String};
 
 pub struct BigFloatVisitor {}
 
-impl<'de> Deserialize<'de> for BigFloatNumber {
+impl<'de> Deserialize<'de> for BigFloat {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_any(BigFloatVisitor {})
     }
 }
 
 impl<'de> Visitor<'de> for BigFloatVisitor {
-    type Value = BigFloatNumber;
+    type Value = BigFloat;
 
     fn expecting(&self, formatter: &mut Formatter) -> core::fmt::Result {
         write!(formatter, "except `String`, `Number`, `Bytes`")
@@ -27,28 +28,28 @@ impl<'de> Visitor<'de> for BigFloatVisitor {
 
     fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> {
         match BigFloatNumber::from_usize(v as usize) {
-            Ok(o) => Ok(o),
+            Ok(o) => Ok(o.into()),
             Err(e) => Err(Error::custom(format!("{e:?}"))),
         }
     }
 
     fn visit_f32<E: Error>(self, v: f32) -> Result<Self::Value, E> {
         match BigFloatNumber::from_f32(64, v) {
-            Ok(o) => Ok(o),
+            Ok(o) => Ok(o.into()),
             Err(e) => Err(Error::custom(format!("{e:?}"))),
         }
     }
 
     fn visit_f64<E: Error>(self, v: f64) -> Result<Self::Value, E> {
         match BigFloatNumber::from_f64(64, v) {
-            Ok(o) => Ok(o),
+            Ok(o) => Ok(o.into()),
             Err(e) => Err(Error::custom(format!("{e:?}"))),
         }
     }
 
     fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
         match BigFloatNumber::parse(v, Radix::Dec, 64, RoundingMode::None) {
-            Ok(o) => Ok(o),
+            Ok(o) => Ok(o.into()),
             Err(e) => Err(Error::custom(format!("{e:?}"))),
         }
     }
@@ -70,37 +71,28 @@ mod tests {
 
     use serde_json::from_str;
 
-    use crate::{BigFloatNumber, Radix, RoundingMode};
+    use crate::BigFloat;
 
     #[test]
     fn from_json() {
         assert_eq!(
             "0.0",
-            from_str::<BigFloatNumber>("-0")
-                .unwrap()
-                .format(Radix::Dec, RoundingMode::None)
-                .unwrap()
+            format!("{}", from_str::<BigFloat>("-0").unwrap())
         );
         assert_eq!(
             "0.0",
-            from_str::<BigFloatNumber>("0.0")
-                .unwrap()
-                .format(Radix::Dec, RoundingMode::None)
-                .unwrap()
+            format!("{}", from_str::<BigFloat>("0.0")
+                .unwrap())
         );
         assert_eq!(
             "2.99999999999999988897e-1",
-            from_str::<BigFloatNumber>("0.3")
-                .unwrap()
-                .format(Radix::Dec, RoundingMode::None)
-                .unwrap()
+            format!("{}", from_str::<BigFloat>("0.3")
+                .unwrap())
         );
         assert_eq!(
             "2.99999999999999999983e-1",
-            from_str::<BigFloatNumber>("\"0.3\"")
-                .unwrap()
-                .format(Radix::Dec, RoundingMode::None)
-                .unwrap()
+            format!("{}", from_str::<BigFloat>("\"0.3\"")
+                .unwrap())
         );
     }
 }

@@ -1,6 +1,6 @@
 //! Auxiliary items.
 
-use crate::{BigFloatNumber, Consts, Error, RoundingMode};
+use crate::{num::BigFloatNumber, Consts, Error, RoundingMode};
 
 impl BigFloatNumber {
     /// Reduce `self` to interval (-2*pi; 2*pi)
