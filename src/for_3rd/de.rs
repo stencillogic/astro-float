@@ -1,4 +1,4 @@
-//! Deserialization of BigFloatNumber.
+//! Deserialization of BigFloat.
 
 use core::fmt::Formatter;
 
@@ -72,6 +72,9 @@ mod tests {
     use serde_json::from_str;
 
     use crate::BigFloat;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::format;
 
     #[test]
     fn from_json() {

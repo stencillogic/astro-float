@@ -1,8 +1,11 @@
-//! Serialization of BigFloatNumber.
+//! Serialization of BigFloat.
 //! Serialization to a string uses decimal radix.
 
 use crate::BigFloat;
 use serde::{Serialize, Serializer};
+
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
 
 impl Serialize for BigFloat {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
