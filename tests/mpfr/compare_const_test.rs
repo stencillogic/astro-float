@@ -65,7 +65,7 @@ fn mpfr_compare_const() {
             test_astro_const!(ln_2, const_log2, p, rm, rnd, "const ln(2)", cc);
 
             // e
-            let n1 = cc.e(p, rm).unwrap().into();
+            let n1 = cc.e(p, rm);
             let mut f1 = mpfr_e.clone();
             unsafe {
                 mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd);
@@ -74,7 +74,7 @@ fn mpfr_compare_const() {
             assert_float_close(n1, f1, p, "const e", true);
 
             // ln(10)
-            let n1 = cc.ln_10(p, rm).unwrap().into();
+            let n1 = cc.ln_10(p, rm);
             f1 = mpfr_ln10.clone();
             unsafe {
                 mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd);

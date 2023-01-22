@@ -6,7 +6,7 @@ impl BigFloatNumber {
     /// Reduce `self` to interval (-2*pi; 2*pi)
     pub(crate) fn reduce_trig_arg(self, cc: &mut Consts, rm: RoundingMode) -> Result<Self, Error> {
         if self.get_exponent() > 2 {
-            let mut pi = cc.pi(
+            let mut pi = cc.pi_num(
                 self.get_mantissa_max_bit_len() + self.get_exponent() as usize,
                 rm,
             )?;

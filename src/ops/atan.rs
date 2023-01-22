@@ -102,7 +102,7 @@ impl BigFloatNumber {
         let mut ret = if x.get_exponent() > 0 {
             x = x.reciprocal(p_x, RoundingMode::None)?;
             let ret = x.atan_series(RoundingMode::None, rm as u32 & 0b11110 != 0)?;
-            let mut pi = cc.pi(p_x, RoundingMode::None)?;
+            let mut pi = cc.pi_num(p_x, RoundingMode::None)?;
             pi.set_exponent(1);
             pi.set_sign(self.get_sign());
 
@@ -244,7 +244,7 @@ mod tests {
         let d3 = BigFloatNumber::min_positive(p).unwrap();
         let zero = BigFloatNumber::new(1).unwrap();
 
-        let mut half_pi = cc.pi(p, RoundingMode::ToEven).unwrap();
+        let mut half_pi = cc.pi_num(p, RoundingMode::ToEven).unwrap();
         half_pi.set_exponent(1);
 
         assert!(d1.atan(p, rm, &mut cc).unwrap().cmp(&half_pi) == 0);

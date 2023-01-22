@@ -245,7 +245,7 @@ mod tests {
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
 
         // asymptotic & extrema testing
-        let mut half_pi = cc.pi(128, RoundingMode::None).unwrap();
+        let mut half_pi = cc.pi_num(128, RoundingMode::None).unwrap();
         half_pi.set_exponent(1);
         half_pi.set_precision(p, RoundingMode::None).unwrap();
 

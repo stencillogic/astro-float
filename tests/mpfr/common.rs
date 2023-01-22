@@ -48,7 +48,7 @@ macro_rules! test_astro_op {
 // test constant value match
 macro_rules! test_astro_const {
     ($astro_const:ident, $mpfr_const:ident, $p:ident, $rm:ident, $rnd:ident, $op_name:literal, $cc:ident) => {
-        let n1: BigFloat = $cc.$astro_const($p, $rm).unwrap().into();
+        let n1: BigFloat = $cc.$astro_const($p, $rm);
 
         let mut f1 = Float::with_val($p as u32, 1);
 

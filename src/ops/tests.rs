@@ -355,7 +355,7 @@ fn test_sin_asin() {
     let mut cc = Consts::new().unwrap();
 
     let pi = cc
-        .pi((prec_rng + 1) * WORD_BIT_SIZE, RoundingMode::None)
+        .pi_num((prec_rng + 1) * WORD_BIT_SIZE, RoundingMode::None)
         .unwrap();
 
     let mut half_pi = pi.clone().unwrap();
@@ -509,7 +509,7 @@ fn test_cos_acos() {
     let mut cc = Consts::new().unwrap();
 
     let pi = cc
-        .pi((prec_rng + 1) * WORD_BIT_SIZE, RoundingMode::None)
+        .pi_num((prec_rng + 1) * WORD_BIT_SIZE, RoundingMode::None)
         .unwrap();
 
     /*     let d1 = BigFloatNumber::from_raw_parts(&[1456218531, 703164634, 3869174995, 728180707, 794142643, 1990575249, 415454075, 2075230275, 2346793028, 681445537, 145621716, 775498281, 2975140815, 876411724, 3147375501, 2338110642, 3577417010, 3095720384, 2063787162, 1985481632, 168798015, 2477960193, 2032112066, 2819367426, 3040156967, 1564854250, 1142645696, 4153181427, 2939931561, 2569220972, 3593998760, 3295389666, 910688784, 3044919667, 4232521584, 3705749987, 3872951028, 388358967, 758972985, 1173372405, 3549434686, 2065917958, 3850118209, 2075337935, 1139277028, 1620627819, 3530770031, 4204162626, 85810630, 561952971, 2901114392, 1321621731, 716297011, 315030023, 1192364819, 3159540812, 1379143592, 1329431425, 760869437, 3340442410, 1450918057, 4178162271, 2810251834, 366126051, 3753313945, 2784305836, 1730114869, 1207852067, 1792591336, 835955104, 2556793533, 1413506794, 1657823935, 4013600827, 3570589700, 1434587096, 4142313494, 2489567354, 3247747544, 2853876571, 3600630716, 3927628676, 1555580733, 2125119320, 3039930421, 3397107605, 3390076514, 296410084, 3322344380, 3590148927, 1318604625, 3138655051, 2632176848, 665236644, 3818083749, 2850228879, 1790884543, 1461204514, 1969835970, 3242394962], 3200, Sign::Pos, 1).unwrap();
@@ -577,7 +577,7 @@ fn test_cos_acos() {
 
             let d2 = d1.acos(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-            let mut hp = cc.pi(prec, RoundingMode::ToZero).unwrap();
+            let mut hp = cc.pi_num(prec, RoundingMode::ToZero).unwrap();
             hp.set_exponent(1);
 
             if d2.abs_cmp(&hp) < 0 {
@@ -614,7 +614,7 @@ fn test_tan_atan() {
     let mut cc = Consts::new().unwrap();
 
     let pi = cc
-        .pi((prec_rng + 1) * WORD_BIT_SIZE, RoundingMode::None)
+        .pi_num((prec_rng + 1) * WORD_BIT_SIZE, RoundingMode::None)
         .unwrap();
 
     let mut half_pi = pi.clone().unwrap();
@@ -659,7 +659,7 @@ fn test_tan_atan() {
 
             let d2 = d1.atan(prec, RoundingMode::ToZero, &mut cc).unwrap();
 
-            let mut hp = cc.pi(prec, RoundingMode::ToZero).unwrap();
+            let mut hp = cc.pi_num(prec, RoundingMode::ToZero).unwrap();
             hp.set_exponent(1);
 
             if d2.abs_cmp(&hp) < 0 {

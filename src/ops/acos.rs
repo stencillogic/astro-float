@@ -27,7 +27,7 @@ impl BigFloatNumber {
 
         let mut ret = x.asin(p_x, RoundingMode::None, cc)?;
 
-        let mut pi = cc.pi(p_x, RoundingMode::None)?;
+        let mut pi = cc.pi_num(p_x, RoundingMode::None)?;
 
         pi.set_exponent(pi.get_exponent() - 1);
 
@@ -41,7 +41,7 @@ impl BigFloatNumber {
 
             ret = x.asin(p_x, RoundingMode::None, cc)?;
 
-            let mut pi = cc.pi(p_x, RoundingMode::None)?;
+            let mut pi = cc.pi_num(p_x, RoundingMode::None)?;
 
             pi.set_exponent(pi.get_exponent() - 1);
 
@@ -103,7 +103,7 @@ mod tests {
         let d3 = BigFloatNumber::min_positive(p).unwrap();
         let zero = BigFloatNumber::new(1).unwrap();
 
-        let mut half_pi = cc.pi(p, RoundingMode::ToEven).unwrap();
+        let mut half_pi = cc.pi_num(p, RoundingMode::ToEven).unwrap();
         half_pi.set_exponent(1);
 
         assert!(d1.acos(p, rm, &mut cc).is_err());

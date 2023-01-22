@@ -47,7 +47,7 @@ impl BigFloatNumber {
 
                     let lnx = x.ln(p + 1, RoundingMode::None, cc)?;
 
-                    let ln2 = cc.ln_2(p + 1, RoundingMode::None)?;
+                    let ln2 = cc.ln_2_num(p + 1, RoundingMode::None)?;
 
                     ln2.add(&lnx, p, rm)
                 } else {

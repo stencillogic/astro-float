@@ -74,7 +74,7 @@
 //! pi.set_precision(1024, rm).expect("Precision updated");
 //!
 //! // Use library's constant for verifying the result
-//! let pi_lib = cc.pi(1024, rm).unwrap().into();
+//! let pi_lib = cc.pi(1024, rm);
 //!
 //! // Compare computed constant with library's constant
 //! assert_eq!(pi.cmp(&pi_lib), Some(0));
@@ -106,7 +106,7 @@ extern crate alloc;
 
 mod common;
 mod conv;
-mod ctx;
+//mod ctx;
 mod defs;
 mod ext;
 mod for_3rd;
@@ -116,11 +116,11 @@ mod ops;
 mod parser;
 mod strop;
 
-pub use crate::ctx::with_consts;
-pub use crate::ctx::with_precision;
-pub use crate::ctx::with_rounding_mode;
-pub use crate::ctx::with_value;
-pub use crate::ctx::Context;
+//pub use crate::ctx::with_consts;
+//pub use crate::ctx::with_precision;
+//pub use crate::ctx::with_rounding_mode;
+//pub use crate::ctx::with_value;
+//pub use crate::ctx::Context;
 pub use crate::defs::Error;
 pub use crate::defs::Exponent;
 pub use crate::defs::Radix;
@@ -169,7 +169,7 @@ mod tests {
         pi.set_precision(1024, rm).expect("Precision updated");
 
         // Use library's constant for verifying the result
-        let pi_lib = cc.pi(1024, rm).unwrap().into();
+        let pi_lib = cc.pi_num(1024, rm).unwrap().into();
 
         // Compare computed constant with library's constant
         assert_eq!(pi.cmp(&pi_lib), Some(0));

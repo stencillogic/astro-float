@@ -72,7 +72,7 @@ impl BigFloatNumber {
             }
         })?;
         let e_int = if int > 0 {
-            let e_const = cc.e(p_work, RoundingMode::None)?;
+            let e_const = cc.e_num(p_work, RoundingMode::None)?;
 
             e_const.powi(int, p_work, RoundingMode::None)
         } else {

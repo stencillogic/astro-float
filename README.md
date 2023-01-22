@@ -42,7 +42,7 @@ let mut pi = six.mul(&n, p, rm);
 pi.set_precision(1024, rm).expect("Precision updated");
 
 // Use library's constant for verifying the result
-let pi_lib = cc.pi(1024, rm).unwrap().into();
+let pi_lib = cc.pi(1024, rm);
 
 // Compare computed constant with library's constant
 assert_eq!(pi.cmp(&pi_lib), Some(0));
@@ -53,7 +53,9 @@ println!("{}", pi);
 
 ## Correctness
 
-The source code contains [integration tests](https://github.com/stencillogic/astro-float/tree/main/tests) for many operations, including arithmetic operations, rounding, mathematical functions, constants, and other, which check whether these computations produce identical results with [rug](https://crates.io/crates/rug) (MPFR).
+Currently, arithmetic operations (add, sub, mul, div, rem), rounding, and constants produce identical results with [rug](https://crates.io/crates/rug) (MPFR), while other operations produce results that may differ by 1 ulp.
+
+The source code contains corresponding [integration tests](https://github.com/stencillogic/astro-float/tree/main/tests).
 
 ## Performance
 

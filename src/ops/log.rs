@@ -130,7 +130,7 @@ impl BigFloatNumber {
         let mut ret = if e == 0 {
             p1
         } else {
-            let p2 = cc.ln_2(p_ext, RoundingMode::None)?;
+            let p2 = cc.ln_2_num(p_ext, RoundingMode::None)?;
 
             let mut n = Self::from_usize(e.unsigned_abs())?;
             if e < 0 {
@@ -237,7 +237,7 @@ impl BigFloatNumber {
 
         let p1 = Self::ln_series(x, RoundingMode::None, rm as u32 & 0b11110 != 0)?;
 
-        let p2 = cc.ln_2(p_ext, RoundingMode::None)?;
+        let p2 = cc.ln_2_num(p_ext, RoundingMode::None)?;
 
         let p3 = p1.div(&p2, p_ext, RoundingMode::None)?;
 
@@ -272,7 +272,7 @@ impl BigFloatNumber {
 
         let p1 = x.ln(p_ext, RoundingMode::None, cc)?;
 
-        let p2 = cc.ln_10(p_ext, RoundingMode::None)?;
+        let p2 = cc.ln_10_num(p_ext, RoundingMode::None)?;
 
         let mut ret = p1.div(&p2, p_ext, RoundingMode::None)?;
         ret.set_precision(p, rm)?;

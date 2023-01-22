@@ -66,7 +66,7 @@ impl BigFloat {
         Self::result_to_ext(BigFloatNumber::from_f64(p, f), false, true)
     }
 
-    fn nan(err: Option<Error>) -> Self {
+    pub(crate) fn nan(err: Option<Error>) -> Self {
         BigFloat {
             inner: Flavor::NaN(err),
         }
@@ -719,7 +719,7 @@ impl BigFloat {
         rm: RoundingMode,
         cc: &mut Consts,
     ) -> Result<BigFloatNumber, Error> {
-        let mut half_pi = cc.pi(p, rm)?;
+        let mut half_pi = cc.pi_num(p, rm)?;
 
         half_pi.set_exponent(1);
         half_pi.set_sign(s);
@@ -1949,7 +1949,7 @@ mod tests {
         assert!(NAN.acos(rand_p(), rm, &mut cc).is_nan());
 
         let p = rand_p();
-        let mut half_pi: BigFloat = cc.pi(p, rm).unwrap().into();
+        let mut half_pi: BigFloat = cc.pi_num(p, rm).unwrap().into();
         half_pi.set_exponent(1);
         assert!(INF_NEG.atan(p, rm, &mut cc).cmp(&half_pi.neg()) == Some(0));
         assert!(INF_POS.atan(p, rm, &mut cc).cmp(&half_pi) == Some(0));
