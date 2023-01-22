@@ -3,12 +3,12 @@ mod ln10;
 mod ln2;
 mod pi;
 
-use crate::BigFloat;
 use crate::common::util::round_p;
 use crate::ops::consts::e::ECache;
 use crate::ops::consts::ln10::Ln10Cache;
 use crate::ops::consts::ln2::Ln2Cache;
 use crate::ops::consts::pi::PiCache;
+use crate::BigFloat;
 use crate::BigFloatNumber;
 use crate::Error;
 use crate::RoundingMode;
@@ -82,7 +82,11 @@ impl Consts {
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - InvalidArgument: the precision is incorrect.
-    pub(crate) fn ln_10_num(&mut self, p: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
+    pub(crate) fn ln_10_num(
+        &mut self,
+        p: usize,
+        rm: RoundingMode,
+    ) -> Result<BigFloatNumber, Error> {
         let p = round_p(p);
         self.ln10.for_prec(p, rm)
     }
