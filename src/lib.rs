@@ -40,8 +40,8 @@
 //!
 //! **Correctness**
 //!
-//! Currently, arithmetic operations produce correctly-rounded results,
-//! while other mathematical functions do not guarantee correctly-rounded results.
+//! Currently, arithmetic operations produce correctly rounded results,
+//! while other mathematical functions do not guarantee correctly rounded results.
 //!
 //!  
 //! ## Examples
