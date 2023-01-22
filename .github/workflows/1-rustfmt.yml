@@ -17,4 +17,4 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Check formatting
-      run: rustfmt --check ./src/*.rs
+      run: rustfmt --check ./src/*.rs ./tests/*.rs
