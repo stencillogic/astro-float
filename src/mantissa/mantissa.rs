@@ -337,7 +337,7 @@ impl Mantissa {
             m3.m.try_extend(p * WORD_BIT_SIZE)?;
             m3.m[..p - n].fill(0);
         } else if m3.len() > p {
-            if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive) {
+            if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive, &mut false, m3.max_bit_len()) {
                 shift -= 1;
             }
             m3.m.trunc_to(p * WORD_BIT_SIZE);
@@ -443,7 +443,7 @@ impl Mantissa {
             m3.m.try_extend(p * WORD_BIT_SIZE)?;
             m3.m[..p - n].fill(0);
         } else if m3.len() > p {
-            if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive) {
+            if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive, &mut false, m3.max_bit_len()) {
                 shift -= 1;
             }
             m3.m.trunc_to(p * WORD_BIT_SIZE);
@@ -480,7 +480,7 @@ impl Mantissa {
             m3.m.try_extend(p * WORD_BIT_SIZE)?;
             m3.m[..p - n].fill(0);
         } else if m3.len() > p {
-            if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive) {
+            if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive, &mut false, m3.max_bit_len()) {
                 shift -= 1;
             }
             m3.m.trunc_to(p * WORD_BIT_SIZE);
@@ -541,7 +541,7 @@ impl Mantissa {
         }
 
         e_shift -= Self::maximize(&mut m3.m) as isize;
-        if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive) {
+        if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive, &mut false, m3.max_bit_len()) {
             e_shift += 1;
         }
 
@@ -819,9 +819,17 @@ impl Mantissa {
         self.len() * WORD_BIT_SIZE
     }
 
-    // Round n positions, return true if exponent is to be incremented.
-    pub fn round_mantissa(&mut self, n: usize, rm: RoundingMode, is_positive: bool) -> bool {
+    /// Round n positions, return true if exponent is to be incremented.
+    /// if `check_roundable` is true on input, the function verifies whether the mantissa is roundable, given it contains `s` correct digits. 
+    /// If `check_roundable` is set to false on return, in any case it means rounding was successful.
+    pub fn round_mantissa(&mut self, n: usize, rm: RoundingMode, is_positive: bool, check_roundable: &mut bool, s: usize) -> bool {
+        debug_assert!(s % WORD_BIT_SIZE == 0);  // assume s is aligned to the word size.
+
+        // TODO: this function is too complex, because it combines rounding for all rounding modes 
+        // and checks for roundability at the same time.
+
         if rm == RoundingMode::None {
+            *check_roundable = false;
             return false;
         }
 
@@ -830,32 +838,70 @@ impl Mantissa {
             let mut i;
             let mut t;
             let mut c = false;
+            let mut cc = (n - (self.max_bit_len() - s)) / WORD_BIT_SIZE;  // num of roundable significant words
 
             if rm == RoundingMode::ToEven || rm == RoundingMode::ToOdd {
                 let n = n - 1;
                 let mut rem_zero = true;
+                let mut td = 0; // either all bits set, or zero (default)
+
+                // analyze bits at n and at n+1
+                // to decide if we need to add 1 or not.
+                let np1 = n + 1;
+                i = n / WORD_BIT_SIZE;
+                let mut z = i;
+                t = n % WORD_BIT_SIZE;
+                let ip1 = np1 / WORD_BIT_SIZE;
+                let tp1 = np1 % WORD_BIT_SIZE;
+                let num = (self.m[i] >> t) & 1;
+                if t > 0 {
+                    let rb = self.m[i] << (WORD_BIT_SIZE - t);
+                    if rb != 0 {
+                        rem_zero = false;
+                    }
+
+                    if *check_roundable {
+                        // try to get information from preceding bits
+                        let msk = rb & (WORD_MAX << (WORD_BIT_SIZE - t));
+                        if msk == rb {
+                            td = WORD_MAX;
+                        } else if msk != 0 {
+                            *check_roundable = false;   // self is roundable
+                        }
+                    }
+                } else if *check_roundable && cc > 0 && z > 0 {
+                    // try to get information from preceding word
+                    z -= 1;
+                    if self.m[z] == WORD_MAX {
+                        td = WORD_MAX;
+                        rem_zero = false;           // sticky is set
+                    } else if self.m[z] != 0 {
+                        *check_roundable = false;   // self is roundable
+                        rem_zero = false;           // sticky is set
+                    }
+                    cc -= 1;
+                }
+
+                let nump1 = if ip1 < self_len { (self.m[ip1] >> tp1) & 1 } else { 0 };
 
                 // anything before n'th word becomes 0
                 for v in &mut self.m[..n / WORD_BIT_SIZE] {
+                    if *check_roundable && cc > 0 {
+                        if *v != td {
+                            *check_roundable = false;   // self is roundable
+                        } else {
+                            cc -= 1;
+                        }
+                    }
                     if *v != 0 {
                         rem_zero = false;
                     }
                     *v = 0;
                 }
 
-                // analyze bits at n and at n+1
-                // to decide if we need to add 1 or not.
-                let np1 = n + 1;
-                i = n / WORD_BIT_SIZE;
-                t = n % WORD_BIT_SIZE;
-                let ip1 = np1 / WORD_BIT_SIZE;
-                let tp1 = np1 % WORD_BIT_SIZE;
-                let num = (self.m[i] >> t) & 1;
-                if t > 0 && self.m[i] << (WORD_BIT_SIZE - t) as Word != 0 {
-                    rem_zero = false;
+                if *check_roundable {
+                    return false;   // self is not roundable
                 }
-
-                let nump1 = if ip1 < self_len { (self.m[ip1] >> tp1) & 1 } else { 0 };
 
                 let eq1 = num == 1 && rem_zero;
                 let gt1 = num == 1 && !rem_zero;
@@ -888,19 +934,57 @@ impl Mantissa {
                 }
             } else {
                 let mut rem_zero = true;
+                let mut td = 0; // either all bits set, or zero (default)
+
+                i = n / WORD_BIT_SIZE;
+                let mut z = i;
+                t = n % WORD_BIT_SIZE;
+                if t > 0 {
+                    // bits coming before the least significant bit
+                    let rb = self.m[i] << (WORD_BIT_SIZE - t);
+                    if rb != 0 {
+                        rem_zero = false;
+                    }
+
+                    if *check_roundable {
+                        // try to get information from preceding bits
+                        let msk = rb & (WORD_MAX << (WORD_BIT_SIZE - t));
+                        if msk == rb {
+                            td = WORD_MAX;
+                        } else if msk != 0 {
+                            *check_roundable = false;   // self is roundable
+                        }
+                    }
+                } else if *check_roundable && cc > 0 && z > 0 {
+                    // try to get information from preceding word
+                    z -= 1;
+                    if self.m[z] == WORD_MAX {
+                        td = WORD_MAX;
+                        rem_zero = false;           // sticky is set
+                    } else if self.m[z] != 0 {
+                        *check_roundable = false;   // self is roundable
+                        rem_zero = false;           // sticky is set
+                    }
+                    cc -= 1;
+                }
 
                 // anything before n'th word becomes 0
-                for v in &mut self.m[..n / WORD_BIT_SIZE] {
+                for v in self.m[..z].iter_mut().rev() {
+                    if *check_roundable && cc > 0 {
+                        if *v != td {
+                            *check_roundable = false;   // self is roundable
+                        } else {
+                            cc -= 1;
+                        }
+                    }
                     if *v != 0 {
-                        rem_zero = false;
+                        rem_zero = false;   // sticky is set
                     }
                     *v = 0;
                 }
 
-                i = n / WORD_BIT_SIZE;
-                t = n % WORD_BIT_SIZE;
-                if t > 0 && self.m[i] << (WORD_BIT_SIZE - t) as Word != 0 {
-                    rem_zero = false;
+                if *check_roundable {
+                    return false;   // self is not roundable
                 }
 
                 match rm {
@@ -926,6 +1010,8 @@ impl Mantissa {
                     _ => unreachable!(),
                 };
             }
+
+            debug_assert!(*check_roundable == false);
 
             if c {
                 if i < self_len {

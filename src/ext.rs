@@ -759,7 +759,7 @@ impl BigFloat {
         }
     }
 
-    /// Returns exponent of `self` or None if `self` is Inf or NaN.
+    /// Returns the exponent of `self`, or None if `self` is Inf or NaN.
     pub fn get_exponent(&self) -> Option<Exponent> {
         match &self.inner {
             Flavor::Value(v) => Some(v.get_exponent()),
@@ -767,7 +767,7 @@ impl BigFloat {
         }
     }
 
-    /// Returns the number of significant bits used in the mantissa or None if `self` is Inf or NaN.
+    /// Returns the number of significant bits used in the mantissa, or None if `self` is Inf or NaN.
     /// Normal numbers use all bits of the mantissa.
     /// Subnormal numbers use fewer bits than the mantissa can hold.
     pub fn get_precision(&self) -> Option<usize> {
@@ -853,7 +853,7 @@ impl BigFloat {
         Self::result_to_ext(BigFloatNumber::from_words(m, s, e), false, true)
     }
 
-    /// Returns the sign of `self` or None if `self` is NaN.
+    /// Returns the sign of `self`, or None if `self` is NaN.
     pub fn get_sign(&self) -> Option<Sign> {
         match &self.inner {
             Flavor::Value(v) => Some(v.get_sign()),

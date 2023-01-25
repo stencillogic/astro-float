@@ -1,6 +1,8 @@
 //! Logarithm.
 
+use crate::WORD_BIT_SIZE;
 use crate::common::consts::ONE;
+use crate::common::consts::TEN;
 use crate::common::consts::TWO;
 use crate::common::util::count_leading_ones;
 use crate::common::util::count_leading_zeroes_skip_first;
@@ -103,47 +105,54 @@ impl BigFloatNumber {
             return Err(Error::InvalidArgument);
         }
 
-        let mut x = self.clone()?;
-        let e = x.normalize2() as isize;
-        let e = self.get_exponent() as isize - e;
+        let p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p + p_inc;
 
-        x.set_exponent(0);
+        loop {
+            let mut x = self.clone()?;
+            let e = x.normalize2() as isize;
+            let e = self.get_exponent() as isize - e;
 
-        let additional_prec = if e == 0 {
-            count_leading_ones(x.get_mantissa_digits())
-        } else if e == 1 {
-            count_leading_zeroes_skip_first(x.get_mantissa_digits())
-        } else {
-            0
-        } + 2;
+            x.set_exponent(0);
 
-        // test for one.
-        if e == 1 && additional_prec == x.get_mantissa_max_bit_len() + 2 {
-            return Self::new(p);
-        }
+            let additional_prec = if e == 0 {
+                count_leading_ones(x.get_mantissa_digits())
+            } else if e == 1 {
+                count_leading_zeroes_skip_first(x.get_mantissa_digits())
+            } else {
+                0
+            } + 2;
 
-        let p_ext = p + additional_prec;
-        x.set_precision(p_ext, RoundingMode::None)?;
-
-        let p1 = Self::ln_series(x, RoundingMode::None, rm as u32 & 0b11110 != 0)?;
-
-        let mut ret = if e == 0 {
-            p1
-        } else {
-            let p2 = cc.ln_2_num(p_ext, RoundingMode::None)?;
-
-            let mut n = Self::from_usize(e.unsigned_abs())?;
-            if e < 0 {
-                n.set_sign(Sign::Neg);
+            // test for one.
+            if e == 1 && additional_prec == x.get_mantissa_max_bit_len() + 2 {
+                return Self::new(p);
             }
 
-            let p2n = p2.mul(&n, p_ext, RoundingMode::None)?;
-            p1.add(&p2n, p_ext, RoundingMode::None)?
-        };
+            let p_ext = p_wrk + additional_prec;
+            x.set_precision(p_ext, RoundingMode::None)?;
 
-        ret.set_precision(p, rm)?;
+            let p1 = Self::ln_series(x, RoundingMode::None, rm as u32 & 0b11110 != 0)?;
 
-        Ok(ret)
+            let mut ret = if e == 0 {
+                p1
+            } else {
+                let p2 = cc.ln_2_num(p_ext, RoundingMode::None)?;
+
+                let mut n = Self::from_usize(e.unsigned_abs())?;
+                if e < 0 {
+                    n.set_sign(Sign::Neg);
+                }
+
+                let p2n = p2.mul(&n, p_ext, RoundingMode::None)?;
+                p1.add(&p2n, p_ext, RoundingMode::None)?
+            };
+
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                return Ok(ret);
+            }
+
+            p_wrk += p_inc;
+        }
     }
 
     fn ln_series(mut x: Self, rm: RoundingMode, with_correction: bool) -> Result<Self, Error> {
@@ -218,39 +227,57 @@ impl BigFloatNumber {
             return Err(Error::InvalidArgument);
         }
 
-        let mut x = self.clone()?;
-        let e = x.normalize2() as isize;
-        let e = self.get_exponent() as isize - e;
+        let p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p + p_inc;
 
-        x.set_exponent(0);
+        loop {
+            let mut x = self.clone()?;
+            let e = x.normalize2() as isize;
+            let e = self.get_exponent() as isize - e;
 
-        let additional_prec = if e == 0 {
-            count_leading_ones(x.get_mantissa_digits())
-        } else if e == 1 {
-            count_leading_zeroes_skip_first(x.get_mantissa_digits())
-        } else {
-            0
-        } + 2;
+            x.set_exponent(0);
 
-        let p_ext = p + additional_prec;
-        x.set_precision(p_ext, RoundingMode::None)?;
+            let zeroes_cnt = count_leading_zeroes_skip_first(x.get_mantissa_digits());
+            if zeroes_cnt == x.get_mantissa_max_bit_len() {
+                // special case x = 0.5
+                let mut ret = Self::from_usize((e as isize - 1).unsigned_abs())?;
+                if e < 1 {
+                    ret.set_sign(Sign::Neg);
+                }
+                ret.set_precision(p, rm)?;
+                return Ok(ret);
+            }
 
-        let p1 = Self::ln_series(x, RoundingMode::None, rm as u32 & 0b11110 != 0)?;
+            let additional_prec = if e == 0 {
+                count_leading_ones(x.get_mantissa_digits())
+            } else if e == 1 {
+                zeroes_cnt
+            } else {
+                0
+            } + 2;
 
-        let p2 = cc.ln_2_num(p_ext, RoundingMode::None)?;
+            let p_ext = p_wrk + additional_prec;
+            x.set_precision(p_ext, RoundingMode::None)?;
 
-        let p3 = p1.div(&p2, p_ext, RoundingMode::None)?;
+            let p1 = Self::ln_series(x, RoundingMode::None, rm as u32 & 0b11110 != 0)?;
 
-        let mut n = Self::from_usize(e.unsigned_abs())?;
-        if e < 0 {
-            n.set_sign(Sign::Neg);
+            let p2 = cc.ln_2_num(p_ext, RoundingMode::None)?;
+
+            let p3 = p1.div(&p2, p_ext, RoundingMode::None)?;
+
+            let mut n = Self::from_usize(e.unsigned_abs())?;
+            if e < 0 {
+                n.set_sign(Sign::Neg);
+            }
+
+            let mut ret = p3.add(&n, p_ext, RoundingMode::None)?;
+
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                return Ok(ret);
+            }
+
+            p_wrk += p_inc;
         }
-
-        let mut ret = p3.add(&n, p_ext, RoundingMode::None)?;
-
-        ret.set_precision(p, rm)?;
-
-        Ok(ret)
     }
 
     /// Computes the logarithm base 10 of a number with precision `p`. The result is rounded using the rounding mode `rm`.
@@ -267,17 +294,36 @@ impl BigFloatNumber {
         // ln(self) / ln(10)
 
         let mut x = self.clone()?;
-        let p_ext = p + 2;
-        x.set_precision(p_ext, RoundingMode::None)?;
 
-        let p1 = x.ln(p_ext, RoundingMode::None, cc)?;
+        let p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p + p_inc;
 
-        let p2 = cc.ln_10_num(p_ext, RoundingMode::None)?;
+        loop {
+            let p_ext = p_wrk + 2;
+            x.set_precision(p_ext, RoundingMode::None)?;
 
-        let mut ret = p1.div(&p2, p_ext, RoundingMode::None)?;
-        ret.set_precision(p, rm)?;
+            let p1 = x.ln(p_ext, RoundingMode::None, cc)?;
 
-        Ok(ret)
+            let p2 = cc.ln_10_num(p_ext, RoundingMode::None)?;
+
+            let mut ret = p1.div(&p2, p_ext, RoundingMode::None)?;
+
+            // check if x is exactly power of 10
+            if ret.is_int() {
+                let n = ret.get_int_as_usize()?;
+                let tp = TEN.powi(n, p_ext, RoundingMode::None)?;
+                if tp.cmp(&x) == 0 {
+                    ret.set_precision(p, rm)?;
+                    return Ok(ret);     
+                }
+            }
+
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                return Ok(ret);
+            }
+
+            p_wrk += p_inc;
+        }
     }
 
     /// Computes the logarithm base `n` of a number with precision `p`. The result is rounded using the rounding mode `rm`.
@@ -300,22 +346,37 @@ impl BigFloatNumber {
 
         // ln(self) / ln(n)
 
-        let p_ext = p + 2;
-
         let mut x = self.clone()?;
-        x.set_precision(p_ext, RoundingMode::None)?;
 
-        let mut n = n.clone()?;
-        n.set_precision(p_ext, RoundingMode::None)?;
+        let p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p + p_inc;
 
-        let p1 = x.ln(p_ext, RoundingMode::None, cc)?;
+        loop {
+            let p_ext = p_wrk + 2;
 
-        let p2 = n.ln(p_ext, RoundingMode::None, cc)?;
+            x.set_precision(p_ext, RoundingMode::None)?;
 
-        let mut ret = p1.div(&p2, p_ext, RoundingMode::None)?;
-        ret.set_precision(p, rm)?;
+            let mut n = n.clone()?;
+            n.set_precision(p_ext, RoundingMode::None)?;
 
-        Ok(ret)
+            let p1 = x.ln(p_ext, RoundingMode::None, cc)?;
+
+            let p2 = n.ln(p_ext, RoundingMode::None, cc)?;
+
+            let mut ret = p1.div(&p2, p_ext, RoundingMode::None)?;
+
+            let pwr = n.pow(&ret, p_ext, RoundingMode::None, cc)?;
+            if pwr.cmp(&x) == 0 {
+                ret.set_precision(p, rm)?;
+                return Ok(ret);
+            }
+            
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                return Ok(ret);
+            }
+
+            p_wrk += p_inc;
+        }
     }
 }
 

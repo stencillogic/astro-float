@@ -35,8 +35,8 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    /// Returns next character of a string in lower case,
-    /// or None if string end reached.
+    // Returns next character of a string in lower case,
+    // or None if string end reached.
     fn next_char(&mut self) -> Option<char> {
         self.cur_ch = self.chars.next().map(|c| c.to_ascii_lowercase());
         self.cur_ch
