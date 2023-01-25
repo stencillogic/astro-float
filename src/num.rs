@@ -1027,7 +1027,10 @@ impl BigFloatNumber {
             if m == self.get_mantissa_max_bit_len() {
                 return Self::new(self.get_mantissa_max_bit_len());
             } else {
-                if ret.m.round_mantissa(m, rm, self.is_positive(), &mut false, ret.m.max_bit_len()) {
+                if ret
+                    .m
+                    .round_mantissa(m, rm, self.is_positive(), &mut false, ret.m.max_bit_len())
+                {
                     if ret.e == EXPONENT_MAX {
                         return Err(Error::ExponentOverflow(ret.s));
                     }
@@ -1089,28 +1092,43 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - InvalidArgument: the precision is incorrect.
     pub fn set_precision(&mut self, p: usize, rm: RoundingMode) -> Result<(), Error> {
-        self.set_precision_internal(p, rm, false, self.get_mantissa_max_bit_len()).map(|_| {})
+        self.set_precision_internal(p, rm, false, self.get_mantissa_max_bit_len())
+            .map(|_| {})
     }
 
-    /// Try to round and then set the precision to `p`, given `self` has `s` correct digits in mantissa. 
+    /// Try to round and then set the precision to `p`, given `self` has `s` correct digits in mantissa.
     /// Returns true if rounding succeeded. If the fuction returns `false`, `self` is still modified, and should be discarded.
     ///
     /// ## Errors
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - InvalidArgument: the precision is incorrect.
-    pub(crate) fn try_set_precision(&mut self, p: usize, rm: RoundingMode, s: usize) -> Result<bool, Error> {
+    pub(crate) fn try_set_precision(
+        &mut self,
+        p: usize,
+        rm: RoundingMode,
+        s: usize,
+    ) -> Result<bool, Error> {
         self.set_precision_internal(p, rm, true, s)
     }
 
-    fn set_precision_internal(&mut self, p: usize, rm: RoundingMode, mut check_roundable: bool, s: usize) -> Result<bool, Error> {
+    fn set_precision_internal(
+        &mut self,
+        p: usize,
+        rm: RoundingMode,
+        mut check_roundable: bool,
+        s: usize,
+    ) -> Result<bool, Error> {
         Self::p_assertion(p)?;
 
         if self.get_mantissa_max_bit_len() > p && p > 0 {
-            if self
-                .m
-                .round_mantissa(self.get_mantissa_max_bit_len() - p, rm, self.is_positive(), &mut check_roundable, s)
-            {
+            if self.m.round_mantissa(
+                self.get_mantissa_max_bit_len() - p,
+                rm,
+                self.is_positive(),
+                &mut check_roundable,
+                s,
+            ) {
                 if self.e == EXPONENT_MAX {
                     return Err(Error::ExponentOverflow(self.s));
                 }

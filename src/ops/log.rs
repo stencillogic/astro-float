@@ -1,6 +1,5 @@
 //! Logarithm.
 
-use crate::WORD_BIT_SIZE;
 use crate::common::consts::ONE;
 use crate::common::consts::TEN;
 use crate::common::consts::TWO;
@@ -20,6 +19,7 @@ use crate::ops::series::series_run;
 use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::PolycoeffGen;
 use crate::Exponent;
+use crate::WORD_BIT_SIZE;
 
 // Polynomial coefficient generator.
 struct AtanhPolycoeffGen {
@@ -314,7 +314,7 @@ impl BigFloatNumber {
                 let tp = TEN.powi(n, p_ext, RoundingMode::None)?;
                 if tp.cmp(&x) == 0 {
                     ret.set_precision(p, rm)?;
-                    return Ok(ret);     
+                    return Ok(ret);
                 }
             }
 
@@ -370,7 +370,7 @@ impl BigFloatNumber {
                 ret.set_precision(p, rm)?;
                 return Ok(ret);
             }
-            
+
             if ret.try_set_precision(p, rm, p_wrk)? {
                 return Ok(ret);
             }

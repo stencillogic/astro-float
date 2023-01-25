@@ -337,7 +337,13 @@ impl Mantissa {
             m3.m.try_extend(p * WORD_BIT_SIZE)?;
             m3.m[..p - n].fill(0);
         } else if m3.len() > p {
-            if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive, &mut false, m3.max_bit_len()) {
+            if m3.round_mantissa(
+                (m3.len() - p) * WORD_BIT_SIZE,
+                rm,
+                is_positive,
+                &mut false,
+                m3.max_bit_len(),
+            ) {
                 shift -= 1;
             }
             m3.m.trunc_to(p * WORD_BIT_SIZE);
@@ -443,7 +449,13 @@ impl Mantissa {
             m3.m.try_extend(p * WORD_BIT_SIZE)?;
             m3.m[..p - n].fill(0);
         } else if m3.len() > p {
-            if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive, &mut false, m3.max_bit_len()) {
+            if m3.round_mantissa(
+                (m3.len() - p) * WORD_BIT_SIZE,
+                rm,
+                is_positive,
+                &mut false,
+                m3.max_bit_len(),
+            ) {
                 shift -= 1;
             }
             m3.m.trunc_to(p * WORD_BIT_SIZE);
@@ -480,7 +492,13 @@ impl Mantissa {
             m3.m.try_extend(p * WORD_BIT_SIZE)?;
             m3.m[..p - n].fill(0);
         } else if m3.len() > p {
-            if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive, &mut false, m3.max_bit_len()) {
+            if m3.round_mantissa(
+                (m3.len() - p) * WORD_BIT_SIZE,
+                rm,
+                is_positive,
+                &mut false,
+                m3.max_bit_len(),
+            ) {
                 shift -= 1;
             }
             m3.m.trunc_to(p * WORD_BIT_SIZE);
@@ -541,7 +559,13 @@ impl Mantissa {
         }
 
         e_shift -= Self::maximize(&mut m3.m) as isize;
-        if m3.round_mantissa((m3.len() - p) * WORD_BIT_SIZE, rm, is_positive, &mut false, m3.max_bit_len()) {
+        if m3.round_mantissa(
+            (m3.len() - p) * WORD_BIT_SIZE,
+            rm,
+            is_positive,
+            &mut false,
+            m3.max_bit_len(),
+        ) {
             e_shift += 1;
         }
 
@@ -820,12 +844,19 @@ impl Mantissa {
     }
 
     /// Round n positions, return true if exponent is to be incremented.
-    /// if `check_roundable` is true on input, the function verifies whether the mantissa is roundable, given it contains `s` correct digits. 
+    /// if `check_roundable` is true on input, the function verifies whether the mantissa is roundable, given it contains `s` correct digits.
     /// If `check_roundable` is set to false on return, in any case it means rounding was successful.
-    pub fn round_mantissa(&mut self, n: usize, rm: RoundingMode, is_positive: bool, check_roundable: &mut bool, s: usize) -> bool {
-        debug_assert!(s % WORD_BIT_SIZE == 0);  // assume s is aligned to the word size.
+    pub fn round_mantissa(
+        &mut self,
+        n: usize,
+        rm: RoundingMode,
+        is_positive: bool,
+        check_roundable: &mut bool,
+        s: usize,
+    ) -> bool {
+        debug_assert!(s % WORD_BIT_SIZE == 0); // assume s is aligned to the word size.
 
-        // TODO: this function is too complex, because it combines rounding for all rounding modes 
+        // TODO: this function is too complex, because it combines rounding for all rounding modes
         // and checks for roundability at the same time.
 
         if rm == RoundingMode::None {
@@ -838,7 +869,7 @@ impl Mantissa {
             let mut i;
             let mut t;
             let mut c = false;
-            let mut cc = (n - (self.max_bit_len() - s)) / WORD_BIT_SIZE;  // num of roundable significant words
+            let mut cc = (n - (self.max_bit_len() - s)) / WORD_BIT_SIZE; // num of roundable significant words
 
             if rm == RoundingMode::ToEven || rm == RoundingMode::ToOdd {
                 let n = n - 1;
@@ -866,7 +897,7 @@ impl Mantissa {
                         if msk == rb {
                             td = WORD_MAX;
                         } else if msk != 0 {
-                            *check_roundable = false;   // self is roundable
+                            *check_roundable = false; // self is roundable
                         }
                     }
                 } else if *check_roundable && cc > 0 && z > 0 {
@@ -874,10 +905,10 @@ impl Mantissa {
                     z -= 1;
                     if self.m[z] == WORD_MAX {
                         td = WORD_MAX;
-                        rem_zero = false;           // sticky is set
+                        rem_zero = false; // sticky is set
                     } else if self.m[z] != 0 {
-                        *check_roundable = false;   // self is roundable
-                        rem_zero = false;           // sticky is set
+                        *check_roundable = false; // self is roundable
+                        rem_zero = false; // sticky is set
                     }
                     cc -= 1;
                 }
@@ -888,7 +919,7 @@ impl Mantissa {
                 for v in &mut self.m[..n / WORD_BIT_SIZE] {
                     if *check_roundable && cc > 0 {
                         if *v != td {
-                            *check_roundable = false;   // self is roundable
+                            *check_roundable = false; // self is roundable
                         } else {
                             cc -= 1;
                         }
@@ -900,7 +931,7 @@ impl Mantissa {
                 }
 
                 if *check_roundable {
-                    return false;   // self is not roundable
+                    return false; // self is not roundable
                 }
 
                 let eq1 = num == 1 && rem_zero;
@@ -952,7 +983,7 @@ impl Mantissa {
                         if msk == rb {
                             td = WORD_MAX;
                         } else if msk != 0 {
-                            *check_roundable = false;   // self is roundable
+                            *check_roundable = false; // self is roundable
                         }
                     }
                 } else if *check_roundable && cc > 0 && z > 0 {
@@ -960,10 +991,10 @@ impl Mantissa {
                     z -= 1;
                     if self.m[z] == WORD_MAX {
                         td = WORD_MAX;
-                        rem_zero = false;           // sticky is set
+                        rem_zero = false; // sticky is set
                     } else if self.m[z] != 0 {
-                        *check_roundable = false;   // self is roundable
-                        rem_zero = false;           // sticky is set
+                        *check_roundable = false; // self is roundable
+                        rem_zero = false; // sticky is set
                     }
                     cc -= 1;
                 }
@@ -972,19 +1003,19 @@ impl Mantissa {
                 for v in self.m[..z].iter_mut().rev() {
                     if *check_roundable && cc > 0 {
                         if *v != td {
-                            *check_roundable = false;   // self is roundable
+                            *check_roundable = false; // self is roundable
                         } else {
                             cc -= 1;
                         }
                     }
                     if *v != 0 {
-                        rem_zero = false;   // sticky is set
+                        rem_zero = false; // sticky is set
                     }
                     *v = 0;
                 }
 
                 if *check_roundable {
-                    return false;   // self is not roundable
+                    return false; // self is not roundable
                 }
 
                 match rm {
