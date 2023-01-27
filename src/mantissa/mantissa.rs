@@ -343,6 +343,7 @@ impl Mantissa {
                 is_positive,
                 &mut false,
                 m3.max_bit_len(),
+            &mut false,
             ) {
                 shift -= 1;
             }
@@ -455,6 +456,7 @@ impl Mantissa {
                 is_positive,
                 &mut false,
                 m3.max_bit_len(),
+                &mut false,
             ) {
                 shift -= 1;
             }
@@ -466,7 +468,7 @@ impl Mantissa {
         Ok((shift, m3))
     }
 
-    /// Multiply two mantissas, return result and exponent shift as positive value.
+    /// Multiply two mantissas, return result, exponent shift, and inexact flag.
     pub fn mul(
         &self,
         m2: &Self,
@@ -474,7 +476,7 @@ impl Mantissa {
         rm: RoundingMode,
         is_positive: bool,
         full_prec: bool,
-    ) -> Result<(isize, Self), Error> {
+    ) -> Result<(isize, Self, bool), Error> {
         let mut m3 = Self::reserve_new(self.len() + m2.len())?;
 
         Self::mul_unbalanced(&self.m, &m2.m, &mut m3)?;
@@ -485,6 +487,8 @@ impl Mantissa {
 
         let p = Self::bit_len_to_word_len(p);
 
+        let mut inexact = false;
+
         if full_prec {
             m3.m.trunc_trailing_zeroes();
         } else if m3.len() < p {
@@ -492,12 +496,19 @@ impl Mantissa {
             m3.m.try_extend(p * WORD_BIT_SIZE)?;
             m3.m[..p - n].fill(0);
         } else if m3.len() > p {
+            if rm == RoundingMode::None {
+                // rounding function will not check for inexactness, so check it here
+                if let Some(_) = m3.find_one_from((m3.len() - p) * WORD_BIT_SIZE) {
+                    inexact = true;
+                }
+            }
             if m3.round_mantissa(
                 (m3.len() - p) * WORD_BIT_SIZE,
                 rm,
                 is_positive,
                 &mut false,
                 m3.max_bit_len(),
+                &mut inexact,
             ) {
                 shift -= 1;
             }
@@ -508,7 +519,7 @@ impl Mantissa {
 
         m3.n = m3.m.len() * WORD_BIT_SIZE;
 
-        Ok((shift, m3))
+        Ok((shift, m3, inexact))
     }
 
     /// Divide mantissa by mantissa, return result and exponent ajustment.
@@ -565,6 +576,7 @@ impl Mantissa {
             is_positive,
             &mut false,
             m3.max_bit_len(),
+            &mut false,
         ) {
             e_shift += 1;
         }
@@ -822,15 +834,6 @@ impl Mantissa {
         true
     }
 
-    /// Decrement length by l, or set lentgh = 0, if l > length
-    pub fn dec_len(&mut self, l: usize) {
-        if self.n > l {
-            self.n -= l;
-        } else {
-            self.n = 0;
-        }
-    }
-
     /// Returns length of the mantissa in words.
     #[inline]
     pub fn len(&self) -> usize {
@@ -844,8 +847,9 @@ impl Mantissa {
     }
 
     /// Round n positions, return true if exponent is to be incremented.
-    /// if `check_roundable` is true on input, the function verifies whether the mantissa is roundable, given it contains `s` correct digits.
+    /// If `check_roundable` is true on input, the function verifies whether the mantissa is roundable, given it contains `s` correct digits.
     /// If `check_roundable` is set to false on return, in any case it means rounding was successful.
+    /// If some bits set to 1 during rounding were set to 0, `inexact` will take value true.
     pub fn round_mantissa(
         &mut self,
         n: usize,
@@ -853,6 +857,7 @@ impl Mantissa {
         is_positive: bool,
         check_roundable: &mut bool,
         s: usize,
+        inexact: &mut bool,
     ) -> bool {
         debug_assert!(s % WORD_BIT_SIZE == 0); // assume s is aligned to the word size.
 
@@ -934,6 +939,10 @@ impl Mantissa {
                     return false; // self is not roundable
                 }
 
+                // inexactness
+                *inexact = !rem_zero || num == 1;
+
+                // rounding
                 let eq1 = num == 1 && rem_zero;
                 let gt1 = num == 1 && !rem_zero;
 
@@ -1018,6 +1027,10 @@ impl Mantissa {
                     return false; // self is not roundable
                 }
 
+                // inexactness
+                *inexact = !rem_zero;
+
+                // rounding
                 match rm {
                     RoundingMode::ToZero => {}
                     RoundingMode::FromZero => {

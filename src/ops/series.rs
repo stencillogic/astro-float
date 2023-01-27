@@ -360,13 +360,13 @@ fn series_horner<T: PolycoeffGen>(
 
     // determine number of parts and cache plynomial coeffs.
     let mut cache = SmallVec::<[BigFloatNumber; MAX_CACHE]>::new();
-    let mut x_p = (-x_first.e) as isize + (-x_step.e) as isize;
+    let mut x_p = -(x_first.e as isize) - x_step.e as isize;
     let mut coef_p = 0;
 
     while x_p + coef_p < p as isize - add.get_exponent() as isize {
         let coeff = polycoeff_gen.next(RoundingMode::None)?;
-        coef_p = (-coeff.e) as isize;
-        x_p += (-x_step.e) as isize;
+        coef_p = -coeff.e as isize;
+        x_p += -x_step.e as isize;
         cache.push(coeff.clone()?);
     }
 

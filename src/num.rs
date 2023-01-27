@@ -213,7 +213,12 @@ impl BigFloatNumber {
     ///  - InvalidArgument: the precision is incorrect.
     #[inline]
     pub fn mul(&self, d2: &Self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
-        self.mul_general_case(d2, p, rm, false)
+        self.mul_general_case(d2, p, rm, false, &mut false)
+    }
+
+    /// like mul, but in case the resulting mantissa exceeds the desired precision, sets inexact flag to true.
+    pub(crate) fn mul_inexact(&self, d2: &Self, p: usize, rm: RoundingMode, inexact: &mut bool) -> Result<Self, Error> {
+        self.mul_general_case(d2, p, rm, false, inexact)
     }
 
     /// Multiplies `d2` by `self` and returns the result of the operation.
@@ -226,7 +231,7 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     #[inline]
     pub fn mul_full_prec(&self, d2: &Self) -> Result<Self, Error> {
-        self.mul_general_case(d2, 0, RoundingMode::None, true)
+        self.mul_general_case(d2, 0, RoundingMode::None, true, &mut false)
     }
 
     fn mul_general_case(
@@ -235,6 +240,7 @@ impl BigFloatNumber {
         p: usize,
         rm: RoundingMode,
         full_prec: bool,
+        inexact: &mut bool,
     ) -> Result<Self, Error> {
         let p = round_p(p);
 
@@ -255,8 +261,10 @@ impl BigFloatNumber {
         let (e2, m2_opt) = d2.normalize()?;
         let m2_normalized = m2_opt.as_ref().unwrap_or(&d2.m);
 
-        let (e_shift, mut m3) =
+        let (e_shift, mut m3, inxt) =
             m1_normalized.mul(m2_normalized, p, rm, s == Sign::Pos, full_prec)?;
+
+        *inexact = inxt;
 
         let mut e = e1 + e2 - e_shift;
         if e > EXPONENT_MAX as isize {
@@ -264,7 +272,14 @@ impl BigFloatNumber {
         }
         if e < EXPONENT_MIN as isize {
             if !Self::process_subnormal(&mut m3, &mut e, rm, s == Sign::Pos) {
-                let mut ret = Self::new(p)?;
+                let mut ret = if rm == RoundingMode::FromZero 
+                    || (s.is_positive() && rm == RoundingMode::Up)
+                    || (s.is_negative() && rm == RoundingMode::Down) {
+                        // non zero for directed rounding modes
+                        Self::min_positive(p)
+                } else {
+                    Self::new(p)
+                }?;
                 ret.set_sign(s);
                 return Ok(ret);
             }
@@ -321,7 +336,14 @@ impl BigFloatNumber {
         }
         if e < EXPONENT_MIN as isize {
             if !Self::process_subnormal(&mut m3, &mut e, rm, s == Sign::Pos) {
-                let mut ret = Self::new(p)?;
+                let mut ret = if rm == RoundingMode::FromZero 
+                    || (s.is_positive() && rm == RoundingMode::Up)
+                    || (s.is_negative() && rm == RoundingMode::Down) {
+                        // non zero for directed rounding modes
+                        Self::min_positive(p)
+                } else {
+                    Self::new(p)
+                }?;
                 ret.set_sign(s);
                 return Ok(ret);
             }
@@ -532,7 +554,14 @@ impl BigFloatNumber {
 
         if e < EXPONENT_MIN as isize {
             if !Self::process_subnormal(&mut m3, &mut e, rm, d3.is_positive()) {
-                let mut ret = Self::new(p)?;
+                let mut ret = if rm == RoundingMode::FromZero 
+                    || (d3.s.is_positive() && rm == RoundingMode::Up)
+                    || (d3.s.is_negative() && rm == RoundingMode::Down) {
+                        // non zero for directed rounding modes
+                        Self::min_positive(p)
+                } else {
+                    Self::new(p)
+                }?;
                 ret.set_sign(d3.s);
                 return Ok(ret);
             }
@@ -544,12 +573,27 @@ impl BigFloatNumber {
         Ok(d3)
     }
 
+    // make self subnormal
     pub(crate) fn subnormalize(&mut self, mut e: isize, rm: RoundingMode) {
+        debug_assert_eq!(self.get_exponent(), EXPONENT_MIN);
+
+        if self.is_zero() {
+            return;
+        }
+
         let is_positive = self.is_positive();
 
         if !Self::process_subnormal(&mut self.m, &mut e, rm, is_positive) {
-            self.m.set_zero();
-            self.e = 0;
+            if rm == RoundingMode::FromZero
+                    || (is_positive && rm == RoundingMode::Up)
+                    || (!is_positive && rm == RoundingMode::Down) {
+                        // non zero for directed rounding modes
+                        self.m.get_digits_mut()[0] = 1;
+                        self.m.set_bit_len(1);
+            } else {
+                self.m.set_zero();
+                self.e = 0;
+            }
         }
     }
 
@@ -568,13 +612,13 @@ impl BigFloatNumber {
 
             let mut shift = (EXPONENT_MIN as isize - *e) as usize;
 
-            if m3.round_mantissa(shift, rm, is_positive, &mut false, m3.max_bit_len()) {
+            if m3.round_mantissa(shift, rm, is_positive, &mut false, m3.max_bit_len(), &mut false) {
                 shift -= 1;
             }
 
             if shift > 0 {
                 m3.shift_right(shift);
-                m3.dec_len(shift);
+                m3.update_bit_len();
             }
 
             *e = EXPONENT_MIN as isize;
@@ -1029,7 +1073,7 @@ impl BigFloatNumber {
             } else {
                 if ret
                     .m
-                    .round_mantissa(m, rm, self.is_positive(), &mut false, ret.m.max_bit_len())
+                    .round_mantissa(m, rm, self.is_positive(), &mut false, ret.m.max_bit_len(), &mut false)
                 {
                     if ret.e == EXPONENT_MAX {
                         return Err(Error::ExponentOverflow(ret.s));
@@ -1092,8 +1136,22 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - InvalidArgument: the precision is incorrect.
     pub fn set_precision(&mut self, p: usize, rm: RoundingMode) -> Result<(), Error> {
-        self.set_precision_internal(p, rm, false, self.get_mantissa_max_bit_len())
+        self.set_precision_internal(p, rm, false, self.get_mantissa_max_bit_len(), &mut false)
             .map(|_| {})
+    }
+
+    /// Sets the precision of `self` to `p`, and returns true if number became inexact representation of self.
+    /// If the new precision is smaller than the existing one, the number is rounded using specified rounding mode `rm`.
+    ///
+    /// ## Errors
+    ///
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - InvalidArgument: the precision is incorrect.
+    pub fn set_precision_inexact(&mut self, p: usize, rm: RoundingMode) -> Result<bool, Error> {
+        let mut inexact = false;
+        self.set_precision_internal(p, rm, false, self.get_mantissa_max_bit_len(), &mut inexact)
+            .map(|_| {})?;
+        Ok(inexact)
     }
 
     /// Try to round and then set the precision to `p`, given `self` has `s` correct digits in mantissa.
@@ -1109,7 +1167,7 @@ impl BigFloatNumber {
         rm: RoundingMode,
         s: usize,
     ) -> Result<bool, Error> {
-        self.set_precision_internal(p, rm, true, s)
+        self.set_precision_internal(p, rm, true, s, &mut false)
     }
 
     fn set_precision_internal(
@@ -1118,16 +1176,24 @@ impl BigFloatNumber {
         rm: RoundingMode,
         mut check_roundable: bool,
         s: usize,
+        inexact: &mut bool,
     ) -> Result<bool, Error> {
         Self::p_assertion(p)?;
 
         if self.get_mantissa_max_bit_len() > p && p > 0 {
+            if rm == RoundingMode::None {
+                // rounding function will not check for inexactness, so check it here
+                if let Some(_) = self.m.find_one_from(self.get_mantissa_max_bit_len() - p) {
+                    *inexact = true;
+                }
+            }
             if self.m.round_mantissa(
                 self.get_mantissa_max_bit_len() - p,
                 rm,
                 self.is_positive(),
                 &mut check_roundable,
                 s,
+                inexact,
             ) {
                 if self.e == EXPONENT_MAX {
                     return Err(Error::ExponentOverflow(self.s));

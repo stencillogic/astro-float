@@ -167,7 +167,7 @@ fn mpfr_compare_ops() {
         // println!("\n{}", i);
         // println!("{:b}\n{}", n1, f1.to_string_radix(2, None));
 
-        assert_float_close(n3, f3, p, "powi", false);
+        assert_float_close(n3, f3, p, "powi", true);
     }
 
     // pow
@@ -193,7 +193,7 @@ fn mpfr_compare_ops() {
         // println!("{:?}", b);
         // println!("{:?}", n1);
 
-        test_astro_op!(false, b, n1, pow, c, f1, pow, p, rm, rnd, "pow", cc);
+        test_astro_op!(true, b, n1, pow, c, f1, pow, p, rm, rnd, "pow", cc);
     }
 
     // n1 = -inf..2: sin, cos, tan
@@ -227,7 +227,7 @@ fn mpfr_compare_ops() {
 
         //println!("{:?}", n1);
 
-        test_astro_op!(false, n1, exp, f1, exp, p, rm, rnd, "exp", cc);
+        test_astro_op!(true, n1, exp, f1, exp, p, rm, rnd, "exp", cc);
         test_astro_op!(false, n1, sinh, f1, sinh, p, rm, rnd, "sinh", cc);
         test_astro_op!(false, n1, cosh, f1, cosh, p, rm, rnd, "cosh", cc);
         test_astro_op!(false, n1, tanh, f1, tanh, p, rm, rnd, "tanh", cc);
@@ -280,9 +280,9 @@ fn mpfr_compare_ops() {
 
         test_astro_op!(false, n1, sqrt, f1, sqrt, p, rm, rnd, "sqrt");
         test_astro_op!(false, n1, cbrt, f1, cbrt, p, rm, rnd, "cbrt");
-        test_astro_op!(false, n1, ln, f1, log, p, rm, rnd, "ln", cc);
-        test_astro_op!(false, n1, log2, f1, log2, p, rm, rnd, "log2", cc);
-        test_astro_op!(false, n1, log10, f1, log10, p, rm, rnd, "log10", cc);
+        test_astro_op!(true, n1, ln, f1, log, p, rm, rnd, "ln", cc);
+        test_astro_op!(true, n1, log2, f1, log2, p, rm, rnd, "log2", cc);
+        test_astro_op!(true, n1, log10, f1, log10, p, rm, rnd, "log10", cc);
         test_astro_op!(false, n1, asinh, f1, asinh, p, rm, rnd, "asinh", cc);
         test_astro_op!(false, n1, atan, f1, atan, p, rm, rnd, "atan", cc);
     }

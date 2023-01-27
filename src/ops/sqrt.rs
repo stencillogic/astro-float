@@ -61,7 +61,14 @@ impl BigFloatNumber {
         if e_corr < EXPONENT_MIN as isize {
             let is_positive = ret.is_positive();
             if !Self::process_subnormal(&mut ret.m, &mut e_corr, rm, is_positive) {
-                return Self::new(p);
+                return if rm == RoundingMode::FromZero 
+                    || (is_positive && rm == RoundingMode::Up)
+                    || (!is_positive && rm == RoundingMode::Down) {
+                        // non zero directed rounding modes
+                        Self::min_positive(p)
+                } else {
+                    Self::new(p)
+                };
             }
         }
 
