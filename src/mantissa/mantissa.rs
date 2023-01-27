@@ -343,7 +343,7 @@ impl Mantissa {
                 is_positive,
                 &mut false,
                 m3.max_bit_len(),
-            &mut false,
+                &mut false,
             ) {
                 shift -= 1;
             }

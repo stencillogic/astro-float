@@ -1,8 +1,8 @@
 //! Exponentiation.
 
-use crate::EXPONENT_MIN;
 use crate::common::util::round_p;
 use crate::ops::consts::Consts;
+use crate::EXPONENT_MIN;
 use crate::{
     common::consts::ONE,
     defs::{Error, WORD_BIT_SIZE, WORD_SIGNIFICANT_BIT},
@@ -165,7 +165,8 @@ impl BigFloatNumber {
                 let p_x = p_wrk + 1;
 
                 let mut inexact = false;
-                let x = self.powi_internal(n.unsigned_abs(), p_x, RoundingMode::None, &mut inexact)?;
+                let x =
+                    self.powi_internal(n.unsigned_abs(), p_x, RoundingMode::None, &mut inexact)?;
 
                 if inexact {
                     let mut ret = ONE.div(&x, p_x, RoundingMode::None)?;
@@ -182,7 +183,13 @@ impl BigFloatNumber {
     }
 
     /// Compute self^n, set inexact to true if the result is inexact.
-    fn powi_internal(&self, n: usize, p: usize, rm: RoundingMode, inexact: &mut bool) -> Result<Self, Error> {
+    fn powi_internal(
+        &self,
+        n: usize,
+        p: usize,
+        rm: RoundingMode,
+        inexact: &mut bool,
+    ) -> Result<Self, Error> {
         let p = round_p(p);
 
         let mut i = n;
@@ -207,7 +214,7 @@ impl BigFloatNumber {
                 break;
             }
         }
-        let bit_pos = bit_pos;  // make immutable
+        let bit_pos = bit_pos; // make immutable
 
         let p = round_p(p);
 
@@ -270,7 +277,7 @@ impl BigFloatNumber {
     // e^self for |self| < 1.
     fn expf(self, rm: RoundingMode) -> Result<Self, Error> {
         debug_assert!(!self.is_zero());
-        
+
         let p = self.get_mantissa_max_bit_len();
 
         let sh = self.sinh_series(p, rm, false)?; // faster convergence than direct series

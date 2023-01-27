@@ -217,7 +217,13 @@ impl BigFloatNumber {
     }
 
     /// like mul, but in case the resulting mantissa exceeds the desired precision, sets inexact flag to true.
-    pub(crate) fn mul_inexact(&self, d2: &Self, p: usize, rm: RoundingMode, inexact: &mut bool) -> Result<Self, Error> {
+    pub(crate) fn mul_inexact(
+        &self,
+        d2: &Self,
+        p: usize,
+        rm: RoundingMode,
+        inexact: &mut bool,
+    ) -> Result<Self, Error> {
         self.mul_general_case(d2, p, rm, false, inexact)
     }
 
@@ -272,11 +278,12 @@ impl BigFloatNumber {
         }
         if e < EXPONENT_MIN as isize {
             if !Self::process_subnormal(&mut m3, &mut e, rm, s == Sign::Pos) {
-                let mut ret = if rm == RoundingMode::FromZero 
+                let mut ret = if rm == RoundingMode::FromZero
                     || (s.is_positive() && rm == RoundingMode::Up)
-                    || (s.is_negative() && rm == RoundingMode::Down) {
-                        // non zero for directed rounding modes
-                        Self::min_positive(p)
+                    || (s.is_negative() && rm == RoundingMode::Down)
+                {
+                    // non zero for directed rounding modes
+                    Self::min_positive(p)
                 } else {
                     Self::new(p)
                 }?;
@@ -336,11 +343,12 @@ impl BigFloatNumber {
         }
         if e < EXPONENT_MIN as isize {
             if !Self::process_subnormal(&mut m3, &mut e, rm, s == Sign::Pos) {
-                let mut ret = if rm == RoundingMode::FromZero 
+                let mut ret = if rm == RoundingMode::FromZero
                     || (s.is_positive() && rm == RoundingMode::Up)
-                    || (s.is_negative() && rm == RoundingMode::Down) {
-                        // non zero for directed rounding modes
-                        Self::min_positive(p)
+                    || (s.is_negative() && rm == RoundingMode::Down)
+                {
+                    // non zero for directed rounding modes
+                    Self::min_positive(p)
                 } else {
                     Self::new(p)
                 }?;
@@ -554,11 +562,12 @@ impl BigFloatNumber {
 
         if e < EXPONENT_MIN as isize {
             if !Self::process_subnormal(&mut m3, &mut e, rm, d3.is_positive()) {
-                let mut ret = if rm == RoundingMode::FromZero 
+                let mut ret = if rm == RoundingMode::FromZero
                     || (d3.s.is_positive() && rm == RoundingMode::Up)
-                    || (d3.s.is_negative() && rm == RoundingMode::Down) {
-                        // non zero for directed rounding modes
-                        Self::min_positive(p)
+                    || (d3.s.is_negative() && rm == RoundingMode::Down)
+                {
+                    // non zero for directed rounding modes
+                    Self::min_positive(p)
                 } else {
                     Self::new(p)
                 }?;
@@ -585,11 +594,12 @@ impl BigFloatNumber {
 
         if !Self::process_subnormal(&mut self.m, &mut e, rm, is_positive) {
             if rm == RoundingMode::FromZero
-                    || (is_positive && rm == RoundingMode::Up)
-                    || (!is_positive && rm == RoundingMode::Down) {
-                        // non zero for directed rounding modes
-                        self.m.get_digits_mut()[0] = 1;
-                        self.m.set_bit_len(1);
+                || (is_positive && rm == RoundingMode::Up)
+                || (!is_positive && rm == RoundingMode::Down)
+            {
+                // non zero for directed rounding modes
+                self.m.get_digits_mut()[0] = 1;
+                self.m.set_bit_len(1);
             } else {
                 self.m.set_zero();
                 self.e = 0;
@@ -612,7 +622,14 @@ impl BigFloatNumber {
 
             let mut shift = (EXPONENT_MIN as isize - *e) as usize;
 
-            if m3.round_mantissa(shift, rm, is_positive, &mut false, m3.max_bit_len(), &mut false) {
+            if m3.round_mantissa(
+                shift,
+                rm,
+                is_positive,
+                &mut false,
+                m3.max_bit_len(),
+                &mut false,
+            ) {
                 shift -= 1;
             }
 
@@ -1071,10 +1088,14 @@ impl BigFloatNumber {
             if m == self.get_mantissa_max_bit_len() {
                 return Self::new(self.get_mantissa_max_bit_len());
             } else {
-                if ret
-                    .m
-                    .round_mantissa(m, rm, self.is_positive(), &mut false, ret.m.max_bit_len(), &mut false)
-                {
+                if ret.m.round_mantissa(
+                    m,
+                    rm,
+                    self.is_positive(),
+                    &mut false,
+                    ret.m.max_bit_len(),
+                    &mut false,
+                ) {
                     if ret.e == EXPONENT_MAX {
                         return Err(Error::ExponentOverflow(ret.s));
                     }
