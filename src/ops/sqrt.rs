@@ -1,7 +1,7 @@
 //! Sqrt computation.
 
-use crate::Sign;
 use crate::common::util::round_p;
+use crate::Sign;
 use crate::{
     defs::{Error, EXPONENT_MIN},
     num::BigFloatNumber,
@@ -45,7 +45,6 @@ impl BigFloatNumber {
             ret.subnormalize(e, rm, &mut true);
 
             Ok(ret)
-            
         } else {
             Ok(BigFloatNumber {
                 m: m3,
@@ -60,9 +59,9 @@ impl BigFloatNumber {
 mod tests {
 
     use super::*;
-    use crate::{Sign, EXPONENT_MAX};
     use crate::common::consts::ONE;
     use crate::{common::util::random_subnormal, defs::WORD_BIT_SIZE, Exponent};
+    use crate::{Sign, EXPONENT_MAX};
 
     #[test]
     fn test_sqrt() {

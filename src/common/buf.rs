@@ -74,7 +74,9 @@ impl WordBuf {
     pub fn try_extend_2(&mut self, p: usize) -> Result<(), Error> {
         let n = (p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         if n > self.inner.capacity() {
-            self.inner.try_reserve(n - self.inner.capacity()).map_err(Error::MemoryAllocation)?;
+            self.inner
+                .try_reserve(n - self.inner.capacity())
+                .map_err(Error::MemoryAllocation)?;
         }
         if n > self.inner.len() {
             self.inner.resize(n, 0);

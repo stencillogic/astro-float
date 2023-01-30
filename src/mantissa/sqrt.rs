@@ -13,7 +13,6 @@ use crate::mantissa::Mantissa;
 impl Mantissa {
     // Basic algorithm for small inputs.
     fn sqrt_rem_basic(m: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
-
         let zc = m.iter().rev().take_while(|x| **x == 0).count();
         if zc == m.len() {
             // m is zero
@@ -53,7 +52,7 @@ impl Mantissa {
                 // remainder
                 let mut rbuf = WordBuf::new(m.len())?;
                 rbuf.copy_from_slice(m);
-                let mut r  = SliceWithSign::new_mut(&mut rbuf, 1);
+                let mut r = SliceWithSign::new_mut(&mut rbuf, 1);
                 r.sub_assign(&sq);
 
                 break Ok((sbuf, rbuf));
@@ -99,7 +98,7 @@ impl Mantissa {
             // s*2 and normalize
             let mut s2buf = WordBuf::new(sbuf.len() + 1)?;
             s2buf[..sbuf.len()].copy_from_slice(&sbuf);
-            *s2buf.last_mut().unwrap() = 0;  // s2buf has at least 1 element.
+            *s2buf.last_mut().unwrap() = 0; // s2buf has at least 1 element.
 
             let pos = find_one_from(&s2buf, 0).unwrap(); // size of s2buf > size of sbuf
 
@@ -157,10 +156,14 @@ impl Mantissa {
     }
 
     fn sqrt_rem_split(m: &[Word], l: usize) -> (SliceWithSign, SliceWithSign, SliceWithSign) {
-        let (m, m2) = m.split_at(2*l);
+        let (m, m2) = m.split_at(2 * l);
         let (m0, m1) = m.split_at(l);
 
-        (SliceWithSign::new(m2, 1), SliceWithSign::new(m1, 1), SliceWithSign::new(m0, 1))
+        (
+            SliceWithSign::new(m2, 1),
+            SliceWithSign::new(m1, 1),
+            SliceWithSign::new(m0, 1),
+        )
     }
 }
 
@@ -188,8 +191,8 @@ mod tests {
             qq.mul_assign(&q, &mut wb);
             qq.add_assign(&r);
 
-            assert_eq!(&qq[..$s1.len()], $s1, "{}", $op);    
-        }
+            assert_eq!(&qq[..$s1.len()], $s1, "{}", $op);
+        };
     }
 
     #[test]
@@ -200,19 +203,19 @@ mod tests {
         let s2: &[Word] = &[WORD_MAX, WORD_MAX];
         let s3: &[Word] = &[WORD_MAX, WORD_MAX, WORD_MAX];
         let s4: &[Word] = &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
-        for s1 in [s1, s2, s3, s4] { 
+        for s1 in [s1, s2, s3, s4] {
             let (qb, rb) = Mantissa::sqrt_rem_basic(s1).unwrap();
 
             assert_sqrt!(s1, &qb, &rb, MAX_BUF, "max");
         }
 
-        let s1: &[Word] = &[WORD_MAX-1];
-        let s2: &[Word] = &[WORD_MAX-1, WORD_MAX];
-        let s3: &[Word] = &[WORD_MAX-1, WORD_MAX, WORD_MAX];
-        let s4: &[Word] = &[WORD_MAX-1, WORD_MAX, WORD_MAX, WORD_MAX];
-        for s1 in [s1, s2, s3, s4] { 
+        let s1: &[Word] = &[WORD_MAX - 1];
+        let s2: &[Word] = &[WORD_MAX - 1, WORD_MAX];
+        let s3: &[Word] = &[WORD_MAX - 1, WORD_MAX, WORD_MAX];
+        let s4: &[Word] = &[WORD_MAX - 1, WORD_MAX, WORD_MAX, WORD_MAX];
+        for s1 in [s1, s2, s3, s4] {
             let (qb, rb) = Mantissa::sqrt_rem_basic(s1).unwrap();
-            
+
             assert_sqrt!(s1, &qb, &rb, MAX_BUF, "single zero");
         }
 
@@ -221,7 +224,7 @@ mod tests {
             let s2: &[Word] = &[int, 0];
             let s3: &[Word] = &[int, 0, 0];
             let s4: &[Word] = &[int, 0, 0, 0];
-            for s1 in [s1, s2, s3, s4] { 
+            for s1 in [s1, s2, s3, s4] {
                 let (qb, rb) = Mantissa::sqrt_rem_basic(s1).unwrap();
 
                 assert_sqrt!(s1, &qb, &rb, MAX_BUF, "int");
@@ -253,11 +256,21 @@ mod tests {
         let s1: &[Word] = &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
         let s2: &[Word] = &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
         let s3: &[Word] = &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
-        let s4: &[Word] = &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
-        let s5: &[Word] = &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
-        let s6: &[Word] = &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
-        let s7: &[Word] = &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
-        for s1 in [s1, s2, s3, s4, s5, s6, s7] { 
+        let s4: &[Word] =
+            &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
+        let s5: &[Word] = &[
+            WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX,
+            WORD_MAX,
+        ];
+        let s6: &[Word] = &[
+            WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX,
+            WORD_MAX, WORD_MAX,
+        ];
+        let s7: &[Word] = &[
+            WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX,
+            WORD_MAX, WORD_MAX, WORD_MAX,
+        ];
+        for s1 in [s1, s2, s3, s4, s5, s6, s7] {
             let (qb, rb) = Mantissa::sqrt_rem(s1).unwrap();
 
             assert_sqrt!(s1, &qb, &rb, MAX_BUF, "max");
@@ -265,17 +278,59 @@ mod tests {
 
         let s1: &[Word] = &[WORD_MAX - 1, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
         let s2: &[Word] = &[WORD_MAX - 1, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
-        let s3: &[Word] = &[WORD_MAX - 1, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
-        let s4: &[Word] = &[WORD_MAX - 1, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
-        let s5: &[Word] = &[WORD_MAX - 1, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
-        let s6: &[Word] = &[WORD_MAX - 1, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
-        let s7: &[Word] = &[WORD_MAX - 1, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
+        let s3: &[Word] =
+            &[WORD_MAX - 1, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX];
+        let s4: &[Word] = &[
+            WORD_MAX - 1,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+        ];
+        let s5: &[Word] = &[
+            WORD_MAX - 1,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+        ];
+        let s6: &[Word] = &[
+            WORD_MAX - 1,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+        ];
+        let s7: &[Word] = &[
+            WORD_MAX - 1,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+            WORD_MAX,
+        ];
         for s1 in [s1, s2, s3, s4, s5, s6, s7] {
             let (qb, rb) = Mantissa::sqrt_rem(s1).unwrap();
 
             assert_sqrt!(s1, &qb, &rb, MAX_BUF, "single zero");
         }
-
 
         let s1: &[Word] = &[0, 0, 0, 0, WORD_SIGNIFICANT_BIT];
         let s2: &[Word] = &[0, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT];

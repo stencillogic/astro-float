@@ -1231,5 +1231,4 @@ impl Mantissa {
 
         Ok((e_shift, m3))
     }
-
 }

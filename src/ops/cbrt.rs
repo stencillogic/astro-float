@@ -4,7 +4,7 @@ use crate::{
     common::util::{log2_ceil, round_p},
     defs::{Error, EXPONENT_MAX, EXPONENT_MIN},
     num::BigFloatNumber,
-    Exponent, RoundingMode
+    Exponent, RoundingMode,
 };
 
 impl BigFloatNumber {

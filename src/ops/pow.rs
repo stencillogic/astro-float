@@ -45,7 +45,11 @@ impl BigFloatNumber {
 
                 // divide by 2
                 if xx.get_exponent() == EXPONENT_MIN {
-                    xx.subnormalize(xx.get_exponent() as isize - 1, RoundingMode::FromZero, &mut true);
+                    xx.subnormalize(
+                        xx.get_exponent() as isize - 1,
+                        RoundingMode::FromZero,
+                        &mut true,
+                    );
                 } else {
                     xx.set_exponent(xx.get_exponent() - 1);
                 }
