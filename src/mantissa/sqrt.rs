@@ -175,6 +175,9 @@ mod tests {
     use super::*;
     use rand::random;
 
+    #[cfg(not(feature = "std"))]
+    use alloc::vec::Vec;
+    
     macro_rules! assert_sqrt {
         ($s1:expr, $qb:expr, $rb:expr, $MAX_BUF:ident, $op:literal) => {
             let mut wb = [0; MAX_BUF * 2];
