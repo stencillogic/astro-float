@@ -920,7 +920,7 @@ impl BigFloat {
     /// Precision is rounded upwards to the word size.
     pub fn reciprocal(&self, p: usize, rm: RoundingMode) -> Self {
         match &self.inner {
-            Flavor::Value(v) => Self::result_to_ext(v.reciprocal(p, rm), v.is_zero(), true),
+            Flavor::Value(v) => Self::result_to_ext(v.reciprocal(p, rm), false, v.is_positive()),
             Flavor::Inf(s) => {
                 let mut ret = Self::new(p);
                 ret.set_sign(*s);

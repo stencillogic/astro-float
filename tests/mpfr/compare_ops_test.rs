@@ -107,7 +107,7 @@ fn mpfr_compare_ops() {
         let mut f3 = Float::with_val(p as u32, 1);
         unsafe { mpfr::div(f3.as_raw_mut(), mpfr_one.as_raw(), f1.as_raw(), rnd) };
 
-        assert_float_close(n3, f3, p, "reciprocal", false);
+        assert_float_close(n3, f3, p, "reciprocal", true);
     }
 
     // rem
@@ -278,7 +278,7 @@ fn mpfr_compare_ops() {
         // println!("{:b}", n1);
         // println!("{}", f1.to_string_radix(2, None));
 
-        test_astro_op!(false, n1, sqrt, f1, sqrt, p, rm, rnd, "sqrt");
+        test_astro_op!(true, n1, sqrt, f1, sqrt, p, rm, rnd, "sqrt");
         test_astro_op!(false, n1, cbrt, f1, cbrt, p, rm, rnd, "cbrt");
         test_astro_op!(true, n1, ln, f1, log, p, rm, rnd, "ln", cc);
         test_astro_op!(true, n1, log2, f1, log2, p, rm, rnd, "log2", cc);

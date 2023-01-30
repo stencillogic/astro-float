@@ -1274,70 +1274,11 @@ impl BigFloatNumber {
     ///
     /// ## Errors
     ///
+    ///  - DivisionByZero: `self` is zero.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    ///  - ExponentOverflow: rounding caused exponent overflow.
-    ///  - InvalidArgument: the precision is incorrect.
     pub fn reciprocal(&self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
-        let p = round_p(p);
-        Self::p_assertion(p)?;
-
-        if self.is_zero() {
-            return Err(Error::ExponentOverflow(self.get_sign()));
-        }
-
-        let mut err = 1;
-
-        let mut mp = p;
-        while mp > 500 {
-            mp >>= 1;
-            err += 5;
-        }
-
-        let e = self.get_exponent();
-        let mut x = self.clone()?;
-
-        x.set_exponent(0);
-        x.set_precision(p + err, RoundingMode::None)?;
-
-        let mut ret = x.recip_iter()?;
-
-        ret.set_precision(p, rm)?;
-
-        if ret.get_exponent() as isize - e as isize > EXPONENT_MAX as isize
-            || (ret.get_exponent() as isize - e as isize) < EXPONENT_MIN as isize
-        {
-            return Err(Error::ExponentOverflow(ret.s));
-        }
-
-        ret.set_exponent(ret.get_exponent() - e);
-
-        Ok(ret)
-    }
-
-    // reciprocal computation.
-    fn recip_iter(&self) -> Result<Self, Error> {
-        if self.m.len() <= 500 {
-            ONE.div(self, self.get_mantissa_max_bit_len(), RoundingMode::None)
-        } else {
-            //  Newton's method: x(n+1) = 2*x(n) - self*x(n)*x(n)
-            let prec = self.get_mantissa_max_bit_len();
-            let mut x = self.clone()?;
-            x.set_precision(prec / 2, RoundingMode::None)?;
-            let mut ret = x.recip_iter()?;
-            ret.set_precision(prec, RoundingMode::None)?;
-
-            // one iteration
-            let d = ret.mul(self, prec, RoundingMode::None)?;
-            let dx = d.mul(&ret, prec, RoundingMode::None)?;
-            if ret.get_exponent() == EXPONENT_MAX {
-                return Err(Error::ExponentOverflow(ret.s));
-            }
-
-            ret.set_exponent(ret.get_exponent() + 1);
-            ret = ret.sub(&dx, prec, RoundingMode::None)?;
-
-            Ok(ret)
-        }
+        ONE.div(self, p, rm)
     }
 
     /// Sets the sign of `self`.
@@ -2161,9 +2102,9 @@ mod tests {
         .unwrap();
 
         d2 = d1.reciprocal(320, RoundingMode::ToEven).unwrap();
-        d3 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000000D237A0818813B78_e+0", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        d3 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000000D237A0818813B7A_e+0", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
 
-        // println!("{:?}", d2.format(crate::Radix::Hex, rm).unwrap());
+        //println!("{:?}", d2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(d2.cmp(&d3) == 0);
 
