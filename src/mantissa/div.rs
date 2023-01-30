@@ -14,7 +14,7 @@ use crate::mantissa::Mantissa;
 
 impl Mantissa {
     // Basic integer division.
-    fn div_basic(m1: &[Word], m2: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
+    pub(super) fn div_basic(m1: &[Word], m2: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
         debug_assert!(m1.len() >= m2.len());
         debug_assert!(!m2.is_empty());
 

@@ -170,6 +170,7 @@ pub fn shift_slice_left(m: &mut [Word], n: usize) {
     } else if shift > 0 {
         let l = m.len() - 1;
         let end = m.as_mut_ptr();
+        // TODO: instead of unsafe code try iterators.
         unsafe {
             // use of slices is almost 50% slower
             let mut dst = end.add(l);
@@ -240,6 +241,7 @@ pub fn shift_slice_right(m: &mut [Word], n: usize) {
     } else if shift > 0 {
         let l = m.len();
         let mut dst = m.as_mut_ptr();
+        // TODO: instead of unsafe code try iterators.
         unsafe {
             // use of slices is almost 50% slower
             let end = dst.add(l - 1);
@@ -329,6 +331,51 @@ pub fn invert_rm_for_sign(rm: RoundingMode) -> RoundingMode {
         RoundingMode::Up
     } else {
         rm
+    }
+}
+
+pub fn find_one_from(slice: &[Word], start_pos: usize) -> Option<usize> {
+    let start_idx = start_pos / WORD_BIT_SIZE;
+    if start_idx >= slice.len() {
+        None
+    } else {
+        let mut iter = slice.iter().rev().skip(start_idx);
+        if let Some(v) = iter.next() {
+            let mut d = *v;
+
+            let start_bit = start_pos % WORD_BIT_SIZE;
+            let mut shift = start_pos;
+
+            d <<= start_bit;
+
+            if d != 0 {
+                while d & WORD_SIGNIFICANT_BIT == 0 {
+                    d <<= 1;
+                    shift += 1;
+                }
+
+                return Some(shift);
+            }
+
+            shift += WORD_BIT_SIZE - start_bit;
+
+            for v in iter {
+                d = *v;
+
+                if d != 0 {
+                    while d & WORD_SIGNIFICANT_BIT == 0 {
+                        d <<= 1;
+                        shift += 1;
+                    }
+
+                    return Some(shift);
+                }
+
+                shift += WORD_BIT_SIZE;
+            }
+        }
+
+        None
     }
 }
 

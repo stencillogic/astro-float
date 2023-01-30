@@ -9,12 +9,14 @@ use core::ops::DerefMut;
 use itertools::izip;
 
 // Internal repr of SliceWithSign.
+#[derive(Debug)]
 enum SliceWithSignType<'a> {
     Mut(&'a mut [Word]),
     Immut(&'a [Word]),
 }
 
 // Slice of words with sign is a lightweight integer number representation.
+#[derive(Debug)]
 pub struct SliceWithSign<'a> {
     m: SliceWithSignType<'a>,
     sign: i8,
@@ -327,6 +329,18 @@ impl<'a> SliceWithSign<'a> {
     #[inline]
     pub fn sign(&self) -> i8 {
         self.sign
+    }
+
+    pub fn cmp(&self, d2: &Self) -> SignedWord {
+        if self.is_zero() && d2.is_zero() {
+            return 0;
+        }
+
+        if self.sign != d2.sign {
+            return self.sign as SignedWord;
+        }
+
+        Self::abs_cmp(self, d2) * self.sign as SignedWord
     }
 }
 

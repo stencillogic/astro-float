@@ -9,7 +9,7 @@ use crate::defs::WORD_BIT_SIZE;
 use crate::mantissa::Mantissa;
 
 impl Mantissa {
-    fn mul_basic(m1: &[Word], m2: &[Word], m3: &mut [Word]) {
+    pub(super) fn mul_basic(m1: &[Word], m2: &[Word], m3: &mut [Word]) {
         m3.fill(0);
 
         for (i, d1mi) in m1.iter().enumerate() {

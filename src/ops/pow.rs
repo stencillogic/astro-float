@@ -45,7 +45,7 @@ impl BigFloatNumber {
 
                 // divide by 2
                 if xx.get_exponent() == EXPONENT_MIN {
-                    xx.subnormalize(xx.get_exponent() as isize - 1, RoundingMode::FromZero);
+                    xx.subnormalize(xx.get_exponent() as isize - 1, RoundingMode::FromZero, &mut true);
                 } else {
                     xx.set_exponent(xx.get_exponent() - 1);
                 }
@@ -227,21 +227,18 @@ impl BigFloatNumber {
             let mut ret = || -> Result<Self, Error> {
                 let mut x = self.clone()?;
 
-                *inexact = x.set_precision_inexact(p_x, RoundingMode::FromZero)?;
+                x.set_precision_inexact(p_x, RoundingMode::FromZero, inexact)?;
 
                 // TODO: consider windowing and precomputed values.
-                let mut inxt = false;
                 let mut bp = bit_pos;
                 let mut j = i;
                 while bp > 0 {
                     bp -= 1;
 
-                    x = x.mul_inexact(&x, p_x, RoundingMode::FromZero, &mut inxt)?;
-                    *inexact |= inxt;
+                    x = x.mul_inexact(&x, p_x, RoundingMode::FromZero, inexact)?;
 
                     if j & WORD_SIGNIFICANT_BIT as usize != 0 {
-                        x = x.mul_inexact(self, p_x, RoundingMode::FromZero, &mut inxt)?;
-                        *inexact |= inxt;
+                        x = x.mul_inexact(self, p_x, RoundingMode::FromZero, inexact)?;
                     }
 
                     j <<= 1;

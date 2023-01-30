@@ -94,7 +94,7 @@ impl BigFloatNumber {
             let mut ret = d3.ln(p, rm, cc)?;
 
             if ret.get_exponent() == EXPONENT_MIN {
-                ret.subnormalize(ret.get_exponent() as isize - 1, rm);
+                ret.subnormalize(ret.get_exponent() as isize - 1, rm, &mut true);
             } else {
                 ret.set_exponent(ret.get_exponent() - 1);
             }

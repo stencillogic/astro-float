@@ -4,7 +4,7 @@ use crate::{
     common::util::{log2_ceil, round_p},
     defs::{Error, EXPONENT_MAX, EXPONENT_MIN},
     num::BigFloatNumber,
-    Exponent, RoundingMode, Sign,
+    Exponent, RoundingMode
 };
 
 impl BigFloatNumber {
@@ -42,23 +42,10 @@ impl BigFloatNumber {
 
         ret.set_precision(p, rm)?;
 
-        let mut e_corr = ret.get_exponent() as isize + (e - e_shift) / 3;
+        let e_corr = ret.get_exponent() as isize + (e - e_shift) / 3;
 
         if e_corr < EXPONENT_MIN as isize {
-            let is_positive = ret.is_positive();
-            if !Self::process_subnormal(&mut ret.m, &mut e_corr, rm, is_positive) {
-                let mut ret = if rm == RoundingMode::FromZero
-                    || (is_positive && rm == RoundingMode::Up)
-                    || (!is_positive && rm == RoundingMode::Down)
-                {
-                    // non zero directed rounding modes
-                    Self::min_positive(p)
-                } else {
-                    Self::new(p)
-                }?;
-                ret.set_sign(if is_positive { Sign::Pos } else { Sign::Neg });
-                return Ok(ret);
-            }
+            ret.subnormalize(e_corr, rm, &mut true);
         }
 
         if e_corr > EXPONENT_MAX as isize {

@@ -42,11 +42,17 @@ impl WordBuf {
         self.inner.len()
     }
 
-    /// Decrease length of mantissa to l bits.
+    /// Decrease length of the buffer to l bits. Buffer is rotated.
     pub fn trunc_to(&mut self, l: usize) {
         let n = (l + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         let sz = self.len();
         self.inner.rotate_left(sz - n);
+        self.inner.truncate(n);
+    }
+
+    /// Decrease length of the buffer to l bits. Data is not moved.
+    pub fn trunc_to_2(&mut self, l: usize) {
+        let n = (l + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         self.inner.truncate(n);
     }
 
@@ -67,13 +73,12 @@ impl WordBuf {
     /// Try to exted the size to fit the precision p. Fill new elements with 0. Data is not moved.
     pub fn try_extend_2(&mut self, p: usize) -> Result<(), Error> {
         let n = (p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
-        let l = self.inner.len();
-        self.inner.try_grow(n).map_err(Error::MemoryAllocation)?;
-        unsafe {
-            // values of the newely allocated words stay unitialized for performance reasons
-            self.inner.set_len(n);
+        if n > self.inner.capacity() {
+            self.inner.try_reserve(n - self.inner.capacity()).map_err(Error::MemoryAllocation)?;
         }
-        self.inner[l..].fill(0);
+        if n > self.inner.len() {
+            self.inner.resize(n, 0);
+        }
         Ok(())
     }
 

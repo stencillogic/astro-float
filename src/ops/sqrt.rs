@@ -1,12 +1,9 @@
 //! Sqrt computation.
 
-use crate::common::consts::FIFTEEN;
-use crate::common::consts::ONE;
-use crate::common::consts::TEN;
-use crate::common::consts::THREE;
+use crate::Sign;
 use crate::common::util::round_p;
 use crate::{
-    defs::{Error, EXPONENT_MAX, EXPONENT_MIN},
+    defs::{Error, EXPONENT_MIN},
     num::BigFloatNumber,
     Exponent, RoundingMode,
 };
@@ -21,6 +18,7 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn sqrt(&self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         let p = round_p(p);
+        Self::p_assertion(p)?;
 
         if self.is_zero() {
             return Self::new(p);
@@ -30,97 +28,31 @@ impl BigFloatNumber {
             return Err(Error::InvalidArgument);
         }
 
-        let mut err = 1;
+        let (e1, m1_opt) = self.normalize()?;
+        let m1_normalized = m1_opt.as_ref().unwrap_or(&self.m);
 
-        let mut x = self.clone()?;
-        let e = x.normalize2() as isize;
+        let (e_shift, m3) = m1_normalized.sqrt(p, rm, true, &mut true, e1 & 1 == 1)?;
 
-        let e = self.get_exponent() as isize - e;
-        let mut e_shift = 0;
-        if e & 1 == 1 {
-            err += 1;
-            if e < 0 {
-                e_shift = 1;
-            }
-        }
+        let e = (e1 + (e1 & 1)) / 2 + e_shift;
 
-        let p_ext = p + err;
+        if e < EXPONENT_MIN as isize {
+            let mut ret = BigFloatNumber {
+                m: m3,
+                s: Sign::Pos,
+                e: EXPONENT_MIN,
+            };
 
-        x.set_precision(p_ext, RoundingMode::None)?;
-        x.set_exponent((e & 1) as Exponent);
+            ret.subnormalize(e, rm, &mut true);
 
-        let mut ret = x.sqrt_iter()?;
-        ret = x.sqrt_step(ret)?;
-
-        ret = x.mul(&ret, p_ext, RoundingMode::None)?;
-        ret.set_precision(p, rm)?;
-
-        // new exponent
-        let mut e_corr = ret.get_exponent() as isize + e / 2 - e_shift as isize;
-
-        if e_corr < EXPONENT_MIN as isize {
-            let is_positive = ret.is_positive();
-            if !Self::process_subnormal(&mut ret.m, &mut e_corr, rm, is_positive) {
-                return if rm == RoundingMode::FromZero
-                    || (is_positive && rm == RoundingMode::Up)
-                    || (!is_positive && rm == RoundingMode::Down)
-                {
-                    // non zero directed rounding modes
-                    Self::min_positive(p)
-                } else {
-                    Self::new(p)
-                };
-            }
-        }
-
-        if e_corr > EXPONENT_MAX as isize {
-            return Err(Error::ExponentOverflow(ret.get_sign()));
-        }
-
-        ret.set_exponent(e_corr as Exponent);
-
-        Ok(ret)
-    }
-
-    // Computation iteration.
-    fn sqrt_iter(&self) -> Result<Self, Error> {
-        let mut prec = self.get_mantissa_max_bit_len();
-
-        if prec <= 64 {
-            let mut x = ONE.div(self, prec, RoundingMode::None)?;
-
-            while prec > 0 {
-                x = self.sqrt_step(x)?;
-                prec /= 3;
-            }
-
-            Ok(x)
+            Ok(ret)
+            
         } else {
-            let mut x = self.clone()?;
-
-            x.set_precision((prec + 2) / 3, RoundingMode::None)?;
-
-            let xn = x.sqrt_iter()?;
-
-            self.sqrt_step(xn)
+            Ok(BigFloatNumber {
+                m: m3,
+                s: Sign::Pos,
+                e: e as Exponent,
+            })
         }
-    }
-
-    fn sqrt_step(&self, mut xn: Self) -> Result<Self, Error> {
-        // y(n) = self*x(n)^2
-        // x(n+1) = x(n)*2^(-3)*(15 - y(n)*(10 - 3*y(n)))
-
-        let p = self.get_mantissa_max_bit_len();
-
-        let yn = self.mul(&xn, p, RoundingMode::None)?;
-        let yn = yn.mul(&xn, p, RoundingMode::None)?;
-        let n1 = THREE.mul(&yn, p, RoundingMode::None)?;
-        let n2 = TEN.sub(&n1, p, RoundingMode::None)?;
-        let n3 = yn.mul(&n2, p, RoundingMode::None)?;
-        let n4 = FIFTEEN.sub(&n3, p, RoundingMode::None)?;
-
-        xn.set_exponent(xn.get_exponent() - 3);
-        xn.mul(&n4, p, RoundingMode::None)
     }
 }
 
@@ -128,18 +60,17 @@ impl BigFloatNumber {
 mod tests {
 
     use super::*;
-    use crate::Sign;
+    use crate::{Sign, EXPONENT_MAX};
+    use crate::common::consts::ONE;
     use crate::{common::util::random_subnormal, defs::WORD_BIT_SIZE, Exponent};
 
     #[test]
     fn test_sqrt() {
-        /*
-         let n1 = BigFloatNumber::from_raw_parts(
-            &[1616073276, 160212377, 2290662135],
-            96, Sign::Pos, -70).unwrap();
-        let n2 = n1.sqrt(RoundingMode::ToEven).unwrap();
-        println!("{:?}", n2.mul(&n2, RoundingMode::ToEven).unwrap());
-        return;  */
+        /* let n1 = BigFloatNumber::from_words(
+            &[18446744073709551614, 18446744073709551615],
+            Sign::Pos, 0).unwrap();
+        let n2 = n1.sqrt(384, RoundingMode::ToEven).unwrap();
+        println!("{:?}", n2.format(crate::Radix::Bin, RoundingMode::None).unwrap()); */
 
         // near 1
         let p = 320;
@@ -179,7 +110,7 @@ mod tests {
         )
         .unwrap();
 
-        // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());
+        //println!("{:?}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
         assert!(d2.cmp(&d3) == 0);
 
