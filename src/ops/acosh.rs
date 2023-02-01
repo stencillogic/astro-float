@@ -90,7 +90,7 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
-    use crate::{Exponent, Sign};
+    use crate::Exponent;
 
     use super::*;
 
