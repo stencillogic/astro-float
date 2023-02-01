@@ -6,6 +6,7 @@ use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
 use crate::Exponent;
+use crate::WORD_BIT_SIZE;
 
 const ACOS_EXP_THRES: Exponent = -32;
 
@@ -20,37 +21,45 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn acos(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
         let p = round_p(p);
-        let mut x = self.clone()?;
 
-        let p_x = p + (-ACOS_EXP_THRES) as usize + 1;
-        x.set_precision(p_x, RoundingMode::None)?;
+        let p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p + p_inc;
 
-        let mut ret = x.asin(p_x, RoundingMode::None, cc)?;
+        loop {
+            let mut x = self.clone()?;
 
-        let mut pi = cc.pi_num(p_x, RoundingMode::None)?;
-
-        pi.set_exponent(pi.get_exponent() - 1);
-
-        ret = pi.sub(&ret, p_x, RoundingMode::None)?;
-
-        if ret.get_exponent() < ACOS_EXP_THRES {
-            let p_x =
-                p + ret.get_exponent().unsigned_abs() as usize + (-ACOS_EXP_THRES) as usize + 1;
-
+            let p_x = p_wrk + (-ACOS_EXP_THRES) as usize + 1;
             x.set_precision(p_x, RoundingMode::None)?;
 
-            ret = x.asin(p_x, RoundingMode::None, cc)?;
+            let mut ret = x.asin(p_x, RoundingMode::None, cc)?;
 
             let mut pi = cc.pi_num(p_x, RoundingMode::None)?;
 
             pi.set_exponent(pi.get_exponent() - 1);
 
             ret = pi.sub(&ret, p_x, RoundingMode::None)?;
+
+            if ret.get_exponent() < ACOS_EXP_THRES {
+                let p_x =
+                    p + ret.get_exponent().unsigned_abs() as usize + (-ACOS_EXP_THRES) as usize + 1;
+
+                x.set_precision(p_x, RoundingMode::None)?;
+
+                ret = x.asin(p_x, RoundingMode::None, cc)?;
+
+                let mut pi = cc.pi_num(p_x, RoundingMode::None)?;
+
+                pi.set_exponent(pi.get_exponent() - 1);
+
+                ret = pi.sub(&ret, p_x, RoundingMode::None)?;
+            }
+
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                return Ok(ret);
+            }
+
+            p_wrk += p_inc;
         }
-
-        ret.set_precision(p, rm)?;
-
-        Ok(ret)
     }
 }
 

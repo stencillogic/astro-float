@@ -260,8 +260,8 @@ fn mpfr_compare_ops() {
 
         //println!("{:?}\n{:?}", n1, f1.to_string_radix(2, None));
 
-        test_astro_op!(false, n1, acos, f1, acos, p, rm, rnd, "acos", cc);
-        test_astro_op!(false, n1, asin, f1, asin, p, rm, rnd, "asin", cc);
+        test_astro_op!(true, n1, acos, f1, acos, p, rm, rnd, "acos", cc);
+        test_astro_op!(true, n1, asin, f1, asin, p, rm, rnd, "asin", cc);
         test_astro_op!(false, n1, atanh, f1, atanh, p, rm, rnd, "atanh", cc);
     }
 
@@ -284,6 +284,6 @@ fn mpfr_compare_ops() {
         test_astro_op!(true, n1, log2, f1, log2, p, rm, rnd, "log2", cc);
         test_astro_op!(true, n1, log10, f1, log10, p, rm, rnd, "log10", cc);
         test_astro_op!(false, n1, asinh, f1, asinh, p, rm, rnd, "asinh", cc);
-        test_astro_op!(false, n1, atan, f1, atan, p, rm, rnd, "atan", cc);
+        test_astro_op!(true, n1, atan, f1, atan, p, rm, rnd, "atan", cc);
     }
 }

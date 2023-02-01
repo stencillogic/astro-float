@@ -76,11 +76,11 @@ impl BigFloatNumber {
 
             Ok(ret)
         } else {
-            // short series: x - x^3/6 + 3*x^5/40 - 5*x^7/112
+            // short series: x - x^3/6 + 3*x^5/40
 
             let mut x = self.clone()?;
 
-            let p_x = p + 4;
+            let p_x = p + 8;
             x.set_precision(p_x, RoundingMode::None)?;
 
             let xx = x.mul(&x, p_x, RoundingMode::None)?;

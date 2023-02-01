@@ -26,6 +26,9 @@ lazy_static! {
     /// 3
     pub(crate) static ref THREE: BigFloatNumber = BigFloatNumber::from_word(3, DEFAULT_P).expect("Constant THREE initialization.");
 
+    /// 5
+    pub(crate) static ref FIVE: BigFloatNumber = BigFloatNumber::from_word(5, DEFAULT_P).expect("Constant FIVE initialization.");
+
     /// 10
     pub(crate) static ref TEN: BigFloatNumber = BigFloatNumber::from_word(10, DEFAULT_P).expect("Constant TEN initialization.");
 
