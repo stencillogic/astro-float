@@ -1231,4 +1231,76 @@ impl Mantissa {
 
         Ok((e_shift, m3))
     }
+
+
+    /// Compute the cube root.
+    pub fn cbrt(
+        &self,
+        p: usize,
+        rm: RoundingMode,
+        is_positive: bool,
+        inexact: &mut bool,
+        add_exp: isize,
+    ) -> Result<(isize, Self), Error> {
+        let p = Self::bit_len_to_word_len(p);
+
+        let k = p.max(self.len()) + 1;
+        let k3 = k * 3;
+
+        let mut e_shift = -((k * WORD_BIT_SIZE) as isize);
+
+        let mut m1 = Self::reserve_new(k3)?;
+
+        let l = k3 - self.len();
+        m1[l..].copy_from_slice(&self.m);
+        m1[..l].fill(0);
+
+        debug_assert!(add_exp >= 0);
+
+        shift_slice_right(&mut m1, add_exp as usize);
+
+        let (q, r) = Self::cbrt_rem(m1)?;
+
+        let mut m3 = Mantissa { m: q, n: 0 };
+
+        let r_sticky = r.iter().any(|&x| x != 0);
+
+        // rounding
+        if r_sticky {
+            *inexact |= true;
+
+            if rm as u32 & 0b1100000 != 0 {
+                m3.m[0] |= 1;
+            } else if rm == RoundingMode::FromZero
+                || (is_positive && rm == RoundingMode::Up)
+                || (!is_positive && rm == RoundingMode::Down)
+            {
+                if m3.add_ulp() {
+                    let m3l = m3.len() - 1;
+                    m3.m[m3l] = WORD_SIGNIFICANT_BIT;
+                    e_shift += 1;
+                }
+            }
+        }
+
+        e_shift += (m3.len() * WORD_BIT_SIZE) as isize;
+
+        e_shift -= Self::maximize(&mut m3.m) as isize;
+
+        if m3.round_mantissa(
+            (m3.len() - p) * WORD_BIT_SIZE,
+            rm,
+            is_positive,
+            &mut false,
+            m3.max_bit_len(),
+            inexact,
+        ) {
+            e_shift += 1;
+        }
+
+        m3.m.trunc_to(p * WORD_BIT_SIZE);
+        m3.n = m3.max_bit_len();
+
+        Ok((e_shift, m3))
+    }
 }

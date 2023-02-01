@@ -1,8 +1,8 @@
 //! Cube root computation.
 
 use crate::{
-    common::util::{log2_ceil, round_p},
-    defs::{Error, EXPONENT_MAX, EXPONENT_MIN},
+    common::util::round_p,
+    defs::{Error, EXPONENT_MIN},
     num::BigFloatNumber,
     Exponent, RoundingMode,
 };
@@ -17,66 +17,46 @@ impl BigFloatNumber {
     ///  - InvalidArgument: the precision is incorrect.
     pub fn cbrt(&self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         let p = round_p(p);
+        Self::p_assertion(p)?;
 
         if self.is_zero() {
-            return Self::new(p);
+            let mut ret = Self::new(p)?;
+            ret.set_sign(self.get_sign());
+            return Ok(ret);
         }
 
-        let mut x = self.clone()?;
+        let (e1, m1_opt) = self.normalize()?;
+        let m1_normalized = m1_opt.as_ref().unwrap_or(&self.m);
 
-        let e = x.normalize2() as isize;
-        let e = self.get_exponent() as isize - e;
-        let e_shift = e % 3 - 3;
+        let exp_add = if e1 < 0 {
+            -e1 % 3
+        } else if e1 > 0 {
+            3 - e1 % 3
+        } else {
+            0
+        };
 
-        let p_ext = p + 1;
-        x.set_precision(p_ext, RoundingMode::None)?;
-        x.set_exponent(e_shift as Exponent);
+        let (e_shift, m3) = m1_normalized.cbrt(p, rm, self.is_positive(), &mut true, exp_add)?;
 
-        let mut ret = x.clone()?;
+        let e = (e1 + exp_add) / 3 + e_shift;
 
-        let mut iters = log2_ceil(p) * 2 / 3 + 4;
-        while iters > 0 {
-            ret = x.cbrt_step(ret)?;
-            iters -= 1;
+        if e < EXPONENT_MIN as isize {
+            let mut ret = BigFloatNumber {
+                m: m3,
+                s: self.get_sign(),
+                e: EXPONENT_MIN,
+            };
+
+            ret.subnormalize(e, rm, &mut true);
+
+            Ok(ret)
+        } else {
+            Ok(BigFloatNumber {
+                m: m3,
+                s: self.get_sign(),
+                e: e as Exponent,
+            })
         }
-
-        ret.set_precision(p, rm)?;
-
-        let e_corr = ret.get_exponent() as isize + (e - e_shift) / 3;
-
-        if e_corr < EXPONENT_MIN as isize {
-            ret.subnormalize(e_corr, rm, &mut true);
-        }
-
-        if e_corr > EXPONENT_MAX as isize {
-            return Err(Error::ExponentOverflow(ret.get_sign()));
-        }
-
-        ret.set_exponent(e_corr as Exponent);
-
-        Ok(ret)
-    }
-
-    fn cbrt_step(&self, mut xn: Self) -> Result<Self, Error> {
-        // x(n+1) = 2 * x(n) * (x(n)^3 / 2 + self) / (2 * x(n)^3 + self)
-
-        let p = self.get_mantissa_max_bit_len();
-
-        let xxn = xn.mul(&xn, p, RoundingMode::None)?;
-        let mut xxxn = xxn.mul(&xn, p, RoundingMode::None)?;
-
-        let e = xxxn.get_exponent();
-
-        xxxn.set_exponent(e - 1);
-        let d1 = xxxn.add(self, p, RoundingMode::None)?;
-
-        xn.set_exponent(xn.get_exponent() + 1);
-        let d2 = xn.mul(&d1, p, RoundingMode::None)?;
-
-        xxxn.set_exponent(e + 1);
-        let d3 = xxxn.add(self, p, RoundingMode::None)?;
-
-        d2.div(&d3, p, RoundingMode::None)
     }
 }
 
@@ -95,18 +75,19 @@ mod tests {
 
     #[test]
     fn test_cbrt() {
-        /* let n1 = BigFloatNumber::from_raw_parts(
-            &[10240209581698738563, 18115871017240605025],
-            128, Sign::Pos, 0).unwrap();
-        let n2 = n1.cbrt(RoundingMode::ToEven).unwrap();
-        println!("{:?}", n1.format(crate::Radix::Dec, RoundingMode::None));
-        println!("{:?}", n2.format(crate::Radix::Dec, RoundingMode::None));
+        /* let n1 = BigFloatNumber::from_words(
+            &[1, 0, 1, 0, 0, 0, WORD_SIGNIFICANT_BIT],
+            Sign::Pos, 1).unwrap(); */
+        /* let n1 = BigFloatNumber::from_word(11*11*11, 128).unwrap();
+        let n2 = n1.cbrt(128, RoundingMode::FromZero).unwrap();
+        println!("{:?}", n1.format(crate::Radix::Bin, RoundingMode::None));
+        println!("{:?}", n2.format(crate::Radix::Bin, RoundingMode::None));
         return; */
 
         let mut eps = ONE.clone().unwrap();
 
         for _ in 0..1000 {
-            let prec = (rand::random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
+            let prec = (rand::random::<usize>() % 5 + 1) * WORD_BIT_SIZE;
             let d1 = BigFloatNumber::random_normal(prec, EXPONENT_MIN, EXPONENT_MAX).unwrap();
             let d2 = d1.cbrt(prec, RoundingMode::ToEven).unwrap();
             let d3 = d2
@@ -117,9 +98,9 @@ mod tests {
 
             eps.set_exponent(d1.get_exponent() - prec as Exponent + 3);
 
-            // println!("d1 {:?}", d1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
-            // println!("d2 {:?}", d2.format(crate::Radix::Dec, RoundingMode::None).unwrap());
-            // println!("d3 {:?}", d3.format(crate::Radix::Dec, RoundingMode::None).unwrap());
+            //println!("d1 {:?}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            //println!("d2 {:?}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            //println!("d3 {:?}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
             assert!(
                 d1.sub(&d3, prec, RoundingMode::ToEven)

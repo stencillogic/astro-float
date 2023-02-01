@@ -10,6 +10,8 @@ use crate::defs::Word;
 use crate::defs::WORD_BIT_SIZE;
 use crate::mantissa::Mantissa;
 
+use super::util::root_estimate;
+
 impl Mantissa {
     // Basic algorithm for small inputs.
     fn sqrt_rem_basic(m: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
@@ -28,8 +30,7 @@ impl Mantissa {
 
         let m = &m[..m.len() - zc];
 
-        let mut sbuf = WordBuf::new(m.len())?;
-        sbuf.copy_from_slice(&m);
+        let mut sbuf = root_estimate(m, 2)?;
 
         loop {
             let (mut qbuf, _rbuf) = Self::div_basic(m, &sbuf)?;
@@ -362,7 +363,7 @@ mod tests {
         }
 
         for _ in 0..1000 {
-            let s1 = random_normalized_slice(MAX_BUF, MAX_BUF);
+            let s1 = random_normalized_slice(1, MAX_BUF);
 
             let (qb, rb) = Mantissa::sqrt_rem(&s1).unwrap();
 
