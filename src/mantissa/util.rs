@@ -1,6 +1,10 @@
 //! Auxiliary structures.
 
-use crate::{defs::WORD_SIGNIFICANT_BIT, Word, WORD_BIT_SIZE, common::{buf::WordBuf, util::log2_floor}, Error};
+use crate::{
+    common::{buf::WordBuf, util::log2_floor},
+    defs::WORD_SIGNIFICANT_BIT,
+    Error, Word, WORD_BIT_SIZE,
+};
 
 /// Length of the slice extended by extra size.
 pub struct ExtendedSlice<T, V>
@@ -202,7 +206,7 @@ pub fn root_estimate(m: &[Word], n: usize) -> Result<WordBuf, Error> {
 
         let nbits = log2_floor(*m.last().unwrap() as usize);
 
-        *buf.last_mut().unwrap() = 1 << (nbits / n + 1);    // buf.len() > 0
+        *buf.last_mut().unwrap() = 1 << (nbits / n + 1); // buf.len() > 0
     }
     Ok(buf)
 }

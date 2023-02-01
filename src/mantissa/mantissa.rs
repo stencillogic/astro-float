@@ -1232,7 +1232,6 @@ impl Mantissa {
         Ok((e_shift, m3))
     }
 
-
     /// Compute the cube root.
     pub fn cbrt(
         &self,

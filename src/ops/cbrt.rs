@@ -76,8 +76,8 @@ mod tests {
     #[test]
     fn test_cbrt() {
         /* let n1 = BigFloatNumber::from_words(
-            &[1, 0, 1, 0, 0, 0, WORD_SIGNIFICANT_BIT],
-            Sign::Pos, 1).unwrap(); */
+        &[1, 0, 1, 0, 0, 0, WORD_SIGNIFICANT_BIT],
+        Sign::Pos, 1).unwrap(); */
         /* let n1 = BigFloatNumber::from_word(11*11*11, 128).unwrap();
         let n2 = n1.cbrt(128, RoundingMode::FromZero).unwrap();
         println!("{:?}", n1.format(crate::Radix::Bin, RoundingMode::None));

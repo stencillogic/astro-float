@@ -1,6 +1,5 @@
 //! Cube root.
 
-use crate::Word;
 use crate::common::buf::WordBuf;
 use crate::common::int::SliceWithSign;
 use crate::common::util::find_one_from;
@@ -8,16 +7,19 @@ use crate::common::util::shift_slice_left;
 use crate::common::util::shift_slice_right;
 use crate::defs::Error;
 use crate::defs::WORD_BIT_SIZE;
-use crate::mantissa::Mantissa;
-use crate::mantissa::util::RightShiftedSlice;
 use crate::mantissa::util::root_estimate;
+use crate::mantissa::util::RightShiftedSlice;
+use crate::mantissa::Mantissa;
+use crate::Word;
 
 impl Mantissa {
-
     // normalize for division
-    fn crbt_normalize_div(m1: &mut WordBuf, m2: &mut [Word], m_shift: usize) -> Result<usize, Error> {
+    fn crbt_normalize_div(
+        m1: &mut WordBuf,
+        m2: &mut [Word],
+        m_shift: usize,
+    ) -> Result<usize, Error> {
         if let Some(shift) = find_one_from(m2, 0) {
-
             shift_slice_left(m2, shift);
 
             if m_shift > shift {
@@ -54,7 +56,9 @@ impl Mantissa {
             let (mut qbuf, _rbuf) = Self::div_unbalanced(&m, &sqbuf)?;
 
             // w = s * 2
-            wb.iter_mut().zip(RightShiftedSlice::new(&sbuf, WORD_BIT_SIZE - 1, 0, 1)).for_each(|(u, v)| *u = v);
+            wb.iter_mut()
+                .zip(RightShiftedSlice::new(&sbuf, WORD_BIT_SIZE - 1, 0, 1))
+                .for_each(|(u, v)| *u = v);
 
             qbuf.try_extend_2((qbuf.len().max(wb.len()) + 1) * WORD_BIT_SIZE)?;
 
@@ -88,7 +92,11 @@ impl Mantissa {
     }
 
     // compute remainder
-    fn cbrt_remainder(tmpbuf: &mut WordBuf, sbuf: &mut WordBuf, r: &mut SliceWithSign) -> Result<(), Error> {
+    fn cbrt_remainder(
+        tmpbuf: &mut WordBuf,
+        sbuf: &mut WordBuf,
+        r: &mut SliceWithSign,
+    ) -> Result<(), Error> {
         let (sqbuf, rest) = tmpbuf.split_at_mut(sbuf.len() * 2);
         let scbuf = &mut rest[..sbuf.len() * 3];
 
@@ -101,13 +109,15 @@ impl Mantissa {
 
         Ok(())
     }
-
 }
 
 #[cfg(test)]
 mod tests {
 
-    use crate::{defs::{WORD_MAX, WORD_SIGNIFICANT_BIT}, Word};
+    use crate::{
+        defs::{WORD_MAX, WORD_SIGNIFICANT_BIT},
+        Word,
+    };
 
     use super::*;
     use rand::random;
@@ -151,7 +161,7 @@ mod tests {
         let (qb, rb) = Mantissa::cbrt_rem(wordbuf_from_words(s1)).unwrap();
 
         println!("\n{:?}\n{:?}", qb, rb);
-        
+
         assert_sqrt!(s1, &qb, &rb, MAX_BUF, "zeroes between");
         return; */
 
@@ -163,8 +173,8 @@ mod tests {
             &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX],
             &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX],
             &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX],
-            &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX],] {
-
+            &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX],
+        ] {
             let (qb, rb) = Mantissa::cbrt_rem(wordbuf_from_words(&s1)).unwrap();
 
             assert_sqrt!(&s1 as &[Word], &qb, &rb, MAX_BUF, "max");
@@ -178,8 +188,8 @@ mod tests {
             &[0, 0, 0, 0, WORD_SIGNIFICANT_BIT],
             &[0, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT],
             &[0, 0, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT],
-            &[0, 0, 0, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT],] {
-
+            &[0, 0, 0, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT],
+        ] {
             let (qb, rb) = Mantissa::cbrt_rem(wordbuf_from_words(&s1)).unwrap();
 
             assert_sqrt!(&s1 as &[Word], &qb, &rb, MAX_BUF, "significant");
@@ -193,8 +203,8 @@ mod tests {
             &[1, 0, 0, 0, WORD_SIGNIFICANT_BIT],
             &[1, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT],
             &[1, 0, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT],
-            &[1, 0, 0, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT],] {
-
+            &[1, 0, 0, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT],
+        ] {
             let (qb, rb) = Mantissa::cbrt_rem(wordbuf_from_words(&s1)).unwrap();
 
             assert_sqrt!(&s1 as &[Word], &qb, &rb, MAX_BUF, "lsb + msb");
@@ -208,8 +218,8 @@ mod tests {
             &[1, 0, 0, 0, 5],
             &[1, 0, 0, 0, 0, 6],
             &[1, 0, 0, 0, 0, 0, 7],
-            &[1, 0, 0, 0, 0, 0, 0, 8],] {
-
+            &[1, 0, 0, 0, 0, 0, 0, 8],
+        ] {
             let (qb, rb) = Mantissa::cbrt_rem(wordbuf_from_words(&s1)).unwrap();
 
             assert_sqrt!(&s1 as &[Word], &qb, &rb, MAX_BUF, "subnormal");
