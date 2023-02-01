@@ -1,6 +1,5 @@
 //! Sine.
 
-use crate::WORD_BIT_SIZE;
 use crate::common::consts::C120;
 use crate::common::consts::FOUR;
 use crate::common::consts::ONE;
@@ -18,6 +17,7 @@ use crate::ops::series::series_run;
 use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::PolycoeffGen;
 use crate::Sign;
+use crate::WORD_BIT_SIZE;
 
 // Polynomial coefficient generator.
 struct SinPolycoeffGen {
@@ -151,7 +151,6 @@ impl BigFloatNumber {
             ret.set_precision(p, rm)?;
 
             Ok(ret)
-
         } else {
             let p_inc = WORD_BIT_SIZE;
             let mut p_wrk = p.max(self.get_mantissa_max_bit_len()) + p_inc;

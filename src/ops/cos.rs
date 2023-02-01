@@ -152,7 +152,6 @@ impl BigFloatNumber {
             ret.set_precision(p, rm)?;
 
             Ok(ret)
-
         } else {
             let p_inc = WORD_BIT_SIZE;
             let mut p_wrk = p.max(self.get_mantissa_max_bit_len()) + p_inc;
@@ -179,7 +178,7 @@ impl BigFloatNumber {
                     p_wrk += p_inc;
                 }
             }
-        }  
+        }
     }
 
     /// cosine series
