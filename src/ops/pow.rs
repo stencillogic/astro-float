@@ -2,7 +2,6 @@
 
 use crate::common::util::round_p;
 use crate::ops::consts::Consts;
-use crate::EXPONENT_MIN;
 use crate::{
     common::consts::ONE,
     defs::{Error, WORD_BIT_SIZE, WORD_SIGNIFICANT_BIT},
@@ -43,16 +42,7 @@ impl BigFloatNumber {
             } else {
                 let ret = ONE.add(&x, p_wrk, RoundingMode::None)?;
 
-                // divide by 2
-                if xx.get_exponent() == EXPONENT_MIN {
-                    xx.subnormalize(
-                        xx.get_exponent() as isize - 1,
-                        RoundingMode::FromZero,
-                        &mut true,
-                    );
-                } else {
-                    xx.set_exponent(xx.get_exponent() - 1);
-                }
+                xx.div_by_2(RoundingMode::FromZero);
 
                 ret.add(&xx, p, rm)
             }

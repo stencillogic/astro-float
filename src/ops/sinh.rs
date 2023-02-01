@@ -15,7 +15,6 @@ use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::PolycoeffGen;
 use crate::Consts;
 use crate::Sign;
-use crate::EXPONENT_MIN;
 
 // Polynomial coefficient generator.
 struct SinhPolycoeffGen {
@@ -136,11 +135,7 @@ impl BigFloatNumber {
 
             ret.set_sign(self.get_sign());
 
-            if ret.get_exponent() == EXPONENT_MIN {
-                ret.subnormalize(ret.get_exponent() as isize - 1, rm, &mut true);
-            } else {
-                ret.set_exponent(ret.get_exponent() - 1);
-            }
+            ret.div_by_2(rm);
 
             Ok(ret)
         } else {
