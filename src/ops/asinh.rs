@@ -26,15 +26,53 @@ impl BigFloatNumber {
     pub fn asinh(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
         let p = round_p(p);
 
-        let mut x = self.clone()?;
-
         if self.is_zero() {
-            x.set_precision(p, RoundingMode::None)?;
-            return Ok(x);
+            let mut ret = Self::new(p)?;
+            ret.set_sign(self.get_sign());
+            return Ok(ret);
         }
 
-        if self.get_exponent() as isize >= -(p as isize) / 6 {
+        if (self.get_exponent() as isize) < -(p as isize) / 6 {
+            // short series: x - x^3 / 6 + 3 * x^5 / 40
+
+            let mut x = self.clone()?;
+
+            let p_x = p.max(x.get_mantissa_max_bit_len()) + 8;
+            x.set_precision(p_x, RoundingMode::None)?;
+
+            let xx = x.mul(&x, p_x, RoundingMode::None)?;
+            let x3 = xx.mul(&x, p_x, RoundingMode::None)?;
+            let p1 = x3.div(&SIX, p_x, RoundingMode::None)?;
+
+            let mut ret = if p1.is_zero() {
+                // p1 is too small, but still enought for rounding
+                x.add_correction(true)
+            } else {
+                x = x.sub(&p1, p_x, RoundingMode::ToZero)?;
+
+                let x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
+                let p2 = x5.mul(&THREE, p_x, RoundingMode::None)?;
+                let p2 = p2.div(&FOURTY, p_x, RoundingMode::None)?;
+
+                if p2.is_zero() {
+                    x.add_correction(false)
+                } else {
+                    x.add(
+                        &p2,
+                        x.get_mantissa_max_bit_len() + 1,
+                        RoundingMode::FromZero,
+                    )
+                }
+            }?;
+
+            ret.set_precision(p, rm)?;
+
+            Ok(ret)
+        } else {
+            let mut x = self.clone()?;
+
             x.set_sign(Sign::Pos);
+
             let rm = if self.is_negative() { invert_rm_for_sign(rm) } else { rm };
 
             let mut ret = if (self.get_exponent() as isize - 1) / 2
@@ -73,47 +111,6 @@ impl BigFloatNumber {
             }?;
 
             ret.set_sign(self.get_sign());
-
-            Ok(ret)
-        } else {
-            // short series: x - x^3/6 + 3*x^5/40
-
-            let mut x = self.clone()?;
-
-            let p_x = p + 8;
-            x.set_precision(p_x, RoundingMode::None)?;
-
-            let xx = x.mul(&x, p_x, RoundingMode::None)?;
-            let x3 = xx.mul(&x, p_x, RoundingMode::None)?;
-            let p1 = x3.div(&SIX, p_x, RoundingMode::None)?;
-
-            let mut ret = if p1.is_zero() {
-                if rm as u32 & 0b11110 != 0 {
-                    // since p1 it is too small there need to be an ajustment for flooring and ceiling rounding modes.
-                    x.add_correction(true)
-                } else {
-                    Ok(x)
-                }
-            } else {
-                x = x.sub(&p1, p_x, RoundingMode::None)?;
-
-                let x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
-                let p2 = x5.mul(&THREE, p_x, RoundingMode::None)?;
-                let p2 = p2.div(&FOURTY, p_x, RoundingMode::None)?;
-
-                if p2.is_zero() {
-                    if rm as u32 & 0b11110 != 0 {
-                        // since p2 it is too small there need to be an ajustment for flooring and ceiling rounding modes.
-                        x.add_correction(false)
-                    } else {
-                        Ok(x)
-                    }
-                } else {
-                    x.add(&p2, p_x, RoundingMode::None)
-                }
-            }?;
-
-            ret.set_precision(p, rm)?;
 
             Ok(ret)
         }

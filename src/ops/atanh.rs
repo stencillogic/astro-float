@@ -1,52 +1,14 @@
 //! Hyperbolic arctangent.
 
+use crate::common::consts::FIVE;
 use crate::common::consts::ONE;
-use crate::common::consts::TWO;
-use crate::common::util::get_add_cost;
+use crate::common::consts::THREE;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::defs::EXPONENT_MIN;
 use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
-use crate::ops::series::series_run;
-use crate::ops::series::PolycoeffGen;
-
-// Polynomial coefficient generator.
-struct AtanhPolycoeffGen {
-    acc: BigFloatNumber,
-    iter_cost: usize,
-}
-
-impl AtanhPolycoeffGen {
-    fn new(_p: usize) -> Result<Self, Error> {
-        let acc = BigFloatNumber::from_word(1, 1)?;
-
-        let iter_cost = get_add_cost(acc.get_mantissa_max_bit_len());
-
-        Ok(AtanhPolycoeffGen { acc, iter_cost })
-    }
-}
-
-impl PolycoeffGen for AtanhPolycoeffGen {
-    fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-        self.acc = self
-            .acc
-            .add(&TWO, self.acc.get_mantissa_max_bit_len(), rm)?;
-
-        Ok(&self.acc)
-    }
-
-    #[inline]
-    fn get_iter_cost(&self) -> usize {
-        self.iter_cost
-    }
-
-    #[inline]
-    fn is_div(&self) -> bool {
-        true
-    }
-}
 
 impl BigFloatNumber {
     /// Computes the hyperbolic arctangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
@@ -62,24 +24,56 @@ impl BigFloatNumber {
         let p = round_p(p);
 
         if self.is_zero() {
-            let mut x = self.clone()?;
-            x.set_precision(p, RoundingMode::None)?;
-            return Ok(x);
+            let mut ret = self.clone()?;
+            ret.set_precision(p, RoundingMode::None)?;
+            return Ok(ret);
         }
 
         if self.get_exponent() == 1 && self.abs_cmp(&ONE) == 0 {
             return Err(Error::ExponentOverflow(self.get_sign()));
         }
 
-        let additional_prec = p / 6;
+        if (self.get_exponent() as isize) < -(p as isize) / 6 {
+            // short series: x + x^3/3 + x^5/5
 
-        // TODO: tune threshold for choosing between series computation and computation using ln
-        if self.get_exponent() as isize >= -(additional_prec as isize) {
+            let mut x = self.clone()?;
+
+            let p_x = p.max(x.get_mantissa_max_bit_len()) + 8;
+            x.set_precision(p_x, RoundingMode::None)?;
+
+            let xx = x.mul(&x, p_x, RoundingMode::None)?;
+            let x3 = x.mul(&xx, p_x, RoundingMode::None)?;
+            let part = x3.div(&THREE, p_x, RoundingMode::None)?;
+
+            let mut ret = if part.is_zero() {
+                // since x != 0 it should be reflected in rounding
+                x.add_correction(false)
+            } else {
+                let ret = x.add(&part, p_x, RoundingMode::FromZero)?;
+
+                let x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
+                let part = x5.div(&FIVE, p_x, RoundingMode::None)?;
+
+                if part.is_zero() {
+                    ret.add_correction(false)
+                } else {
+                    ret.add(
+                        &part,
+                        ret.get_mantissa_max_bit_len() + 1, // part is much smaller now, so increase precision
+                        RoundingMode::FromZero,
+                    )
+                }
+            }?;
+
+            ret.set_precision(p, rm)?;
+
+            Ok(ret)
+        } else {
             // 0.5 * ln((1 + x) / (1 - x))
 
             let mut x = self.clone()?;
 
-            let p_x = p + additional_prec + 3;
+            let p_x = p + p / 6 + 3;
             x.set_precision(p_x, RoundingMode::None)?;
 
             let d1 = ONE.add(&x, p_x, RoundingMode::None)?;
@@ -98,31 +92,6 @@ impl BigFloatNumber {
             } else {
                 ret.set_exponent(ret.get_exponent() - 1);
             }
-
-            Ok(ret)
-        } else {
-            // series: x + x^3/3 + x^5/5 + ...
-
-            let mut x = self.clone()?;
-
-            let p_x = p + 1;
-            x.set_precision(p_x, RoundingMode::None)?;
-
-            let mut polycoeff_gen = AtanhPolycoeffGen::new(p_x)?;
-
-            let x_step = x.mul(&x, p_x, RoundingMode::None)?; // x^2
-            let x_first = x.mul(&x_step, p_x, RoundingMode::None)?; // x^3
-
-            let mut ret = series_run(
-                x,
-                x_first,
-                x_step,
-                1,
-                &mut polycoeff_gen,
-                rm as u32 & 0b11110 != 0,
-            )?;
-
-            ret.set_precision(p, rm)?;
 
             Ok(ret)
         }

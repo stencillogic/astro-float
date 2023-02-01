@@ -7,8 +7,8 @@ use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
 use crate::Consts;
-use crate::Sign;
 use crate::EXPONENT_MAX;
+use crate::WORD_BIT_SIZE;
 
 impl BigFloatNumber {
     /// Computes the hyperbolic arccosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
@@ -33,7 +33,29 @@ impl BigFloatNumber {
         if (self.get_exponent() as isize - 1) / 2 > self.get_mantissa_max_bit_len() as isize + 2 {
             // acosh(x) = ln(2*x)
             if self.get_exponent() == EXPONENT_MAX {
-                Err(Error::ExponentOverflow(Sign::Pos))
+                // ln(2) + ln(x)
+
+                let p_inc = WORD_BIT_SIZE;
+                let mut p_wrk = p + p_inc;
+
+                let mut x = self.clone()?;
+
+                loop {
+                    let p_x = p_wrk + 3;
+                    x.set_precision(p_x, RoundingMode::None)?;
+
+                    x = x.ln(p_x, RoundingMode::None, cc)?;
+
+                    let ln2 = cc.ln_2_num(p_x, RoundingMode::None)?;
+
+                    let mut ret = ln2.add(&x, p_x, RoundingMode::None)?;
+
+                    if ret.try_set_precision(p, rm, p_wrk)? {
+                        break Ok(ret);
+                    }
+
+                    p_wrk += p_inc;
+                }
             } else {
                 let mut x = self.clone()?;
                 x.set_exponent(x.get_exponent() + 1);
@@ -68,7 +90,7 @@ impl BigFloatNumber {
 #[cfg(test)]
 mod tests {
 
-    use crate::Exponent;
+    use crate::{Exponent, Sign};
 
     use super::*;
 
@@ -102,15 +124,18 @@ mod tests {
 
         assert!(n2.cmp(&n3) == 0);
 
-        let mut d1 = BigFloatNumber::max_value(p).unwrap();
+        let d1 = BigFloatNumber::max_value(p).unwrap();
         let d2 = BigFloatNumber::min_value(p).unwrap();
         let d3 = BigFloatNumber::min_positive(p).unwrap();
 
-        assert!(d1.acosh(p, rm, &mut cc).unwrap_err() == Error::ExponentOverflow(Sign::Pos));
+        // MAX
+        let mut d4 = d1.acosh(p, RoundingMode::Down, &mut cc).unwrap();
 
-        d1.set_exponent(d1.get_exponent() - 1);
-        let d4 = d1.acosh(p, rm, &mut cc).unwrap();
+        d4.set_exponent(d4.get_exponent() - 1);
         let d5 = d4.cosh(p, rm, &mut cc).unwrap();
+        let mut d5 = d5.mul(&d5, p, rm).unwrap();
+        d5.set_exponent(d5.get_exponent() + 1);
+
         let mut eps = ONE.clone().unwrap();
         eps.set_exponent(
             d1.get_exponent() - p as Exponent + core::mem::size_of::<Exponent>() as Exponent * 8,

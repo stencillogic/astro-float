@@ -245,7 +245,7 @@ fn mpfr_compare_ops() {
 
         //println!("{:?}", n1);
 
-        test_astro_op!(false, n1, acosh, f1, acosh, p, rm, rnd, "acosh", cc);
+        test_astro_op!(true, n1, acosh, f1, acosh, p, rm, rnd, "acosh", cc);
     }
 
     // n1 = 0..1.0: acos, asin, atanh
@@ -262,7 +262,7 @@ fn mpfr_compare_ops() {
 
         test_astro_op!(true, n1, acos, f1, acos, p, rm, rnd, "acos", cc);
         test_astro_op!(true, n1, asin, f1, asin, p, rm, rnd, "asin", cc);
-        test_astro_op!(false, n1, atanh, f1, atanh, p, rm, rnd, "atanh", cc);
+        test_astro_op!(true, n1, atanh, f1, atanh, p, rm, rnd, "atanh", cc);
     }
 
     // n1 = -inf..+inf: sqrt, cbrt, ln, log2, log10, asinh, atan
@@ -283,7 +283,7 @@ fn mpfr_compare_ops() {
         test_astro_op!(true, n1, ln, f1, log, p, rm, rnd, "ln", cc);
         test_astro_op!(true, n1, log2, f1, log2, p, rm, rnd, "log2", cc);
         test_astro_op!(true, n1, log10, f1, log10, p, rm, rnd, "log10", cc);
-        test_astro_op!(false, n1, asinh, f1, asinh, p, rm, rnd, "asinh", cc);
+        test_astro_op!(true, n1, asinh, f1, asinh, p, rm, rnd, "asinh", cc);
         test_astro_op!(true, n1, atan, f1, atan, p, rm, rnd, "atan", cc);
     }
 }
