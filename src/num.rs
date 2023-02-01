@@ -1370,6 +1370,16 @@ impl BigFloatNumber {
         corr.set_sign(if inv_corr_sign { self.get_sign().invert() } else { self.get_sign() });
         self.add(&corr, p, RoundingMode::None)
     }
+
+    /// Divide `self` by 2.
+    pub(crate) fn div_by_2(&mut self, rm: RoundingMode) {
+        let e = self.get_exponent();
+        if e == EXPONENT_MIN {
+            self.subnormalize(e as isize - 1, rm, &mut true);
+        } else {
+            self.set_exponent(e - 1);
+        }
+    }
 }
 
 macro_rules! impl_int_conv {

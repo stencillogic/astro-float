@@ -1,6 +1,8 @@
 //! Tangent.
 
+use crate::common::consts::FIFTEEN;
 use crate::common::consts::ONE;
+use crate::common::consts::THREE;
 use crate::common::consts::TWO;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
@@ -12,7 +14,6 @@ use crate::ops::consts::Consts;
 use crate::ops::series::series_cost_optimize;
 use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::PolycoeffGen;
-use crate::ops::util::fast_compute_small_arg;
 use crate::Exponent;
 use crate::EXPONENT_MIN;
 use crate::WORD_BIT_SIZE;
@@ -77,25 +78,63 @@ impl BigFloatNumber {
             return Ok(ret);
         }
 
-        fast_compute_small_arg!(self, 1, false, p, rm);
+        if (self.get_exponent() as isize) < -(p as isize) / 6 {
+            // short series:  x + x^3 / 3 + x^5 * 2 / 15
 
-        let mut arg = self.clone()?;
+            let mut x = self.clone()?;
 
-        let p_wrk = if p > self.get_mantissa_max_bit_len() {
-            p
+            let p_x = p.max(x.get_mantissa_max_bit_len()) + 8;
+            x.set_precision(p_x, RoundingMode::None)?;
+
+            let xx = x.mul(&x, p_x, RoundingMode::None)?;
+            let x3 = xx.mul(&x, p_x, RoundingMode::None)?;
+            let p1 = x3.div(&THREE, p_x, RoundingMode::None)?;
+
+            let mut ret = if p1.is_zero() {
+                // p1 is too small, but still enought for rounding
+                x.add_correction(false)
+            } else {
+                x = x.add(&p1, p_x, RoundingMode::FromZero)?;
+
+                let mut x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
+                x5.set_exponent(x5.get_exponent() + 1);
+                let p2 = x5.div(&FIFTEEN, p_x, RoundingMode::None)?;
+
+                if p2.is_zero() {
+                    x.add_correction(false)
+                } else {
+                    x.add(
+                        &p2,
+                        x.get_mantissa_max_bit_len() + 1,
+                        RoundingMode::FromZero,
+                    )
+                }
+            }?;
+
+            ret.set_precision(p, rm)?;
+
+            Ok(ret)
+
         } else {
-            self.get_mantissa_max_bit_len()
-        };
+            let p_inc = WORD_BIT_SIZE;
+            let mut p_wrk = p.max(self.get_mantissa_max_bit_len()) + p_inc;
 
-        arg.set_precision(p_wrk + 1, RoundingMode::None)?;
+            loop {
+                let mut x = self.clone()?;
 
-        let arg = arg.reduce_trig_arg(cc, RoundingMode::None)?;
+                x.set_precision(p_wrk + 1, RoundingMode::None)?;
 
-        let mut ret = arg.tan_series(RoundingMode::None)?;
+                x = x.reduce_trig_arg(cc, RoundingMode::None)?;
 
-        ret.set_precision(p, rm)?;
+                let mut ret = x.tan_series(RoundingMode::None)?;
 
-        Ok(ret)
+                if ret.try_set_precision(p, rm, p_wrk)? {
+                    break Ok(ret);
+                }
+
+                p_wrk += p_inc;
+            }
+        }
     }
 
     fn tan_series(mut self, rm: RoundingMode) -> Result<Self, Error> {

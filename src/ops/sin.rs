@@ -1,7 +1,10 @@
 //! Sine.
 
+use crate::WORD_BIT_SIZE;
+use crate::common::consts::C120;
 use crate::common::consts::FOUR;
 use crate::common::consts::ONE;
+use crate::common::consts::SIX;
 use crate::common::consts::THREE;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
@@ -107,28 +110,67 @@ impl BigFloatNumber {
     pub fn sin(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
         let p = round_p(p);
 
-        let mut arg = self.clone()?;
-
         if self.is_zero() {
-            arg.set_precision(p, RoundingMode::None)?;
-            return Ok(arg);
+            let mut ret = Self::new(p)?;
+            ret.set_sign(self.get_sign());
+            return Ok(ret);
         }
 
-        let p_wrk = if p > self.get_mantissa_max_bit_len() {
-            p
+        if (self.get_exponent() as isize) < -(p as isize) / 6 {
+            // short series:  x - x^3/3! + x^5/5!
+
+            let mut x = self.clone()?;
+
+            let p_x = p.max(x.get_mantissa_max_bit_len()) + 8;
+            x.set_precision(p_x, RoundingMode::None)?;
+
+            let xx = x.mul(&x, p_x, RoundingMode::None)?;
+            let x3 = xx.mul(&x, p_x, RoundingMode::None)?;
+            let p1 = x3.div(&SIX, p_x, RoundingMode::None)?;
+
+            let mut ret = if p1.is_zero() {
+                // p1 is too small, but still enought for rounding
+                x.add_correction(true)
+            } else {
+                x = x.sub(&p1, p_x, RoundingMode::ToZero)?;
+
+                let x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
+                let p2 = x5.div(&C120, p_x, RoundingMode::None)?;
+
+                if p2.is_zero() {
+                    x.add_correction(false)
+                } else {
+                    x.add(
+                        &p2,
+                        x.get_mantissa_max_bit_len() + 1,
+                        RoundingMode::FromZero,
+                    )
+                }
+            }?;
+
+            ret.set_precision(p, rm)?;
+
+            Ok(ret)
+
         } else {
-            self.get_mantissa_max_bit_len()
-        };
+            let p_inc = WORD_BIT_SIZE;
+            let mut p_wrk = p.max(self.get_mantissa_max_bit_len()) + p_inc;
 
-        arg.set_precision(p_wrk + 1, RoundingMode::None)?;
+            loop {
+                let mut x = self.clone()?;
+                x.set_precision(p_wrk + 1, RoundingMode::None)?;
 
-        let arg = arg.reduce_trig_arg(cc, RoundingMode::None)?;
+                x = x.reduce_trig_arg(cc, RoundingMode::None)?;
 
-        let mut ret = arg.sin_series(RoundingMode::None, rm as u32 & 0b11110 != 0)?;
+                let mut ret = x.sin_series(RoundingMode::None, false)?;
 
-        ret.set_precision(p, rm)?;
+                if ret.try_set_precision(p, rm, p_wrk)? {
+                    break Ok(ret);
+                }
 
-        Ok(ret)
+                p_wrk += p_inc;
+            }
+        }
     }
 
     /// sine using series

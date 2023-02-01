@@ -209,9 +209,9 @@ fn mpfr_compare_ops() {
 
         //println!("{:?}", n1);
 
-        test_astro_op!(false, n1, sin, f1, sin, p, rm, rnd, "sin", cc);
-        test_astro_op!(false, n1, cos, f1, cos, p, rm, rnd, "cos", cc);
-        test_astro_op!(false, n1, tan, f1, tan, p, rm, rnd, "tan", cc);
+        test_astro_op!(true, n1, sin, f1, sin, p, rm, rnd, "sin", cc);
+        test_astro_op!(true, n1, cos, f1, cos, p, rm, rnd, "cos", cc);
+        test_astro_op!(true, n1, tan, f1, tan, p, rm, rnd, "tan", cc);
     }
 
     // n1 = -inf..log2(emax): sinh, cosh, tanh, exp

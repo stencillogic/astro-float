@@ -35,8 +35,14 @@ lazy_static! {
     /// 15
     pub(crate) static ref FIFTEEN: BigFloatNumber = BigFloatNumber::from_word(15, DEFAULT_P).expect("Constant FIFTEEN initialization.");
 
+    /// 24
+    pub(crate) static ref C24: BigFloatNumber = BigFloatNumber::from_word(24, DEFAULT_P).expect("Constant C24 initialization.");
+
     /// 40
     pub(crate) static ref FOURTY: BigFloatNumber = BigFloatNumber::from_word(40, DEFAULT_P).expect("Constant FOURTY initialization.");
+
+    /// 120
+    pub(crate) static ref C120: BigFloatNumber = BigFloatNumber::from_word(120, DEFAULT_P).expect("Constant C24 initialization.");
 
     /// 10^9
     pub(crate) static ref TEN_POW_9: BigFloatNumber = BigFloatNumber::from_word(1000000000, DEFAULT_P).expect("Constant TEN_POW_9 initialization.");
