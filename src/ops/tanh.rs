@@ -1,14 +1,14 @@
 //! Hyperbolic tangent.
 
-use crate::common::consts::FIFTEEN;
 use crate::common::consts::ONE;
-use crate::common::consts::THREE;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::defs::EXPONENT_MAX;
 use crate::num::BigFloatNumber;
+use crate::ops::util::compute_small_exp;
 use crate::Consts;
+use crate::WORD_BIT_SIZE;
 
 impl BigFloatNumber {
     /// Computes the hyperbolic tangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
@@ -23,81 +23,81 @@ impl BigFloatNumber {
     pub fn tanh(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
         let p = round_p(p);
 
-        let mut x = self.clone()?;
-
         if self.is_zero() {
-            x.set_precision(p, RoundingMode::None)?;
-            return Ok(x);
+            let mut ret = Self::new(p)?;
+            ret.set_sign(self.get_sign());
+            return Ok(ret);
         }
 
-        if self.get_exponent() as isize >= -(p as isize) / 6 {
-            // (e^(2*x) - 1) / (e^(2*x) + 1)
+        // prevent overflow
+        if self.get_exponent() == EXPONENT_MAX {
+            let mut ret = Self::from_i8(self.get_sign().as_int(), p)?;
+            ret = ret.add_correction(true)?;
+            ret.set_precision(p, rm)?;
+            return Ok(ret);
+        }
 
-            let mut additional_prec = 2;
-            if self.get_exponent() < 0 {
-                additional_prec += self.get_exponent().unsigned_abs() as usize;
-            }
+        compute_small_exp!(self, self.get_exponent() as isize - 1, true, p, rm);
 
-            let p_x = p + additional_prec;
+        // (e^(2*x) - 1) / (e^(2*x) + 1)
+
+        let mut additional_prec = 4;
+        if self.get_exponent() < 0 {
+            additional_prec += self.get_exponent().unsigned_abs() as usize;
+        }
+
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p + p_inc;
+
+        loop {
+            let mut x = self.clone()?;
+
+            let p_x = p_wrk + additional_prec;
             x.set_precision(p_x, RoundingMode::None)?;
-
-            if x.get_exponent() == EXPONENT_MAX {
-                return Self::from_i8(self.get_sign().as_int(), p);
-            }
 
             x.set_exponent(x.get_exponent() + 1);
 
-            let xexp = match x.exp(p_x, RoundingMode::None, cc) {
+            let xexp = match x.exp(p_x, RoundingMode::FromZero, cc) {
                 Ok(v) => Ok(v),
                 Err(e) => match e {
-                    Error::ExponentOverflow(s) => return Self::from_i8(s.as_int(), p),
+                    Error::ExponentOverflow(_) => {
+                        if rm as u32 & 0b1100 != 0 {
+                            // rounding down or to zero
+                            let mut ret = BigFloatNumber::max_value(p)?;
+                            ret.set_exponent(0);
+                            return Ok(ret);
+                        } else {
+                            return Self::from_i8(1, p);
+                        }
+                    }
                     Error::DivisionByZero => Err(Error::DivisionByZero),
                     Error::InvalidArgument => Err(Error::InvalidArgument),
                     Error::MemoryAllocation(a) => Err(Error::MemoryAllocation(a)),
                 },
             }?;
 
-            let d1 = xexp.sub(&ONE, p_x, RoundingMode::None)?;
-            let d2 = xexp.add(&ONE, p_x, RoundingMode::None)?;
-
-            d1.div(&d2, p, rm)
-        } else {
-            // short series: x - x^3/3 + 2*x^5/15
-
-            let p_x = p + 2;
-            x.set_precision(p_x, RoundingMode::None)?;
-
-            let xx = x.mul(&x, p_x, RoundingMode::None)?;
-            let x3 = xx.mul(&x, p_x, RoundingMode::None)?;
-            let p1 = x3.div(&THREE, p_x, RoundingMode::None)?;
-
-            let mut ret = if p1.is_zero() {
-                if rm as u32 & 0b11110 != 0 {
-                    x.add_correction(true)?
+            if xexp.is_zero() {
+                if rm as u32 & 0b1010 != 0 {
+                    // rounding up or to zero
+                    let mut ret = BigFloatNumber::min_value(p)?;
+                    ret.set_exponent(0);
+                    return Ok(ret);
                 } else {
-                    x
+                    return Self::from_i8(-1, p);
                 }
-            } else {
-                let ret = x.sub(&p1, p_x, RoundingMode::None)?;
+            }
 
-                let mut x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
-                x5.set_exponent(x5.get_exponent() + 1);
-                let p2 = x5.div(&FIFTEEN, p_x, RoundingMode::None)?;
+            let d1 = xexp.sub(&ONE, p_x, RoundingMode::Down)?;
+            let d2 = xexp.add(&ONE, p_x, RoundingMode::Up)?;
 
-                if p2.is_zero() {
-                    if rm as u32 & 0b11110 != 0 {
-                        ret.add_correction(false)?
-                    } else {
-                        ret
-                    }
-                } else {
-                    ret.add(&p2, p_x, RoundingMode::None)?
-                }
-            };
+            let mut ret = d1.div(&d2, p_x, RoundingMode::None)?;
 
-            ret.set_precision(p, rm)?;
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                break Ok(ret);
+            }
 
-            Ok(ret)
+            p_wrk += p_inc;
+            p_inc *= 2;
         }
     }
 }

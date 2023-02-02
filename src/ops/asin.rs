@@ -1,9 +1,6 @@
 //! Arcsine.
 
-use crate::common::consts::FOURTY;
 use crate::common::consts::ONE;
-use crate::common::consts::SIX;
-use crate::common::consts::THREE;
 use crate::common::util::count_leading_ones;
 use crate::common::util::invert_rm_for_sign;
 use crate::common::util::round_p;
@@ -11,6 +8,7 @@ use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
+use crate::ops::util::compute_small_exp;
 use crate::WORD_BIT_SIZE;
 
 impl BigFloatNumber {
@@ -45,71 +43,36 @@ impl BigFloatNumber {
             return Ok(pi);
         }
 
-        if (self.get_exponent() as isize) < -(p as isize) / 6 {
-            // for small input compute directly: x + x^3 / 6 + x^5 * 3 / 40
+        compute_small_exp!(self, self.get_exponent() as isize / 2 - 2, false, p, rm);
 
+        let mut additional_prec = 2;
+        if self.get_exponent() == 0 {
+            additional_prec += count_leading_ones(self.get_mantissa_digits());
+        }
+
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p + p_inc;
+
+        loop {
             let mut x = self.clone()?;
 
-            let p_x = p.max(x.get_mantissa_max_bit_len()) + 8;
+            let p_x = p_wrk + additional_prec;
             x.set_precision(p_x, RoundingMode::None)?;
 
+            // arcsin(x) = arctan(x / sqrt(1 - x^2))
             let xx = x.mul(&x, p_x, RoundingMode::None)?;
-            let x3 = x.mul(&xx, p_x, RoundingMode::None)?;
-            let part = x3.div(&SIX, p_x, RoundingMode::None)?;
+            let t = ONE.sub(&xx, p_x, RoundingMode::None)?;
+            let s = t.sqrt(p_x, RoundingMode::None)?;
+            let d = x.div(&s, p_x, RoundingMode::None)?;
 
-            let mut ret = if part.is_zero() {
-                // since x != 0, part != 0 when rounding
-                x.add_correction(false)
-            } else {
-                let ret = x.add(&part, p_x, RoundingMode::FromZero)?;
+            let mut ret = d.atan(p_x, rm, cc)?;
 
-                let x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
-                let part = x5.mul(&THREE, p_x, RoundingMode::None)?;
-                let part = part.div(&FOURTY, p_x, RoundingMode::None)?;
-
-                if part.is_zero() {
-                    ret.add_correction(false)
-                } else {
-                    ret.add(
-                        &part,
-                        ret.get_mantissa_max_bit_len() + 1,
-                        RoundingMode::FromZero,
-                    ) // part is much smaller now, so increase precision
-                }
-            }?;
-
-            ret.set_precision(p, rm)?;
-
-            Ok(ret)
-        } else {
-            let mut additional_prec = 2;
-            if self.get_exponent() == 0 {
-                additional_prec += count_leading_ones(self.get_mantissa_digits());
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                break Ok(ret);
             }
 
-            let p_inc = WORD_BIT_SIZE;
-            let mut p_wrk = p + p_inc;
-
-            loop {
-                let mut x = self.clone()?;
-
-                let p_x = p_wrk + additional_prec;
-                x.set_precision(p_x, RoundingMode::None)?;
-
-                // arcsin(x) = arctan(x / sqrt(1 - x^2))
-                let xx = x.mul(&x, p_x, RoundingMode::None)?;
-                let t = ONE.sub(&xx, p_x, RoundingMode::None)?;
-                let s = t.sqrt(p_x, RoundingMode::None)?;
-                let d = x.div(&s, p_x, RoundingMode::None)?;
-
-                let mut ret = d.atan(p_x, rm, cc)?;
-
-                if ret.try_set_precision(p, rm, p_wrk)? {
-                    break Ok(ret);
-                }
-
-                p_wrk += p_inc;
-            }
+            p_wrk += p_inc;
+            p_inc *= 2;
         }
     }
 }

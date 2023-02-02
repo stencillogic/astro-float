@@ -1,14 +1,12 @@
 //! Hyperbolic arcsine.
 
-use crate::common::consts::FOURTY;
 use crate::common::consts::ONE;
-use crate::common::consts::SIX;
-use crate::common::consts::THREE;
 use crate::common::util::invert_rm_for_sign;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
+use crate::ops::util::compute_small_exp;
 use crate::Consts;
 use crate::Sign;
 use crate::EXPONENT_MAX;
@@ -32,88 +30,52 @@ impl BigFloatNumber {
             return Ok(ret);
         }
 
-        if (self.get_exponent() as isize) < -(p as isize) / 6 {
-            // short series: x - x^3 / 6 + 3 * x^5 / 40
+        compute_small_exp!(self, self.get_exponent() as isize / 2 - 2, true, p, rm);
 
-            let mut x = self.clone()?;
+        let mut x = self.clone()?;
 
-            let p_x = p.max(x.get_mantissa_max_bit_len()) + 8;
+        x.set_sign(Sign::Pos);
+
+        let rm = if self.is_negative() { invert_rm_for_sign(rm) } else { rm };
+
+        let mut ret = if (self.get_exponent() as isize - 1) / 2
+            > self.get_mantissa_max_bit_len() as isize + 2
+        {
+            // asinh(x) = ln(2 * |x|) * signum(x)
+
+            if self.get_exponent() == EXPONENT_MAX {
+                // ln(2 * |x|) = ln(2) + ln(|x|)
+
+                let lnx = x.ln(p + 1, RoundingMode::None, cc)?;
+
+                let ln2 = cc.ln_2_num(p + 1, RoundingMode::None)?;
+
+                ln2.add(&lnx, p, rm)
+            } else {
+                x.set_exponent(x.get_exponent() + 1);
+
+                x.ln(p, rm, cc)
+            }
+        } else {
+            // ln(|x| + sqrt(x*x + 1)) * signum(x)
+
+            let p_x = p + self.get_exponent().unsigned_abs() as usize + 5;
             x.set_precision(p_x, RoundingMode::None)?;
 
             let xx = x.mul(&x, p_x, RoundingMode::None)?;
-            let x3 = xx.mul(&x, p_x, RoundingMode::None)?;
-            let p1 = x3.div(&SIX, p_x, RoundingMode::None)?;
 
-            let mut ret = if p1.is_zero() {
-                // p1 is too small, but still enought for rounding
-                x.add_correction(true)
-            } else {
-                x = x.sub(&p1, p_x, RoundingMode::ToZero)?;
+            let d1 = xx.add(&ONE, p_x, RoundingMode::None)?;
 
-                let x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
-                let p2 = x5.mul(&THREE, p_x, RoundingMode::None)?;
-                let p2 = p2.div(&FOURTY, p_x, RoundingMode::None)?;
+            let d2 = d1.sqrt(p_x, RoundingMode::None)?;
 
-                if p2.is_zero() {
-                    x.add_correction(false)
-                } else {
-                    x.add(
-                        &p2,
-                        x.get_mantissa_max_bit_len() + 1,
-                        RoundingMode::FromZero,
-                    )
-                }
-            }?;
+            let d3 = d2.add(&x, p_x, RoundingMode::None)?;
 
-            ret.set_precision(p, rm)?;
+            d3.ln(p, rm, cc)
+        }?;
 
-            Ok(ret)
-        } else {
-            let mut x = self.clone()?;
+        ret.set_sign(self.get_sign());
 
-            x.set_sign(Sign::Pos);
-
-            let rm = if self.is_negative() { invert_rm_for_sign(rm) } else { rm };
-
-            let mut ret = if (self.get_exponent() as isize - 1) / 2
-                > self.get_mantissa_max_bit_len() as isize + 2
-            {
-                // asinh(x) = ln(2 * |x|) * signum(x)
-
-                if self.get_exponent() == EXPONENT_MAX {
-                    // ln(2 * |x|) = ln(2) + ln(|x|)
-
-                    let lnx = x.ln(p + 1, RoundingMode::None, cc)?;
-
-                    let ln2 = cc.ln_2_num(p + 1, RoundingMode::None)?;
-
-                    ln2.add(&lnx, p, rm)
-                } else {
-                    x.set_exponent(x.get_exponent() + 1);
-
-                    x.ln(p, rm, cc)
-                }
-            } else {
-                // ln(|x| + sqrt(x*x + 1)) * signum(x)
-
-                let p_x = p + self.get_exponent().unsigned_abs() as usize + 5;
-                x.set_precision(p_x, RoundingMode::None)?;
-
-                let xx = x.mul(&x, p_x, RoundingMode::None)?;
-
-                let d1 = xx.add(&ONE, p_x, RoundingMode::None)?;
-
-                let d2 = d1.sqrt(p_x, RoundingMode::None)?;
-
-                let d3 = d2.add(&x, p_x, RoundingMode::None)?;
-
-                d3.ln(p, rm, cc)
-            }?;
-
-            ret.set_sign(self.get_sign());
-
-            Ok(ret)
-        }
+        Ok(ret)
     }
 }
 

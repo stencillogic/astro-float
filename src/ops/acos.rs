@@ -22,7 +22,7 @@ impl BigFloatNumber {
     pub fn acos(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
         let p = round_p(p);
 
-        let p_inc = WORD_BIT_SIZE;
+        let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
 
         loop {
@@ -59,6 +59,7 @@ impl BigFloatNumber {
             }
 
             p_wrk += p_inc;
+            p_inc *= 2;
         }
     }
 }

@@ -1,13 +1,85 @@
 //! Exponentiation.
 
-use crate::common::util::round_p;
+use crate::common::consts::{FOUR, THREE};
+use crate::common::util::{get_add_cost, get_mul_cost, round_p};
 use crate::ops::consts::Consts;
+use crate::ops::util::compute_small_exp;
 use crate::{
     common::consts::ONE,
     defs::{Error, WORD_BIT_SIZE, WORD_SIGNIFICANT_BIT},
     num::BigFloatNumber,
     RoundingMode, Sign,
 };
+
+use super::series::{series_cost_optimize, series_run, ArgReductionEstimator, PolycoeffGen};
+
+// Polynomial coefficient generator.
+struct SinhPolycoeffGen {
+    one_full_p: BigFloatNumber,
+    inc: BigFloatNumber,
+    fct: BigFloatNumber,
+    iter_cost: usize,
+}
+
+impl SinhPolycoeffGen {
+    fn new(p: usize) -> Result<Self, Error> {
+        let inc = BigFloatNumber::from_word(1, 1)?;
+        let fct = BigFloatNumber::from_word(1, p)?;
+        let one_full_p = BigFloatNumber::from_word(1, p)?;
+
+        let iter_cost =
+            (get_mul_cost(p) + get_add_cost(p) + get_add_cost(inc.get_mantissa_max_bit_len())) * 2;
+
+        Ok(SinhPolycoeffGen {
+            one_full_p,
+            inc,
+            fct,
+            iter_cost,
+        })
+    }
+}
+
+impl PolycoeffGen for SinhPolycoeffGen {
+    fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
+        let p_inc = self.inc.get_mantissa_max_bit_len();
+        let p_one = self.one_full_p.get_mantissa_max_bit_len();
+
+        self.inc = self.inc.add(&ONE, p_inc, rm)?;
+        let inv_inc = self.one_full_p.div(&self.inc, p_one, rm)?;
+        self.fct = self.fct.mul(&inv_inc, p_one, rm)?;
+
+        self.inc = self.inc.add(&ONE, p_inc, rm)?;
+        let inv_inc = self.one_full_p.div(&self.inc, p_one, rm)?;
+        self.fct = self.fct.mul(&inv_inc, p_one, rm)?;
+
+        Ok(&self.fct)
+    }
+
+    #[inline]
+    fn get_iter_cost(&self) -> usize {
+        self.iter_cost
+    }
+}
+
+struct SinhArgReductionEstimator {}
+
+impl ArgReductionEstimator for SinhArgReductionEstimator {
+    /// Estimates cost of reduction n times for number with precision p.
+    fn get_reduction_cost(n: usize, p: usize) -> usize {
+        let cost_mul = get_mul_cost(p);
+        let cost_add = get_add_cost(p);
+        let cost_mul2 = get_mul_cost(THREE.get_mantissa_max_bit_len());
+
+        n * (2 * cost_mul + 3 * cost_add + cost_mul2)
+    }
+
+    /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
+    #[inline]
+    fn reduction_effect(n: usize, m: isize) -> usize {
+        // n*log2(3) + m
+        (n as isize * 1000 / 631 + m) as usize
+    }
+}
 
 impl BigFloatNumber {
     /// Computes `e` to the power of `self` with precision `p`. The result is rounded using the rounding mode `rm`.
@@ -26,55 +98,37 @@ impl BigFloatNumber {
             return Self::from_word(1, p);
         }
 
-        let p_inc = WORD_BIT_SIZE;
+        compute_small_exp!(ONE, self.get_exponent() as isize, self.is_negative(), p, rm);
+
+        let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
 
-        if p_wrk as isize + 3 < -(self.get_exponent() as isize) * 2 {
-            // for small input compute directly: 1 + x + x^2 / 2
-
-            let mut x = self.clone()?;
-            x.set_precision(p_wrk, RoundingMode::None)?;
-
-            let mut xx = x.mul(&x, p_wrk, RoundingMode::None)?;
-
-            if xx.is_zero() {
-                ONE.add(&x, p, rm)
-            } else {
-                let ret = ONE.add(&x, p_wrk, RoundingMode::None)?;
-
-                xx.div_by_2(RoundingMode::FromZero);
-
-                ret.add(&xx, p, rm)
-            }
-        } else {
-            loop {
-                let mut ret = if self.is_negative() {
-                    let p_x = p_wrk + 1;
-                    let x = match self.exp_positive_arg(p_x, cc) {
-                        Ok(v) => Ok(v),
-                        Err(e) => match e {
-                            Error::ExponentOverflow(_) => Self::new(p),
-                            Error::DivisionByZero => Err(Error::DivisionByZero),
-                            Error::InvalidArgument => Err(Error::InvalidArgument),
-                            Error::MemoryAllocation(a) => Err(Error::MemoryAllocation(a)),
-                        },
-                    }?;
-
-                    if x.is_zero() {
-                        Ok(x)
-                    } else {
-                        ONE.div(&x, p_wrk, RoundingMode::FromZero)
-                    }
-                } else {
-                    self.exp_positive_arg(p_wrk, cc)
+        loop {
+            let mut ret = if self.is_negative() {
+                let p_x = p_wrk + 1;
+                let x = match self.exp_positive_arg(p_x, cc) {
+                    Ok(v) => Ok(v),
+                    Err(e) => match e {
+                        Error::ExponentOverflow(_) => {
+                            return Self::new(p);
+                        }
+                        Error::DivisionByZero => Err(Error::DivisionByZero),
+                        Error::InvalidArgument => Err(Error::InvalidArgument),
+                        Error::MemoryAllocation(a) => Err(Error::MemoryAllocation(a)),
+                    },
                 }?;
 
-                if ret.try_set_precision(p, rm, p_wrk)? {
-                    return Ok(ret);
-                }
+                ONE.div(&x, p_wrk, RoundingMode::FromZero)
+            } else {
+                self.exp_positive_arg(p_wrk, cc)
+            }?;
 
-                p_wrk += p_inc;
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                return Ok(ret);
             }
+
+            p_wrk += p_inc;
+            p_inc *= 2;
         }
     }
 
@@ -152,7 +206,7 @@ impl BigFloatNumber {
                 return ONE.div(&self, p, rm);
             }
 
-            let p_inc = WORD_BIT_SIZE;
+            let mut p_inc = WORD_BIT_SIZE;
             let mut p_wrk = p + p_inc;
 
             loop {
@@ -172,6 +226,7 @@ impl BigFloatNumber {
                 }
 
                 p_wrk += p_inc;
+                p_inc *= 2;
             }
         }
     }
@@ -212,7 +267,7 @@ impl BigFloatNumber {
 
         let p = round_p(p);
 
-        let p_inc = WORD_BIT_SIZE;
+        let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
 
         loop {
@@ -262,6 +317,7 @@ impl BigFloatNumber {
             }
 
             p_wrk += p_inc;
+            p_inc *= 2;
         }
     }
 
@@ -278,6 +334,82 @@ impl BigFloatNumber {
         let sq2 = sq.add(&ONE, p, rm)?;
         let sq3 = sq2.sqrt(p, rm)?;
         sq3.add(&sh, p, RoundingMode::FromZero)
+    }
+
+    /// sinh using series, for |x| < 1
+    pub(super) fn sinh_series(
+        mut self,
+        p: usize,
+        rm: RoundingMode,
+        with_correction: bool,
+    ) -> Result<Self, Error> {
+        // sinh:  x + x^3/3! + x^5/5! + x^7/7! + ...
+
+        let mut polycoeff_gen = SinhPolycoeffGen::new(p)?;
+        let (reduction_times, niter) = series_cost_optimize::<SinhArgReductionEstimator>(
+            p,
+            &polycoeff_gen,
+            -(self.e as isize),
+            2,
+            false,
+        );
+
+        let p_arg = p + 1 + reduction_times * 3;
+        self.set_precision(p_arg, rm)?;
+
+        let arg = if reduction_times > 0 {
+            self.sinh_arg_reduce(reduction_times, rm)?
+        } else {
+            self
+        };
+
+        let acc = arg.clone()?; // x
+        let x_step = arg.mul(&arg, p_arg, rm)?; // x^2
+        let x_first = arg.mul(&x_step, p_arg, rm)?; // x^3
+
+        let ret = series_run(
+            acc,
+            x_first,
+            x_step,
+            niter,
+            &mut polycoeff_gen,
+            with_correction,
+        )?;
+
+        if reduction_times > 0 {
+            ret.sinh_arg_restore(reduction_times, rm)
+        } else {
+            Ok(ret)
+        }
+    }
+
+    // reduce argument n times.
+    // cost: n * O(add)
+    fn sinh_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+        // sinh(3*x) = 3*sinh(x) + 4*sinh(x)^3
+        let mut d = THREE.clone()?;
+        for _ in 1..n {
+            d = d.mul_full_prec(&THREE)?;
+        }
+        self.div(&d, self.get_mantissa_max_bit_len(), rm)
+    }
+
+    // restore value for the argument reduced n times.
+    // cost: n * (4*O(mul) + O(add))
+    fn sinh_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+        // sinh(3*x) = 3*sinh(x) + 4*sinh(x)^3
+        let mut sinh = self.clone()?;
+        let p = sinh.get_mantissa_max_bit_len();
+
+        for _ in 0..n {
+            let mut sinh_cub = sinh.mul(&sinh, p, rm)?;
+            sinh_cub = sinh_cub.mul(&sinh, p, rm)?;
+            let p1 = sinh.mul(&THREE, p, rm)?;
+            let p2 = sinh_cub.mul(&FOUR, p, rm)?;
+            sinh = p1.add(&p2, p, rm)?;
+        }
+
+        Ok(sinh)
     }
 
     /// Compute the power of `self` to the `n` with precision `p`. The result is rounded using the rounding mode `rm`.

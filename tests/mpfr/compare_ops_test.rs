@@ -228,9 +228,9 @@ fn mpfr_compare_ops() {
         //println!("{:?}", n1);
 
         test_astro_op!(true, n1, exp, f1, exp, p, rm, rnd, "exp", cc);
-        test_astro_op!(false, n1, sinh, f1, sinh, p, rm, rnd, "sinh", cc);
-        test_astro_op!(false, n1, cosh, f1, cosh, p, rm, rnd, "cosh", cc);
-        test_astro_op!(false, n1, tanh, f1, tanh, p, rm, rnd, "tanh", cc);
+        test_astro_op!(true, n1, sinh, f1, sinh, p, rm, rnd, "sinh", cc);
+        test_astro_op!(true, n1, cosh, f1, cosh, p, rm, rnd, "cosh", cc);
+        test_astro_op!(true, n1, tanh, f1, tanh, p, rm, rnd, "tanh", cc);
     }
 
     // n1 = 1.0..+inf: acosh

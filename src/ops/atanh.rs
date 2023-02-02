@@ -1,13 +1,13 @@
 //! Hyperbolic arctangent.
 
-use crate::common::consts::FIVE;
 use crate::common::consts::ONE;
-use crate::common::consts::THREE;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
+use crate::ops::util::compute_small_exp;
+use crate::WORD_BIT_SIZE;
 
 impl BigFloatNumber {
     /// Computes the hyperbolic arctangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
@@ -32,63 +32,39 @@ impl BigFloatNumber {
             return Err(Error::ExponentOverflow(self.get_sign()));
         }
 
-        if (self.get_exponent() as isize) < -(p as isize) / 6 {
-            // short series: x + x^3/3 + x^5/5
+        compute_small_exp!(self, self.get_exponent() as isize / 2 - 1, false, p, rm);
 
+        // 0.5 * ln((1 + x) / (1 - x))
+
+        let mut additional_prec = 4;
+        if self.get_exponent() < 0 {
+            additional_prec += self.get_exponent().unsigned_abs() as usize;
+        }
+
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p + p_inc;
+
+        loop {
             let mut x = self.clone()?;
 
-            let p_x = p.max(x.get_mantissa_max_bit_len()) + 8;
-            x.set_precision(p_x, RoundingMode::None)?;
-
-            let xx = x.mul(&x, p_x, RoundingMode::None)?;
-            let x3 = x.mul(&xx, p_x, RoundingMode::None)?;
-            let part = x3.div(&THREE, p_x, RoundingMode::None)?;
-
-            let mut ret = if part.is_zero() {
-                // since x != 0 it should be reflected in rounding
-                x.add_correction(false)
-            } else {
-                let ret = x.add(&part, p_x, RoundingMode::FromZero)?;
-
-                let x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
-                let part = x5.div(&FIVE, p_x, RoundingMode::None)?;
-
-                if part.is_zero() {
-                    ret.add_correction(false)
-                } else {
-                    ret.add(
-                        &part,
-                        ret.get_mantissa_max_bit_len() + 1, // part is much smaller now, so increase precision
-                        RoundingMode::FromZero,
-                    )
-                }
-            }?;
-
-            ret.set_precision(p, rm)?;
-
-            Ok(ret)
-        } else {
-            // 0.5 * ln((1 + x) / (1 - x))
-
-            let mut x = self.clone()?;
-
-            let p_x = p + p / 6 + 3;
+            let p_x = p_wrk + additional_prec;
             x.set_precision(p_x, RoundingMode::None)?;
 
             let d1 = ONE.add(&x, p_x, RoundingMode::None)?;
             let d2 = ONE.sub(&x, p_x, RoundingMode::None)?;
 
-            if d2.is_zero() {
-                return Err(Error::ExponentOverflow(self.get_sign()));
-            }
-
             let d3 = d1.div(&d2, p_x, RoundingMode::None)?;
 
-            let mut ret = d3.ln(p, rm, cc)?;
+            let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
 
-            ret.div_by_2(rm);
+            ret.div_by_2(RoundingMode::None);
 
-            Ok(ret)
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                break Ok(ret);
+            }
+
+            p_wrk += p_inc;
+            p_inc *= 2;
         }
     }
 }

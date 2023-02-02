@@ -19,3 +19,20 @@ impl BigFloatNumber {
         }
     }
 }
+
+/// Compute result for argument with small exponent.
+macro_rules! compute_small_exp {
+    ($arg:ident, $exp:expr, $sign_inverse:expr, $p:ident, $rm:ident) => {
+        if $p as isize + 1 < -($exp) {
+            let mut x = $arg.clone()?;
+            if $p > x.get_mantissa_max_bit_len() {
+                x.set_precision($p, RoundingMode::None)?;
+            }
+            let mut ret = x.add_correction($sign_inverse)?;
+            ret.set_precision($p, $rm)?;
+            return Ok(ret);
+        }
+    };
+}
+
+pub(super) use compute_small_exp;

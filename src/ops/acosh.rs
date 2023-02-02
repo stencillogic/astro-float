@@ -35,7 +35,7 @@ impl BigFloatNumber {
             if self.get_exponent() == EXPONENT_MAX {
                 // ln(2) + ln(x)
 
-                let p_inc = WORD_BIT_SIZE;
+                let mut p_inc = WORD_BIT_SIZE;
                 let mut p_wrk = p + p_inc;
 
                 let mut x = self.clone()?;
@@ -55,6 +55,7 @@ impl BigFloatNumber {
                     }
 
                     p_wrk += p_inc;
+                    p_inc *= 2;
                 }
             } else {
                 let mut x = self.clone()?;

@@ -1,88 +1,14 @@
 //! Hyperbolic cocosine.
 
-use crate::common::consts::FOUR;
 use crate::common::consts::ONE;
-use crate::common::consts::THREE;
-use crate::common::util::get_add_cost;
-use crate::common::util::get_mul_cost;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
-use crate::ops::series::series_cost_optimize;
-use crate::ops::series::series_run;
-use crate::ops::series::ArgReductionEstimator;
-use crate::ops::series::PolycoeffGen;
+use crate::ops::util::compute_small_exp;
 use crate::Consts;
 use crate::Sign;
-
-// Polynomial coefficient generator.
-struct CoshPolycoeffGen {
-    one_full_p: BigFloatNumber,
-    inc: BigFloatNumber,
-    fct: BigFloatNumber,
-    iter_cost: usize,
-}
-
-impl CoshPolycoeffGen {
-    fn new(p: usize) -> Result<Self, Error> {
-        let inc = BigFloatNumber::from_word(0, 1)?;
-        let fct = BigFloatNumber::from_word(1, p)?;
-        let one_full_p = BigFloatNumber::from_word(1, p)?;
-
-        let iter_cost =
-            (get_mul_cost(p) + get_add_cost(p) + get_add_cost(inc.get_mantissa_max_bit_len())) * 2;
-
-        Ok(CoshPolycoeffGen {
-            one_full_p,
-            inc,
-            fct,
-            iter_cost,
-        })
-    }
-}
-
-impl PolycoeffGen for CoshPolycoeffGen {
-    fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-        let p_inc = self.inc.get_mantissa_max_bit_len();
-        let p_one = self.one_full_p.get_mantissa_max_bit_len();
-
-        self.inc = self.inc.add(&ONE, p_inc, rm)?;
-        let inv_inc = self.one_full_p.div(&self.inc, p_one, rm)?;
-        self.fct = self.fct.mul(&inv_inc, p_one, rm)?;
-
-        self.inc = self.inc.add(&ONE, p_inc, rm)?;
-        let inv_inc = self.one_full_p.div(&self.inc, p_one, rm)?;
-        self.fct = self.fct.mul(&inv_inc, p_one, rm)?;
-
-        Ok(&self.fct)
-    }
-
-    #[inline]
-    fn get_iter_cost(&self) -> usize {
-        self.iter_cost
-    }
-}
-
-struct CoshArgReductionEstimator {}
-
-impl ArgReductionEstimator for CoshArgReductionEstimator {
-    /// Estimates the cost of reduction n times for number with precision p.
-    fn get_reduction_cost(n: usize, p: usize) -> usize {
-        let cost_mul = get_mul_cost(p);
-        let cost_add = get_add_cost(p);
-        let cost_mul2 = get_mul_cost(THREE.get_mantissa_max_bit_len());
-
-        n * (2 * cost_mul + 3 * cost_add + cost_mul2)
-    }
-
-    /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
-    #[inline]
-    fn reduction_effect(n: usize, m: isize) -> usize {
-        // n*log2(3) + m
-        (n as isize * 1000 / 631 + m) as usize
-    }
-}
+use crate::WORD_BIT_SIZE;
 
 impl BigFloatNumber {
     /// Computes the hyperbolic cosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
@@ -96,122 +22,50 @@ impl BigFloatNumber {
     pub fn cosh(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
         let p = round_p(p);
 
-        let mut arg = self.clone()?;
-
-        if arg.is_zero() {
+        if self.is_zero() {
             return Self::from_word(1, p);
         }
 
-        if self.get_exponent() > 0 {
-            arg.set_sign(Sign::Pos);
+        compute_small_exp!(ONE, self.get_exponent() as isize / 2 - 1, false, p, rm);
 
-            let mut ret = if (self.get_exponent() as isize - 1) / 2
-                > self.get_mantissa_max_bit_len() as isize + 2
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p + p_inc;
+
+        loop {
+            let mut x = self.clone()?;
+
+            let p_x = p_wrk + 4;
+            x.set_precision(p_x, RoundingMode::None)?;
+
+            x.set_sign(Sign::Pos);
+
+            let mut ret = if (x.get_exponent() as isize - 1) / 2
+                > x.get_mantissa_max_bit_len() as isize + 2
             {
                 // e^x / 2
 
-                arg.exp(p, rm, cc)
+                x.exp(p_x, RoundingMode::None, cc)
             } else {
                 // (e^x + e^(-x)) / 2
 
-                let p_arg = p + 3;
+                x.set_precision(p_x, RoundingMode::None)?;
 
-                arg.set_precision(p_arg, RoundingMode::None)?;
+                let ex = x.exp(p_x, RoundingMode::None, cc)?;
 
-                let ex = arg.exp(p_arg, rm, cc)?;
+                let xe = ex.reciprocal(p_x, RoundingMode::None)?;
 
-                let xe = ex.reciprocal(p_arg, RoundingMode::None)?;
-
-                ex.add(&xe, p, rm)
+                ex.add(&xe, p_x, RoundingMode::None)
             }?;
 
-            ret.div_by_2(rm);
+            ret.div_by_2(RoundingMode::None);
 
-            Ok(ret)
-        } else {
-            let mut ret = arg.cosh_series(p, rm, rm as u32 & 0b11110 != 0)?;
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                break Ok(ret);
+            }
 
-            ret.set_precision(p, rm)?;
-
-            Ok(ret)
+            p_wrk += p_inc;
+            p_inc *= 2;
         }
-    }
-
-    /// cosh using series, for |x| < 1
-    pub(super) fn cosh_series(
-        mut self,
-        p: usize,
-        rm: RoundingMode,
-        with_correction: bool,
-    ) -> Result<Self, Error> {
-        let p = round_p(p);
-
-        // cosh:  1 + x^2/2! + x^4/4! + x^6/6! + ...
-
-        let mut polycoeff_gen = CoshPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<CoshArgReductionEstimator>(
-            p,
-            &polycoeff_gen,
-            -(self.e as isize),
-            2,
-            false,
-        );
-
-        let p_arg = p + 1 + reduction_times * 6;
-        self.set_precision(p_arg, rm)?;
-
-        let arg = if reduction_times > 0 {
-            self.cosh_arg_reduce(reduction_times, rm)?
-        } else {
-            self
-        };
-
-        let acc = Self::from_word(1, p_arg)?; // 1
-        let x_step = arg.mul(&arg, p_arg, rm)?; // x^2
-        let x_first = x_step.clone()?; // x^2
-
-        let ret = series_run(
-            acc,
-            x_first,
-            x_step,
-            niter,
-            &mut polycoeff_gen,
-            with_correction,
-        )?;
-
-        if reduction_times > 0 {
-            ret.cosh_arg_restore(reduction_times, rm)
-        } else {
-            Ok(ret)
-        }
-    }
-
-    // reduce argument n times.
-    // cost: n * O(add)
-    fn cosh_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
-        // cosh(3*x) = 4*cosh(x)^3 - 3*cosh(x)
-        let mut d = THREE.clone()?;
-        for _ in 1..n {
-            d = d.mul_full_prec(&THREE)?;
-        }
-        self.div(&d, self.get_mantissa_max_bit_len(), rm)
-    }
-
-    // restore value for the argument reduced n times.
-    fn cosh_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
-        // cosh(3*x) = 4*cosh(x)^3 - 3*cosh(x)
-        let mut cosh = self.clone()?;
-        let p = cosh.get_mantissa_max_bit_len();
-
-        for _ in 0..n {
-            let mut cosh_cub = cosh.mul(&cosh, p, rm)?;
-            cosh_cub = cosh_cub.mul(&cosh, p, rm)?;
-            let p1 = cosh.mul(&THREE, p, rm)?;
-            let p2 = cosh_cub.mul(&FOUR, p, rm)?;
-            cosh = p2.sub(&p1, p, rm)?;
-        }
-
-        Ok(cosh)
     }
 }
 

@@ -1,8 +1,6 @@
 //! Arctangent.
 
-use crate::common::consts::FIVE;
 use crate::common::consts::ONE;
-use crate::common::consts::THREE;
 use crate::common::consts::TWO;
 use crate::common::util::get_add_cost;
 use crate::common::util::get_mul_cost;
@@ -16,6 +14,7 @@ use crate::ops::series::series_cost_optimize;
 use crate::ops::series::series_run;
 use crate::ops::series::ArgReductionEstimator;
 use crate::ops::series::PolycoeffGen;
+use crate::ops::util::compute_small_exp;
 use crate::Exponent;
 use crate::WORD_BIT_SIZE;
 
@@ -97,70 +96,36 @@ impl BigFloatNumber {
             return Ok(ret);
         }
 
-        if (self.get_exponent() as isize) < -(p as isize) / 6 {
-            // for small input compute directly: x - x^3 / 3 + x^5 / 5
+        compute_small_exp!(self, self.get_exponent() as isize / 2 - 1, true, p, rm);
 
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p + p_inc;
+
+        loop {
             let mut x = self.clone()?;
 
-            let p_x = p.max(x.get_mantissa_max_bit_len()) + 8;
+            let p_x = p_wrk + 2;
             x.set_precision(p_x, RoundingMode::None)?;
 
-            let xx = x.mul(&x, p_x, RoundingMode::None)?;
-            let x3 = x.mul(&xx, p_x, RoundingMode::None)?;
-            let part = x3.div(&THREE, p_x, RoundingMode::None)?;
+            // if x > 1 then arctan(x) = pi/2 - arctan(1/x)
+            let mut ret = if x.get_exponent() > 0 {
+                x = x.reciprocal(p_x, RoundingMode::None)?;
+                let ret = x.atan_series(RoundingMode::None, rm as u32 & 0b11110 != 0)?;
+                let mut pi = cc.pi_num(p_x, RoundingMode::None)?;
+                pi.set_exponent(1);
+                pi.set_sign(self.get_sign());
 
-            let mut ret = if part.is_zero() {
-                // since x != 0, part != 0 when rounding
-                x.add_correction(true)
+                pi.sub(&ret, p_x, RoundingMode::None)
             } else {
-                let ret = x.sub(&part, p_x, RoundingMode::ToZero)?; // part sign is inverse of x, so round to zero
-
-                let x5 = x3.mul(&xx, p_x, RoundingMode::None)?;
-                let part = x5.div(&FIVE, p_x, RoundingMode::None)?;
-
-                if part.is_zero() {
-                    ret.add_correction(false)
-                } else {
-                    ret.add(
-                        &part,
-                        ret.get_mantissa_max_bit_len() + 1,
-                        RoundingMode::FromZero,
-                    ) // part is much smaller now, so increase precision
-                }
+                x.atan_series(RoundingMode::None, rm as u32 & 0b11110 != 0)
             }?;
 
-            ret.set_precision(p, rm)?;
-
-            Ok(ret)
-        } else {
-            let p_inc = WORD_BIT_SIZE;
-            let mut p_wrk = p + p_inc;
-
-            loop {
-                let mut x = self.clone()?;
-
-                let p_x = p_wrk + 2;
-                x.set_precision(p_x, RoundingMode::None)?;
-
-                // if x > 1 then arctan(x) = pi/2 - arctan(1/x)
-                let mut ret = if x.get_exponent() > 0 {
-                    x = x.reciprocal(p_x, RoundingMode::None)?;
-                    let ret = x.atan_series(RoundingMode::None, rm as u32 & 0b11110 != 0)?;
-                    let mut pi = cc.pi_num(p_x, RoundingMode::None)?;
-                    pi.set_exponent(1);
-                    pi.set_sign(self.get_sign());
-
-                    pi.sub(&ret, p_x, RoundingMode::None)
-                } else {
-                    x.atan_series(RoundingMode::None, rm as u32 & 0b11110 != 0)
-                }?;
-
-                if ret.try_set_precision(p, rm, p_wrk)? {
-                    break Ok(ret);
-                }
-
-                p_wrk += p_inc;
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                break Ok(ret);
             }
+
+            p_wrk += p_inc;
+            p_inc *= 2;
         }
     }
 

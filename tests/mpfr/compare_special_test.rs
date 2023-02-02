@@ -4,7 +4,7 @@
 use std::ops::Add;
 
 use crate::mpfr::common::{
-    assert_float_close, conv_to_mpfr, get_oned_sides, get_oned_zeroed, get_periodic,
+    assert_float_close, conv_to_mpfr, get_last_zero, get_oned_sides, get_oned_zeroed, get_periodic,
     get_random_rnd_pair,
 };
 use crate::mpfr::common::{get_prec_rng, test_astro_op};
@@ -18,7 +18,7 @@ use rug::{
 
 #[test]
 fn mpfr_compare_special() {
-    let run_cnt = 500;
+    let run_cnt = 1000;
 
     let p_rng = get_prec_rng();
     let p_min = 1;
@@ -63,9 +63,12 @@ fn mpfr_compare_special() {
             get_oned_zeroed(p1, EXPONENT_MIN, EXPONENT_MAX),
             get_oned_sides(p1, EXPONENT_MIN, EXPONENT_MAX),
             get_periodic(p1, EXPONENT_MIN, EXPONENT_MAX),
+            get_last_zero(p1, EXPONENT_MIN, EXPONENT_MAX),
         ];
 
         for n in nn.iter() {
+            //println!("{:?}", n);
+
             let f = conv_to_mpfr(p1, &n);
 
             let nn1 = [
@@ -80,6 +83,7 @@ fn mpfr_compare_special() {
                 get_oned_zeroed(p2, EXPONENT_MIN, EXPONENT_MAX),
                 get_oned_sides(p2, EXPONENT_MIN, EXPONENT_MAX),
                 get_periodic(p2, EXPONENT_MIN, EXPONENT_MAX),
+                get_last_zero(p2, EXPONENT_MIN, EXPONENT_MAX),
             ];
 
             for n1 in nn1.iter() {
@@ -93,7 +97,7 @@ fn mpfr_compare_special() {
                 test_astro_op!(true, n, n1, mul, f, f1, mul, p, rm, rnd, "mul");
                 test_astro_op!(true, n, n1, div, f, f1, div, p, rm, rnd, "div");
 
-                test_astro_op!(false, n, n1, pow, f, f1, pow, p, rm, rnd, "pow", cc);
+                test_astro_op!(true, n, n1, pow, f, f1, pow, p, rm, rnd, "pow", cc);
 
                 // rem
                 let p = p1.max(p2);
@@ -117,13 +121,13 @@ fn mpfr_compare_special() {
                 assert_float_close(n3, f3, p, "rem", true);
             }
 
-            test_astro_op!(false, n, sqrt, f, sqrt, p, rm, rnd, "sqrt");
-            test_astro_op!(false, n, cbrt, f, cbrt, p, rm, rnd, "cbrt");
-            test_astro_op!(false, n, ln, f, log, p, rm, rnd, "ln", cc);
-            test_astro_op!(false, n, log2, f, log2, p, rm, rnd, "log2", cc);
-            test_astro_op!(false, n, log10, f, log10, p, rm, rnd, "log10", cc);
-            test_astro_op!(false, n, asinh, f, asinh, p, rm, rnd, "asinh", cc);
-            test_astro_op!(false, n, atan, f, atan, p, rm, rnd, "atan", cc);
+            test_astro_op!(true, n, sqrt, f, sqrt, p, rm, rnd, "sqrt");
+            test_astro_op!(true, n, cbrt, f, cbrt, p, rm, rnd, "cbrt");
+            test_astro_op!(true, n, ln, f, log, p, rm, rnd, "ln", cc);
+            test_astro_op!(true, n, log2, f, log2, p, rm, rnd, "log2", cc);
+            test_astro_op!(true, n, log10, f, log10, p, rm, rnd, "log10", cc);
+            test_astro_op!(true, n, asinh, f, asinh, p, rm, rnd, "asinh", cc);
+            test_astro_op!(true, n, atan, f, atan, p, rm, rnd, "atan", cc);
 
             let mut n_trig = n.clone();
             let f_trig = if n.get_exponent().unwrap() > 128 {
@@ -133,20 +137,20 @@ fn mpfr_compare_special() {
                 f.clone()
             };
 
-            test_astro_op!(false, n_trig, sin, f_trig, sin, p, rm, rnd, "sin", cc);
-            test_astro_op!(false, n_trig, cos, f_trig, cos, p, rm, rnd, "cos", cc);
-            test_astro_op!(false, n_trig, tan, f_trig, tan, p, rm, rnd, "tan", cc);
+            test_astro_op!(true, n_trig, sin, f_trig, sin, p, rm, rnd, "sin", cc);
+            test_astro_op!(true, n_trig, cos, f_trig, cos, p, rm, rnd, "cos", cc);
+            test_astro_op!(true, n_trig, tan, f_trig, tan, p, rm, rnd, "tan", cc);
 
-            test_astro_op!(false, n, exp, f, exp, p, rm, rnd, "exp", cc);
-            test_astro_op!(false, n, sinh, f, sinh, p, rm, rnd, "sinh", cc);
-            test_astro_op!(false, n, cosh, f, cosh, p, rm, rnd, "cosh", cc);
-            test_astro_op!(false, n, tanh, f, tanh, p, rm, rnd, "tanh", cc);
+            test_astro_op!(true, n, exp, f, exp, p, rm, rnd, "exp", cc);
+            test_astro_op!(true, n, sinh, f, sinh, p, rm, rnd, "sinh", cc);
+            test_astro_op!(true, n, cosh, f, cosh, p, rm, rnd, "cosh", cc);
+            test_astro_op!(true, n, tanh, f, tanh, p, rm, rnd, "tanh", cc);
 
-            test_astro_op!(false, n, acosh, f, acosh, p, rm, rnd, "acosh", cc);
+            test_astro_op!(true, n, acosh, f, acosh, p, rm, rnd, "acosh", cc);
 
-            test_astro_op!(false, n, acos, f, acos, p, rm, rnd, "acos", cc);
-            test_astro_op!(false, n, asin, f, asin, p, rm, rnd, "asin", cc);
-            test_astro_op!(false, n, atanh, f, atanh, p, rm, rnd, "atanh", cc);
+            test_astro_op!(true, n, acos, f, acos, p, rm, rnd, "acos", cc);
+            test_astro_op!(true, n, asin, f, asin, p, rm, rnd, "asin", cc);
+            test_astro_op!(true, n, atanh, f, atanh, p, rm, rnd, "atanh", cc);
 
             // powi
             for i in [0, 1, 2, 31, 32, usize::MAX] {
@@ -156,7 +160,7 @@ fn mpfr_compare_special() {
 
                 unsafe { mpfr::pow_ui(f3.as_raw_mut(), f.as_raw(), i as u64, rnd) };
 
-                assert_float_close(n3, f3, p, "powi", false);
+                assert_float_close(n3, f3, p, "powi", true);
             }
 
             // reciprocal
@@ -165,7 +169,7 @@ fn mpfr_compare_special() {
             let mut f3 = Float::with_val(p as u32, 1);
             unsafe { mpfr::div(f3.as_raw_mut(), mpfr_one.as_raw(), f.as_raw(), rnd) };
 
-            assert_float_close(n3, f3, p, "reciprocal", false);
+            assert_float_close(n3, f3, p, "reciprocal", true);
         }
     }
 }
