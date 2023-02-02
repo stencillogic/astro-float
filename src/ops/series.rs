@@ -87,16 +87,15 @@ pub(crate) fn series_run<T: PolycoeffGen>(
     x_step: BigFloatNumber,
     niter: usize,
     polycoeff_gen: &mut T,
-    with_correction: bool,
 ) -> Result<BigFloatNumber, Error> {
     if x_first.is_zero() || x_step.is_zero() {
-        series_compute_fast(acc, x_first, polycoeff_gen, with_correction)
+        series_compute_fast(acc, x_first, polycoeff_gen)
     } else if niter >= RECT_ITER_THRESHOLD {
-        series_rectangular(niter, acc, x_first, x_step, polycoeff_gen, with_correction)
+        series_rectangular(niter, acc, x_first, x_step, polycoeff_gen)
     } else if polycoeff_gen.is_div() {
-        series_linear(acc, x_first, x_step, polycoeff_gen, with_correction)
+        series_linear(acc, x_first, x_step, polycoeff_gen)
     } else {
-        series_horner(acc, x_first, x_step, polycoeff_gen, with_correction)
+        series_horner(acc, x_first, x_step, polycoeff_gen)
     }
 }
 
@@ -139,20 +138,9 @@ fn series_compute_fast<T: PolycoeffGen>(
     acc: BigFloatNumber,
     x_first: BigFloatNumber,
     polycoeff_gen: &mut T,
-    with_correction: bool,
 ) -> Result<BigFloatNumber, Error> {
     if x_first.is_zero() {
-        if with_correction {
-            // add a small value representing inexactly the next-and-last part of the series;
-            // this plays role in rounding modes with ceiling or flooring.
-
-            let coeff = polycoeff_gen.next(RoundingMode::None)?;
-            let next_sign = coeff.mul(&x_first, 1, RoundingMode::None)?;
-
-            acc.add_correction(acc.get_sign() != next_sign.get_sign())
-        } else {
-            Ok(acc)
-        }
+        Ok(acc)
     } else {
         let p = acc
             .get_mantissa_max_bit_len()
@@ -168,22 +156,7 @@ fn series_compute_fast<T: PolycoeffGen>(
             x_first.mul(coeff, p, RoundingMode::None)
         }?;
 
-        if part.is_zero() {
-            if with_correction {
-                // add a small value representing inexactly the next-and-last part of the series
-                acc.add_correction(part.get_sign() != acc.get_sign())
-            } else {
-                Ok(acc)
-            }
-        } else {
-            let x = acc.add(&part, p, RoundingMode::None)?;
-            if with_correction && x.cmp(&acc) == 0 {
-                // add a small value representing inexactly the next-and-last part of the series
-                x.add_correction(part.get_sign() != acc.get_sign())
-            } else {
-                Ok(x)
-            }
-        }
+        acc.add(&part, p, RoundingMode::None)
     }
 }
 
@@ -201,7 +174,6 @@ fn series_rectangular<T: PolycoeffGen>(
     x_first: BigFloatNumber,
     x_step: BigFloatNumber,
     polycoeff_gen: &mut T,
-    with_correction: bool,
 ) -> Result<BigFloatNumber, Error> {
     debug_assert!(niter >= 4);
 
@@ -251,9 +223,9 @@ fn series_rectangular<T: PolycoeffGen>(
 
     acc = if niter < MAX_CACHE * 10 && !polycoeff_gen.is_div() {
         // probably not too many iterations left
-        series_horner(acc, terminal_pow, x_step, polycoeff_gen, with_correction)
+        series_horner(acc, terminal_pow, x_step, polycoeff_gen)
     } else {
-        series_linear(acc, terminal_pow, x_step, polycoeff_gen, with_correction)
+        series_linear(acc, terminal_pow, x_step, polycoeff_gen)
     }?;
 
     Ok(acc)
@@ -266,7 +238,6 @@ fn series_linear<T: PolycoeffGen>(
     x_first: BigFloatNumber,
     x_step: BigFloatNumber,
     polycoeff_gen: &mut T,
-    with_correction: bool,
 ) -> Result<BigFloatNumber, Error> {
     let p = acc
         .get_mantissa_max_bit_len()
@@ -284,23 +255,11 @@ fn series_linear<T: PolycoeffGen>(
             x_pow.mul(coeff, p, RoundingMode::None)
         }?;
 
-        if part.is_zero() {
-            if with_correction {
-                // add a small value representing inexactly the next-and-last part of the series
-                acc = acc.add_correction(acc.get_sign() != part.get_sign())?;
-            }
-            break;
-        } else {
-            acc = acc.add(&part, p, RoundingMode::None)?;
-        }
+        acc = acc.add(&part, p, RoundingMode::None)?;
 
         if part.get_exponent() as isize
             <= acc.get_exponent() as isize - acc.get_mantissa_max_bit_len() as isize
         {
-            if with_correction {
-                // add a small value representing inexactly the next-and-last part of the series
-                acc = acc.add_correction(acc.get_sign() != part.get_sign())?;
-            }
             break;
         }
 
@@ -347,7 +306,6 @@ fn series_horner<T: PolycoeffGen>(
     x_first: BigFloatNumber,
     x_step: BigFloatNumber,
     polycoeff_gen: &mut T,
-    with_correction: bool,
 ) -> Result<BigFloatNumber, Error> {
     debug_assert!(x_first.e <= 0);
     debug_assert!(x_step.e <= 0);
@@ -380,22 +338,7 @@ fn series_horner<T: PolycoeffGen>(
 
     acc = acc.mul(&x_first, p, RoundingMode::None)?;
 
-    if acc.is_zero() {
-        if with_correction {
-            // add a small value representing inexactly the next-and-last part of the series
-            add.add_correction(add.get_sign() != acc.get_sign())
-        } else {
-            Ok(add)
-        }
-    } else {
-        let x = add.add(&acc, p, RoundingMode::None)?;
-        if with_correction && x.cmp(&add) == 0 {
-            // add a small value representing inexactly the next-and-last part of the series
-            x.add_correction(add.get_sign() != acc.get_sign())
-        } else {
-            Ok(x)
-        }
-    }
+    add.add(&acc, p, RoundingMode::None)
 }
 
 // Is it possbile to make it more effective than series_rect?
@@ -414,7 +357,6 @@ fn ndim_series<T: PolycoeffGen>(
     x_factor: BigFloatNumber,
     x_step: BigFloatNumber,
     polycoeff_gen: &mut T,
-    with_correction: bool,
 ) -> Result<BigFloatNumber, Error> {
     debug_assert!((2..=8).contains(&n));
 
@@ -467,9 +409,8 @@ fn ndim_series<T: PolycoeffGen>(
     acc = acc.mul(&x_factor, p, RoundingMode::None)?;
     terminal_pow = terminal_pow.mul(&x_factor, p, RoundingMode::None)?;
     acc = acc.add(&add, p, RoundingMode::None)?;
-    acc = series_linear(acc, terminal_pow, x_step, polycoeff_gen, with_correction)?;
 
-    Ok(acc)
+    series_linear(acc, terminal_pow, x_step, polycoeff_gen)
 }
 
 #[allow(dead_code)]

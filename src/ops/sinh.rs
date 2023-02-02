@@ -120,7 +120,7 @@ mod tests {
         for _ in 0..5 {
             let start_time = std::time::Instant::now();
             for ni in n.drain(..) {
-                let _f = ni.sinh_series(p, RoundingMode::ToEven, false).unwrap();
+                let _f = ni.sinh_series(p, RoundingMode::ToEven).unwrap();
             }
             let time = start_time.elapsed();
             println!("{}", time.as_millis());

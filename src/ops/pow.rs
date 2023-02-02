@@ -327,7 +327,7 @@ impl BigFloatNumber {
 
         let p = self.get_mantissa_max_bit_len();
 
-        let sh = self.sinh_series(p, rm, false)?; // faster convergence than direct series
+        let sh = self.sinh_series(p, rm)?; // faster convergence than direct series
 
         // e = sh + sqrt(sh^2 + 1)
         let sq = sh.mul(&sh, p, rm)?;
@@ -337,12 +337,7 @@ impl BigFloatNumber {
     }
 
     /// sinh using series, for |x| < 1
-    pub(super) fn sinh_series(
-        mut self,
-        p: usize,
-        rm: RoundingMode,
-        with_correction: bool,
-    ) -> Result<Self, Error> {
+    pub fn sinh_series(mut self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         // sinh:  x + x^3/3! + x^5/5! + x^7/7! + ...
 
         let mut polycoeff_gen = SinhPolycoeffGen::new(p)?;
@@ -367,14 +362,7 @@ impl BigFloatNumber {
         let x_step = arg.mul(&arg, p_arg, rm)?; // x^2
         let x_first = arg.mul(&x_step, p_arg, rm)?; // x^3
 
-        let ret = series_run(
-            acc,
-            x_first,
-            x_step,
-            niter,
-            &mut polycoeff_gen,
-            with_correction,
-        )?;
+        let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen)?;
 
         if reduction_times > 0 {
             ret.sinh_arg_restore(reduction_times, rm)
@@ -690,5 +678,25 @@ mod test {
         let d2 = ONE.div(&TWO, p, rm).unwrap();
 
         assert!(d1.cmp(&d2) == 0);
+    }
+
+    #[ignore]
+    #[test]
+    #[cfg(feature = "std")]
+    fn sinh_perf() {
+        let p = 32000;
+        let mut n = vec![];
+        for _ in 0..100 {
+            n.push(BigFloatNumber::random_normal(p, -0, -0).unwrap());
+        }
+
+        for _ in 0..5 {
+            let start_time = std::time::Instant::now();
+            for ni in n.drain(..) {
+                let _f = ni.sinh_series(p, RoundingMode::ToEven).unwrap();
+            }
+            let time = start_time.elapsed();
+            println!("{}", time.as_millis());
+        }
     }
 }
