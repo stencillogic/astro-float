@@ -45,15 +45,15 @@ impl Mantissa {
         m.try_extend_2((m.len() + 2) * WORD_BIT_SIZE)?;
 
         loop {
-            let mut sqbuf = &mut tmpbuf[..sbuf.len() * 2];
+            let sqbuf = &mut tmpbuf[..sbuf.len() * 2];
 
             // sq = s^2
-            Self::mul_unbalanced(&sbuf, &sbuf, &mut sqbuf)?;
+            Self::mul_unbalanced(&sbuf, &sbuf, sqbuf)?;
 
             m_shift = Self::crbt_normalize_div(&mut m, sqbuf, m_shift)?;
 
             // m / sq
-            let (mut qbuf, _rbuf) = Self::div_unbalanced(&m, &sqbuf)?;
+            let (mut qbuf, _rbuf) = Self::div_unbalanced(&m, sqbuf)?;
 
             // w = s * 2
             wb.iter_mut()
@@ -101,8 +101,8 @@ impl Mantissa {
         let scbuf = &mut rest[..sbuf.len() * 3];
 
         // q^3
-        Self::mul_unbalanced(&sbuf, &sbuf, sqbuf)?;
-        Self::mul_unbalanced(&sqbuf, &sbuf, scbuf)?;
+        Self::mul_unbalanced(sbuf, sbuf, sqbuf)?;
+        Self::mul_unbalanced(sqbuf, sbuf, scbuf)?;
         let sc = SliceWithSign::new(scbuf, 1);
 
         r.sub_assign(&sc);
@@ -172,9 +172,9 @@ mod tests {
             &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX],
             &[WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX, WORD_MAX],
         ] {
-            let (qb, rb) = Mantissa::cbrt_rem(wordbuf_from_words(&s1)).unwrap();
+            let (qb, rb) = Mantissa::cbrt_rem(wordbuf_from_words(s1)).unwrap();
 
-            assert_sqrt!(&s1 as &[Word], &qb, &rb, MAX_BUF, "max");
+            assert_sqrt!(s1 as &[Word], &qb, &rb, MAX_BUF, "max");
         }
 
         for s1 in [
@@ -187,9 +187,9 @@ mod tests {
             &[0, 0, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT],
             &[0, 0, 0, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT],
         ] {
-            let (qb, rb) = Mantissa::cbrt_rem(wordbuf_from_words(&s1)).unwrap();
+            let (qb, rb) = Mantissa::cbrt_rem(wordbuf_from_words(s1)).unwrap();
 
-            assert_sqrt!(&s1 as &[Word], &qb, &rb, MAX_BUF, "significant");
+            assert_sqrt!(s1 as &[Word], &qb, &rb, MAX_BUF, "significant");
         }
 
         for s1 in [
@@ -202,9 +202,9 @@ mod tests {
             &[1, 0, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT],
             &[1, 0, 0, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT],
         ] {
-            let (qb, rb) = Mantissa::cbrt_rem(wordbuf_from_words(&s1)).unwrap();
+            let (qb, rb) = Mantissa::cbrt_rem(wordbuf_from_words(s1)).unwrap();
 
-            assert_sqrt!(&s1 as &[Word], &qb, &rb, MAX_BUF, "lsb + msb");
+            assert_sqrt!(s1 as &[Word], &qb, &rb, MAX_BUF, "lsb + msb");
         }
 
         for s1 in [
@@ -217,9 +217,9 @@ mod tests {
             &[1, 0, 0, 0, 0, 0, 7],
             &[1, 0, 0, 0, 0, 0, 0, 8],
         ] {
-            let (qb, rb) = Mantissa::cbrt_rem(wordbuf_from_words(&s1)).unwrap();
+            let (qb, rb) = Mantissa::cbrt_rem(wordbuf_from_words(s1)).unwrap();
 
-            assert_sqrt!(&s1 as &[Word], &qb, &rb, MAX_BUF, "subnormal");
+            assert_sqrt!(s1 as &[Word], &qb, &rb, MAX_BUF, "subnormal");
         }
 
         for _ in 0..1000 {

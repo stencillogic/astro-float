@@ -26,7 +26,7 @@ impl Mantissa {
         let mut k: DoubleWord;
         let mut rh: DoubleWord;
         let mut buf = WordBuf::new(l1 + l2 + 2)?;
-        let (buf1, buf2) = (&mut buf).split_at_mut(l1 + 1);
+        let (buf1, buf2) = buf.split_at_mut(l1 + 1);
         let n = l2 - 1;
         let m = l1 - 1;
         let mut m3 = WordBuf::new(m - n + 1)?;

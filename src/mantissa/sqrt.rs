@@ -37,7 +37,7 @@ impl Mantissa {
 
             qbuf.try_extend_2((m.len() + 1) * WORD_BIT_SIZE)?;
 
-            let s = SliceWithSign::new(&mut sbuf, 1);
+            let s = SliceWithSign::new(&sbuf, 1);
             let mut q = SliceWithSign::new_mut(&mut qbuf, 1);
 
             q.add_assign(&s);

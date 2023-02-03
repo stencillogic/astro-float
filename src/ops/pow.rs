@@ -194,7 +194,7 @@ impl BigFloatNumber {
     ///  - DivisionByZero: `self` is zero and `n` is negative.
     pub fn powsi(&self, n: isize, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         if n >= 0 {
-            return self.powi(n as usize, p, rm);
+            self.powi(n as usize, p, rm)
         } else {
             let p = round_p(p);
 
@@ -203,7 +203,7 @@ impl BigFloatNumber {
             }
 
             if n == -1 {
-                return ONE.div(&self, p, rm);
+                return ONE.div(self, p, rm);
             }
 
             let mut p_inc = WORD_BIT_SIZE;
@@ -465,7 +465,7 @@ impl BigFloatNumber {
                 ret.set_precision(p, rm)?;
                 return Ok(ret);
             } else {
-                return ONE.div(&self, p, rm);
+                return ONE.div(self, p, rm);
             }
         }
 

@@ -234,7 +234,7 @@ impl BigFloatNumber {
             let zeroes_cnt = count_leading_zeroes_skip_first(x.get_mantissa_digits());
             if zeroes_cnt == x.get_mantissa_max_bit_len() {
                 // special case x = 0.5
-                let mut ret = Self::from_usize((e as isize - 1).unsigned_abs())?;
+                let mut ret = Self::from_usize((e - 1).unsigned_abs())?;
                 if e < 1 {
                     ret.set_sign(Sign::Neg);
                 }

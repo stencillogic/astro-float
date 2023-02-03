@@ -481,7 +481,7 @@ impl Mantissa {
             m3.m.trunc_to(p * WORD_BIT_SIZE);
         }
 
-        debug_assert!(shift >= -1 && shift <= 1); // prevent exponent overflow
+        debug_assert!((-1..=1).contains(&shift)); // prevent exponent overflow
 
         m3.n = m3.max_bit_len();
 
@@ -801,7 +801,7 @@ impl Mantissa {
 
     /// Returns true if all digits are equal to 0.
     pub fn is_all_zero(&self) -> bool {
-        for v in (&self.m).iter() {
+        for v in (self.m).iter() {
             if *v != 0 {
                 return false;
             }
@@ -844,7 +844,7 @@ impl Mantissa {
 
             // inexact?
             if *inexact == false && n > 0 && n < self.max_bit_len() {
-                if let Some(_) = self.find_one_from(self.max_bit_len() - n) {
+                if self.find_one_from(self.max_bit_len() - n).is_some() {
                     *inexact |= true;
                 }
             }
@@ -1037,7 +1037,7 @@ impl Mantissa {
                 };
             }
 
-            debug_assert!(*check_roundable == false);
+            debug_assert!(!(*check_roundable));
 
             if c {
                 if i < self_len {
@@ -1103,7 +1103,7 @@ impl Mantissa {
     /// Returns randomized mantissa with at least p bits of length.
     pub fn random_normal(p: usize) -> Result<Self, Error> {
         let mut m = Self::reserve_new(Self::bit_len_to_word_len(p))?;
-        for v in (&mut m).iter_mut() {
+        for v in m.iter_mut() {
             *v = rand::random::<Word>();
         }
         let mut ret = Mantissa { m, n: 0 };
@@ -1118,7 +1118,7 @@ impl Mantissa {
     /// Clones the mantissa.
     pub fn clone(&self) -> Result<Self, Error> {
         let mut m = Self::reserve_new(self.m.len())?;
-        (&mut m).copy_from_slice(&self.m);
+        m.copy_from_slice(&self.m);
         Ok(Mantissa { m, n: self.n })
     }
 

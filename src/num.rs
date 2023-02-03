@@ -471,7 +471,7 @@ impl BigFloatNumber {
 
             let mut m2_normalized = if let Some(m2) = m2_opt { m2 } else { d2.m.clone()? };
 
-            let e2eff = e as isize - m2_normalized.max_bit_len() as isize;
+            let e2eff = e - m2_normalized.max_bit_len() as isize;
             let ediff = (e2eff - e1eff) as usize;
 
             let m2l = m2_normalized.max_bit_len() + ediff;
@@ -610,8 +610,8 @@ impl BigFloatNumber {
             }
         }?;
 
-        debug_assert!(shift as isize <= isize::MAX / 2 && e >= isize::MIN / 2);
-        e -= shift as isize;
+        debug_assert!(shift <= isize::MAX / 2 && e >= isize::MIN / 2);
+        e -= shift;
 
         if e > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(d3.s));
@@ -1234,7 +1234,7 @@ impl BigFloatNumber {
         if self.get_mantissa_max_bit_len() > p && p > 0 {
             if rm == RoundingMode::None {
                 // rounding function will not check for inexactness, so check it here
-                if let Some(_) = self.m.find_one_from(self.get_mantissa_max_bit_len() - p) {
+                if self.m.find_one_from(self.get_mantissa_max_bit_len() - p).is_some() {
                     *inexact = true;
                 }
             }
