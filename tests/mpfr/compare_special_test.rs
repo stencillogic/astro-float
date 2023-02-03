@@ -69,7 +69,7 @@ fn mpfr_compare_special() {
         for n in nn.iter() {
             //println!("{:?}", n);
 
-            let f = conv_to_mpfr(p1, &n);
+            let f = conv_to_mpfr(p1, n);
 
             let nn1 = [
                 BigFloat::new(p2),
@@ -87,7 +87,7 @@ fn mpfr_compare_special() {
             ];
 
             for n1 in nn1.iter() {
-                let f1 = conv_to_mpfr(p2, &n1);
+                let f1 = conv_to_mpfr(p2, n1);
 
                 //println!("rm {:?}", rm);
                 //println!("\n--{:?}\n{:?}", n, n1);
@@ -104,7 +104,7 @@ fn mpfr_compare_special() {
                 let f = f.clone().abs();
                 let f1 = f1.abs();
 
-                let mut n3 = n.rem(&n1);
+                let mut n3 = n.rem(n1);
 
                 let mut f3 = Float::with_val(p as u32, 0);
                 unsafe { mpfr::remainder(f3.as_raw_mut(), f.as_raw(), f1.as_raw(), rnd) };
@@ -154,7 +154,7 @@ fn mpfr_compare_special() {
 
             // powi
             for i in [0, 1, 2, 31, 32, usize::MAX] {
-                let n3 = BigFloat::powi(&n, i, p, rm);
+                let n3 = BigFloat::powi(n, i, p, rm);
 
                 let mut f3 = Float::with_val(p as u32, 1);
 
@@ -164,7 +164,7 @@ fn mpfr_compare_special() {
             }
 
             // reciprocal
-            let n3 = BigFloat::reciprocal(&n, p, rm);
+            let n3 = BigFloat::reciprocal(n, p, rm);
 
             let mut f3 = Float::with_val(p as u32, 1);
             unsafe { mpfr::div(f3.as_raw_mut(), mpfr_one.as_raw(), f.as_raw(), rnd) };

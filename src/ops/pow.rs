@@ -128,7 +128,7 @@ impl BigFloatNumber {
             }
 
             p_wrk += p_inc;
-            p_inc *= 2;
+            p_inc = round_p(p_wrk / 5);
         }
     }
 
@@ -226,7 +226,7 @@ impl BigFloatNumber {
                 }
 
                 p_wrk += p_inc;
-                p_inc *= 2;
+                p_inc = round_p(p_wrk / 5);
             }
         }
     }
@@ -276,7 +276,7 @@ impl BigFloatNumber {
             let mut ret = || -> Result<Self, Error> {
                 let mut x = self.clone()?;
 
-                x.set_precision_inexact(p_x, RoundingMode::FromZero, inexact)?;
+                x.set_precision_inexact(p_x, RoundingMode::None, inexact)?;
 
                 // TODO: consider windowing and precomputed values.
                 let mut bp = bit_pos;
@@ -284,10 +284,10 @@ impl BigFloatNumber {
                 while bp > 0 {
                     bp -= 1;
 
-                    x = x.mul_inexact(&x, p_x, RoundingMode::FromZero, inexact)?;
+                    x = x.mul_inexact(&x, p_x, RoundingMode::None, inexact)?;
 
                     if j & WORD_SIGNIFICANT_BIT as usize != 0 {
-                        x = x.mul_inexact(self, p_x, RoundingMode::FromZero, inexact)?;
+                        x = x.mul_inexact(self, p_x, RoundingMode::None, inexact)?;
                     }
 
                     j <<= 1;
@@ -317,7 +317,7 @@ impl BigFloatNumber {
             }
 
             p_wrk += p_inc;
-            p_inc *= 2;
+            p_inc = round_p(p_wrk / 5);
         }
     }
 
@@ -507,6 +507,11 @@ mod test {
     #[test]
     fn test_power() {
         let mut cc = Consts::new().unwrap();
+
+        /*         let n1 = BigFloatNumber::from_words(&[3, 0, 0, 0, 13835058055282163712], Sign::Pos, 245552510).unwrap();
+        let ret = n1.powi(2, 320, RoundingMode::ToEven).unwrap();
+        println!("{:?}", ret);
+        return; */
 
         // near 1
         let p = 320;

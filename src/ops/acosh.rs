@@ -55,7 +55,7 @@ impl BigFloatNumber {
                     }
 
                     p_wrk += p_inc;
-                    p_inc *= 2;
+                    p_inc = round_p(p_wrk / 5);
                 }
             } else {
                 let mut x = self.clone()?;

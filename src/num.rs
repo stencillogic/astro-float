@@ -1234,7 +1234,11 @@ impl BigFloatNumber {
         if self.get_mantissa_max_bit_len() > p && p > 0 {
             if rm == RoundingMode::None {
                 // rounding function will not check for inexactness, so check it here
-                if self.m.find_one_from(self.get_mantissa_max_bit_len() - p).is_some() {
+                if self
+                    .m
+                    .find_one_from(self.get_mantissa_max_bit_len() - p)
+                    .is_some()
+                {
                     *inexact = true;
                 }
             }

@@ -876,15 +876,15 @@ impl Mantissa {
                     let rb = self.m[i] << (WORD_BIT_SIZE - t);
                     if rb != 0 {
                         rem_zero = false;
-                    }
 
-                    if *check_roundable {
-                        // try to get information from preceding bits
-                        let msk = rb & (WORD_MAX << (WORD_BIT_SIZE - t));
-                        if msk == rb {
-                            td = WORD_MAX;
-                        } else if msk != 0 {
-                            *check_roundable = false; // self is roundable
+                        if *check_roundable {
+                            // try to get information from preceding bits
+                            let msk = rb & (WORD_MAX << (WORD_BIT_SIZE - t));
+                            if msk == rb {
+                                td = WORD_MAX;
+                            } else if msk != 0 {
+                                *check_roundable = false; // self is roundable
+                            }
                         }
                     }
                 } else if *check_roundable && cc > 0 && z > 0 {
@@ -966,15 +966,15 @@ impl Mantissa {
                     let rb = self.m[i] << (WORD_BIT_SIZE - t);
                     if rb != 0 {
                         rem_zero = false;
-                    }
 
-                    if *check_roundable {
-                        // try to get information from preceding bits
-                        let msk = rb & (WORD_MAX << (WORD_BIT_SIZE - t));
-                        if msk == rb {
-                            td = WORD_MAX;
-                        } else if msk != 0 {
-                            *check_roundable = false; // self is roundable
+                        if *check_roundable {
+                            // try to get information from preceding bits
+                            let msk = rb & (WORD_MAX << (WORD_BIT_SIZE - t));
+                            if msk == rb {
+                                td = WORD_MAX;
+                            } else if msk != 0 {
+                                *check_roundable = false; // self is roundable
+                            }
                         }
                     }
                 } else if *check_roundable && cc > 0 && z > 0 {
