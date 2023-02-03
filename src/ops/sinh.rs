@@ -106,24 +106,4 @@ mod tests {
         assert!(zero.sinh(p, rm, &mut cc).unwrap().is_zero());
         assert!(n1.sinh(p, rm, &mut cc).unwrap().cmp(&n1) == 0);
     }
-
-    #[ignore]
-    #[test]
-    #[cfg(feature = "std")]
-    fn sinh_perf() {
-        let p = 32000;
-        let mut n = vec![];
-        for _ in 0..100 {
-            n.push(BigFloatNumber::random_normal(p, -0, -0).unwrap());
-        }
-
-        for _ in 0..5 {
-            let start_time = std::time::Instant::now();
-            for ni in n.drain(..) {
-                let _f = ni.sinh_series(p, RoundingMode::ToEven).unwrap();
-            }
-            let time = start_time.elapsed();
-            println!("{}", time.as_millis());
-        }
-    }
 }
