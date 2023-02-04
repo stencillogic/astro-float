@@ -39,15 +39,13 @@ impl BigFloatNumber {
 
             x.set_sign(Sign::Pos);
 
-            let mut ret = if (x.exponent() as isize - 1) / 2 > x.mantissa_max_bit_len() as isize + 2
+            let mut ret = if (x.exponent() as isize - 1) * 2 > x.mantissa_max_bit_len() as isize + 2
             {
                 // e^x / 2
 
                 x.exp(p_x, RoundingMode::None, cc)
             } else {
                 // (e^x + e^(-x)) / 2
-
-                x.set_precision(p_x, RoundingMode::None)?;
 
                 let ex = x.exp(p_x, RoundingMode::None, cc)?;
 

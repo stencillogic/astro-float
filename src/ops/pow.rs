@@ -104,8 +104,9 @@ impl BigFloatNumber {
         let mut p_wrk = p + p_inc;
 
         loop {
+            let p_x = p_wrk + 2;
+
             let mut ret = if self.is_negative() {
-                let p_x = p_wrk + 1;
                 let x = match self.exp_positive_arg(p_x, cc) {
                     Ok(v) => Ok(v),
                     Err(e) => match e {
@@ -118,9 +119,9 @@ impl BigFloatNumber {
                     },
                 }?;
 
-                ONE.div(&x, p_wrk, RoundingMode::FromZero)
+                ONE.div(&x, p_x, RoundingMode::FromZero)
             } else {
-                self.exp_positive_arg(p_wrk, cc)
+                self.exp_positive_arg(p_x, cc)
             }?;
 
             if ret.try_set_precision(p, rm, p_wrk)? {
@@ -210,7 +211,7 @@ impl BigFloatNumber {
             let mut p_wrk = p + p_inc;
 
             loop {
-                let p_x = p_wrk + 1;
+                let p_x = p_wrk + 2;
 
                 let mut inexact = false;
                 let x =
@@ -218,6 +219,7 @@ impl BigFloatNumber {
 
                 if inexact {
                     let mut ret = ONE.div(&x, p_x, RoundingMode::None)?;
+
                     if ret.try_set_precision(p, rm, p_wrk)? {
                         return Ok(ret);
                     }

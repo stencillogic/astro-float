@@ -104,13 +104,15 @@ impl BigFloatNumber {
         loop {
             let mut x = self.clone()?;
 
-            let p_x = p_wrk + 2;
+            let p_x = p_wrk + 5;
             x.set_precision(p_x, RoundingMode::None)?;
 
             // if x > 1 then arctan(x) = pi/2 - arctan(1/x)
             let mut ret = if x.exponent() > 0 {
                 x = x.reciprocal(p_x, RoundingMode::None)?;
+
                 let ret = x.atan_series(RoundingMode::None)?;
+
                 let mut pi = cc.pi_num(p_x, RoundingMode::None)?;
                 pi.set_exponent(1);
                 pi.set_sign(self.sign());

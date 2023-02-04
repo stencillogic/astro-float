@@ -35,12 +35,11 @@ impl BigFloatNumber {
             let mut ret = x.asin(p_x, RoundingMode::None, cc)?;
 
             let mut pi = cc.pi_num(p_x, RoundingMode::None)?;
-
             pi.set_exponent(pi.exponent() - 1);
 
             ret = pi.sub(&ret, p_x, RoundingMode::None)?;
 
-            let t = ret.exponent().unsigned_abs() as usize + 1;
+            let t = ret.exponent().unsigned_abs() as usize + 1; // ret near pi / 2 gives cancellation
             if add_p < t {
                 add_p = t;
             } else {

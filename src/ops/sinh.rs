@@ -34,23 +34,25 @@ impl BigFloatNumber {
 
         loop {
             let mut x = self.clone()?;
-            x.set_precision(p_wrk + 4, RoundingMode::None)?;
+
+            let p_x = p_wrk + 4;
+            x.set_precision(p_x, RoundingMode::None)?;
 
             x.set_sign(Sign::Pos);
 
             let mut ret =
-                if (x.exponent() as isize - 1) / 2 > x.mantissa_max_bit_len() as isize + 2 {
-                    // e^|x| / 2 * signum(x)
+                if (x.exponent() as isize - 1) * 2 > x.mantissa_max_bit_len() as isize + 2 {
+                    // e^|x| / 2 * signum(self)
 
-                    x.exp(p_wrk, RoundingMode::None, cc)
+                    x.exp(p_x, RoundingMode::None, cc)
                 } else {
                     // (e^x - e^(-x)) / 2
 
-                    let ex = x.exp(p_wrk, RoundingMode::None, cc)?;
+                    let ex = x.exp(p_x, RoundingMode::None, cc)?;
 
-                    let xe = ex.reciprocal(p_wrk, RoundingMode::None)?;
+                    let xe = ex.reciprocal(p_x, RoundingMode::None)?;
 
-                    ex.sub(&xe, p_wrk, RoundingMode::None)
+                    ex.sub(&xe, p_x, RoundingMode::None)
                 }
                 .map_err(|e| -> Error {
                     if let Error::ExponentOverflow(_) = e {

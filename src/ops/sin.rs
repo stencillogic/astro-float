@@ -122,7 +122,9 @@ impl BigFloatNumber {
 
         loop {
             let mut x = self.clone()?;
-            x.set_precision(p_wrk + 1, RoundingMode::None)?;
+
+            let p_x = p_wrk + 3;
+            x.set_precision(p_x, RoundingMode::None)?;
 
             x = x.reduce_trig_arg(cc, RoundingMode::None)?;
 

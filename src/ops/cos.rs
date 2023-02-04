@@ -131,7 +131,7 @@ impl BigFloatNumber {
 
             let mut ret = x.cos_series(RoundingMode::None)?;
 
-            let t = ret.exponent().unsigned_abs() as usize + 1;
+            let t = ret.exponent().unsigned_abs() as usize + 1; // avoid cancellation when x near pi / 2
             if add_p < t {
                 add_p = t;
             } else {

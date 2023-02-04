@@ -103,46 +103,49 @@ impl BigFloatNumber {
             return Err(Error::InvalidArgument);
         }
 
+        let mut m = self.clone()?;
+        let e = m.normalize2() as isize;
+        let e = self.exponent() as isize - e;
+
+        m.set_exponent(0);
+
+        // cancellation when x is near 1
+        let additional_prec = if e == 0 {
+            count_leading_ones(m.mantissa_digits())
+        } else if e == 1 {
+            count_leading_zeroes_skip_first(m.mantissa_digits())
+        } else {
+            0
+        } + 5;
+
+        // test for one.
+        if e == 1 && additional_prec == m.mantissa_max_bit_len() + 5 {
+            return Self::new(p);
+        }
+
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
 
         loop {
-            let mut x = self.clone()?;
-            let e = x.normalize2() as isize;
-            let e = self.exponent() as isize - e;
+            let mut x = m.clone()?;
 
-            x.set_exponent(0);
-
-            let additional_prec = if e == 0 {
-                count_leading_ones(x.mantissa_digits())
-            } else if e == 1 {
-                count_leading_zeroes_skip_first(x.mantissa_digits())
-            } else {
-                0
-            } + 2;
-
-            // test for one.
-            if e == 1 && additional_prec == x.mantissa_max_bit_len() + 2 {
-                return Self::new(p);
-            }
-
-            let p_ext = p_wrk + additional_prec;
-            x.set_precision(p_ext, RoundingMode::None)?;
+            let p_x = p_wrk + additional_prec;
+            x.set_precision(p_x, RoundingMode::None)?;
 
             let p1 = Self::ln_series(x, RoundingMode::None)?;
 
             let mut ret = if e == 0 {
                 p1
             } else {
-                let p2 = cc.ln_2_num(p_ext, RoundingMode::None)?;
+                let p2 = cc.ln_2_num(p_x, RoundingMode::None)?;
 
                 let mut n = Self::from_usize(e.unsigned_abs())?;
                 if e < 0 {
                     n.set_sign(Sign::Neg);
                 }
 
-                let p2n = p2.mul(&n, p_ext, RoundingMode::None)?;
-                p1.add(&p2n, p_ext, RoundingMode::None)?
+                let p2n = p2.mul(&n, p_x, RoundingMode::None)?;
+                p1.add(&p2n, p_x, RoundingMode::None)?
             };
 
             if ret.try_set_precision(p, rm, p_wrk)? {
@@ -219,50 +222,55 @@ impl BigFloatNumber {
             return Err(Error::InvalidArgument);
         }
 
+        let mut m = self.clone()?;
+        let e = m.normalize2() as isize;
+        let e = self.exponent() as isize - e;
+
+        m.set_exponent(0);
+
+        let zeroes_cnt = count_leading_zeroes_skip_first(m.mantissa_digits());
+        if zeroes_cnt == m.mantissa_max_bit_len() {
+            // special case: x = 0.5
+            let mut ret = Self::from_usize((e - 1).unsigned_abs())?;
+
+            if e < 1 {
+                ret.set_sign(Sign::Neg);
+            }
+
+            ret.set_precision(p, rm)?;
+
+            return Ok(ret);
+        }
+
+        let additional_prec = if e == 0 {
+            count_leading_ones(m.mantissa_digits())
+        } else if e == 1 {
+            zeroes_cnt
+        } else {
+            0
+        } + 5;
+
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
 
         loop {
-            let mut x = self.clone()?;
-            let e = x.normalize2() as isize;
-            let e = self.exponent() as isize - e;
+            let mut x = m.clone()?;
 
-            x.set_exponent(0);
-
-            let zeroes_cnt = count_leading_zeroes_skip_first(x.mantissa_digits());
-            if zeroes_cnt == x.mantissa_max_bit_len() {
-                // special case x = 0.5
-                let mut ret = Self::from_usize((e - 1).unsigned_abs())?;
-                if e < 1 {
-                    ret.set_sign(Sign::Neg);
-                }
-                ret.set_precision(p, rm)?;
-                return Ok(ret);
-            }
-
-            let additional_prec = if e == 0 {
-                count_leading_ones(x.mantissa_digits())
-            } else if e == 1 {
-                zeroes_cnt
-            } else {
-                0
-            } + 2;
-
-            let p_ext = p_wrk + additional_prec;
-            x.set_precision(p_ext, RoundingMode::None)?;
+            let p_x = p_wrk + additional_prec;
+            x.set_precision(p_x, RoundingMode::None)?;
 
             let p1 = Self::ln_series(x, RoundingMode::None)?;
 
-            let p2 = cc.ln_2_num(p_ext, RoundingMode::None)?;
+            let p2 = cc.ln_2_num(p_x, RoundingMode::None)?;
 
-            let p3 = p1.div(&p2, p_ext, RoundingMode::None)?;
+            let p3 = p1.div(&p2, p_x, RoundingMode::None)?;
 
             let mut n = Self::from_usize(e.unsigned_abs())?;
             if e < 0 {
                 n.set_sign(Sign::Neg);
             }
 
-            let mut ret = p3.add(&n, p_ext, RoundingMode::None)?;
+            let mut ret = p3.add(&n, p_x, RoundingMode::None)?;
 
             if ret.try_set_precision(p, rm, p_wrk)? {
                 return Ok(ret);
@@ -286,25 +294,27 @@ impl BigFloatNumber {
 
         // ln(self) / ln(10)
 
-        let mut x = self.clone()?;
-
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
 
         loop {
-            let p_ext = p_wrk + 2;
-            x.set_precision(p_ext, RoundingMode::None)?;
+            let mut x = self.clone()?;
 
-            let p1 = x.ln(p_ext, RoundingMode::None, cc)?;
+            let p_x = p_wrk + 5;
+            x.set_precision(p_x, RoundingMode::None)?;
 
-            let p2 = cc.ln_10_num(p_ext, RoundingMode::None)?;
+            let p1 = x.ln(p_x, RoundingMode::None, cc)?;
 
-            let mut ret = p1.div(&p2, p_ext, RoundingMode::None)?;
+            let p2 = cc.ln_10_num(p_x, RoundingMode::None)?;
+
+            let mut ret = p1.div(&p2, p_x, RoundingMode::None)?;
 
             // check if x is exactly power of 10
             if ret.is_int() {
                 let n = ret.int_as_usize()?;
-                let tp = TEN.powi(n, p_ext, RoundingMode::None)?;
+
+                let tp = TEN.powi(n, p_x, RoundingMode::None)?;
+
                 if tp.cmp(&x) == 0 {
                     ret.set_precision(p, rm)?;
                     return Ok(ret);
@@ -338,35 +348,46 @@ impl BigFloatNumber {
     ) -> Result<Self, Error> {
         let p = round_p(p);
 
-        // ln(self) / ln(n)
+        if self.is_zero() || self.is_negative() || n.is_zero() || n.is_negative() {
+            return Err(Error::InvalidArgument);
+        }
 
-        let mut x = self.clone()?;
+        // ln(self) / ln(n)
 
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
 
         loop {
-            let p_ext = p_wrk + 2;
+            let mut x = self.clone()?;
 
-            x.set_precision(p_ext, RoundingMode::None)?;
+            let p_x = p_wrk + 5;
+            x.set_precision(p_x, RoundingMode::None)?;
 
             let mut n = n.clone()?;
-            n.set_precision(p_ext, RoundingMode::None)?;
+            n.set_precision(p_x, RoundingMode::None)?;
 
-            let p1 = x.ln(p_ext, RoundingMode::None, cc)?;
+            let p1 = x.ln(p_x, RoundingMode::None, cc)?;
 
-            let p2 = n.ln(p_ext, RoundingMode::None, cc)?;
+            let p2 = n.ln(p_x, RoundingMode::None, cc)?;
 
-            let mut ret = p1.div(&p2, p_ext, RoundingMode::None)?;
+            let mut ret = p1.div(&p2, p_x, RoundingMode::None)?;
 
-            let pwr = n.pow(&ret, p_ext, RoundingMode::None, cc)?;
-            if pwr.cmp(&x) == 0 {
-                ret.set_precision(p, rm)?;
-                return Ok(ret);
-            }
-
+            let mut ret2 = ret.clone()?; // clone, becuase try_set_precision modifies ret
             if ret.try_set_precision(p, rm, p_wrk)? {
                 return Ok(ret);
+            } else {
+                // check if the result is exact
+                let pwr = n.pow(
+                    &ret2,
+                    p_x.max(self.mantissa_max_bit_len()),
+                    RoundingMode::None,
+                    cc,
+                )?;
+
+                if pwr.cmp(self) == 0 {
+                    ret2.set_precision(p, rm)?;
+                    return Ok(ret2);
+                }
             }
 
             p_wrk += p_inc;

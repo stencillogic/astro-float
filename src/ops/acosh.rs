@@ -38,9 +38,9 @@ impl BigFloatNumber {
                 let mut p_inc = WORD_BIT_SIZE;
                 let mut p_wrk = p + p_inc;
 
-                let mut x = self.clone()?;
-
                 loop {
+                    let mut x = self.clone()?;
+
                     let p_x = p_wrk + 3;
                     x.set_precision(p_x, RoundingMode::None)?;
 

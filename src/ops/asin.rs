@@ -45,7 +45,7 @@ impl BigFloatNumber {
 
         compute_small_exp!(self, self.exponent() as isize * 2 - 2, false, p, rm);
 
-        let mut additional_prec = 2;
+        let mut additional_prec = 5;
         if self.exponent() == 0 {
             additional_prec += count_leading_ones(self.mantissa_digits());
         }
