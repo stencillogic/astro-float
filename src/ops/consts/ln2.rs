@@ -1,12 +1,12 @@
 //! ln(2)
 
-use crate::WORD_BIT_SIZE;
 use crate::common::consts::ONE;
 use crate::common::consts::THREE;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::num::BigFloatNumber;
 use crate::RoundingMode;
+use crate::WORD_BIT_SIZE;
 
 fn pqr(a: usize, b: usize) -> Result<(BigFloatNumber, BigFloatNumber, BigFloatNumber), Error> {
     if a == b - 1 {

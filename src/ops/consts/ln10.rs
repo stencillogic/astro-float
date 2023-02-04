@@ -95,7 +95,7 @@ impl Ln10Cache {
 
         loop {
             let kext = k * 1728 / 1000 + 4;
-        
+
             if self.b > kext {
                 let mut ret = self.val.clone()?;
 
