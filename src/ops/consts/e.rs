@@ -1,10 +1,10 @@
 //! Euler's number
 
 use crate::common::consts::ONE;
-use crate::common::util::log2_floor;
+use crate::common::util::{log2_floor, round_p};
 use crate::defs::Error;
 use crate::num::BigFloatNumber;
-use crate::RoundingMode;
+use crate::{RoundingMode, WORD_BIT_SIZE};
 
 fn pq(a: usize, b: usize) -> Result<(BigFloatNumber, BigFloatNumber), Error> {
     if a == b - 1 {
@@ -95,9 +95,23 @@ impl ECache {
 
     /// Return value of e with precision k.
     pub(crate) fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
-        let kext = Self::b_factor(k);
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = round_p(k) + p_inc;
 
-        if self.b <= kext {
+        loop {
+            let kext = Self::b_factor(p_wrk);
+
+            if self.b > kext {
+                let mut ret = self.val.clone()?;
+
+                if ret.try_set_precision(k, rm, p_wrk)? {
+                    return Ok(ret);
+                }
+
+                p_wrk += p_inc;
+                p_inc = round_p(p_wrk / 5);
+            }
+
             let mut pk;
             let mut qk;
             let mut bb;
@@ -108,23 +122,11 @@ impl ECache {
                 (pk, qk, bb) = pqr_inc(&pk, &qk, bb)?;
             }
 
-            let mut ret = Self::calc_e(&pk, &qk)?;
-
-            self.val = ret.clone()?;
-
-            ret.set_precision(k, rm)?;
+            self.val = Self::calc_e(&pk, &qk)?;
 
             self.pk = pk;
             self.qk = qk;
             self.b = bb;
-
-            Ok(ret)
-        } else {
-            let mut ret = self.val.clone()?;
-
-            ret.set_precision(k, rm)?;
-
-            Ok(ret)
         }
     }
 }

@@ -1,7 +1,9 @@
 //! ln(2)
 
+use crate::WORD_BIT_SIZE;
 use crate::common::consts::ONE;
 use crate::common::consts::THREE;
+use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::num::BigFloatNumber;
 use crate::RoundingMode;
@@ -84,9 +86,23 @@ impl Ln2Cache {
 
     /// Return value of ln(2) with precision k (calculate if needed).
     pub(crate) fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
-        let kext = k / 2 + 4;
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = round_p(k) + p_inc;
 
-        if self.b <= kext {
+        loop {
+            let kext = k / 2 + 4;
+
+            if self.b > kext {
+                let mut ret = self.val.clone()?;
+
+                if ret.try_set_precision(k, rm, p_wrk)? {
+                    return Ok(ret);
+                }
+
+                p_wrk += p_inc;
+                p_inc = round_p(p_wrk / 5);
+            }
+
             let mut pk;
             let mut qk;
             let mut rk;
@@ -107,22 +123,12 @@ impl Ln2Cache {
             ret = ret.div(&THREE, prec, crate::RoundingMode::None)?;
             ret.set_exponent(ret.get_exponent() + 1);
 
-            self.val = ret.clone()?;
-
-            ret.set_precision(k, rm)?;
+            self.val = ret;
 
             self.pk = pk;
             self.qk = qk;
             self.rk = rk;
             self.b = bb;
-
-            Ok(ret)
-        } else {
-            let mut ret = self.val.clone()?;
-
-            ret.set_precision(k, rm)?;
-
-            Ok(ret)
         }
     }
 }

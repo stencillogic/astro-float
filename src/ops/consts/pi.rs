@@ -1,5 +1,6 @@
 //! π number
 
+use crate::common::util::round_p;
 use crate::defs::{Error, WORD_BIT_SIZE};
 use crate::num::BigFloatNumber;
 use crate::RoundingMode;
@@ -112,9 +113,23 @@ impl PiCache {
 
     /// Return value of PI with precision `k`.
     pub(crate) fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
-        let kext = (k + 46 + WORD_BIT_SIZE) / 47;
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = round_p(k) + p_inc;
 
-        if self.b <= kext {
+        loop {
+            let kext = (k + 46 + WORD_BIT_SIZE) / 47;
+
+            if self.b > kext {
+                let mut ret = self.val.clone()?;
+
+                if ret.try_set_precision(k, rm, p_wrk)? {
+                    return Ok(ret);
+                }
+
+                p_wrk += p_inc;
+                p_inc = round_p(p_wrk / 5);
+            }
+
             let mut pk;
             let mut qk;
             let mut rk;
@@ -126,23 +141,12 @@ impl PiCache {
                 (pk, qk, rk, bb) = pqr_inc(&pk, &qk, &rk, bb)?;
             }
 
-            let mut ret = Self::calc_pi(&pk, &qk, bb * 47)?;
-
-            self.val = ret.clone()?;
-
-            ret.set_precision(k, rm)?;
+            self.val = Self::calc_pi(&pk, &qk, bb * 47)?;
 
             self.pk = pk;
             self.qk = qk;
             self.rk = rk;
             self.b = bb;
-            Ok(ret)
-        } else {
-            let mut ret = self.val.clone()?;
-
-            ret.set_precision(k, rm)?;
-
-            Ok(ret)
         }
     }
 }

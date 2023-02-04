@@ -1,9 +1,10 @@
 //! ln(10)
 
 use crate::common::consts::ONE;
+use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::num::BigFloatNumber;
-use crate::RoundingMode;
+use crate::{RoundingMode, WORD_BIT_SIZE};
 
 fn pqr(a: usize, b: usize) -> Result<(BigFloatNumber, BigFloatNumber, BigFloatNumber), Error> {
     if a == b - 1 {
@@ -89,9 +90,23 @@ impl Ln10Cache {
 
     /// Return value of ln(10) with precision k (calculate if needed).
     pub(crate) fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
-        let kext = k * 1728 / 1000 + 4;
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = round_p(k) + p_inc;
 
-        if self.b <= kext {
+        loop {
+            let kext = k * 1728 / 1000 + 4;
+        
+            if self.b > kext {
+                let mut ret = self.val.clone()?;
+
+                if ret.try_set_precision(k, rm, p_wrk)? {
+                    return Ok(ret);
+                }
+
+                p_wrk += p_inc;
+                p_inc = round_p(p_wrk / 5);
+            }
+
             let mut pk;
             let mut qk;
             let mut rk;
@@ -103,24 +118,12 @@ impl Ln10Cache {
                 (pk, qk, rk, bb) = pqr_inc(&pk, &qk, &rk, bb)?;
             }
 
-            let mut ret = Self::calc_ln10(&pk, &qk)?;
-
-            self.val = ret.clone()?;
-
-            ret.set_precision(k, rm)?;
+            self.val = Self::calc_ln10(&pk, &qk)?;
 
             self.pk = pk;
             self.qk = qk;
             self.rk = rk;
             self.b = bb;
-
-            Ok(ret)
-        } else {
-            let mut ret = self.val.clone()?;
-
-            ret.set_precision(k, rm)?;
-
-            Ok(ret)
         }
     }
 }
