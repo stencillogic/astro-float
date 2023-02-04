@@ -9,7 +9,7 @@ The library can work without the standard library provided there is a memory all
 
 ## What's new
 
-Information about new features ad latest changes is available in [Release notes]()
+Information about the latest changes is available in [Release notes](https://github.com/stencillogic/astro-float/blob/main/RELEASE_NOTES.md)
 
 ## Usage
 
