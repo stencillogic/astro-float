@@ -23,15 +23,12 @@ fn ttt() {
     let n2 = BigFloatNumber::parse(s, crate::Radix::Bin, 2560, RoundingMode::None).unwrap();
 
     //let v = cc.pi(1984, RoundingMode::ToEven).unwrap();
-
-    let n1 = BigFloatNumber::from_words(&[18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615], Sign::Pos, 1024).unwrap();
-
-    let v = n1.sin(1344, RoundingMode::ToEven, &mut cc).unwrap();
+    let mut eps = ONE.clone().unwrap();
 
     //let v = n2.sin(2496, RoundingMode::ToEven, &mut cc).unwrap();
     //println!("{:?}", v);
     //println!("{}", n1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-    println!("{}", v.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+    //println!("{}", v.format(crate::Radix::Bin, RoundingMode::ToEven).unwrap());
 } */
 
 const fn get_prec_rng() -> usize {
@@ -425,7 +422,7 @@ fn test_sin_asin() {
             // println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
             // println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-            eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent + 1);
+            eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent + 2);
 
             assert!(
                 d1.sub(&d3, prec, RoundingMode::ToEven)

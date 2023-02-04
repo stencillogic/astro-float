@@ -276,7 +276,7 @@ impl BigFloatNumber {
             let mut ret = || -> Result<Self, Error> {
                 let mut x = self.clone()?;
 
-                x.set_precision_inexact(p_x, RoundingMode::None, inexact)?;
+                x.set_precision_inexact(p_x, RoundingMode::FromZero, inexact)?;
 
                 // TODO: consider windowing and precomputed values.
                 let mut bp = bit_pos;
@@ -284,10 +284,10 @@ impl BigFloatNumber {
                 while bp > 0 {
                     bp -= 1;
 
-                    x = x.mul_inexact(&x, p_x, RoundingMode::None, inexact)?;
+                    x = x.mul_inexact(&x, p_x, RoundingMode::FromZero, inexact)?;
 
                     if j & WORD_SIGNIFICANT_BIT as usize != 0 {
-                        x = x.mul_inexact(self, p_x, RoundingMode::None, inexact)?;
+                        x = x.mul_inexact(self, p_x, RoundingMode::FromZero, inexact)?;
                     }
 
                     j <<= 1;

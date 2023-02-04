@@ -25,10 +25,11 @@ impl BigFloatNumber {
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
 
+        let mut add_p = (1 - ACOS_EXP_THRES) as usize;
         loop {
             let mut x = self.clone()?;
 
-            let p_x = p_wrk + (-ACOS_EXP_THRES) as usize + 1;
+            let p_x = p_wrk + add_p;
             x.set_precision(p_x, RoundingMode::None)?;
 
             let mut ret = x.asin(p_x, RoundingMode::None, cc)?;
@@ -39,27 +40,17 @@ impl BigFloatNumber {
 
             ret = pi.sub(&ret, p_x, RoundingMode::None)?;
 
-            if ret.get_exponent() < ACOS_EXP_THRES {
-                let p_x =
-                    p + ret.get_exponent().unsigned_abs() as usize + (-ACOS_EXP_THRES) as usize + 1;
+            let t = ret.get_exponent().unsigned_abs() as usize + 1;
+            if add_p < t {
+                add_p = t;
+            } else {
+                if ret.try_set_precision(p, rm, p_wrk)? {
+                    return Ok(ret);
+                }
 
-                x.set_precision(p_x, RoundingMode::None)?;
-
-                ret = x.asin(p_x, RoundingMode::None, cc)?;
-
-                let mut pi = cc.pi_num(p_x, RoundingMode::None)?;
-
-                pi.set_exponent(pi.get_exponent() - 1);
-
-                ret = pi.sub(&ret, p_x, RoundingMode::None)?;
+                p_wrk += p_inc;
+                p_inc = round_p(p_wrk / 5);
             }
-
-            if ret.try_set_precision(p, rm, p_wrk)? {
-                return Ok(ret);
-            }
-
-            p_wrk += p_inc;
-            p_inc = round_p(p_wrk / 5);
         }
     }
 }
