@@ -30,7 +30,7 @@ impl BigFloatNumber {
             return Ok(ret);
         }
 
-        compute_small_exp!(self, self.exponent() as isize / 2 - 2, true, p, rm);
+        compute_small_exp!(self, self.exponent() as isize * 2 - 2, true, p, rm);
 
         let mut x = self.clone()?;
 

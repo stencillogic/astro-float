@@ -7,6 +7,10 @@ The library implements the basic operations and functions. It uses classical alg
 
 The library can work without the standard library provided there is a memory allocator.
 
+## What's new
+
+Information about new features ad latest changes is available in [Release notes]()
+
 ## Usage
 
 Below is an example of using the library.

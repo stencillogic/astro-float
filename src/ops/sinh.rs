@@ -27,7 +27,7 @@ impl BigFloatNumber {
             return Ok(ret);
         }
 
-        compute_small_exp!(self, self.exponent() as isize - 2, false, p, rm);
+        compute_small_exp!(self, self.exponent() as isize * 2 - 2, false, p, rm);
 
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;

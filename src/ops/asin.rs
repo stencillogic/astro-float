@@ -43,7 +43,7 @@ impl BigFloatNumber {
             return Ok(pi);
         }
 
-        compute_small_exp!(self, self.exponent() as isize / 2 - 2, false, p, rm);
+        compute_small_exp!(self, self.exponent() as isize * 2 - 2, false, p, rm);
 
         let mut additional_prec = 2;
         if self.exponent() == 0 {

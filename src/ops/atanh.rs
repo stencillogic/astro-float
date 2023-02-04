@@ -32,7 +32,7 @@ impl BigFloatNumber {
             return Err(Error::ExponentOverflow(self.sign()));
         }
 
-        compute_small_exp!(self, self.exponent() as isize / 2 - 1, false, p, rm);
+        compute_small_exp!(self, self.exponent() as isize * 2 - 1, false, p, rm);
 
         // 0.5 * ln((1 + x) / (1 - x))
 

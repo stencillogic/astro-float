@@ -115,7 +115,7 @@ impl BigFloatNumber {
             return Self::from_word(1, p);
         }
 
-        compute_small_exp!(ONE, self.exponent() as isize / 2 - 1, true, p, rm);
+        compute_small_exp!(ONE, self.exponent() as isize * 2 - 1, true, p, rm);
 
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;

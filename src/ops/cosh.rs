@@ -26,7 +26,7 @@ impl BigFloatNumber {
             return Self::from_word(1, p);
         }
 
-        compute_small_exp!(ONE, self.exponent() as isize / 2 - 1, false, p, rm);
+        compute_small_exp!(ONE, self.exponent() as isize * 2 - 1, false, p, rm);
 
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
