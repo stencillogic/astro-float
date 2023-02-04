@@ -1,7 +1,7 @@
 ![Rust](https://github.com/stencillogic/astro-float/workflows/Rust/badge.svg)
 ![Minimum rustc version](https://img.shields.io/badge/rustc-1.62.1+-lightgray.svg)
 
-Astro-float (astronomically large floating point numbers) is a library that implements arbitrary precision floating point numbers purely in Rust.
+Astro-float (astronomically large floating point numbers) is a library that implements arbitrary precision floating point numbers with correct rounding purely in Rust.
 
 The library implements the basic operations and functions. It uses classical algorithms such as Karatsuba, Toom-Cook, Schönhage-Strassen algorithm, and others.
 
@@ -61,4 +61,4 @@ Future improvements include the implementation of faster mathematical function a
 
 ## Contributing
 
-The library is still young and may lack some features or contain bugs. Issues for these or other cases can be opened here: https://github.com/stencillogic/astro-float/issues 
+Issues regarding bugs, new features, or other cases can be opened here: https://github.com/stencillogic/astro-float/issues 

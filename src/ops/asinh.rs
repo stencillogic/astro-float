@@ -26,11 +26,11 @@ impl BigFloatNumber {
 
         if self.is_zero() {
             let mut ret = Self::new(p)?;
-            ret.set_sign(self.get_sign());
+            ret.set_sign(self.sign());
             return Ok(ret);
         }
 
-        compute_small_exp!(self, self.get_exponent() as isize / 2 - 2, true, p, rm);
+        compute_small_exp!(self, self.exponent() as isize / 2 - 2, true, p, rm);
 
         let mut x = self.clone()?;
 
@@ -38,42 +38,41 @@ impl BigFloatNumber {
 
         let rm = if self.is_negative() { invert_rm_for_sign(rm) } else { rm };
 
-        let mut ret = if (self.get_exponent() as isize - 1) / 2
-            > self.get_mantissa_max_bit_len() as isize + 2
-        {
-            // asinh(x) = ln(2 * |x|) * signum(x)
+        let mut ret =
+            if (self.exponent() as isize - 1) / 2 > self.mantissa_max_bit_len() as isize + 2 {
+                // asinh(x) = ln(2 * |x|) * signum(x)
 
-            if self.get_exponent() == EXPONENT_MAX {
-                // ln(2 * |x|) = ln(2) + ln(|x|)
+                if self.exponent() == EXPONENT_MAX {
+                    // ln(2 * |x|) = ln(2) + ln(|x|)
 
-                let lnx = x.ln(p + 1, RoundingMode::None, cc)?;
+                    let lnx = x.ln(p + 1, RoundingMode::None, cc)?;
 
-                let ln2 = cc.ln_2_num(p + 1, RoundingMode::None)?;
+                    let ln2 = cc.ln_2_num(p + 1, RoundingMode::None)?;
 
-                ln2.add(&lnx, p, rm)
+                    ln2.add(&lnx, p, rm)
+                } else {
+                    x.set_exponent(x.exponent() + 1);
+
+                    x.ln(p, rm, cc)
+                }
             } else {
-                x.set_exponent(x.get_exponent() + 1);
+                // ln(|x| + sqrt(x*x + 1)) * signum(x)
 
-                x.ln(p, rm, cc)
-            }
-        } else {
-            // ln(|x| + sqrt(x*x + 1)) * signum(x)
+                let p_x = p + self.exponent().unsigned_abs() as usize + 5;
+                x.set_precision(p_x, RoundingMode::None)?;
 
-            let p_x = p + self.get_exponent().unsigned_abs() as usize + 5;
-            x.set_precision(p_x, RoundingMode::None)?;
+                let xx = x.mul(&x, p_x, RoundingMode::None)?;
 
-            let xx = x.mul(&x, p_x, RoundingMode::None)?;
+                let d1 = xx.add(&ONE, p_x, RoundingMode::None)?;
 
-            let d1 = xx.add(&ONE, p_x, RoundingMode::None)?;
+                let d2 = d1.sqrt(p_x, RoundingMode::None)?;
 
-            let d2 = d1.sqrt(p_x, RoundingMode::None)?;
+                let d3 = d2.add(&x, p_x, RoundingMode::None)?;
 
-            let d3 = d2.add(&x, p_x, RoundingMode::None)?;
+                d3.ln(p, rm, cc)
+            }?;
 
-            d3.ln(p, rm, cc)
-        }?;
-
-        ret.set_sign(self.get_sign());
+        ret.set_sign(self.sign());
 
         Ok(ret)
     }
@@ -123,15 +122,15 @@ mod tests {
 
         let mut eps = ONE.clone().unwrap();
         eps.set_exponent(
-            d1.get_exponent() - p as Exponent + core::mem::size_of::<Exponent>() as Exponent * 8,
+            d1.exponent() - p as Exponent + core::mem::size_of::<Exponent>() as Exponent * 8,
         );
 
         let mut d4 = d1.asinh(p, rm, &mut cc).unwrap();
         // avoid overflow using sinh(x) = 2 * sinh(x/2)^2
-        d4.set_exponent(d4.get_exponent() - 1);
+        d4.set_exponent(d4.exponent() - 1);
         let tmp = d4.sinh(p + 1, RoundingMode::None, &mut cc).unwrap();
         let mut d5 = tmp.mul(&tmp, p, rm).unwrap();
-        d5.set_exponent(d5.get_exponent() + 1);
+        d5.set_exponent(d5.exponent() + 1);
 
         assert!(
             d1.sub(&d5, p, RoundingMode::ToEven)
@@ -144,14 +143,14 @@ mod tests {
 
         let mut d4 = d2.asinh(p, rm, &mut cc).unwrap();
         // avoid overflow using sinh(x) = 2 * sinh(x/2)^2
-        d4.set_exponent(d4.get_exponent() - 1);
+        d4.set_exponent(d4.exponent() - 1);
         let tmp = d4.sinh(p + 1, RoundingMode::None, &mut cc).unwrap();
         let mut d5 = tmp.mul(&tmp, p, rm).unwrap();
-        d5.set_exponent(d5.get_exponent() + 1);
+        d5.set_exponent(d5.exponent() + 1);
         d5.set_sign(Sign::Neg);
 
         eps.set_exponent(
-            d2.get_exponent() - p as Exponent + core::mem::size_of::<Exponent>() as Exponent * 8,
+            d2.exponent() - p as Exponent + core::mem::size_of::<Exponent>() as Exponent * 8,
         );
 
         assert!(

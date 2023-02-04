@@ -130,7 +130,7 @@ fn mpfr_compare_special() {
             test_astro_op!(true, n, atan, f, atan, p, rm, rnd, "atan", cc);
 
             let mut n_trig = n.clone();
-            let f_trig = if n.get_exponent().unwrap() > 128 {
+            let f_trig = if n.exponent().unwrap() > 128 {
                 n_trig.set_exponent(128); // large exponent causes very long computation.
                 conv_to_mpfr(p1, &n_trig)
             } else {

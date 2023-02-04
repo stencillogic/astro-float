@@ -2,8 +2,8 @@
 
 use crate::common::consts::ONE;
 use crate::common::consts::TWO;
-use crate::common::util::get_add_cost;
-use crate::common::util::get_mul_cost;
+use crate::common::util::calc_add_cost;
+use crate::common::util::calc_mul_cost;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
@@ -37,7 +37,7 @@ impl CosPolycoeffGen {
         let one_full_p = BigFloatNumber::from_word(1, p)?;
 
         let iter_cost =
-            (get_mul_cost(p) + get_add_cost(p) + get_add_cost(inc.get_mantissa_max_bit_len())) * 2;
+            (calc_mul_cost(p) + calc_add_cost(p) + calc_add_cost(inc.mantissa_max_bit_len())) * 2;
 
         let sign = 1;
 
@@ -53,8 +53,8 @@ impl CosPolycoeffGen {
 
 impl PolycoeffGen for CosPolycoeffGen {
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-        let p_inc = self.inc.get_mantissa_max_bit_len();
-        let p_one = self.one_full_p.get_mantissa_max_bit_len();
+        let p_inc = self.inc.mantissa_max_bit_len();
+        let p_one = self.one_full_p.mantissa_max_bit_len();
 
         self.inc = self.inc.add(&ONE, p_inc, rm)?;
         let inv_inc = self.one_full_p.div(&self.inc, p_one, rm)?;
@@ -75,7 +75,7 @@ impl PolycoeffGen for CosPolycoeffGen {
     }
 
     #[inline]
-    fn get_iter_cost(&self) -> usize {
+    fn iter_cost(&self) -> usize {
         self.iter_cost
     }
 }
@@ -84,10 +84,10 @@ struct CosArgReductionEstimator {}
 
 impl ArgReductionEstimator for CosArgReductionEstimator {
     /// Estimates cost of reduction n times for number with precision p.
-    fn get_reduction_cost(n: usize, p: usize) -> usize {
+    fn reduction_cost(n: usize, p: usize) -> usize {
         // n * (cost(add) + cost(mul))
-        let cost_mul = get_mul_cost(p);
-        let cost_add = get_add_cost(p);
+        let cost_mul = calc_mul_cost(p);
+        let cost_add = calc_add_cost(p);
         n * (cost_mul + cost_add)
     }
 
@@ -115,10 +115,10 @@ impl BigFloatNumber {
             return Self::from_word(1, p);
         }
 
-        compute_small_exp!(ONE, self.get_exponent() as isize / 2 - 1, true, p, rm);
+        compute_small_exp!(ONE, self.exponent() as isize / 2 - 1, true, p, rm);
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.get_mantissa_max_bit_len()) + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
         let mut add_p = (1 - COS_EXP_THRES) as usize;
         loop {
@@ -131,7 +131,7 @@ impl BigFloatNumber {
 
             let mut ret = x.cos_series(RoundingMode::None)?;
 
-            let t = ret.get_exponent().unsigned_abs() as usize + 1;
+            let t = ret.exponent().unsigned_abs() as usize + 1;
             if add_p < t {
                 add_p = t;
             } else {
@@ -149,7 +149,7 @@ impl BigFloatNumber {
     pub(super) fn cos_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
         // cos:  1 - x^2/2! + x^4/4! - x^6/6! + ...
 
-        let p = self.get_mantissa_max_bit_len();
+        let p = self.mantissa_max_bit_len();
         let mut polycoeff_gen = CosPolycoeffGen::new(p)?;
         let (reduction_times, niter) = series_cost_optimize::<CosArgReductionEstimator>(
             p,
@@ -186,14 +186,14 @@ impl BigFloatNumber {
     fn cos_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // cos(2*x) = 2*cos(x)^2 - 1
         let mut ret = self.clone()?;
-        let p = ret.get_mantissa_max_bit_len();
-        if ret.get_exponent() < EXPONENT_MIN + n as Exponent {
+        let p = ret.mantissa_max_bit_len();
+        if ret.exponent() < EXPONENT_MIN + n as Exponent {
             ret.set_exponent(EXPONENT_MIN);
-            for _ in 0..n - (ret.get_exponent() - EXPONENT_MIN) as usize {
+            for _ in 0..n - (ret.exponent() - EXPONENT_MIN) as usize {
                 ret = ret.div(&TWO, p, rm)?;
             }
         } else {
-            ret.set_exponent(ret.get_exponent() - n as Exponent);
+            ret.set_exponent(ret.exponent() - n as Exponent);
         }
         Ok(ret)
     }
@@ -203,11 +203,11 @@ impl BigFloatNumber {
     fn cos_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // cos(2*x) = 2*cos(x)^2 - 1
         let mut cos = self.clone()?;
-        let p = cos.get_mantissa_max_bit_len();
+        let p = cos.mantissa_max_bit_len();
 
         for _ in 0..n {
             let mut cos2 = cos.mul(&cos, p, rm)?;
-            cos2.set_exponent(cos2.get_exponent() + 1);
+            cos2.set_exponent(cos2.exponent() + 1);
             cos = cos2.sub(&ONE, p, rm)?;
         }
 

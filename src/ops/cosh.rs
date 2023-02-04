@@ -26,7 +26,7 @@ impl BigFloatNumber {
             return Self::from_word(1, p);
         }
 
-        compute_small_exp!(ONE, self.get_exponent() as isize / 2 - 1, false, p, rm);
+        compute_small_exp!(ONE, self.exponent() as isize / 2 - 1, false, p, rm);
 
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
@@ -39,8 +39,7 @@ impl BigFloatNumber {
 
             x.set_sign(Sign::Pos);
 
-            let mut ret = if (x.get_exponent() as isize - 1) / 2
-                > x.get_mantissa_max_bit_len() as isize + 2
+            let mut ret = if (x.exponent() as isize - 1) / 2 > x.mantissa_max_bit_len() as isize + 2
             {
                 // e^x / 2
 

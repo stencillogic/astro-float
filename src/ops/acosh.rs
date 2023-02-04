@@ -30,9 +30,9 @@ impl BigFloatNumber {
             return Err(Error::InvalidArgument);
         }
 
-        if (self.get_exponent() as isize - 1) / 2 > self.get_mantissa_max_bit_len() as isize + 2 {
+        if (self.exponent() as isize - 1) / 2 > self.mantissa_max_bit_len() as isize + 2 {
             // acosh(x) = ln(2*x)
-            if self.get_exponent() == EXPONENT_MAX {
+            if self.exponent() == EXPONENT_MAX {
                 // ln(2) + ln(x)
 
                 let mut p_inc = WORD_BIT_SIZE;
@@ -59,15 +59,15 @@ impl BigFloatNumber {
                 }
             } else {
                 let mut x = self.clone()?;
-                x.set_exponent(x.get_exponent() + 1);
+                x.set_exponent(x.exponent() + 1);
                 x.ln(p, rm, cc)
             }
         } else {
             // ln(x + sqrt(x*x - 1))
 
             let mut additional_prec = 0;
-            if self.get_exponent() == 1 {
-                additional_prec = count_leading_zeroes_skip_first(self.m.get_digits());
+            if self.exponent() == 1 {
+                additional_prec = count_leading_zeroes_skip_first(self.m.digits());
             }
 
             let mut x = self.clone()?;
@@ -132,14 +132,14 @@ mod tests {
         // MAX
         let mut d4 = d1.acosh(p, RoundingMode::Down, &mut cc).unwrap();
 
-        d4.set_exponent(d4.get_exponent() - 1);
+        d4.set_exponent(d4.exponent() - 1);
         let d5 = d4.cosh(p, rm, &mut cc).unwrap();
         let mut d5 = d5.mul(&d5, p, rm).unwrap();
-        d5.set_exponent(d5.get_exponent() + 1);
+        d5.set_exponent(d5.exponent() + 1);
 
         let mut eps = ONE.clone().unwrap();
         eps.set_exponent(
-            d1.get_exponent() - p as Exponent + core::mem::size_of::<Exponent>() as Exponent * 8,
+            d1.exponent() - p as Exponent + core::mem::size_of::<Exponent>() as Exponent * 8,
         );
 
         assert!(

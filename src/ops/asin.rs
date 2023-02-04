@@ -25,7 +25,7 @@ impl BigFloatNumber {
 
         if self.is_zero() {
             let mut ret = Self::new(p)?;
-            ret.set_sign(self.get_sign());
+            ret.set_sign(self.sign());
             return Ok(ret);
         }
 
@@ -37,17 +37,17 @@ impl BigFloatNumber {
 
             let mut pi = cc.pi_num(p, rm)?;
 
-            pi.set_exponent(pi.get_exponent() - 1);
-            pi.set_sign(self.get_sign());
+            pi.set_exponent(pi.exponent() - 1);
+            pi.set_sign(self.sign());
 
             return Ok(pi);
         }
 
-        compute_small_exp!(self, self.get_exponent() as isize / 2 - 2, false, p, rm);
+        compute_small_exp!(self, self.exponent() as isize / 2 - 2, false, p, rm);
 
         let mut additional_prec = 2;
-        if self.get_exponent() == 0 {
-            additional_prec += count_leading_ones(self.get_mantissa_digits());
+        if self.exponent() == 0 {
+            additional_prec += count_leading_ones(self.mantissa_digits());
         }
 
         let mut p_inc = WORD_BIT_SIZE;

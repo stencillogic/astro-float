@@ -71,7 +71,7 @@ fn test_ln_exp() {
             let d2 = d1.ln(prec, RoundingMode::ToEven, &mut cc).unwrap();
             let d3 = d2.exp(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-            eps.set_exponent(d2.get_exponent() - prec as Exponent);
+            eps.set_exponent(d2.exponent() - prec as Exponent);
             let err = eps.exp(prec, RoundingMode::Up, &mut cc).unwrap();
 
             //println!("{}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
@@ -90,16 +90,16 @@ fn test_ln_exp() {
 
             let d3 = d2.ln(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-            if d1.get_exponent() < 1 {
+            if d1.exponent() < 1 {
                 let addexp = if d1.is_negative() {
                     count_leading_ones
                 } else {
                     count_leading_zeroes_skip_first
-                }(d2.get_mantissa_digits()) as Exponent;
+                }(d2.mantissa_digits()) as Exponent;
 
-                eps.set_exponent(d1.get_exponent() - prec as Exponent + addexp + 1);
+                eps.set_exponent(d1.exponent() - prec as Exponent + addexp + 1);
             } else {
-                eps.set_exponent(d1.get_exponent() - prec as Exponent + 1);
+                eps.set_exponent(d1.exponent() - prec as Exponent + 1);
             }
 
             // println!("{}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
@@ -141,7 +141,7 @@ fn test_powi() {
             .unwrap();
         for _ in 1..i {
             d3 = d3
-                .mul(&d1, d3.get_mantissa_max_bit_len(), RoundingMode::None)
+                .mul(&d1, d3.mantissa_max_bit_len(), RoundingMode::None)
                 .unwrap();
         }
         d3.set_precision(prec, RoundingMode::ToEven).unwrap();
@@ -183,13 +183,13 @@ fn test_log2_log10_pow() {
             //println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
             // d2 - ulp(d2)/2 <= log2(d1) <= d2 + ulp(d2)/2  ->  d3 / 2^(ulp(d2)/2) <= d1 <= d3 * 2^(ulp(d2)/2)
-            eps.set_exponent(d2.get_exponent() - prec as Exponent);
+            eps.set_exponent(d2.exponent() - prec as Exponent);
             let err = two.pow(&eps, prec, RoundingMode::Up, &mut cc).unwrap();
 
             assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0);
             assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0);
 
-            eps.set_exponent(d4.get_exponent() - prec as Exponent);
+            eps.set_exponent(d4.exponent() - prec as Exponent);
             let err = ten.pow(&eps, prec, RoundingMode::Up, &mut cc).unwrap();
 
             assert!(d1.cmp(&d5.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0);
@@ -208,16 +208,16 @@ fn test_log2_log10_pow() {
             let d5 = d4.log10(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
             let set_eps = |x, eps: &mut BigFloatNumber| {
-                if d1.get_exponent() < 1 {
+                if d1.exponent() < 1 {
                     let addexp = if d1.is_negative() {
                         count_leading_ones
                     } else {
                         count_leading_zeroes_skip_first
                     }(x) as Exponent;
 
-                    eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent + addexp + 2);
+                    eps.set_exponent(d1.exponent() - prec.min(p1) as Exponent + addexp + 2);
                 } else {
-                    eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent + 2);
+                    eps.set_exponent(d1.exponent() - prec.min(p1) as Exponent + 2);
                 }
             };
 
@@ -225,7 +225,7 @@ fn test_log2_log10_pow() {
             // println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
             // println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-            set_eps(d2.get_mantissa_digits(), &mut eps);
+            set_eps(d2.mantissa_digits(), &mut eps);
 
             assert!(
                 d1.sub(&d3, prec, RoundingMode::ToEven)
@@ -236,7 +236,7 @@ fn test_log2_log10_pow() {
                     < 0
             );
 
-            set_eps(d4.get_mantissa_digits(), &mut eps);
+            set_eps(d4.mantissa_digits(), &mut eps);
 
             assert!(
                 d1.sub(&d5, prec, RoundingMode::ToEven)
@@ -276,10 +276,10 @@ fn test_log_pow() {
             // println!("b  {}", b.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
             // d2 - ulp(d2)/2 <= log_b(d1) <= d2 + ulp(d2)/2  ->  d3 / b^(ulp(d2)/2) <= d1 <= d3 * b^(ulp(d2)/2)
-            eps.set_exponent(d2.get_exponent() - prec as Exponent);
+            eps.set_exponent(d2.exponent() - prec as Exponent);
             let err = b.pow(&eps, prec, RoundingMode::Up, &mut cc).unwrap();
 
-            if b.get_exponent() > 0 {
+            if b.exponent() > 0 {
                 assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0);
                 assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0);
             } else {
@@ -296,13 +296,13 @@ fn test_log_pow() {
             // let d2 - err <= b^d1 <= d2 + err, then log_b(d2 - err) <= d1 <= log_b(d2 + err),
             // and log_b(x) has steep derivative 1 / x / ln(b).
             let mut berr = 0;
-            if b.get_exponent() == 0 {
-                berr = count_leading_ones(b.get_mantissa_digits()) as Exponent;
-            } else if b.get_exponent() == 1 {
-                berr = count_leading_zeroes_skip_first(b.get_mantissa_digits()) as Exponent;
+            if b.exponent() == 0 {
+                berr = count_leading_ones(b.mantissa_digits()) as Exponent;
+            } else if b.exponent() == 1 {
+                berr = count_leading_zeroes_skip_first(b.mantissa_digits()) as Exponent;
             }
 
-            let n = b.get_exponent().unsigned_abs() as usize;
+            let n = b.exponent().unsigned_abs() as usize;
             let emax = log2_floor(EXPONENT_MAX as usize / if n == 0 { 1 } else { n }) as Exponent;
             let emin = -emax;
             let d1 = BigFloatNumber::random_normal(p1, emin, emax).unwrap();
@@ -315,18 +315,18 @@ fn test_log_pow() {
             // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
             // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-            if d1.get_exponent() < 1 {
-                let addexp = if (b.get_exponent() > 0 && d1.is_negative())
-                    || b.get_exponent() <= 0 && d1.is_positive()
+            if d1.exponent() < 1 {
+                let addexp = if (b.exponent() > 0 && d1.is_negative())
+                    || b.exponent() <= 0 && d1.is_positive()
                 {
                     count_leading_ones
                 } else {
                     count_leading_zeroes_skip_first
-                }(d2.get_mantissa_digits()) as Exponent;
+                }(d2.mantissa_digits()) as Exponent;
 
-                eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent + addexp + berr + 2);
+                eps.set_exponent(d1.exponent() - prec.min(p1) as Exponent + addexp + berr + 2);
             } else {
-                eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent + berr + 2);
+                eps.set_exponent(d1.exponent() - prec.min(p1) as Exponent + berr + 2);
             }
 
             assert!(
@@ -399,9 +399,9 @@ fn test_sin_asin() {
             // println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
             eps.set_exponent(
-                d1.get_exponent() - prec as Exponent
+                d1.exponent() - prec as Exponent
                     + 1
-                    + count_leading_ones(d2.get_mantissa_digits()) as Exponent,
+                    + count_leading_ones(d2.mantissa_digits()) as Exponent,
             );
 
             assert!(
@@ -422,7 +422,7 @@ fn test_sin_asin() {
             // println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
             // println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-            eps.set_exponent(d1.get_exponent() - prec.min(p1) as Exponent + 2);
+            eps.set_exponent(d1.exponent() - prec.min(p1) as Exponent + 2);
 
             assert!(
                 d1.sub(&d3, prec, RoundingMode::ToEven)
@@ -473,7 +473,7 @@ fn test_sin_asin() {
             // println!("{}", d2.format(Radix::Dec, RoundingMode::None).unwrap());
             // println!("{}", d3.format(Radix::Dec, RoundingMode::None).unwrap());
 
-            eps.set_exponent(d1.get_exponent() - prec as Exponent - thres_exp);
+            eps.set_exponent(d1.exponent() - prec as Exponent - thres_exp);
 
             assert!(
                 d1.abs()
@@ -553,9 +553,9 @@ fn test_cos_acos() {
 
             if d2.cmp(&ONE) != 0 {
                 eps.set_exponent(
-                    d1.get_exponent() - prec as Exponent
+                    d1.exponent() - prec as Exponent
                         + 1
-                        + count_leading_ones(d2.get_mantissa_digits()) as Exponent,
+                        + count_leading_ones(d2.mantissa_digits()) as Exponent,
                 );
 
                 assert!(
@@ -580,9 +580,7 @@ fn test_cos_acos() {
             if d2.abs_cmp(&hp) < 0 {
                 let d3 = d2.cos(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-                eps.set_exponent(
-                    d1.get_exponent() - prec.min(p1) as Exponent - d1.get_exponent() + 2,
-                );
+                eps.set_exponent(d1.exponent() - prec.min(p1) as Exponent - d1.exponent() + 2);
 
                 // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
                 // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
@@ -641,7 +639,7 @@ fn test_tan_atan() {
             // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
             // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-            eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+            eps.set_exponent(d1.exponent() - prec as Exponent + 2);
 
             assert!(
                 d1.sub(&d3, prec, RoundingMode::ToEven)
@@ -662,7 +660,7 @@ fn test_tan_atan() {
             if d2.abs_cmp(&hp) < 0 {
                 let d3 = d2.tan(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-                eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+                eps.set_exponent(d1.exponent() - prec as Exponent + 2);
 
                 // println!("d1 {}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
                 // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
@@ -702,7 +700,7 @@ fn test_sinh_asinh() {
             // println!("d2 {}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
             // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-            eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+            eps.set_exponent(d1.exponent() - prec as Exponent + 2);
 
             assert!(
                 d1.sub(&d3, prec, RoundingMode::ToEven)
@@ -718,7 +716,7 @@ fn test_sinh_asinh() {
             let d2 = d1.asinh(prec, RoundingMode::ToEven, &mut cc).unwrap();
             let d3 = d2.sinh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-            if d1.get_exponent() < -(prec as Exponent) {
+            if d1.exponent() < -(prec as Exponent) {
                 // both asinh and sinh are linear near 0
                 d1.set_precision(prec, RoundingMode::ToEven).unwrap();
 
@@ -728,7 +726,7 @@ fn test_sinh_asinh() {
                 let exp = d2.exp(prec + 1, RoundingMode::ToEven, &mut cc).unwrap();
                 let expr = exp.reciprocal(prec + 1, RoundingMode::ToEven).unwrap();
                 let mut d4 = exp.sub(&expr, prec + 1, RoundingMode::ToEven).unwrap();
-                d4.set_exponent(d4.get_exponent() - 1);
+                d4.set_exponent(d4.exponent() - 1);
 
                 d4.set_precision(prec, RoundingMode::ToEven).unwrap();
 
@@ -761,9 +759,9 @@ fn test_cosh_acosh() {
             let d3 = d2.acosh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
             eps.set_exponent(
-                d1.get_exponent() - prec as Exponent
+                d1.exponent() - prec as Exponent
                     + 2
-                    + count_leading_zeroes_skip_first(d2.get_mantissa_digits()) as Exponent,
+                    + count_leading_zeroes_skip_first(d2.mantissa_digits()) as Exponent,
             );
 
             assert!(
@@ -786,7 +784,7 @@ fn test_cosh_acosh() {
             let exp = d2.exp(prec + 1, RoundingMode::ToEven, &mut cc).unwrap();
             let expr = exp.reciprocal(prec + 1, RoundingMode::ToEven).unwrap();
             let mut d4 = exp.add(&expr, prec + 1, RoundingMode::ToEven).unwrap();
-            d4.set_exponent(d4.get_exponent() - 1);
+            d4.set_exponent(d4.exponent() - 1);
 
             d4.set_precision(prec, RoundingMode::ToEven).unwrap();
 
@@ -818,9 +816,9 @@ fn test_tanh_atanh() {
             let d3 = d2.atanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
             eps.set_exponent(
-                d1.get_exponent() - prec as Exponent
+                d1.exponent() - prec as Exponent
                     + 1
-                    + count_leading_ones(d2.get_mantissa_digits()) as Exponent,
+                    + count_leading_ones(d2.mantissa_digits()) as Exponent,
             );
 
             (d1, d3)
@@ -830,7 +828,7 @@ fn test_tanh_atanh() {
             let d2 = d1.atanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
             let d3 = d2.tanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
 
-            eps.set_exponent(d1.get_exponent() - prec as Exponent + 1);
+            eps.set_exponent(d1.exponent() - prec as Exponent + 1);
 
             (d1, d3)
         };

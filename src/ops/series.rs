@@ -1,7 +1,7 @@
 //! Power series computation appliance.
 
-use crate::common::util::get_add_cost;
-use crate::common::util::get_mul_cost;
+use crate::common::util::calc_add_cost;
+use crate::common::util::calc_mul_cost;
 use crate::common::util::log2_floor;
 use crate::common::util::nroot_int;
 use crate::common::util::sqrt_int;
@@ -23,7 +23,7 @@ pub(crate) trait PolycoeffGen {
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error>;
 
     /// Returns the cost of one call to next if numbers have precision p.
-    fn get_iter_cost(&self) -> usize;
+    fn iter_cost(&self) -> usize;
 
     /// Returns true if coefficient is divizor.
     fn is_div(&self) -> bool {
@@ -34,7 +34,7 @@ pub(crate) trait PolycoeffGen {
 /// Estimate how argument reduction influences cost.
 pub trait ArgReductionEstimator {
     /// Estimates cost of reduction n times for number with precision p.
-    fn get_reduction_cost(n: usize, p: usize) -> usize;
+    fn reduction_cost(n: usize, p: usize) -> usize;
 
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
     fn reduction_effect(n: usize, m: isize) -> usize;
@@ -67,10 +67,10 @@ pub(crate) fn series_cost_optimize<S: ArgReductionEstimator>(
         let m_eff = S::reduction_effect(reduction_times, m);
         let niter = series_niter(p, m_eff) / pwr_step;
         let cost2 = if ext {
-            polycoeff_gen.get_iter_cost() * niter
+            polycoeff_gen.iter_cost() * niter
         } else {
             series_cost(niter, p, polycoeff_gen)
-        } + S::get_reduction_cost(reduction_times, p);
+        } + S::reduction_cost(reduction_times, p);
 
         if cost2 < cost1 {
             cost1 = cost2;
@@ -117,16 +117,16 @@ fn series_niter(p: usize, m: usize) -> usize {
 /// p is the numbers precision
 /// polycoeff_gen is the coefficient generator
 fn series_cost<T: PolycoeffGen>(niter: usize, p: usize, polycoeff_gen: &T) -> usize {
-    let cost_mul = get_mul_cost(p);
-    let cost_add = get_add_cost(p);
+    let cost_mul = calc_mul_cost(p);
+    let cost_add = calc_add_cost(p);
 
-    let cost = niter * (cost_mul + cost_add + polycoeff_gen.get_iter_cost());
+    let cost = niter * (cost_mul + cost_add + polycoeff_gen.iter_cost());
 
     if niter >= RECT_ITER_THRESHOLD {
         // niter * (cost(mul) + cost(add) + cost(polcoeff_gen.next)) + sqrt(niter) * cost(mul)
         // + niter / 10 * (2 * cost(mul) + cost(add) + cost(polcoeff_gen.next))
         cost + sqrt_int(niter as u32) as usize * cost_mul
-            + niter / 10 * ((cost_mul << 1) + cost_add + polycoeff_gen.get_iter_cost())
+            + niter / 10 * ((cost_mul << 1) + cost_add + polycoeff_gen.iter_cost())
     } else {
         // niter * (cost(mul) + cost(add) + cost(polycoeff_gen.next))
         cost
@@ -143,8 +143,8 @@ fn series_compute_fast<T: PolycoeffGen>(
         Ok(acc)
     } else {
         let p = acc
-            .get_mantissa_max_bit_len()
-            .max(x_first.get_mantissa_max_bit_len());
+            .mantissa_max_bit_len()
+            .max(x_first.mantissa_max_bit_len());
 
         let is_div = polycoeff_gen.is_div();
 
@@ -178,9 +178,9 @@ fn series_rectangular<T: PolycoeffGen>(
     debug_assert!(niter >= 4);
 
     let p = add
-        .get_mantissa_max_bit_len()
-        .max(x_first.get_mantissa_max_bit_len())
-        .max(x_step.get_mantissa_max_bit_len());
+        .mantissa_max_bit_len()
+        .max(x_first.mantissa_max_bit_len())
+        .max(x_step.mantissa_max_bit_len());
 
     let mut acc = BigFloatNumber::new(p)?;
 
@@ -188,9 +188,7 @@ fn series_rectangular<T: PolycoeffGen>(
     let mut cache = SmallVec::<[BigFloatNumber; MAX_CACHE]>::new();
     let sqrt_iter = sqrt_int(niter as u32) as usize;
     let cache_sz = MAX_CACHE.min(sqrt_iter);
-    cache
-        .try_reserve_exact(cache_sz)
-        .map_err(Error::MemoryAllocation)?;
+    cache.try_reserve_exact(cache_sz)?;
     let mut x_pow = x_step.clone()?;
 
     for _ in 0..cache_sz {
@@ -240,9 +238,9 @@ fn series_linear<T: PolycoeffGen>(
     polycoeff_gen: &mut T,
 ) -> Result<BigFloatNumber, Error> {
     let p = acc
-        .get_mantissa_max_bit_len()
-        .max(x_first.get_mantissa_max_bit_len())
-        .max(x_step.get_mantissa_max_bit_len());
+        .mantissa_max_bit_len()
+        .max(x_first.mantissa_max_bit_len())
+        .max(x_step.mantissa_max_bit_len());
 
     let is_div = polycoeff_gen.is_div();
     let mut x_pow = x_first;
@@ -257,8 +255,7 @@ fn series_linear<T: PolycoeffGen>(
 
         acc = acc.add(&part, p, RoundingMode::None)?;
 
-        if part.get_exponent() as isize
-            <= acc.get_exponent() as isize - acc.get_mantissa_max_bit_len() as isize
+        if part.exponent() as isize <= acc.exponent() as isize - acc.mantissa_max_bit_len() as isize
         {
             break;
         }
@@ -312,16 +309,16 @@ fn series_horner<T: PolycoeffGen>(
     debug_assert!(!polycoeff_gen.is_div());
 
     let p = add
-        .get_mantissa_max_bit_len()
-        .max(x_first.get_mantissa_max_bit_len())
-        .max(x_step.get_mantissa_max_bit_len());
+        .mantissa_max_bit_len()
+        .max(x_first.mantissa_max_bit_len())
+        .max(x_step.mantissa_max_bit_len());
 
     // determine number of parts and cache plynomial coeffs.
     let mut cache = SmallVec::<[BigFloatNumber; MAX_CACHE]>::new();
     let mut x_p = -(x_first.e as isize) - x_step.e as isize;
     let mut coef_p = 0;
 
-    while x_p + coef_p < p as isize - add.get_exponent() as isize {
+    while x_p + coef_p < p as isize - add.exponent() as isize {
         let coeff = polycoeff_gen.next(RoundingMode::None)?;
         coef_p = -coeff.e as isize;
         x_p += -x_step.e as isize;
@@ -361,9 +358,9 @@ fn ndim_series<T: PolycoeffGen>(
     debug_assert!((2..=8).contains(&n));
 
     let p = add
-        .get_mantissa_max_bit_len()
-        .max(x_factor.get_mantissa_max_bit_len())
-        .max(x_step.get_mantissa_max_bit_len());
+        .mantissa_max_bit_len()
+        .max(x_factor.mantissa_max_bit_len())
+        .max(x_step.mantissa_max_bit_len());
 
     let mut acc = BigFloatNumber::new(p)?;
 
@@ -384,7 +381,7 @@ fn ndim_series<T: PolycoeffGen>(
 
     // run computation
     let poly_val = compute_cube(
-        acc.get_mantissa_max_bit_len(),
+        acc.mantissa_max_bit_len(),
         n - 1,
         &cache,
         cache_dim_sz,
@@ -395,7 +392,7 @@ fn ndim_series<T: PolycoeffGen>(
 
     for _ in 1..cache_dim_sz {
         let poly_val = compute_cube(
-            acc.get_mantissa_max_bit_len(),
+            acc.mantissa_max_bit_len(),
             n - 1,
             &cache,
             cache_dim_sz,

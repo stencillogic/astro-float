@@ -40,10 +40,9 @@
 //!
 //! **Correctness**
 //!
-//! Currently, arithmetic operations produce correctly rounded results,
-//! while other mathematical functions do not guarantee correctly rounded results.
-//!
+//! Results of all arithmetic operations, mathematical functions, and constant values are correctly rounded.
 //!  
+//!
 //! ## Examples
 //!
 //! ``` rust
@@ -58,7 +57,7 @@
 //! let rm = RoundingMode::ToEven;
 //!
 //! // Initialize mathematical constants cache
-//! let mut cc = Consts::new().unwrap();
+//! let mut cc = Consts::new().expect("An error occured when initializing contants");
 //!
 //! // Compute pi: pi = 6*arctan(1/sqrt(3))
 //! let six = BigFloat::from_word(6, 1);
@@ -151,7 +150,7 @@ mod tests {
         let rm = RoundingMode::ToEven;
 
         // Initialize mathematical constants cache
-        let mut cc = Consts::new().unwrap();
+        let mut cc = Consts::new().expect("An error occured when initializing contants");
 
         // Compute pi: pi = 6*arctan(1/sqrt(3))
         let six = BigFloat::from_word(6, 1);

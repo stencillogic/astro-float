@@ -85,14 +85,10 @@ impl PiCache {
 
         let f3 = BigFloatNumber::from_word(10005, 1)?;
         let f4 = f3.sqrt(k, RoundingMode::None)?;
-        let prec = p0
-            .get_mantissa_max_bit_len()
-            .max(f4.get_mantissa_max_bit_len());
+        let prec = p0.mantissa_max_bit_len().max(f4.mantissa_max_bit_len());
         let f5 = p0.mul(&f4, prec, RoundingMode::None)?;
 
-        let prec = q0
-            .get_mantissa_max_bit_len()
-            .max(f5.get_mantissa_max_bit_len());
+        let prec = q0.mantissa_max_bit_len().max(f5.mantissa_max_bit_len());
         let ret = q0.div(&f5, prec, RoundingMode::None)?;
 
         Ok(ret)

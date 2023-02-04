@@ -119,22 +119,22 @@ impl Context {
     }
 
     /// Returns the precision of the context.
-    pub fn get_precision(&self) -> usize {
+    pub fn precision(&self) -> usize {
         self.p
     }
 
     /// Returns the rounding mode of the context.
-    pub fn get_rounding_mode(&self) -> RoundingMode {
+    pub fn rounding_mode(&self) -> RoundingMode {
         self.rm
     }
 
     /// Returns the constant cache of the context.
-    pub fn get_consts(&self) -> Rc<RefCell<Consts>> {
+    pub fn consts(&self) -> Rc<RefCell<Consts>> {
         self.cc.clone()
     }
 
     /// Returns the current value of the context.
-    pub fn get_value(&self) -> &BigFloat {
+    pub fn value(&self) -> &BigFloat {
         &self.value
     }
 

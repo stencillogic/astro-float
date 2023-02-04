@@ -77,7 +77,7 @@ fn nroot_step(x: u64, n: u64, a: u64) -> u64 {
 }
 
 // cost of multiplication of two numbers with precision p.
-pub fn get_mul_cost(p: usize) -> usize {
+pub fn calc_mul_cost(p: usize) -> usize {
     if p < 70 {
         p * p
     } else {
@@ -93,13 +93,13 @@ pub fn get_mul_cost(p: usize) -> usize {
 
 // cost of addition/subtraction of two numbers with precision p.
 #[inline]
-pub fn get_add_cost(p: usize) -> usize {
+pub fn calc_add_cost(p: usize) -> usize {
     p
 }
 
 // Estimate of sqrt op cost.
 #[inline]
-pub fn get_sqrt_cost(p: usize, cost_mul: usize, cost_add: usize) -> usize {
+pub fn calc_sqrt_cost(p: usize, cost_mul: usize, cost_add: usize) -> usize {
     let log3_estimate = (log2_floor(p) * 41349) >> 16;
     log3_estimate * (5 * cost_mul + 2 * cost_add) / 2
 }

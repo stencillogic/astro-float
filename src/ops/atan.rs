@@ -2,9 +2,9 @@
 
 use crate::common::consts::ONE;
 use crate::common::consts::TWO;
-use crate::common::util::get_add_cost;
-use crate::common::util::get_mul_cost;
-use crate::common::util::get_sqrt_cost;
+use crate::common::util::calc_add_cost;
+use crate::common::util::calc_mul_cost;
+use crate::common::util::calc_sqrt_cost;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
@@ -28,7 +28,7 @@ impl AtanPolycoeffGen {
     fn new(_p: usize) -> Result<Self, Error> {
         let f = BigFloatNumber::from_word(1, 1)?;
 
-        let iter_cost = get_add_cost(f.get_mantissa_max_bit_len());
+        let iter_cost = calc_add_cost(f.mantissa_max_bit_len());
 
         Ok(AtanPolycoeffGen { f, iter_cost })
     }
@@ -36,7 +36,7 @@ impl AtanPolycoeffGen {
 
 impl PolycoeffGen for AtanPolycoeffGen {
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-        let p = self.f.get_mantissa_max_bit_len();
+        let p = self.f.mantissa_max_bit_len();
         if self.f.is_positive() {
             self.f = self.f.add(&TWO, p, rm)?;
         } else {
@@ -49,7 +49,7 @@ impl PolycoeffGen for AtanPolycoeffGen {
     }
 
     #[inline]
-    fn get_iter_cost(&self) -> usize {
+    fn iter_cost(&self) -> usize {
         self.iter_cost
     }
 
@@ -63,10 +63,10 @@ struct AtanArgReductionEstimator {}
 
 impl ArgReductionEstimator for AtanArgReductionEstimator {
     /// Estimates cost of reduction n times for number with precision p.
-    fn get_reduction_cost(n: usize, p: usize) -> usize {
-        let cost_mul = get_mul_cost(p);
-        let cost_add = get_add_cost(p);
-        let sqrt_cost = get_sqrt_cost(p, cost_mul, cost_add);
+    fn reduction_cost(n: usize, p: usize) -> usize {
+        let cost_mul = calc_mul_cost(p);
+        let cost_add = calc_add_cost(p);
+        let sqrt_cost = calc_sqrt_cost(p, cost_mul, cost_add);
         n * (2 * (cost_mul + cost_add) + sqrt_cost)
     }
 
@@ -92,11 +92,11 @@ impl BigFloatNumber {
 
         if self.is_zero() {
             let mut ret = Self::new(p)?;
-            ret.set_sign(self.get_sign());
+            ret.set_sign(self.sign());
             return Ok(ret);
         }
 
-        compute_small_exp!(self, self.get_exponent() as isize / 2 - 1, true, p, rm);
+        compute_small_exp!(self, self.exponent() as isize / 2 - 1, true, p, rm);
 
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
@@ -108,12 +108,12 @@ impl BigFloatNumber {
             x.set_precision(p_x, RoundingMode::None)?;
 
             // if x > 1 then arctan(x) = pi/2 - arctan(1/x)
-            let mut ret = if x.get_exponent() > 0 {
+            let mut ret = if x.exponent() > 0 {
                 x = x.reciprocal(p_x, RoundingMode::None)?;
                 let ret = x.atan_series(RoundingMode::None)?;
                 let mut pi = cc.pi_num(p_x, RoundingMode::None)?;
                 pi.set_exponent(1);
-                pi.set_sign(self.get_sign());
+                pi.set_sign(self.sign());
 
                 pi.sub(&ret, p_x, RoundingMode::None)
             } else {
@@ -133,7 +133,7 @@ impl BigFloatNumber {
     pub(super) fn atan_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
         // atan:  x - x^3/3 + x^5/5 - x^7/7 + ...
 
-        let p = self.get_mantissa_max_bit_len();
+        let p = self.mantissa_max_bit_len();
         let mut polycoeff_gen = AtanPolycoeffGen::new(p)?;
         let (reduction_times, niter) = series_cost_optimize::<AtanArgReductionEstimator>(
             p,
@@ -143,7 +143,7 @@ impl BigFloatNumber {
             false,
         );
 
-        let p_arg = self.get_mantissa_max_bit_len() + 1 + reduction_times * 3;
+        let p_arg = self.mantissa_max_bit_len() + 1 + reduction_times * 3;
         self.set_precision(p_arg, rm)?;
 
         let arg = if reduction_times > 0 {
@@ -159,7 +159,7 @@ impl BigFloatNumber {
         let mut ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen)?;
 
         if reduction_times > 0 {
-            ret.set_exponent(ret.get_exponent() + reduction_times as Exponent);
+            ret.set_exponent(ret.exponent() + reduction_times as Exponent);
         }
 
         Ok(ret)
@@ -169,7 +169,7 @@ impl BigFloatNumber {
     fn atan_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // y = x / (1 + sqrt(1 + x*x))
         let mut ret = self.clone()?;
-        let p = ret.get_mantissa_max_bit_len();
+        let p = ret.mantissa_max_bit_len();
 
         for _ in 0..n {
             let xx = ret.mul(&ret, p, rm)?;

@@ -382,9 +382,7 @@ impl Mantissa {
         part_len: usize,
     ) -> Result<SmallVec<[SliceWithSign; 0]>, Error> {
         let mut parts = SmallVec::<[SliceWithSign; 0]>::new();
-        parts
-            .try_reserve_exact(k1)
-            .map_err(Error::MemoryAllocation)?;
+        parts.try_reserve_exact(k1)?;
 
         let mut rest = buf;
 

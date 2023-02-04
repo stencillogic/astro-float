@@ -22,7 +22,6 @@ use crate::EXPONENT_MIN;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-use smallvec::CollectionAllocErr;
 
 impl BigFloatNumber {
     /// Converts an array of digits in radix `rdx` to BigFloatNumber with precision `p`.
@@ -169,7 +168,7 @@ impl BigFloatNumber {
             // fill mantissa
             let mut filled = start_bit % WORD_BIT_SIZE + shift - first_shift;
             let mut dst = m
-                .get_digits_mut()
+                .digits_mut()
                 .iter_mut()
                 .rev()
                 .skip(start_bit / WORD_BIT_SIZE);
@@ -244,8 +243,8 @@ impl BigFloatNumber {
                 i = 0;
 
                 let d2 = Self::from_word(word, 1)?;
-                f = f.mul(&TEN_POW_9, f.get_mantissa_max_bit_len(), RoundingMode::None)?;
-                f = f.add(&d2, f.get_mantissa_max_bit_len(), RoundingMode::None)?;
+                f = f.mul(&TEN_POW_9, f.mantissa_max_bit_len(), RoundingMode::None)?;
+                f = f.add(&d2, f.mantissa_max_bit_len(), RoundingMode::None)?;
 
                 word = 0;
             }
@@ -260,8 +259,8 @@ impl BigFloatNumber {
             }
             let ten_pow = Self::from_word(ten_pow, 1)?;
             let d2 = Self::from_word(word, 1)?;
-            f = f.mul(&ten_pow, f.get_mantissa_max_bit_len(), RoundingMode::None)?;
-            f = f.add(&d2, f.get_mantissa_max_bit_len(), RoundingMode::None)?;
+            f = f.mul(&ten_pow, f.mantissa_max_bit_len(), RoundingMode::None)?;
+            f = f.add(&d2, f.mantissa_max_bit_len(), RoundingMode::None)?;
         }
 
         // exponent part
@@ -277,9 +276,9 @@ impl BigFloatNumber {
 
             while nabs > nmax {
                 f = if n < 0 {
-                    f.div(&fpnmax, f.get_mantissa_max_bit_len(), RoundingMode::None)
+                    f.div(&fpnmax, f.mantissa_max_bit_len(), RoundingMode::None)
                 } else {
-                    f.mul(&fpnmax, f.get_mantissa_max_bit_len(), RoundingMode::None)
+                    f.mul(&fpnmax, f.mantissa_max_bit_len(), RoundingMode::None)
                 }?;
                 nabs -= nmax;
             }
@@ -289,9 +288,9 @@ impl BigFloatNumber {
             let fpn = ten.powi(nabs, pf.max(p) + WORD_BIT_SIZE, RoundingMode::None)?;
 
             f = if n < 0 {
-                f.div(&fpn, f.get_mantissa_max_bit_len(), RoundingMode::None)
+                f.div(&fpn, f.mantissa_max_bit_len(), RoundingMode::None)
             } else {
-                f.mul(&fpn, f.get_mantissa_max_bit_len(), RoundingMode::None)
+                f.mul(&fpn, f.mantissa_max_bit_len(), RoundingMode::None)
             }?;
         }
 
@@ -329,13 +328,13 @@ impl BigFloatNumber {
         // let f = m / rdx^n,
         // then resulting number is F = f * rdx^n
 
-        let n = self.get_exponent().unsigned_abs() as usize * 3010299957 / 10000000000;
-        let l = self.get_mantissa_max_bit_len() * 3010299957 / 10000000000 + 1;
+        let n = self.exponent().unsigned_abs() as usize * 3010299957 / 10000000000;
+        let l = self.mantissa_max_bit_len() * 3010299957 / 10000000000 + 1;
 
         let (digits, e_shift) = if n == 0 {
             self.conv_mantissa(l, Radix::Dec, rm)
         } else {
-            let p_w = self.get_mantissa_max_bit_len() + WORD_BIT_SIZE;
+            let p_w = self.mantissa_max_bit_len() + WORD_BIT_SIZE;
 
             let rdx = Self::number_for_radix(Radix::Dec)?;
 
@@ -344,37 +343,37 @@ impl BigFloatNumber {
 
                 let d = rdx.powi(n - 1, p_w, RoundingMode::None)?;
 
-                if self.get_exponent() < 0 {
-                    self.mul(&d, self.get_mantissa_max_bit_len(), RoundingMode::None)?
-                        .mul(rdx, self.get_mantissa_max_bit_len(), RoundingMode::None)
+                if self.exponent() < 0 {
+                    self.mul(&d, self.mantissa_max_bit_len(), RoundingMode::None)?
+                        .mul(rdx, self.mantissa_max_bit_len(), RoundingMode::None)
                 } else {
-                    self.div(&d, self.get_mantissa_max_bit_len(), RoundingMode::None)?
-                        .div(rdx, self.get_mantissa_max_bit_len(), RoundingMode::None)
+                    self.div(&d, self.mantissa_max_bit_len(), RoundingMode::None)?
+                        .div(rdx, self.mantissa_max_bit_len(), RoundingMode::None)
                 }
             } else {
                 let d = rdx.powi(n, p_w, RoundingMode::None)?;
 
-                if self.get_exponent() < 0 {
-                    self.mul(&d, self.get_mantissa_max_bit_len(), RoundingMode::None)
+                if self.exponent() < 0 {
+                    self.mul(&d, self.mantissa_max_bit_len(), RoundingMode::None)
                 } else {
-                    self.div(&d, self.get_mantissa_max_bit_len(), RoundingMode::None)
+                    self.div(&d, self.mantissa_max_bit_len(), RoundingMode::None)
                 }
             }?;
 
             f.conv_mantissa(l, Radix::Dec, rm)
         }?;
 
-        let e = (n as Exponent) * self.get_exponent().signum() + e_shift;
+        let e = (n as Exponent) * self.exponent().signum() + e_shift;
 
-        Ok((self.get_sign(), digits, e))
+        Ok((self.sign(), digits, e))
     }
 
     /// Conversion for radixes of power of 2.
     fn conv_to_commensurable(&self, shift: usize) -> Result<(Sign, Vec<u8>, Exponent), Error> {
-        let mut e = self.get_exponent();
+        let mut e = self.exponent();
         let mut e_shift = e.unsigned_abs() as usize % shift;
         e /= shift as Exponent;
-        if e_shift != 0 && self.get_exponent() > 0 {
+        if e_shift != 0 && self.exponent() > 0 {
             e_shift = shift - e_shift;
             e += 1;
         }
@@ -382,7 +381,7 @@ impl BigFloatNumber {
         let mut ret = Vec::new();
 
         let mask = (WORD_MAX >> (WORD_BIT_SIZE - shift)) as DoubleWord;
-        let mut iter = self.get_mantissa_digits().iter().rev();
+        let mut iter = self.mantissa_digits().iter().rev();
 
         let mut done = WORD_BIT_SIZE - shift + e_shift;
         let mut d = *iter.next().unwrap() as DoubleWord; // iter is never empty.
@@ -416,19 +415,19 @@ impl BigFloatNumber {
             ret.push(digit);
         }
 
-        Ok((self.get_sign(), ret, e))
+        Ok((self.sign(), ret, e))
     }
 
     fn conv_to_binary(&self) -> Result<(Sign, Vec<u8>, Exponent), Error> {
         let mut ret = Vec::new();
 
-        for v in self.get_mantissa_digits().iter().rev() {
+        for v in self.mantissa_digits().iter().rev() {
             for i in (0..WORD_BIT_SIZE).rev() {
                 ret.push(((v >> i) & 1) as u8);
             }
         }
 
-        Ok((self.get_sign(), ret, self.get_exponent()))
+        Ok((self.sign(), ret, self.exponent()))
     }
 
     fn conv_mantissa(
@@ -441,47 +440,45 @@ impl BigFloatNumber {
         let mut e_shift = 0;
 
         if self.is_zero() {
-            ret.try_reserve_exact(1)
-                .map_err(|_| Error::MemoryAllocation(CollectionAllocErr::CapacityOverflow))?;
+            ret.try_reserve_exact(1)?;
             ret.push(0);
         } else {
-            ret.try_reserve_exact(3 + l)
-                .map_err(|_| Error::MemoryAllocation(CollectionAllocErr::CapacityOverflow))?;
+            ret.try_reserve_exact(3 + l)?;
 
             let mut r = self.clone()?;
             r.set_sign(Sign::Pos);
-            r.set_precision(r.get_mantissa_max_bit_len() + 4, RoundingMode::None)?;
+            r.set_precision(r.mantissa_max_bit_len() + 4, RoundingMode::None)?;
 
             let rdx_num = Self::number_for_radix(rdx)?;
             let rdx_word = Self::word_for_radix(rdx);
 
             let mut word;
 
-            let d = r.mul(rdx_num, r.get_mantissa_max_bit_len(), RoundingMode::None)?;
+            let d = r.mul(rdx_num, r.mantissa_max_bit_len(), RoundingMode::None)?;
             r = d.fract()?;
-            word = d.get_int_as_word();
+            word = d.int_as_word();
             if word == 0 {
                 e_shift = -1;
-                let d = r.mul(rdx_num, r.get_mantissa_max_bit_len(), RoundingMode::None)?;
+                let d = r.mul(rdx_num, r.mantissa_max_bit_len(), RoundingMode::None)?;
                 r = d.fract()?;
-                word = d.get_int_as_word();
+                word = d.int_as_word();
             } else if word >= rdx_word {
                 e_shift = 1;
 
                 ret.push((word / rdx_word) as u8);
                 ret.push((word % rdx_word) as u8);
 
-                let d = r.mul(rdx_num, r.get_mantissa_max_bit_len(), RoundingMode::None)?;
+                let d = r.mul(rdx_num, r.mantissa_max_bit_len(), RoundingMode::None)?;
                 r = d.fract()?;
-                word = d.get_int_as_word();
+                word = d.int_as_word();
             }
 
             for _ in 0..l {
                 ret.push(word as u8);
 
-                let d = r.mul(rdx_num, r.get_mantissa_max_bit_len(), RoundingMode::None)?;
+                let d = r.mul(rdx_num, r.mantissa_max_bit_len(), RoundingMode::None)?;
                 r = d.fract()?;
-                word = d.get_int_as_word();
+                word = d.int_as_word();
             }
 
             if !r.round(0, rm)?.is_zero() {
@@ -558,7 +555,7 @@ mod tests {
 
         let g = BigFloatNumber::convert_from_radix(s, &m, e, Radix::Bin, 160, RoundingMode::ToEven)
             .unwrap();
-        let f = g.as_f64();
+        let f = g.to_f64();
 
         assert!(f == 0.031256789f64);
 
@@ -698,7 +695,7 @@ mod tests {
             //println!("{:?}\n{:?}", n, g);
 
             if rdx == Radix::Dec {
-                eps.set_exponent(n.get_exponent() - p as Exponent + 3);
+                eps.set_exponent(n.exponent() - p as Exponent + 3);
                 assert!(
                     n.sub(&g, p, RoundingMode::None)
                         .unwrap()
@@ -739,7 +736,7 @@ mod tests {
 
             if rdx == Radix::Dec {
                 let mut eps = BigFloatNumber::min_positive(p).unwrap();
-                eps.set_exponent(eps.get_exponent() + 1);
+                eps.set_exponent(eps.exponent() + 1);
 
                 assert!(
                     n.sub(&g, p, RoundingMode::None)
@@ -784,7 +781,7 @@ mod tests {
                 //println!("{:?}", g);
 
                 if rdx == Radix::Dec {
-                    eps.set_exponent(n.get_exponent() - p as Exponent + 3);
+                    eps.set_exponent(n.exponent() - p as Exponent + 3);
                     assert!(n.sub(&g, p, rm).unwrap().abs().unwrap().cmp(&eps) <= 0);
                 } else {
                     if p2 < p1 {
@@ -811,7 +808,7 @@ mod tests {
 
             if rdx == Radix::Dec {
                 let mut eps = BigFloatNumber::min_positive(p).unwrap();
-                eps.set_exponent(eps.get_exponent() + 1);
+                eps.set_exponent(eps.exponent() + 1);
                 assert!(n.sub(&g, p, rm).unwrap().abs().unwrap().cmp(&eps) <= 0);
             } else {
                 if p2 < p1 {

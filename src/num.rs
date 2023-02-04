@@ -16,7 +16,7 @@ use crate::mantissa::Mantissa;
 
 /// A finite floating point number with mantissa of an arbitrary size, an exponent, and the sign.
 /// (BigFloatNumber will be removed in the future. BigFloat should be used instead).
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub(crate) struct BigFloatNumber {
     pub(super) e: Exponent,
     pub(super) s: Sign,
@@ -631,7 +631,7 @@ impl BigFloatNumber {
 
     /// Make `self` subnormal
     pub(crate) fn subnormalize(&mut self, e: isize, rm: RoundingMode, inexact: &mut bool) {
-        debug_assert_eq!(self.get_exponent(), EXPONENT_MIN);
+        debug_assert_eq!(self.exponent(), EXPONENT_MIN);
 
         if self.is_zero() {
             return;
@@ -665,7 +665,7 @@ impl BigFloatNumber {
         {
             // non zero for directed rounding modes
             self.m.set_zero();
-            self.m.get_digits_mut()[0] = 1;
+            self.m.digits_mut()[0] = 1;
             self.m.set_bit_len(1);
         } else {
             self.m.set_zero();
@@ -698,9 +698,9 @@ impl BigFloatNumber {
             }
         }
 
-        let n1 = self.get_mantissa_max_bit_len() as isize - self.get_precision() as isize;
+        let n1 = self.mantissa_max_bit_len() as isize - self.precision() as isize;
 
-        let n2 = d2.get_mantissa_max_bit_len() as isize - d2.get_precision() as isize;
+        let n2 = d2.mantissa_max_bit_len() as isize - d2.precision() as isize;
 
         let e: isize = self.e as isize - n1 - d2.e as isize + n2;
         if e > 0 {
@@ -773,7 +773,7 @@ impl BigFloatNumber {
 
     /// Converts a number to f64 value.
     #[cfg(test)]
-    pub(crate) fn as_f64(&self) -> f64 {
+    pub(crate) fn to_f64(&self) -> f64 {
         if self.m.is_zero() {
             return 0.0;
         }
@@ -828,8 +828,8 @@ impl BigFloatNumber {
     /// Converts a number to f32 value.
     #[inline]
     #[cfg(test)]
-    pub(crate) fn as_f32(&self) -> f32 {
-        self.as_f64() as f32
+    pub(crate) fn to_f32(&self) -> f32 {
+        self.to_f64() as f32
     }
 
     /// Returns true if `self` is subnormal. A number is subnormal if the most significant bit of the mantissa is not equal to 1.
@@ -840,7 +840,7 @@ impl BigFloatNumber {
 
     /// Decomposes `self` into raw parts. The function returns a reference to a slice of words representing mantissa, numbers of significant bits in the mantissa, sign, and exponent.
     #[inline]
-    pub fn to_raw_parts(&self) -> (&[Word], usize, Sign, Exponent) {
+    pub fn as_raw_parts(&self) -> (&[Word], usize, Sign, Exponent) {
         let (m, n) = self.m.to_raw_parts();
         (m, n, self.s, self.e)
     }
@@ -920,7 +920,7 @@ impl BigFloatNumber {
 
     /// Returns the sign of a number.
     #[inline]
-    pub fn get_sign(&self) -> Sign {
+    pub fn sign(&self) -> Sign {
         self.s
     }
 
@@ -938,7 +938,7 @@ impl BigFloatNumber {
 
     /// Returns the exponent of `self`.
     #[inline]
-    pub fn get_exponent(&self) -> Exponent {
+    pub fn exponent(&self) -> Exponent {
         self.e
     }
 
@@ -956,7 +956,7 @@ impl BigFloatNumber {
     pub fn floor(&self) -> Result<Self, Error> {
         let int = self.int()?;
         if self.is_negative() && !self.fract()?.m.is_zero() {
-            return int.sub(&ONE, int.get_mantissa_max_bit_len(), RoundingMode::ToZero);
+            return int.sub(&ONE, int.mantissa_max_bit_len(), RoundingMode::ToZero);
         }
         Ok(int)
     }
@@ -969,7 +969,7 @@ impl BigFloatNumber {
     pub fn ceil(&self) -> Result<Self, Error> {
         let int = self.int()?;
         if self.is_positive() && !self.fract()?.m.is_zero() {
-            return int.add(&ONE, int.get_mantissa_max_bit_len(), RoundingMode::ToZero);
+            return int.add(&ONE, int.mantissa_max_bit_len(), RoundingMode::ToZero);
         }
         Ok(int)
     }
@@ -1014,9 +1014,9 @@ impl BigFloatNumber {
     }
 
     /// Returns integer part as a word.
-    pub(crate) fn get_int_as_word(&self) -> Word {
+    pub(crate) fn int_as_word(&self) -> Word {
         if self.e > 0 && WORD_BIT_SIZE > self.e as usize {
-            let d = self.m.get_most_significant_word();
+            let d = self.m.most_significant_word();
             let shift = WORD_BIT_SIZE - self.e as usize;
             d >> shift
         } else {
@@ -1051,12 +1051,12 @@ impl BigFloatNumber {
     }
 
     /// Returns integer part of a number as built-in integer.
-    pub(super) fn get_int_as_usize(&self) -> Result<usize, Error> {
+    pub(super) fn int_as_usize(&self) -> Result<usize, Error> {
         if self.e > 0 {
             debug_assert!(core::mem::size_of::<usize>() >= core::mem::size_of::<Word>());
             if (self.e as usize) <= WORD_BIT_SIZE {
                 let shift = WORD_BIT_SIZE - self.e as usize;
-                let ret = self.m.get_most_significant_word() as usize;
+                let ret = self.m.most_significant_word() as usize;
                 Ok(ret >> shift)
             } else {
                 Err(Error::InvalidArgument)
@@ -1073,7 +1073,7 @@ impl BigFloatNumber {
             if self.is_subnormal() && e > EXPONENT_MIN {
                 let ediff = (e as isize - EXPONENT_MIN as isize) as usize;
 
-                let n = self.get_mantissa_max_bit_len() - self.get_precision();
+                let n = self.mantissa_max_bit_len() - self.precision();
                 if n >= ediff {
                     self.m.shift_left(ediff);
                     self.m.set_bit_len(self.m.bit_len() + ediff);
@@ -1090,14 +1090,14 @@ impl BigFloatNumber {
 
     /// Returns the maximum mantissa length of `self` in bits regardless of whether `self` is normal or subnormal.
     #[inline]
-    pub fn get_mantissa_max_bit_len(&self) -> usize {
+    pub fn mantissa_max_bit_len(&self) -> usize {
         self.m.max_bit_len()
     }
 
     /// Returns the number of significant bits used in the mantissa. Normal numbers use all bits of the mantissa.
     /// Subnormal numbers use fewer bits than the mantissa can hold.
     #[inline]
-    pub fn get_precision(&self) -> usize {
+    pub fn precision(&self) -> usize {
         self.m.bit_len()
     }
 
@@ -1109,11 +1109,11 @@ impl BigFloatNumber {
     ///  - ExponentOverflow: rounding causes exponent overflow.
     pub fn round(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         let mut ret = self.clone()?;
-        let e = self.get_mantissa_max_bit_len() as isize - self.e as isize;
+        let e = self.mantissa_max_bit_len() as isize - self.e as isize;
         if e > 0 && e as usize > n {
             let m = e as usize - n;
-            if m == self.get_mantissa_max_bit_len() {
-                return Self::new(self.get_mantissa_max_bit_len());
+            if m == self.mantissa_max_bit_len() {
+                return Self::new(self.mantissa_max_bit_len());
             } else {
                 if ret.m.round_mantissa(
                     m,
@@ -1129,7 +1129,7 @@ impl BigFloatNumber {
                     ret.e += 1;
                 }
                 if ret.m.is_all_zero() {
-                    return Self::new(self.get_mantissa_max_bit_len());
+                    return Self::new(self.mantissa_max_bit_len());
                 }
                 if ret.m.is_subnormal() {
                     ret.m.update_bit_len();
@@ -1184,7 +1184,7 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - InvalidArgument: the precision is incorrect.
     pub fn set_precision(&mut self, p: usize, rm: RoundingMode) -> Result<(), Error> {
-        self.set_precision_internal(p, rm, false, self.get_mantissa_max_bit_len(), &mut true)
+        self.set_precision_internal(p, rm, false, self.mantissa_max_bit_len(), &mut true)
             .map(|_| {})
     }
 
@@ -1201,7 +1201,7 @@ impl BigFloatNumber {
         rm: RoundingMode,
         inexact: &mut bool,
     ) -> Result<(), Error> {
-        self.set_precision_internal(p, rm, false, self.get_mantissa_max_bit_len(), inexact)
+        self.set_precision_internal(p, rm, false, self.mantissa_max_bit_len(), inexact)
             .map(|_| {})
     }
 
@@ -1231,19 +1231,19 @@ impl BigFloatNumber {
     ) -> Result<bool, Error> {
         Self::p_assertion(p)?;
 
-        if self.get_mantissa_max_bit_len() > p && p > 0 {
+        if self.mantissa_max_bit_len() > p && p > 0 {
             if rm == RoundingMode::None {
                 // rounding function will not check for inexactness, so check it here
                 if self
                     .m
-                    .find_one_from(self.get_mantissa_max_bit_len() - p)
+                    .find_one_from(self.mantissa_max_bit_len() - p)
                     .is_some()
                 {
                     *inexact = true;
                 }
             }
             if self.m.round_mantissa(
-                self.get_mantissa_max_bit_len() - p,
+                self.mantissa_max_bit_len() - p,
                 rm,
                 self.is_positive(),
                 &mut check_roundable,
@@ -1309,8 +1309,8 @@ impl BigFloatNumber {
     }
 
     /// Returns the raw mantissa words of a number.
-    pub fn get_mantissa_digits(&self) -> &[Word] {
-        self.m.get_digits()
+    pub fn mantissa_digits(&self) -> &[Word] {
+        self.m.digits()
     }
 
     /// Constructs BigFloatNumber with precision `p` from a signed integer value `i`.
@@ -1368,16 +1368,16 @@ impl BigFloatNumber {
 
     // Add correction to x for flooring and ceiling rounding modes.
     pub(crate) fn add_correction(&self, inv_corr_sign: bool) -> Result<Self, Error> {
-        let p = self.get_mantissa_max_bit_len() + 1;
+        let p = self.mantissa_max_bit_len() + 1;
         let mut corr = BigFloatNumber::min_positive(p)?;
-        corr.set_exponent(self.get_exponent());
-        corr.set_sign(if inv_corr_sign { self.get_sign().invert() } else { self.get_sign() });
+        corr.set_exponent(self.exponent());
+        corr.set_sign(if inv_corr_sign { self.sign().invert() } else { self.sign() });
         self.add(&corr, p, RoundingMode::None)
     }
 
     /// Divide `self` by 2.
     pub(crate) fn div_by_2(&mut self, rm: RoundingMode) {
-        let e = self.get_exponent();
+        let e = self.exponent();
         if e == EXPONENT_MIN {
             self.subnormalize(e as isize - 1, rm, &mut true);
         } else {
@@ -1487,7 +1487,7 @@ mod tests {
         d2.inv_sign();
         assert!(d1.cmp(&d2) < 0);
         assert!(d2.cmp(&d1) > 0);
-        d2.set_exponent(d2.get_exponent() + 1);
+        d2.set_exponent(d2.exponent() + 1);
         assert!(d1.cmp(&d2) > 0);
         assert!(d2.cmp(&d1) < 0);
         d1.inv_sign();
@@ -1548,10 +1548,10 @@ mod tests {
             d1.set_sign(s1);
             d2.set_sign(s2);
 
-            d2.set_exponent(d1.get_exponent());
+            d2.set_exponent(d1.exponent());
             assert!(d1.abs_cmp(&d2) > 0);
             assert!(d2.abs_cmp(&d1) < 0);
-            d2.set_exponent(d1.get_exponent() + 123);
+            d2.set_exponent(d1.exponent() + 123);
             assert!(d1.abs_cmp(&d2) < 0);
             assert!(d2.abs_cmp(&d1) > 0);
         }
@@ -1588,7 +1588,7 @@ mod tests {
         assert!(BigFloatNumber::from_f64(p, f64::NAN).unwrap_err() == Error::InvalidArgument);
 
         // 0.0
-        assert!(BigFloatNumber::from_f64(p, 0.0).unwrap().as_f64() == 0.0);
+        assert!(BigFloatNumber::from_f64(p, 0.0).unwrap().to_f64() == 0.0);
 
         // conversions
         for _ in 0..10000 {
@@ -1597,9 +1597,9 @@ mod tests {
             let f: f64 = random_f64();
             if f.is_finite() {
                 d1 = BigFloatNumber::from_f64(p, f).unwrap();
-                assert!(d1.as_f64() == f);
+                assert!(d1.to_f64() == f);
                 d1 = BigFloatNumber::from_f32(p, f as f32).unwrap();
-                assert!(d1.as_f32() == f as f32);
+                assert!(d1.to_f32() == f as f32);
             }
         }
 
@@ -1712,7 +1712,7 @@ mod tests {
             let d3 = d1.sub(&d2, p, RoundingMode::ToEven).unwrap();
             let d4 = d3.add(&d2, p, RoundingMode::ToEven).unwrap();
 
-            eps.set_exponent(d1.get_exponent().max(d2.get_exponent()) - p as Exponent + 2);
+            eps.set_exponent(d1.exponent().max(d2.exponent()) - p as Exponent + 2);
 
             assert!(
                 d1.sub(&d4, p, RoundingMode::ToEven)
@@ -1756,7 +1756,7 @@ mod tests {
 
         d3 = d1.sub(&d2, WORD_BIT_SIZE, RoundingMode::None).unwrap();
 
-        assert_eq!(w, d3.get_mantissa_digits()[0]);
+        assert_eq!(w, d3.mantissa_digits()[0]);
 
         // increase precision
         d1 = BigFloatNumber::from_raw_parts(
@@ -1796,7 +1796,7 @@ mod tests {
             .add(&d2, WORD_BIT_SIZE * 4, RoundingMode::ToEven)
             .unwrap();
 
-        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 4);
+        assert!(d4.mantissa_max_bit_len() == WORD_BIT_SIZE * 4);
         assert!(d3.cmp(&d4) == 0);
 
         d1 = BigFloatNumber::from_raw_parts(
@@ -1836,7 +1836,7 @@ mod tests {
             .sub(&d2, WORD_BIT_SIZE * 4, RoundingMode::ToEven)
             .unwrap();
 
-        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 4);
+        assert!(d4.mantissa_max_bit_len() == WORD_BIT_SIZE * 4);
         assert!(d3.cmp(&d4) == 0);
 
         // decrease precision
@@ -1861,7 +1861,7 @@ mod tests {
         d4.set_precision(WORD_BIT_SIZE, RoundingMode::ToEven)
             .unwrap();
 
-        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE);
+        assert!(d4.mantissa_max_bit_len() == WORD_BIT_SIZE);
         assert!(d3.cmp(&d4) == 0);
 
         d3 = d1.sub(&d2, WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
@@ -1871,7 +1871,7 @@ mod tests {
         d4.set_precision(WORD_BIT_SIZE, RoundingMode::ToEven)
             .unwrap();
 
-        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE);
+        assert!(d4.mantissa_max_bit_len() == WORD_BIT_SIZE);
         assert!(d3.cmp(&d4) == 0);
 
         // full prec
@@ -1910,7 +1910,7 @@ mod tests {
                     d3.div(&d2, p, RoundingMode::ToEven).unwrap()
                 };
 
-                eps.set_exponent(d1.get_exponent() - p as Exponent + 2);
+                eps.set_exponent(d1.exponent() - p as Exponent + 2);
 
                 //println!("\n{:?}\n{:?}\n{:?}\n{:?}", d1,d2,d3,d4);
 
@@ -1987,7 +1987,7 @@ mod tests {
                     d3.div(&d2, p, RoundingMode::ToEven).unwrap()
                 };
 
-                eps.set_exponent(d1.get_exponent() - p as Exponent + 2);
+                eps.set_exponent(d1.exponent() - p as Exponent + 2);
 
                 assert!(
                     d1.sub(&d4, p, RoundingMode::ToEven)
@@ -2022,14 +2022,14 @@ mod tests {
             .mul(&d2, WORD_BIT_SIZE * 5, RoundingMode::ToEven)
             .unwrap();
 
-        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 5);
+        assert!(d4.mantissa_max_bit_len() == WORD_BIT_SIZE * 5);
         assert!(d3.cmp(&d4) == 0);
 
         let d4 = d1
             .mul(&d2, WORD_BIT_SIZE * 4, RoundingMode::ToEven)
             .unwrap();
 
-        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 4);
+        assert!(d4.mantissa_max_bit_len() == WORD_BIT_SIZE * 4);
         assert!(d3.cmp(&d4) == 0);
 
         d3.set_precision(WORD_BIT_SIZE * 3, RoundingMode::ToEven)
@@ -2038,14 +2038,14 @@ mod tests {
             .mul(&d2, WORD_BIT_SIZE * 3, RoundingMode::ToEven)
             .unwrap();
 
-        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 3);
+        assert!(d4.mantissa_max_bit_len() == WORD_BIT_SIZE * 3);
         assert!(d3.cmp(&d4) == 0);
 
         d3.set_precision(WORD_BIT_SIZE, RoundingMode::ToEven)
             .unwrap();
         let d4 = d1.mul(&d2, WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
 
-        assert!(d4.get_mantissa_max_bit_len() == WORD_BIT_SIZE);
+        assert!(d4.mantissa_max_bit_len() == WORD_BIT_SIZE);
         assert!(d3.cmp(&d4) == 0);
 
         d1 = BigFloatNumber::from_i8(2, WORD_BIT_SIZE * 2).unwrap();
@@ -2055,9 +2055,9 @@ mod tests {
             .div(&d2, WORD_BIT_SIZE * 5, RoundingMode::ToEven)
             .unwrap();
 
-        assert!(d3.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 5);
+        assert!(d3.mantissa_max_bit_len() == WORD_BIT_SIZE * 5);
         assert!(
-            d3.get_mantissa_digits()
+            d3.mantissa_digits()
                 == [
                     12297829382473034411,
                     12297829382473034410,
@@ -2071,16 +2071,16 @@ mod tests {
             .div(&d2, WORD_BIT_SIZE * 3, RoundingMode::ToEven)
             .unwrap();
 
-        assert!(d3.get_mantissa_max_bit_len() == WORD_BIT_SIZE * 3);
+        assert!(d3.mantissa_max_bit_len() == WORD_BIT_SIZE * 3);
         assert!(
-            d3.get_mantissa_digits()
+            d3.mantissa_digits()
                 == [12297829382473034411, 12297829382473034410, 12297829382473034410]
         );
 
         d3 = d1.div(&d2, WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
 
-        assert!(d3.get_mantissa_max_bit_len() == WORD_BIT_SIZE);
-        assert!(d3.get_mantissa_digits() == [12297829382473034411]);
+        assert!(d3.mantissa_max_bit_len() == WORD_BIT_SIZE);
+        assert!(d3.mantissa_digits() == [12297829382473034411]);
 
         // reciprocal
         for _ in 0..1000 {
@@ -2098,7 +2098,7 @@ mod tests {
                 let d3 = d1.reciprocal(p, rm).unwrap();
                 let d4 = ONE.div(&d3, p, rm).unwrap();
 
-                eps.set_exponent(d1.get_exponent() - p as Exponent + 2);
+                eps.set_exponent(d1.exponent() - p as Exponent + 2);
 
                 //println!("\n{:?}\n{:?}\n{:?}", d1, d3, d4);
 
@@ -2127,7 +2127,7 @@ mod tests {
         d2 = d1.reciprocal(p, rm).unwrap();
         d3 = ONE.div(&d1, p, rm).unwrap();
         let mut eps2 = BigFloatNumber::min_positive(p).unwrap();
-        eps2.set_exponent(d3.get_exponent());
+        eps2.set_exponent(d3.exponent());
         // TODO: reciprocal is not precise, because does not take into account remainder.
         assert!(
             d3.sub(&d2, p, RoundingMode::None)
@@ -2145,7 +2145,7 @@ mod tests {
             .unwrap();
 
         assert!(
-            d2.get_mantissa_digits()
+            d2.mantissa_digits()
                 == [
                     12297829382473034411,
                     12297829382473034410,
@@ -2157,7 +2157,7 @@ mod tests {
 
         d2 = d1.reciprocal(WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
 
-        assert!(d2.get_mantissa_digits() == [12297829382473034411]);
+        assert!(d2.mantissa_digits() == [12297829382473034411]);
 
         // subnormal numbers basic sanity
         d1 = BigFloatNumber::min_positive(p).unwrap();
@@ -2233,7 +2233,7 @@ mod tests {
         // decompose and compose
         let f1 = random_f64_exp(50, 25);
         d1 = BigFloatNumber::from_f64(p, f1).unwrap();
-        let (m, n, s, e) = d1.to_raw_parts();
+        let (m, n, s, e) = d1.as_raw_parts();
         d2 = BigFloatNumber::from_raw_parts(m, n, s, e).unwrap();
         assert!(d1.cmp(&d2) == 0);
         assert!(BigFloatNumber::from_raw_parts(
@@ -2276,18 +2276,18 @@ mod tests {
 
         // sign and exponent
         d1 = one.clone().unwrap();
-        assert!(d1.get_sign() == Sign::Pos);
+        assert!(d1.sign() == Sign::Pos);
         assert!(d1.is_positive());
         d1 = d1.neg().unwrap();
-        assert!(d1.get_sign() == Sign::Neg);
+        assert!(d1.sign() == Sign::Neg);
         assert!(d1.is_negative());
-        assert!(d1.get_exponent() == 1);
+        assert!(d1.exponent() == 1);
 
         // fract & int
         let f1 = 12345.6789;
         d1 = BigFloatNumber::from_f64(p, f1).unwrap();
-        assert!(d1.fract().unwrap().as_f64() == f1.fract());
-        assert!(d1.int().unwrap().as_f64() == (f1 as u64) as f64);
+        assert!(d1.fract().unwrap().to_f64() == f1.fract());
+        assert!(d1.int().unwrap().to_f64() == (f1 as u64) as f64);
 
         let f1 = -0.006789;
         d1 = BigFloatNumber::from_f64(p, f1).unwrap();
@@ -2319,24 +2319,24 @@ mod tests {
 
         // ceil & floor
         d1 = BigFloatNumber::from_f64(p, 12.3).unwrap();
-        assert!(d1.floor().unwrap().as_f64() == 12.0);
-        assert!(d1.ceil().unwrap().as_f64() == 13.0);
+        assert!(d1.floor().unwrap().to_f64() == 12.0);
+        assert!(d1.ceil().unwrap().to_f64() == 13.0);
         d1 = BigFloatNumber::from_f64(p, 12.0).unwrap();
-        assert!(d1.floor().unwrap().as_f64() == 12.0);
-        assert!(d1.ceil().unwrap().as_f64() == 12.0);
+        assert!(d1.floor().unwrap().to_f64() == 12.0);
+        assert!(d1.ceil().unwrap().to_f64() == 12.0);
 
         d1 = BigFloatNumber::from_f64(p, -12.3).unwrap();
-        assert!(d1.floor().unwrap().as_f64() == -13.0);
-        assert!(d1.ceil().unwrap().as_f64() == -12.0);
+        assert!(d1.floor().unwrap().to_f64() == -13.0);
+        assert!(d1.ceil().unwrap().to_f64() == -12.0);
         d1 = BigFloatNumber::from_f64(p, -12.0).unwrap();
-        assert!(d1.floor().unwrap().as_f64() == -12.0);
-        assert!(d1.ceil().unwrap().as_f64() == -12.0);
+        assert!(d1.floor().unwrap().to_f64() == -12.0);
+        assert!(d1.ceil().unwrap().to_f64() == -12.0);
 
         // abs
         d1 = BigFloatNumber::from_f64(p, 12.3).unwrap();
-        assert!(d1.abs().unwrap().as_f64() == 12.3);
+        assert!(d1.abs().unwrap().to_f64() == 12.3);
         d1 = BigFloatNumber::from_f64(p, -12.3).unwrap();
-        assert!(d1.abs().unwrap().as_f64() == 12.3);
+        assert!(d1.abs().unwrap().to_f64() == 12.3);
 
         // rem
         for (prec1, prec2) in [(128, 128), (128, 320), (320, 128)] {
@@ -2405,7 +2405,7 @@ mod tests {
             .unwrap()
             .abs()
             .unwrap();
-            d2 = BigFloatNumber::random_normal(p2, d1.get_exponent() - 10, d1.get_exponent() + 10)
+            d2 = BigFloatNumber::random_normal(p2, d1.exponent() - 10, d1.exponent() + 10)
                 .unwrap()
                 .abs()
                 .unwrap();
@@ -2446,13 +2446,13 @@ mod tests {
 
             if !ret.is_zero() {
                 // check exponent
-                assert!(ret.get_exponent() == EXPONENT_MIN);
+                assert!(ret.exponent() == EXPONENT_MIN);
             }
 
-            eps.set_exponent(1 - (ret.get_precision() as Exponent));
+            eps.set_exponent(1 - (ret.precision() as Exponent));
 
             // compare mantissas
-            ret.set_exponent((ret.get_mantissa_max_bit_len() - ret.get_precision()) as Exponent);
+            ret.set_exponent((ret.mantissa_max_bit_len() - ret.precision()) as Exponent);
             d3.set_exponent(0);
 
             assert!(
@@ -2510,50 +2510,50 @@ mod tests {
         // build from words
         let d1 = BigFloatNumber::from_words(&[], Sign::Pos, EXPONENT_MAX).unwrap();
         assert!(d1.is_zero());
-        assert_eq!(d1.get_exponent(), 0);
-        assert_eq!(d1.get_precision(), 0);
-        assert_eq!(d1.get_mantissa_max_bit_len(), 0);
-        assert_eq!(d1.get_sign(), Sign::Pos);
+        assert_eq!(d1.exponent(), 0);
+        assert_eq!(d1.precision(), 0);
+        assert_eq!(d1.mantissa_max_bit_len(), 0);
+        assert_eq!(d1.sign(), Sign::Pos);
 
         let d1 = BigFloatNumber::from_words(&[0, 0], Sign::Neg, EXPONENT_MIN).unwrap();
         assert!(d1.is_zero());
-        assert_eq!(d1.get_exponent(), 0);
-        assert_eq!(d1.get_precision(), 0);
-        assert_eq!(d1.get_mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
-        assert_eq!(d1.get_sign(), Sign::Neg);
+        assert_eq!(d1.exponent(), 0);
+        assert_eq!(d1.precision(), 0);
+        assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.sign(), Sign::Neg);
 
         let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Pos, EXPONENT_MAX).unwrap();
         assert_eq!(
-            d1.get_mantissa_digits(),
+            d1.mantissa_digits(),
             [0x8000000000000000u64, 0x8000000000000001u64]
         );
-        assert_eq!(d1.get_exponent(), EXPONENT_MAX - 63);
-        assert_eq!(d1.get_precision(), WORD_BIT_SIZE * 2);
-        assert_eq!(d1.get_mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
-        assert_eq!(d1.get_sign(), Sign::Pos);
+        assert_eq!(d1.exponent(), EXPONENT_MAX - 63);
+        assert_eq!(d1.precision(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.sign(), Sign::Pos);
 
         let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Neg, EXPONENT_MIN).unwrap();
-        assert_eq!(d1.get_mantissa_digits(), [3, 1]);
-        assert_eq!(d1.get_exponent(), EXPONENT_MIN);
-        assert_eq!(d1.get_precision(), 65);
-        assert_eq!(d1.get_mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
-        assert_eq!(d1.get_sign(), Sign::Neg);
+        assert_eq!(d1.mantissa_digits(), [3, 1]);
+        assert_eq!(d1.exponent(), EXPONENT_MIN);
+        assert_eq!(d1.precision(), 65);
+        assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.sign(), Sign::Neg);
 
         let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Pos, EXPONENT_MIN + 5).unwrap();
-        assert_eq!(d1.get_mantissa_digits(), [3 << 5, 1 << 5]);
-        assert_eq!(d1.get_exponent(), EXPONENT_MIN);
-        assert_eq!(d1.get_precision(), WORD_BIT_SIZE + 6);
-        assert_eq!(d1.get_mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
-        assert_eq!(d1.get_sign(), Sign::Pos);
+        assert_eq!(d1.mantissa_digits(), [3 << 5, 1 << 5]);
+        assert_eq!(d1.exponent(), EXPONENT_MIN);
+        assert_eq!(d1.precision(), WORD_BIT_SIZE + 6);
+        assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.sign(), Sign::Pos);
 
         let d1 =
             BigFloatNumber::from_words(&[3, 0x8000000000000000u64], Sign::Pos, EXPONENT_MIN + 5)
                 .unwrap();
-        assert_eq!(d1.get_mantissa_digits(), [3, 0x8000000000000000u64]);
-        assert_eq!(d1.get_exponent(), EXPONENT_MIN + 5);
-        assert_eq!(d1.get_precision(), WORD_BIT_SIZE * 2);
-        assert_eq!(d1.get_mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
-        assert_eq!(d1.get_sign(), Sign::Pos);
+        assert_eq!(d1.mantissa_digits(), [3, 0x8000000000000000u64]);
+        assert_eq!(d1.exponent(), EXPONENT_MIN + 5);
+        assert_eq!(d1.precision(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
+        assert_eq!(d1.sign(), Sign::Pos);
     }
 
     fn random_f64() -> f64 {

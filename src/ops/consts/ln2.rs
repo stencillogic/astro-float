@@ -67,13 +67,11 @@ impl Ln2Cache {
         let (p01, q01, r01) = pqr(0, 1)?;
 
         // 2 * (1 + p / q) / 3
-        let prec = p01
-            .get_mantissa_max_bit_len()
-            .max(q01.get_mantissa_max_bit_len());
+        let prec = p01.mantissa_max_bit_len().max(q01.mantissa_max_bit_len());
         let mut val = p01.div(&q01, prec, crate::RoundingMode::None)?;
         val = val.add(&ONE, prec, crate::RoundingMode::None)?;
         val = val.div(&THREE, prec, crate::RoundingMode::None)?;
-        val.set_exponent(val.get_exponent() + 1);
+        val.set_exponent(val.exponent() + 1);
 
         Ok(Ln2Cache {
             b: 1,
@@ -115,13 +113,11 @@ impl Ln2Cache {
             }
 
             // 2 * (1 + p / q) / 3
-            let prec = pk
-                .get_mantissa_max_bit_len()
-                .max(qk.get_mantissa_max_bit_len());
+            let prec = pk.mantissa_max_bit_len().max(qk.mantissa_max_bit_len());
             let mut ret = pk.div(&qk, prec, crate::RoundingMode::None)?;
             ret = ret.add(&ONE, prec, crate::RoundingMode::None)?;
             ret = ret.div(&THREE, prec, crate::RoundingMode::None)?;
-            ret.set_exponent(ret.get_exponent() + 1);
+            ret.set_exponent(ret.exponent() + 1);
 
             self.val = ret;
 

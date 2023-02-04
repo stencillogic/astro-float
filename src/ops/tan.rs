@@ -2,8 +2,8 @@
 
 use crate::common::consts::ONE;
 use crate::common::consts::TWO;
-use crate::common::util::get_add_cost;
-use crate::common::util::get_mul_cost;
+use crate::common::util::calc_add_cost;
+use crate::common::util::calc_mul_cost;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
@@ -24,7 +24,8 @@ struct TanPolycoeffGen {
 
 impl TanPolycoeffGen {
     fn new(p: usize) -> Result<Self, Error> {
-        let iter_cost = 9 * get_mul_cost(p) + 2 * (get_add_cost(p) + get_add_cost(WORD_BIT_SIZE));
+        let iter_cost =
+            9 * calc_mul_cost(p) + 2 * (calc_add_cost(p) + calc_add_cost(WORD_BIT_SIZE));
 
         Ok(TanPolycoeffGen { iter_cost })
     }
@@ -36,7 +37,7 @@ impl PolycoeffGen for TanPolycoeffGen {
     }
 
     #[inline]
-    fn get_iter_cost(&self) -> usize {
+    fn iter_cost(&self) -> usize {
         self.iter_cost
     }
 }
@@ -45,9 +46,9 @@ struct TanArgReductionEstimator {}
 
 impl ArgReductionEstimator for TanArgReductionEstimator {
     /// Estimates cost of reduction n times for number with precision p.
-    fn get_reduction_cost(n: usize, p: usize) -> usize {
-        let cost_mul = get_mul_cost(p);
-        let cost_add = get_add_cost(p);
+    fn reduction_cost(n: usize, p: usize) -> usize {
+        let cost_mul = calc_mul_cost(p);
+        let cost_add = calc_add_cost(p);
         n * (2 * cost_mul + cost_add)
     }
 
@@ -77,10 +78,10 @@ impl BigFloatNumber {
             return Ok(ret);
         }
 
-        compute_small_exp!(self, self.get_exponent() as isize / 2 - 1, false, p, rm);
+        compute_small_exp!(self, self.exponent() as isize / 2 - 1, false, p, rm);
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.get_mantissa_max_bit_len()) + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
         loop {
             let mut x = self.clone()?;
@@ -101,7 +102,7 @@ impl BigFloatNumber {
     }
 
     fn tan_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
-        let p = self.get_mantissa_max_bit_len();
+        let p = self.mantissa_max_bit_len();
 
         let polycoeff_gen = TanPolycoeffGen::new(p)?;
         let (reduction_times, niter) = series_cost_optimize::<TanArgReductionEstimator>(
@@ -137,7 +138,7 @@ impl BigFloatNumber {
         //  sin + cos series combined
         // tan(x) = x * (((3! - x^2 * 1!) * 5! + x^4 * 3!) * 7! - ...) / (((2! - x^2 * 1!) * 4! + x^4 * 2!) * 6! - ...) / (3*5*7*...)
 
-        let p = self.get_mantissa_max_bit_len();
+        let p = self.mantissa_max_bit_len();
         let mut xx = self.mul(self, p, rm)?;
         xx.inv_sign();
         let mut xxacc = BigFloatNumber::from_word(1, 1)?;
@@ -148,7 +149,7 @@ impl BigFloatNumber {
         let mut q2 = BigFloatNumber::from_word(1, 1)?;
         let mut p2 = BigFloatNumber::from_word(1, 1)?;
 
-        while fct.get_exponent() as isize - (xxacc.get_exponent() as isize) <= p as isize {
+        while fct.exponent() as isize - (xxacc.exponent() as isize) <= p as isize {
             // -x^2, +x^4, -x^6, ...
             xxacc = xxacc.mul(&xx, p, rm)?;
 
@@ -159,8 +160,8 @@ impl BigFloatNumber {
 
             q1 = q1.mul(&fct, p, rm)?;
 
-            inc = inc.add(&ONE, inc.get_mantissa_max_bit_len(), rm)?;
-            if fct.get_mantissa_max_bit_len() < p {
+            inc = inc.add(&ONE, inc.mantissa_max_bit_len(), rm)?;
+            if fct.mantissa_max_bit_len() < p {
                 fct = fct.mul_full_prec(&inc)?;
             } else {
                 fct = fct.mul(&inc, p, rm)?;
@@ -173,8 +174,8 @@ impl BigFloatNumber {
 
             q2 = q2.mul(&fct, p, rm)?;
 
-            inc = inc.add(&ONE, inc.get_mantissa_max_bit_len(), rm)?;
-            if fct.get_mantissa_max_bit_len() < p {
+            inc = inc.add(&ONE, inc.mantissa_max_bit_len(), rm)?;
+            if fct.mantissa_max_bit_len() < p {
                 fct = fct.mul_full_prec(&inc)?;
             } else {
                 fct = fct.mul(&inc, p, rm)?;
@@ -192,14 +193,14 @@ impl BigFloatNumber {
     fn tan_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // tan(3*x) = 3*tan(x) - tan(x)^3 / (1 - 3*tan(x)^2)
         let mut ret = self.clone()?;
-        let p = ret.get_mantissa_max_bit_len();
-        if ret.get_exponent() < EXPONENT_MIN + n as Exponent {
+        let p = ret.mantissa_max_bit_len();
+        if ret.exponent() < EXPONENT_MIN + n as Exponent {
             ret.set_exponent(EXPONENT_MIN);
-            for _ in 0..n - (ret.get_exponent() - EXPONENT_MIN) as usize {
+            for _ in 0..n - (ret.exponent() - EXPONENT_MIN) as usize {
                 ret = ret.div(&TWO, p, rm)?;
             }
         } else {
-            ret.set_exponent(ret.get_exponent() - n as Exponent);
+            ret.set_exponent(ret.exponent() - n as Exponent);
         }
         Ok(ret)
     }
@@ -209,12 +210,12 @@ impl BigFloatNumber {
         // tan(2*x) = 2*tan(x) / (1 - tan(x)^2)
 
         let mut val = self.clone()?;
-        let p = val.get_mantissa_max_bit_len();
+        let p = val.mantissa_max_bit_len();
 
         for _ in 0..n {
             let val_sq = val.mul(&val, p, rm)?;
             let q = ONE.sub(&val_sq, p, rm)?;
-            val.set_exponent(val.get_exponent() + 1);
+            val.set_exponent(val.exponent() + 1);
             val = val.div(&q, p, rm)?;
         }
 

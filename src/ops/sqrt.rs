@@ -120,7 +120,7 @@ mod tests {
         let d1 = BigFloatNumber::max_value(prec).unwrap();
         let d2 = d1.sqrt(prec, RoundingMode::ToEven).unwrap();
         let d3 = d2.mul(&d2, prec, RoundingMode::ToEven).unwrap();
-        eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+        eps.set_exponent(d1.exponent() - prec as Exponent + 2);
         assert!(
             d1.sub(&d3, prec, RoundingMode::ToEven)
                 .unwrap()
@@ -158,7 +158,7 @@ mod tests {
             let d2 = d1.sqrt(prec, RoundingMode::ToEven).unwrap();
             let d3 = d2.mul(&d2, prec, RoundingMode::ToEven).unwrap();
 
-            eps.set_exponent(d1.get_exponent() - prec as Exponent + 2);
+            eps.set_exponent(d1.exponent() - prec as Exponent + 2);
 
             //println!("d1 {:?}\nd3 {:?}", d1, d3);
 

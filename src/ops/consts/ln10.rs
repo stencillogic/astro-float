@@ -77,9 +77,7 @@ impl Ln10Cache {
 
     fn calc_ln10(p: &BigFloatNumber, q: &BigFloatNumber) -> Result<BigFloatNumber, Error> {
         // 18 * (1 + p / q) / 11
-        let prec = p
-            .get_mantissa_max_bit_len()
-            .max(q.get_mantissa_max_bit_len());
+        let prec = p.mantissa_max_bit_len().max(q.mantissa_max_bit_len());
         let mut val = p.div(q, prec, crate::RoundingMode::None)?;
         val = val.add(&ONE, prec, crate::RoundingMode::None)?;
         let f0 = BigFloatNumber::from_word(18, 1)?;

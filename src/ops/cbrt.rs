@@ -21,7 +21,7 @@ impl BigFloatNumber {
 
         if self.is_zero() {
             let mut ret = Self::new(p)?;
-            ret.set_sign(self.get_sign());
+            ret.set_sign(self.sign());
             return Ok(ret);
         }
 
@@ -43,7 +43,7 @@ impl BigFloatNumber {
         if e < EXPONENT_MIN as isize {
             let mut ret = BigFloatNumber {
                 m: m3,
-                s: self.get_sign(),
+                s: self.sign(),
                 e: EXPONENT_MIN,
             };
 
@@ -53,7 +53,7 @@ impl BigFloatNumber {
         } else {
             Ok(BigFloatNumber {
                 m: m3,
-                s: self.get_sign(),
+                s: self.sign(),
                 e: e as Exponent,
             })
         }
@@ -96,7 +96,7 @@ mod tests {
                 .mul(&d2, prec, RoundingMode::ToEven)
                 .unwrap();
 
-            eps.set_exponent(d1.get_exponent() - prec as Exponent + 3);
+            eps.set_exponent(d1.exponent() - prec as Exponent + 3);
 
             //println!("d1 {:?}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
             //println!("d2 {:?}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
@@ -121,7 +121,7 @@ mod tests {
             .unwrap()
             .mul(&d2, prec, RoundingMode::ToEven)
             .unwrap();
-        eps.set_exponent(d1.get_exponent() - prec as Exponent + 3);
+        eps.set_exponent(d1.exponent() - prec as Exponent + 3);
         assert!(
             d1.sub(&d3, prec, RoundingMode::ToEven)
                 .unwrap()
@@ -139,7 +139,7 @@ mod tests {
             .unwrap()
             .mul(&d2, prec, RoundingMode::ToEven)
             .unwrap();
-        eps.set_exponent(d1.get_exponent() - prec as Exponent + 3);
+        eps.set_exponent(d1.exponent() - prec as Exponent + 3);
         assert!(
             d1.sub(&d3, prec, RoundingMode::ToEven)
                 .unwrap()

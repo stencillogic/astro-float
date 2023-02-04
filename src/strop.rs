@@ -1,7 +1,5 @@
 //! BigFloatNumber formatting.
 
-use smallvec::CollectionAllocErr;
-
 use crate::defs::Error;
 use crate::defs::Radix;
 use crate::defs::RoundingMode;
@@ -57,7 +55,7 @@ impl BigFloatNumber {
 
         let mut mstr = String::new();
         let mstr_sz = 8
-            + (self.get_mantissa_max_bit_len() + core::mem::size_of::<Exponent>() * 8)
+            + (self.mantissa_max_bit_len() + core::mem::size_of::<Exponent>() * 8)
                 / match rdx {
                     Radix::Bin => 1,
                     Radix::Oct => 3,
@@ -66,8 +64,8 @@ impl BigFloatNumber {
                 };
 
         // TODO: replace SmallVec with Vec.
-        mstr.try_reserve_exact(mstr_sz)
-            .map_err(|_| Error::MemoryAllocation(CollectionAllocErr::CapacityOverflow))?;
+        mstr.try_reserve_exact(mstr_sz)?;
+
         if s == Sign::Neg {
             mstr.push('-');
         }
@@ -152,9 +150,9 @@ mod tests {
                 if rdx == Radix::Dec {
                     //println!("\n{:?}\n{:?}\n{:?}", s, n, d);
                     if i & 1 == 0 {
-                        eps.set_exponent(n.get_exponent() - p as Exponent + 3);
+                        eps.set_exponent(n.exponent() - p as Exponent + 3);
                         assert!(
-                            d.sub(&n, d.get_mantissa_max_bit_len(), rm)
+                            d.sub(&n, d.mantissa_max_bit_len(), rm)
                                 .unwrap()
                                 .abs()
                                 .unwrap()
@@ -163,9 +161,9 @@ mod tests {
                         );
                     } else {
                         let mut eps2 = BigFloatNumber::min_positive(p).unwrap();
-                        eps2.set_exponent(eps2.get_exponent() + 2);
+                        eps2.set_exponent(eps2.exponent() + 2);
                         assert!(
-                            d.sub(&n, d.get_mantissa_max_bit_len(), rm)
+                            d.sub(&n, d.mantissa_max_bit_len(), rm)
                                 .unwrap()
                                 .abs()
                                 .unwrap()
@@ -206,7 +204,7 @@ mod tests {
                 //println!("{:?}", g);
 
                 if rdx == Radix::Dec {
-                    eps.set_exponent(n.get_exponent() - p as Exponent + 3);
+                    eps.set_exponent(n.exponent() - p as Exponent + 3);
                     assert!(n.sub(&g, p, rm).unwrap().abs().unwrap().cmp(&eps) <= 0);
                 } else {
                     if p2 < p1 {
@@ -228,7 +226,7 @@ mod tests {
 
             if rdx == Radix::Dec {
                 let mut eps = BigFloatNumber::min_positive(p).unwrap();
-                eps.set_exponent(eps.get_exponent() + 2);
+                eps.set_exponent(eps.exponent() + 2);
                 assert!(n.sub(&g, p, rm).unwrap().abs().unwrap().cmp(&eps) < 0);
             } else {
                 if p2 < p1 {

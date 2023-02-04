@@ -3,11 +3,11 @@
 use crate::common::consts::ONE;
 use crate::common::consts::TEN;
 use crate::common::consts::TWO;
+use crate::common::util::calc_add_cost;
+use crate::common::util::calc_mul_cost;
+use crate::common::util::calc_sqrt_cost;
 use crate::common::util::count_leading_ones;
 use crate::common::util::count_leading_zeroes_skip_first;
-use crate::common::util::get_add_cost;
-use crate::common::util::get_mul_cost;
-use crate::common::util::get_sqrt_cost;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
@@ -35,7 +35,7 @@ impl AtanhPolycoeffGen {
         let one_full_p = BigFloatNumber::from_word(1, p)?;
         let val = BigFloatNumber::from_word(1, p)?;
 
-        let iter_cost = get_add_cost(p) + get_add_cost(acc.get_mantissa_max_bit_len());
+        let iter_cost = calc_add_cost(p) + calc_add_cost(acc.mantissa_max_bit_len());
 
         Ok(AtanhPolycoeffGen {
             acc,
@@ -48,18 +48,16 @@ impl AtanhPolycoeffGen {
 
 impl PolycoeffGen for AtanhPolycoeffGen {
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-        self.acc = self
-            .acc
-            .add(&TWO, self.acc.get_mantissa_max_bit_len(), rm)?;
-        self.val =
-            self.one_full_p
-                .div(&self.acc, self.one_full_p.get_mantissa_max_bit_len(), rm)?;
+        self.acc = self.acc.add(&TWO, self.acc.mantissa_max_bit_len(), rm)?;
+        self.val = self
+            .one_full_p
+            .div(&self.acc, self.one_full_p.mantissa_max_bit_len(), rm)?;
 
         Ok(&self.val)
     }
 
     #[inline]
-    fn get_iter_cost(&self) -> usize {
+    fn iter_cost(&self) -> usize {
         self.iter_cost
     }
 }
@@ -68,11 +66,11 @@ struct LnArgReductionEstimator {}
 
 impl ArgReductionEstimator for LnArgReductionEstimator {
     /// Estimates cost of reduction n times for number with precision p.
-    fn get_reduction_cost(n: usize, p: usize) -> usize {
+    fn reduction_cost(n: usize, p: usize) -> usize {
         // cost(shift) + n*cost(sqrt)
-        let cost_mul = get_mul_cost(p);
-        let cost_add = get_add_cost(p);
-        let sqrt_cost = get_sqrt_cost(p, cost_mul, cost_add);
+        let cost_mul = calc_mul_cost(p);
+        let cost_add = calc_add_cost(p);
+        let sqrt_cost = calc_sqrt_cost(p, cost_mul, cost_add);
 
         n * sqrt_cost
     }
@@ -111,20 +109,20 @@ impl BigFloatNumber {
         loop {
             let mut x = self.clone()?;
             let e = x.normalize2() as isize;
-            let e = self.get_exponent() as isize - e;
+            let e = self.exponent() as isize - e;
 
             x.set_exponent(0);
 
             let additional_prec = if e == 0 {
-                count_leading_ones(x.get_mantissa_digits())
+                count_leading_ones(x.mantissa_digits())
             } else if e == 1 {
-                count_leading_zeroes_skip_first(x.get_mantissa_digits())
+                count_leading_zeroes_skip_first(x.mantissa_digits())
             } else {
                 0
             } + 2;
 
             // test for one.
-            if e == 1 && additional_prec == x.get_mantissa_max_bit_len() + 2 {
+            if e == 1 && additional_prec == x.mantissa_max_bit_len() + 2 {
                 return Self::new(p);
             }
 
@@ -157,13 +155,13 @@ impl BigFloatNumber {
     }
 
     fn ln_series(mut x: Self, rm: RoundingMode) -> Result<Self, Error> {
-        let p = x.get_mantissa_max_bit_len();
+        let p = x.mantissa_max_bit_len();
         let mut polycoeff_gen = AtanhPolycoeffGen::new(p)?;
         let (reduction_times, niter) =
             series_cost_optimize::<LnArgReductionEstimator>(p, &polycoeff_gen, 0, 2, false);
 
         let err = reduction_times + 4;
-        let p = x.get_mantissa_max_bit_len() + err;
+        let p = x.mantissa_max_bit_len() + err;
         x.set_precision(p, rm)?;
 
         let arg = if reduction_times > 0 {
@@ -188,7 +186,7 @@ impl BigFloatNumber {
     // reduce argument n times.
     fn ln_arg_reduce(mut x: Self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         for _ in 0..n {
-            x = x.sqrt(x.get_mantissa_max_bit_len(), rm)?;
+            x = x.sqrt(x.mantissa_max_bit_len(), rm)?;
         }
 
         Ok(x)
@@ -196,7 +194,7 @@ impl BigFloatNumber {
 
     // restore value for the argument reduced n times.
     fn ln_arg_restore(mut x: Self, n: usize) -> Result<Self, Error> {
-        x.set_exponent(x.get_exponent() + n as Exponent);
+        x.set_exponent(x.exponent() + n as Exponent);
 
         Ok(x)
     }
@@ -227,12 +225,12 @@ impl BigFloatNumber {
         loop {
             let mut x = self.clone()?;
             let e = x.normalize2() as isize;
-            let e = self.get_exponent() as isize - e;
+            let e = self.exponent() as isize - e;
 
             x.set_exponent(0);
 
-            let zeroes_cnt = count_leading_zeroes_skip_first(x.get_mantissa_digits());
-            if zeroes_cnt == x.get_mantissa_max_bit_len() {
+            let zeroes_cnt = count_leading_zeroes_skip_first(x.mantissa_digits());
+            if zeroes_cnt == x.mantissa_max_bit_len() {
                 // special case x = 0.5
                 let mut ret = Self::from_usize((e - 1).unsigned_abs())?;
                 if e < 1 {
@@ -243,7 +241,7 @@ impl BigFloatNumber {
             }
 
             let additional_prec = if e == 0 {
-                count_leading_ones(x.get_mantissa_digits())
+                count_leading_ones(x.mantissa_digits())
             } else if e == 1 {
                 zeroes_cnt
             } else {
@@ -305,7 +303,7 @@ impl BigFloatNumber {
 
             // check if x is exactly power of 10
             if ret.is_int() {
-                let n = ret.get_int_as_usize()?;
+                let n = ret.int_as_usize()?;
                 let tp = TEN.powi(n, p_ext, RoundingMode::None)?;
                 if tp.cmp(&x) == 0 {
                     ret.set_precision(p, rm)?;
@@ -444,8 +442,8 @@ mod tests {
         let d2 = d1.ln(prec, RoundingMode::ToEven, &mut cc).unwrap();
         let d3 = d2.exp(prec, RoundingMode::ToEven, &mut cc).unwrap();
         eps.set_exponent(
-            d1.get_exponent() - prec as Exponent
-                + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent,
+            d1.exponent() - prec as Exponent
+                + log2_ceil(d1.exponent().unsigned_abs() as usize) as Exponent,
         );
 
         assert!(
@@ -461,8 +459,8 @@ mod tests {
         match TWO.pow(&d2, prec, RoundingMode::ToEven, &mut cc) {
             Ok(d3) => {
                 eps.set_exponent(
-                    d1.get_exponent() - prec as Exponent
-                        + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent,
+                    d1.exponent() - prec as Exponent
+                        + log2_ceil(d1.exponent().unsigned_abs() as usize) as Exponent,
                 );
 
                 assert!(
@@ -485,8 +483,8 @@ mod tests {
         match TEN.pow(&d2, prec, RoundingMode::ToEven, &mut cc) {
             Ok(d3) => {
                 eps.set_exponent(
-                    d1.get_exponent() - prec as Exponent
-                        + log2_ceil(d1.get_exponent().unsigned_abs() as usize) as Exponent,
+                    d1.exponent() - prec as Exponent
+                        + log2_ceil(d1.exponent().unsigned_abs() as usize) as Exponent,
                 );
 
                 assert!(
@@ -528,7 +526,7 @@ mod tests {
             let mut d1 = random_subnormal(prec);
             d1.set_sign(Sign::Pos);
             let mut d2 = d1.ln(prec, RoundingMode::ToEven, &mut cc).unwrap();
-            let d2e = d2.get_exponent();
+            let d2e = d2.exponent();
             d2.set_exponent(d2e / 2 + (d2e & 1));
             let d3 = d2.exp(prec + 1, RoundingMode::None, &mut cc).unwrap();
             let d4 = d3.powi(1 << (d2e / 2), prec, RoundingMode::ToEven).unwrap();

@@ -28,17 +28,17 @@ impl BigFloatNumber {
             return Ok(ret);
         }
 
-        if self.get_exponent() == 1 && self.abs_cmp(&ONE) == 0 {
-            return Err(Error::ExponentOverflow(self.get_sign()));
+        if self.exponent() == 1 && self.abs_cmp(&ONE) == 0 {
+            return Err(Error::ExponentOverflow(self.sign()));
         }
 
-        compute_small_exp!(self, self.get_exponent() as isize / 2 - 1, false, p, rm);
+        compute_small_exp!(self, self.exponent() as isize / 2 - 1, false, p, rm);
 
         // 0.5 * ln((1 + x) / (1 - x))
 
         let mut additional_prec = 4;
-        if self.get_exponent() < 0 {
-            additional_prec += self.get_exponent().unsigned_abs() as usize;
+        if self.exponent() < 0 {
+            additional_prec += self.exponent().unsigned_abs() as usize;
         }
 
         let mut p_inc = WORD_BIT_SIZE;

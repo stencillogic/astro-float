@@ -13,7 +13,7 @@ use smallvec::SmallVec;
 const STATIC_ALLOCATION: usize = 5;
 
 /// Buffer for holding mantissa gidits.
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct WordBuf {
     inner: SmallVec<[Word; STATIC_ALLOCATION]>,
 }
@@ -22,9 +22,7 @@ impl WordBuf {
     #[inline]
     pub fn new(sz: usize) -> Result<Self, Error> {
         let mut inner = SmallVec::new();
-        inner
-            .try_reserve_exact(sz)
-            .map_err(Error::MemoryAllocation)?;
+        inner.try_reserve_exact(sz)?;
         unsafe {
             // values of the newely allocated words stay unitialized for performance reasons
             inner.set_len(sz);
@@ -60,7 +58,7 @@ impl WordBuf {
     pub fn try_extend(&mut self, p: usize) -> Result<(), Error> {
         let n = (p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         let l = self.inner.len();
-        self.inner.try_grow(n).map_err(Error::MemoryAllocation)?;
+        self.inner.try_grow(n)?;
         unsafe {
             // values of the newely allocated words stay unitialized for performance reasons
             self.inner.set_len(n);
@@ -74,9 +72,7 @@ impl WordBuf {
     pub fn try_extend_2(&mut self, p: usize) -> Result<(), Error> {
         let n = (p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         if n > self.inner.capacity() {
-            self.inner
-                .try_reserve(n - self.inner.capacity())
-                .map_err(Error::MemoryAllocation)?;
+            self.inner.try_reserve(n - self.inner.capacity())?;
         }
         if n > self.inner.len() {
             self.inner.resize(n, 0);

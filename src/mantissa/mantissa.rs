@@ -22,7 +22,7 @@ use core::mem::size_of;
 use itertools::izip;
 
 /// Mantissa representation.
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Mantissa {
     pub(super) m: WordBuf,
     pub(super) n: usize, // number of bits, 0 is for number 0
@@ -1091,7 +1091,7 @@ impl Mantissa {
         Ok(())
     }
 
-    pub fn get_most_significant_word(&self) -> Word {
+    pub fn most_significant_word(&self) -> Word {
         if self.n > 0 {
             self.m[(self.n - 1) / WORD_BIT_SIZE]
         } else {
@@ -1122,11 +1122,11 @@ impl Mantissa {
         Ok(Mantissa { m, n: self.n })
     }
 
-    pub fn get_digits(&self) -> &[Word] {
+    pub fn digits(&self) -> &[Word] {
         &self.m
     }
 
-    pub fn get_digits_mut(&mut self) -> &mut [Word] {
+    pub fn digits_mut(&mut self) -> &mut [Word] {
         &mut self.m
     }
 

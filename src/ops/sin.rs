@@ -3,8 +3,8 @@
 use crate::common::consts::FOUR;
 use crate::common::consts::ONE;
 use crate::common::consts::THREE;
-use crate::common::util::get_add_cost;
-use crate::common::util::get_mul_cost;
+use crate::common::util::calc_add_cost;
+use crate::common::util::calc_mul_cost;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
@@ -34,7 +34,7 @@ impl SinPolycoeffGen {
         let one_full_p = BigFloatNumber::from_word(1, p)?;
 
         let iter_cost =
-            (get_mul_cost(p) + get_add_cost(p) + get_add_cost(inc.get_mantissa_max_bit_len())) * 2;
+            (calc_mul_cost(p) + calc_add_cost(p) + calc_add_cost(inc.mantissa_max_bit_len())) * 2;
 
         let sign = 1;
 
@@ -50,8 +50,8 @@ impl SinPolycoeffGen {
 
 impl PolycoeffGen for SinPolycoeffGen {
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-        let p_inc = self.inc.get_mantissa_max_bit_len();
-        let p_one = self.one_full_p.get_mantissa_max_bit_len();
+        let p_inc = self.inc.mantissa_max_bit_len();
+        let p_one = self.one_full_p.mantissa_max_bit_len();
 
         self.inc = self.inc.add(&ONE, p_inc, rm)?;
         let inv_inc = self.one_full_p.div(&self.inc, p_one, rm)?;
@@ -72,7 +72,7 @@ impl PolycoeffGen for SinPolycoeffGen {
     }
 
     #[inline]
-    fn get_iter_cost(&self) -> usize {
+    fn iter_cost(&self) -> usize {
         self.iter_cost
     }
 }
@@ -81,10 +81,10 @@ struct SinArgReductionEstimator {}
 
 impl ArgReductionEstimator for SinArgReductionEstimator {
     /// Estimates cost of reduction n times for number with precision p.
-    fn get_reduction_cost(n: usize, p: usize) -> usize {
-        let cost_mul = get_mul_cost(p);
-        let cost_add = get_add_cost(p);
-        let cost_mul2 = get_mul_cost(THREE.get_mantissa_max_bit_len());
+    fn reduction_cost(n: usize, p: usize) -> usize {
+        let cost_mul = calc_mul_cost(p);
+        let cost_add = calc_add_cost(p);
+        let cost_mul2 = calc_mul_cost(THREE.mantissa_max_bit_len());
 
         n * (2 * cost_mul + 3 * cost_add + cost_mul2)
     }
@@ -111,14 +111,14 @@ impl BigFloatNumber {
 
         if self.is_zero() {
             let mut ret = Self::new(p)?;
-            ret.set_sign(self.get_sign());
+            ret.set_sign(self.sign());
             return Ok(ret);
         }
 
-        compute_small_exp!(self, self.get_exponent() as isize / 2 - 1, true, p, rm);
+        compute_small_exp!(self, self.exponent() as isize / 2 - 1, true, p, rm);
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.get_mantissa_max_bit_len()) + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
         loop {
             let mut x = self.clone()?;
@@ -141,7 +141,7 @@ impl BigFloatNumber {
     pub fn sin_series(mut self, rm: RoundingMode) -> Result<Self, Error> {
         // sin:  x - x^3/3! + x^5/5! - x^7/7! + ...
 
-        let p = self.get_mantissa_max_bit_len();
+        let p = self.mantissa_max_bit_len();
 
         let mut polycoeff_gen = SinPolycoeffGen::new(p)?;
         let (reduction_times, niter) = series_cost_optimize::<SinArgReductionEstimator>(
@@ -182,7 +182,7 @@ impl BigFloatNumber {
         for _ in 1..n {
             d = d.mul_full_prec(&THREE)?;
         }
-        self.div(&d, self.get_mantissa_max_bit_len(), rm)
+        self.div(&d, self.mantissa_max_bit_len(), rm)
     }
 
     // restore value for the argument reduced n times.
@@ -190,7 +190,7 @@ impl BigFloatNumber {
     fn sin_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // sin(3*x) = 3*sin(x) - 4*sin(x)^3
         let mut sin = self.clone()?;
-        let p = sin.get_mantissa_max_bit_len();
+        let p = sin.mantissa_max_bit_len();
 
         for _ in 0..n {
             let mut sin_cub = sin.mul(&sin, p, rm)?;

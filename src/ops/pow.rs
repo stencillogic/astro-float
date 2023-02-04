@@ -1,7 +1,7 @@
 //! Exponentiation.
 
 use crate::common::consts::{FOUR, THREE};
-use crate::common::util::{get_add_cost, get_mul_cost, round_p};
+use crate::common::util::{calc_add_cost, calc_mul_cost, round_p};
 use crate::ops::consts::Consts;
 use crate::ops::util::compute_small_exp;
 use crate::{
@@ -28,7 +28,7 @@ impl SinhPolycoeffGen {
         let one_full_p = BigFloatNumber::from_word(1, p)?;
 
         let iter_cost =
-            (get_mul_cost(p) + get_add_cost(p) + get_add_cost(inc.get_mantissa_max_bit_len())) * 2;
+            (calc_mul_cost(p) + calc_add_cost(p) + calc_add_cost(inc.mantissa_max_bit_len())) * 2;
 
         Ok(SinhPolycoeffGen {
             one_full_p,
@@ -41,8 +41,8 @@ impl SinhPolycoeffGen {
 
 impl PolycoeffGen for SinhPolycoeffGen {
     fn next(&mut self, rm: RoundingMode) -> Result<&BigFloatNumber, Error> {
-        let p_inc = self.inc.get_mantissa_max_bit_len();
-        let p_one = self.one_full_p.get_mantissa_max_bit_len();
+        let p_inc = self.inc.mantissa_max_bit_len();
+        let p_one = self.one_full_p.mantissa_max_bit_len();
 
         self.inc = self.inc.add(&ONE, p_inc, rm)?;
         let inv_inc = self.one_full_p.div(&self.inc, p_one, rm)?;
@@ -56,7 +56,7 @@ impl PolycoeffGen for SinhPolycoeffGen {
     }
 
     #[inline]
-    fn get_iter_cost(&self) -> usize {
+    fn iter_cost(&self) -> usize {
         self.iter_cost
     }
 }
@@ -65,10 +65,10 @@ struct SinhArgReductionEstimator {}
 
 impl ArgReductionEstimator for SinhArgReductionEstimator {
     /// Estimates cost of reduction n times for number with precision p.
-    fn get_reduction_cost(n: usize, p: usize) -> usize {
-        let cost_mul = get_mul_cost(p);
-        let cost_add = get_add_cost(p);
-        let cost_mul2 = get_mul_cost(THREE.get_mantissa_max_bit_len());
+    fn reduction_cost(n: usize, p: usize) -> usize {
+        let cost_mul = calc_mul_cost(p);
+        let cost_add = calc_add_cost(p);
+        let cost_mul2 = calc_mul_cost(THREE.mantissa_max_bit_len());
 
         n * (2 * cost_mul + 3 * cost_add + cost_mul2)
     }
@@ -98,7 +98,7 @@ impl BigFloatNumber {
             return Self::from_word(1, p);
         }
 
-        compute_small_exp!(ONE, self.get_exponent() as isize, self.is_negative(), p, rm);
+        compute_small_exp!(ONE, self.exponent() as isize, self.is_negative(), p, rm);
 
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
@@ -114,7 +114,7 @@ impl BigFloatNumber {
                         }
                         Error::DivisionByZero => Err(Error::DivisionByZero),
                         Error::InvalidArgument => Err(Error::InvalidArgument),
-                        Error::MemoryAllocation(a) => Err(Error::MemoryAllocation(a)),
+                        Error::MemoryAllocation => Err(Error::MemoryAllocation),
                     },
                 }?;
 
@@ -137,13 +137,13 @@ impl BigFloatNumber {
         debug_assert!(!self.is_zero());
 
         if self.e as isize > WORD_BIT_SIZE as isize {
-            return Err(Error::ExponentOverflow(self.get_sign()));
+            return Err(Error::ExponentOverflow(self.sign()));
         }
 
         let p_work = p + 4;
 
         // compute separately for int and fract parts, then combine the results.
-        let int = self.get_int_as_usize().map_err(|e| {
+        let int = self.int_as_usize().map_err(|e| {
             if matches!(e, Error::InvalidArgument) {
                 Error::ExponentOverflow(Sign::Pos)
             } else {
@@ -325,7 +325,7 @@ impl BigFloatNumber {
     fn expf(self, rm: RoundingMode) -> Result<Self, Error> {
         debug_assert!(!self.is_zero());
 
-        let p = self.get_mantissa_max_bit_len();
+        let p = self.mantissa_max_bit_len();
 
         let sh = self.sinh_series(p, rm)?; // faster convergence than direct series
 
@@ -379,7 +379,7 @@ impl BigFloatNumber {
         for _ in 1..n {
             d = d.mul_full_prec(&THREE)?;
         }
-        self.div(&d, self.get_mantissa_max_bit_len(), rm)
+        self.div(&d, self.mantissa_max_bit_len(), rm)
     }
 
     // restore value for the argument reduced n times.
@@ -387,7 +387,7 @@ impl BigFloatNumber {
     fn sinh_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
         // sinh(3*x) = 3*sinh(x) + 4*sinh(x)^3
         let mut sinh = self.clone()?;
-        let p = sinh.get_mantissa_max_bit_len();
+        let p = sinh.mantissa_max_bit_len();
 
         for _ in 0..n {
             let mut sinh_cub = sinh.mul(&sinh, p, rm)?;
@@ -421,20 +421,20 @@ impl BigFloatNumber {
         } else if self.is_zero() {
             return if n.is_negative() {
                 if n.is_odd_int() {
-                    Err(Error::ExponentOverflow(self.get_sign()))
+                    Err(Error::ExponentOverflow(self.sign()))
                 } else {
                     Err(Error::ExponentOverflow(Sign::Pos))
                 }
             } else {
                 let mut ret = Self::new(p)?;
                 if n.is_odd_int() {
-                    ret.set_sign(self.get_sign());
+                    ret.set_sign(self.sign());
                 }
                 Ok(ret)
             };
-        } else if self.get_exponent() == 1 && self.abs_cmp(&ONE) == 0 {
+        } else if self.exponent() == 1 && self.abs_cmp(&ONE) == 0 {
             return if n.is_odd_int() {
-                Self::from_i8(self.get_sign().as_int(), p)
+                Self::from_i8(self.sign().to_int(), p)
             } else {
                 if self.is_positive() || n.is_int() {
                     Self::from_word(1, p)
@@ -444,7 +444,7 @@ impl BigFloatNumber {
             };
         } else if self.is_negative() {
             if n.is_int() {
-                let int = n.get_int_as_usize().map_err(|e| {
+                let int = n.int_as_usize().map_err(|e| {
                     if matches!(e, Error::InvalidArgument) {
                         let sign = if n.is_odd_int() { Sign::Neg } else { Sign::Pos };
                         Error::ExponentOverflow(sign)
@@ -453,13 +453,13 @@ impl BigFloatNumber {
                     }
                 })?;
 
-                let int = int as isize * n.get_sign().as_int() as isize;
+                let int = int as isize * n.sign().to_int() as isize;
 
                 return self.powsi(int, p, rm);
             } else {
                 return Err(Error::InvalidArgument);
             }
-        } else if n.get_exponent() == 1 && n.abs_cmp(&ONE) == 0 {
+        } else if n.exponent() == 1 && n.abs_cmp(&ONE) == 0 {
             if n.is_positive() {
                 let mut ret = self.clone()?;
                 ret.set_precision(p, rm)?;
@@ -489,7 +489,7 @@ impl BigFloatNumber {
                 Error::ExponentOverflow(Sign::Pos) => Err(Error::ExponentOverflow(Sign::Pos)),
                 Error::DivisionByZero => Err(Error::DivisionByZero),
                 Error::InvalidArgument => Err(Error::InvalidArgument),
-                Error::MemoryAllocation(a) => Err(Error::MemoryAllocation(a)),
+                Error::MemoryAllocation => Err(Error::MemoryAllocation),
             },
         }?;
 

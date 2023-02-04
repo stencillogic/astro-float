@@ -149,7 +149,7 @@ fn parse_num(parser_state: &mut ParserState, rdx: Radix) -> Result<(), Error> {
 
         if parser_state.e < EXPONENT_MIN as isize {
             let mut zero = SmallVec::new();
-            zero.try_reserve_exact(1).map_err(Error::MemoryAllocation)?;
+            zero.try_reserve_exact(1)?;
             zero.push(0);
             parser_state.mantissa_bytes = zero;
             parser_state.e = 0;
@@ -193,8 +193,7 @@ fn parse_digits(
     if ch.is_some() && is_radix_digit(ch.unwrap(), rdx) {
         parser_state
             .mantissa_bytes
-            .try_reserve_exact(parser_state.s_len)
-            .map_err(Error::MemoryAllocation)?;
+            .try_reserve_exact(parser_state.s_len)?;
 
         while let Some(c) = ch {
             if is_radix_digit(c, rdx) {

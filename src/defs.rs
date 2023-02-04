@@ -1,5 +1,15 @@
 //! Definitions.
 
+use core::fmt::Display;
+
+#[cfg(feature = "std")]
+use std::collections::TryReserveError;
+
+#[cfg(not(feature = "std"))]
+use alloc::collections::TryReserveError;
+
+use smallvec::CollectionAllocErr;
+
 /// A word.
 #[cfg(target_arch = "x86_64")]
 pub type Word = u64;
@@ -52,7 +62,7 @@ pub const DEFAULT_RM: RoundingMode = RoundingMode::ToEven;
 pub const DEFAULT_P: usize = 128;
 
 /// Sign.
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(PartialEq, Eq, Copy, Clone, Debug, Hash)]
 pub enum Sign {
     /// Negative.
     Neg = -1,
@@ -81,15 +91,13 @@ impl Sign {
     }
 
     /// Returns 1 for the positive sign and -1 for the negative sign.
-    pub fn as_int(&self) -> i8 {
+    pub fn to_int(&self) -> i8 {
         *self as i8
     }
 }
 
-use smallvec::CollectionAllocErr;
-
 /// Possible errors.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Error {
     /// The exponent value becomes greater than the upper limit of the range of exponent values.
     ExponentOverflow(Sign),
@@ -101,22 +109,31 @@ pub enum Error {
     InvalidArgument,
 
     /// Memory allocation error.
-    MemoryAllocation(CollectionAllocErr),
+    MemoryAllocation,
 }
 
-impl Clone for Error {
-    fn clone(&self) -> Self {
-        match self {
-            Self::ExponentOverflow(arg) => Self::ExponentOverflow(*arg),
-            Self::DivisionByZero => Self::DivisionByZero,
-            Self::InvalidArgument => Self::InvalidArgument,
-            Self::MemoryAllocation(arg) => Self::MemoryAllocation(match arg {
-                CollectionAllocErr::CapacityOverflow => CollectionAllocErr::CapacityOverflow,
-                CollectionAllocErr::AllocErr { layout } => {
-                    CollectionAllocErr::AllocErr { layout: *layout }
+#[cfg(feature = "std")]
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let repr = match self {
+            Error::ExponentOverflow(s) => {
+                if s.is_positive() {
+                    "positive overflow"
+                } else {
+                    "negative overflow"
                 }
-            }),
-        }
+            }
+            Error::DivisionByZero => "division by zero",
+            Error::InvalidArgument => "invalid argument",
+            Error::MemoryAllocation => "memory allocation failure",
+        };
+        f.write_str(repr)
     }
 }
 
@@ -124,11 +141,20 @@ impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::ExponentOverflow(l0), Self::ExponentOverflow(r0)) => l0 == r0,
-            (Self::MemoryAllocation(l0), Self::MemoryAllocation(r0)) => {
-                core::mem::discriminant(l0) == core::mem::discriminant(r0)
-            }
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
+    }
+}
+
+impl From<CollectionAllocErr> for Error {
+    fn from(_: CollectionAllocErr) -> Self {
+        Error::MemoryAllocation
+    }
+}
+
+impl From<TryReserveError> for Error {
+    fn from(_: TryReserveError) -> Self {
+        Error::MemoryAllocation
     }
 }
 

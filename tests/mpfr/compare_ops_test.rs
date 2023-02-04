@@ -67,7 +67,7 @@ fn mpfr_compare_ops() {
         let (rm, rnd) = get_random_rnd_pair();
 
         let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, EXPONENT_MAX);
-        let n1e = n1.get_exponent().unwrap();
+        let n1e = n1.exponent().unwrap();
         let (n2, f2) = get_float_pair(
             p2,
             n1e.saturating_sub(2 * (p2 + p1) as Exponent),
@@ -184,7 +184,7 @@ fn mpfr_compare_ops() {
         b = b.abs();
         c = c.abs();
 
-        let n = b.get_exponent().unwrap().unsigned_abs() as usize;
+        let n = b.exponent().unwrap().unsigned_abs() as usize;
         let emax = EXPONENT_MAX / if n == 0 { 1 } else { n } as Exponent;
         let emin = -emax;
 

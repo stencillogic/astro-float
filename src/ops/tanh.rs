@@ -25,25 +25,25 @@ impl BigFloatNumber {
 
         if self.is_zero() {
             let mut ret = Self::new(p)?;
-            ret.set_sign(self.get_sign());
+            ret.set_sign(self.sign());
             return Ok(ret);
         }
 
         // prevent overflow
-        if self.get_exponent() == EXPONENT_MAX {
-            let mut ret = Self::from_i8(self.get_sign().as_int(), p)?;
+        if self.exponent() == EXPONENT_MAX {
+            let mut ret = Self::from_i8(self.sign().to_int(), p)?;
             ret = ret.add_correction(true)?;
             ret.set_precision(p, rm)?;
             return Ok(ret);
         }
 
-        compute_small_exp!(self, self.get_exponent() as isize - 1, true, p, rm);
+        compute_small_exp!(self, self.exponent() as isize - 1, true, p, rm);
 
         // (e^(2*x) - 1) / (e^(2*x) + 1)
 
         let mut additional_prec = 4;
-        if self.get_exponent() < 0 {
-            additional_prec += self.get_exponent().unsigned_abs() as usize;
+        if self.exponent() < 0 {
+            additional_prec += self.exponent().unsigned_abs() as usize;
         }
 
         let mut p_inc = WORD_BIT_SIZE;
@@ -55,7 +55,7 @@ impl BigFloatNumber {
             let p_x = p_wrk + additional_prec;
             x.set_precision(p_x, RoundingMode::None)?;
 
-            x.set_exponent(x.get_exponent() + 1);
+            x.set_exponent(x.exponent() + 1);
 
             let xexp = match x.exp(p_x, RoundingMode::FromZero, cc) {
                 Ok(v) => Ok(v),
@@ -72,7 +72,7 @@ impl BigFloatNumber {
                     }
                     Error::DivisionByZero => Err(Error::DivisionByZero),
                     Error::InvalidArgument => Err(Error::InvalidArgument),
-                    Error::MemoryAllocation(a) => Err(Error::MemoryAllocation(a)),
+                    Error::MemoryAllocation => Err(Error::MemoryAllocation),
                 },
             }?;
 

@@ -23,11 +23,11 @@ impl BigFloatNumber {
 
         if self.is_zero() {
             let mut ret = Self::new(p)?;
-            ret.set_sign(self.get_sign());
+            ret.set_sign(self.sign());
             return Ok(ret);
         }
 
-        compute_small_exp!(self, self.get_exponent() as isize - 2, false, p, rm);
+        compute_small_exp!(self, self.exponent() as isize - 2, false, p, rm);
 
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
@@ -38,32 +38,31 @@ impl BigFloatNumber {
 
             x.set_sign(Sign::Pos);
 
-            let mut ret = if (x.get_exponent() as isize - 1) / 2
-                > x.get_mantissa_max_bit_len() as isize + 2
-            {
-                // e^|x| / 2 * signum(x)
+            let mut ret =
+                if (x.exponent() as isize - 1) / 2 > x.mantissa_max_bit_len() as isize + 2 {
+                    // e^|x| / 2 * signum(x)
 
-                x.exp(p_wrk, RoundingMode::None, cc)
-            } else {
-                // (e^x - e^(-x)) / 2
-
-                let ex = x.exp(p_wrk, RoundingMode::None, cc)?;
-
-                let xe = ex.reciprocal(p_wrk, RoundingMode::None)?;
-
-                ex.sub(&xe, p_wrk, RoundingMode::None)
-            }
-            .map_err(|e| -> Error {
-                if let Error::ExponentOverflow(_) = e {
-                    Error::ExponentOverflow(self.get_sign())
+                    x.exp(p_wrk, RoundingMode::None, cc)
                 } else {
-                    e
+                    // (e^x - e^(-x)) / 2
+
+                    let ex = x.exp(p_wrk, RoundingMode::None, cc)?;
+
+                    let xe = ex.reciprocal(p_wrk, RoundingMode::None)?;
+
+                    ex.sub(&xe, p_wrk, RoundingMode::None)
                 }
-            })?;
+                .map_err(|e| -> Error {
+                    if let Error::ExponentOverflow(_) = e {
+                        Error::ExponentOverflow(self.sign())
+                    } else {
+                        e
+                    }
+                })?;
 
             ret.div_by_2(RoundingMode::None);
 
-            ret.set_sign(self.get_sign());
+            ret.set_sign(self.sign());
 
             if ret.try_set_precision(p, rm, p_wrk)? {
                 break Ok(ret);

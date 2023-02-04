@@ -122,24 +122,24 @@ pub fn assert_float_close(n: BigFloat, f: Float, p: usize, op: &str, eq: bool) {
         let s2 = conv_str_from_mpfr_compat(s1);
         let n2 = BigFloat::parse(&s2, Radix::Bin, p, RoundingMode::None);
         assert_eq!(
-            n.get_mantissa_max_bit_len(),
-            n2.get_mantissa_max_bit_len(),
+            n.mantissa_max_bit_len(),
+            n2.mantissa_max_bit_len(),
             "{}",
             op
         );
 
         let d = n.sub(&n2, 1, RoundingMode::None).abs();
 
-        let e1 = n.get_exponent().unwrap() as isize
-            - (n.get_mantissa_max_bit_len().unwrap() - n.get_precision().unwrap()) as isize;
-        let e2 = d.get_exponent().unwrap() as isize
-            - (d.get_mantissa_max_bit_len().unwrap() - d.get_precision().unwrap()) as isize;
+        let e1 = n.exponent().unwrap() as isize
+            - (n.mantissa_max_bit_len().unwrap() - n.precision().unwrap()) as isize;
+        let e2 = d.exponent().unwrap() as isize
+            - (d.mantissa_max_bit_len().unwrap() - d.precision().unwrap()) as isize;
 
         //println!("\n{:?}\n{:?}\n{:?}\n{} {}", n, n2, d, e1, e2);
 
         if !d.is_zero() {
             assert!(
-                e1 - e2 >= n.get_mantissa_max_bit_len().unwrap() as isize - 1,
+                e1 - e2 >= n.mantissa_max_bit_len().unwrap() as isize - 1,
                 "{}",
                 op
             );
