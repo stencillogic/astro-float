@@ -1,0 +1,17 @@
+[package]
+name = "astro-float-macro"
+version = "0.1.0"
+edition = "2021"
+authors = ["stencillogic <stencillogic@gmail.com>"]
+license = "MIT"
+description = "Macros for multiple precision floating point numbers library astro-float."
+categories = ["algorithms", "data-structures", "science"]
+keywords = ["bigfloat", "numeric", "mathematics", "bignum"]
+repository = "https://github.com/stencillogic/astro-float"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = { version = "1", default-features = false }
+syn = { version = "1", default-features = false }
