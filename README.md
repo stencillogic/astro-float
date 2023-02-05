@@ -59,10 +59,6 @@ println!("{}", pi);
 
 Benchmark can be found here: https://github.com/stencillogic/bigfloat-bench.
 
-## Roadmap
-
-Future improvements include the implementation of faster mathematical function algorithms for arguments with large precision, such as AGM implementation for calculating the logarithm, and faster trigonometric functions.
-
 ## Contributing
 
-Issues regarding bugs, new features, or other cases can be opened here: https://github.com/stencillogic/astro-float/issues 
+Issues regarding bugs or new features can be opened here: https://github.com/stencillogic/astro-float/issues 

@@ -31,7 +31,7 @@
 //! **Error handling**
 //!
 //! In case of an error, such as memory allocation error, `BigFloat` takes the value `NaN`.
-//! `BigFloat::get_err()` can be used to get the associated error in this situation.
+//! `BigFloat::err()` can be used to get the associated error in this situation.
 //!
 //! **Constants**
 //!
