@@ -189,6 +189,7 @@ mod tests {
             320,
             Sign::Pos,
             2,
+            false,
         )
         .unwrap();
         assert!(c.cmp(&r) == 0);

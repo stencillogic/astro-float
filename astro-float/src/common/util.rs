@@ -402,7 +402,7 @@ pub(crate) fn random_subnormal(p: usize) -> BigFloatNumber {
 
     let s = if rand::random::<u8>() & 1 == 0 { Sign::Pos } else { Sign::Neg };
 
-    BigFloatNumber::from_raw_parts(&m, n, s, EXPONENT_MIN).unwrap()
+    BigFloatNumber::from_raw_parts(&m, n, s, EXPONENT_MIN, false).unwrap()
 }
 
 #[cfg(test)]

@@ -31,7 +31,9 @@ impl BigFloatNumber {
         let (e1, m1_opt) = self.normalize()?;
         let m1_normalized = m1_opt.as_ref().unwrap_or(&self.m);
 
-        let (e_shift, m3) = m1_normalized.sqrt(p, rm, true, &mut true, e1 & 1 == 1)?;
+        let mut inexact = self.inexact;
+
+        let (e_shift, m3) = m1_normalized.sqrt(p, rm, true, &mut inexact, e1 & 1 == 1)?;
 
         let e = (e1 + (e1 & 1)) / 2 + e_shift;
 
@@ -40,9 +42,10 @@ impl BigFloatNumber {
                 m: m3,
                 s: Sign::Pos,
                 e: EXPONENT_MIN,
+                inexact,
             };
 
-            ret.subnormalize(e, rm, &mut true);
+            ret.subnormalize(e, rm);
 
             Ok(ret)
         } else {
@@ -50,6 +53,7 @@ impl BigFloatNumber {
                 m: m3,
                 s: Sign::Pos,
                 e: e as Exponent,
+                inexact,
             })
         }
     }

@@ -1,6 +1,7 @@
 //! BigFloatNumber definition and basic arithmetic, comparison, and number manipulation operations.
 
 use crate::common::consts::ONE;
+use crate::common::util::count_leading_zeroes_skip_first;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::Exponent;
@@ -21,6 +22,7 @@ pub(crate) struct BigFloatNumber {
     pub(super) e: Exponent,
     pub(super) s: Sign,
     pub(super) m: Mantissa,
+    pub(super) inexact: bool,
 }
 
 impl BigFloatNumber {
@@ -45,6 +47,24 @@ impl BigFloatNumber {
             m: Mantissa::new(p)?,
             e: 0,
             s: Sign::Pos,
+            inexact: false,
+        })
+    }
+
+    /// Returns a new number with value of 0, precision of `p` bits, sign `s`, and marked as inexact if `inexact` is true.
+    /// Precision is rounded upwards to the word size.
+    ///
+    /// ## Errors
+    ///
+    ///  - InvalidArgument: the precision is incorrect.
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    pub fn new2(p: usize, s: Sign, inexact: bool) -> Result<Self, Error> {
+        Self::p_assertion(p)?;
+        Ok(BigFloatNumber {
+            m: Mantissa::new(p)?,
+            e: 0,
+            s,
+            inexact,
         })
     }
 
@@ -62,6 +82,7 @@ impl BigFloatNumber {
             m: Mantissa::oned_mantissa(p)?,
             e: EXPONENT_MAX,
             s: Sign::Pos,
+            inexact: false,
         })
     }
 
@@ -77,6 +98,7 @@ impl BigFloatNumber {
             m: Mantissa::oned_mantissa(p)?,
             e: EXPONENT_MAX,
             s: Sign::Neg,
+            inexact: false,
         })
     }
 
@@ -95,6 +117,7 @@ impl BigFloatNumber {
             m: Mantissa::min(p)?,
             e: EXPONENT_MIN,
             s: Sign::Pos,
+            inexact: false,
         })
     }
 
@@ -113,6 +136,7 @@ impl BigFloatNumber {
             m: Mantissa::from_word(p, WORD_SIGNIFICANT_BIT)?,
             e: EXPONENT_MIN,
             s: Sign::Pos,
+            inexact: false,
         })
     }
 
@@ -124,6 +148,7 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn from_word(mut d: Word, p: usize) -> Result<Self, Error> {
         Self::p_assertion(p)?;
+
         if d == 0 {
             Self::new(p)
         } else {
@@ -136,6 +161,7 @@ impl BigFloatNumber {
                 m: Mantissa::from_word(p, d)?,
                 e: (WORD_BIT_SIZE - shift) as Exponent,
                 s: Sign::Pos,
+                inexact: false,
             })
         }
     }
@@ -161,7 +187,7 @@ impl BigFloatNumber {
     ///  - InvalidArgument: the precision is incorrect.
     #[inline]
     pub fn add(&self, d2: &Self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
-        self.add_sub(d2, p, 1, rm, false, &mut true)
+        self.add_sub(d2, p, 1, rm, false)
     }
 
     /// Subtracts `d2` from `self` and returns the result of the operation with precision `p` rounded according to `rm`.
@@ -174,7 +200,7 @@ impl BigFloatNumber {
     ///  - InvalidArgument: the precision is incorrect.
     #[inline]
     pub fn sub(&self, d2: &Self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
-        self.add_sub(d2, p, -1, rm, false, &mut true)
+        self.add_sub(d2, p, -1, rm, false)
     }
 
     /// Adds `d2` to `self` and returns the result of the operation.
@@ -187,7 +213,7 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     #[inline]
     pub fn add_full_prec(&self, d2: &Self) -> Result<Self, Error> {
-        self.add_sub(d2, 0, 1, RoundingMode::None, true, &mut true)
+        self.add_sub(d2, 0, 1, RoundingMode::None, true)
     }
 
     /// Subtracts `d2` from `self` and returns the result of the operation.
@@ -200,7 +226,7 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     #[inline]
     pub fn sub_full_prec(&self, d2: &Self) -> Result<Self, Error> {
-        self.add_sub(d2, 0, -1, RoundingMode::None, true, &mut true)
+        self.add_sub(d2, 0, -1, RoundingMode::None, true)
     }
 
     /// Multiplies `d2` by `self` and returns the result of the operation with precision `p` rounded according to `rm`.
@@ -213,26 +239,7 @@ impl BigFloatNumber {
     ///  - InvalidArgument: the precision is incorrect.
     #[inline]
     pub fn mul(&self, d2: &Self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
-        self.mul_general_case(d2, p, rm, false, &mut true)
-    }
-
-    /// Multiplies `d2` by `self` and returns the result of the operation with precision `p` rounded according to `rm`.
-    /// Precision is rounded upwards to the word size.
-    /// If the resulting precision exceeds the desired precision, `inexact` flag is set to true.
-    ///
-    /// ## Errors
-    ///
-    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
-    ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    ///  - InvalidArgument: the precision is incorrect.
-    pub(crate) fn mul_inexact(
-        &self,
-        d2: &Self,
-        p: usize,
-        rm: RoundingMode,
-        inexact: &mut bool,
-    ) -> Result<Self, Error> {
-        self.mul_general_case(d2, p, rm, false, inexact)
+        self.mul_general_case(d2, p, rm, false)
     }
 
     /// Multiplies `d2` by `self` and returns the result of the operation.
@@ -245,7 +252,7 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     #[inline]
     pub fn mul_full_prec(&self, d2: &Self) -> Result<Self, Error> {
-        self.mul_general_case(d2, 0, RoundingMode::None, true, &mut true)
+        self.mul_general_case(d2, 0, RoundingMode::None, true)
     }
 
     fn mul_general_case(
@@ -254,7 +261,6 @@ impl BigFloatNumber {
         p: usize,
         rm: RoundingMode,
         full_prec: bool,
-        inexact: &mut bool,
     ) -> Result<Self, Error> {
         let p = round_p(p);
 
@@ -275,8 +281,16 @@ impl BigFloatNumber {
         let (e2, m2_opt) = d2.normalize()?;
         let m2_normalized = m2_opt.as_ref().unwrap_or(&d2.m);
 
-        let (e_shift, m3) =
-            m1_normalized.mul(m2_normalized, p, rm, s == Sign::Pos, full_prec, inexact)?;
+        let mut inexact = self.inexact || d2.inexact;
+
+        let (e_shift, m3) = m1_normalized.mul(
+            m2_normalized,
+            p,
+            rm,
+            s == Sign::Pos,
+            full_prec,
+            &mut inexact,
+        )?;
 
         let e = e1 + e2 - e_shift;
 
@@ -289,9 +303,10 @@ impl BigFloatNumber {
                 m: m3,
                 s,
                 e: EXPONENT_MIN,
+                inexact,
             };
 
-            ret.subnormalize(e, rm, inexact);
+            ret.subnormalize(e, rm);
 
             Ok(ret)
         } else {
@@ -299,6 +314,7 @@ impl BigFloatNumber {
                 m: m3,
                 s,
                 e: e as Exponent,
+                inexact,
             })
         }
     }
@@ -313,26 +329,6 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - InvalidArgument: both `self` and `d2` are zero or precision is incorrect.
     pub fn div(&self, d2: &Self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
-        self.div_inexact(d2, p, rm, &mut true)
-    }
-
-    /// Divides `self` by `d2` and returns the result of the operation with precision `p` rounded according to `rm`.
-    /// Precision is rounded upwards to the word size.
-    /// If the resulting precision exceeds the desired precision, `inexact` flag is set to true.
-    ///
-    /// ## Errors
-    ///
-    ///  - DivisionByZero: `d2` is zero.
-    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
-    ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    ///  - InvalidArgument: both `self` and `d2` are zero or precision is incorrect.
-    pub(crate) fn div_inexact(
-        &self,
-        d2: &Self,
-        p: usize,
-        rm: RoundingMode,
-        inexact: &mut bool,
-    ) -> Result<Self, Error> {
         if d2.m.is_zero() {
             return if self.is_zero() {
                 Err(Error::InvalidArgument)
@@ -357,7 +353,10 @@ impl BigFloatNumber {
         let (e2, m2_opt) = d2.normalize()?;
         let m2_normalized = m2_opt.as_ref().unwrap_or(&d2.m);
 
-        let (e_shift, m3) = m1_normalized.div(m2_normalized, p, rm, s == Sign::Pos, inexact)?;
+        let mut inexact = self.inexact || d2.inexact;
+
+        let (e_shift, m3) =
+            m1_normalized.div(m2_normalized, p, rm, s == Sign::Pos, &mut inexact)?;
 
         let e = e1 - e2 + e_shift;
 
@@ -370,9 +369,10 @@ impl BigFloatNumber {
                 m: m3,
                 s,
                 e: EXPONENT_MIN,
+                inexact,
             };
 
-            ret.subnormalize(e, rm, inexact);
+            ret.subnormalize(e, rm);
 
             Ok(ret)
         } else {
@@ -380,6 +380,7 @@ impl BigFloatNumber {
                 m: m3,
                 s,
                 e: e as Exponent,
+                inexact,
             })
         }
     }
@@ -441,6 +442,7 @@ impl BigFloatNumber {
                 m: m3,
                 s: self.s,
                 e: e as Exponent,
+                inexact: self.inexact || d2.inexact,
             };
 
             Ok(ret)
@@ -522,7 +524,6 @@ impl BigFloatNumber {
         op: i8,
         rm: RoundingMode,
         full_prec: bool,
-        inexact: &mut bool,
     ) -> Result<Self, Error> {
         let p = round_p(p);
         Self::p_assertion(p)?;
@@ -551,6 +552,8 @@ impl BigFloatNumber {
         let (e2, m2_opt) = d2.normalize()?;
         let m2 = m2_opt.as_ref().unwrap_or(&d2.m);
 
+        let mut inexact = self.inexact || d2.inexact;
+
         let mut e;
         let (shift, m3) = if (self.s != d2.s && op >= 0) || (op < 0 && self.s == d2.s) {
             // subtract
@@ -565,7 +568,7 @@ impl BigFloatNumber {
                     rm,
                     d3.is_positive(),
                     full_prec,
-                    inexact,
+                    &mut inexact,
                 )
             } else if cmp < 0 {
                 d3.s = if op >= 0 { d2.s } else { d2.s.invert() };
@@ -577,10 +580,12 @@ impl BigFloatNumber {
                     rm,
                     d3.is_positive(),
                     full_prec,
-                    inexact,
+                    &mut inexact,
                 )
             } else {
-                return Self::new(p);
+                let mut ret = Self::new(p)?;
+                ret.inexact = inexact;
+                return Ok(ret);
             }
         } else {
             // add
@@ -594,7 +599,7 @@ impl BigFloatNumber {
                     rm,
                     d3.is_positive(),
                     full_prec,
-                    inexact,
+                    &mut inexact,
                 )
             } else {
                 e = e2;
@@ -605,10 +610,12 @@ impl BigFloatNumber {
                     rm,
                     d3.is_positive(),
                     full_prec,
-                    inexact,
+                    &mut inexact,
                 )
             }
         }?;
+
+        d3.inexact |= inexact;
 
         debug_assert!(shift <= isize::MAX / 2 && e >= isize::MIN / 2);
         e -= shift;
@@ -621,7 +628,7 @@ impl BigFloatNumber {
 
         if e < EXPONENT_MIN as isize {
             d3.e = EXPONENT_MIN;
-            d3.subnormalize(e, rm, inexact);
+            d3.subnormalize(e, rm);
         } else {
             d3.e = e as Exponent;
         }
@@ -630,8 +637,9 @@ impl BigFloatNumber {
     }
 
     /// Make `self` subnormal
-    pub(crate) fn subnormalize(&mut self, e: isize, rm: RoundingMode, inexact: &mut bool) {
+    pub(crate) fn subnormalize(&mut self, e: isize, rm: RoundingMode) {
         debug_assert_eq!(self.exponent(), EXPONENT_MIN);
+        debug_assert!(!self.is_subnormal());
 
         if self.is_zero() {
             return;
@@ -644,16 +652,20 @@ impl BigFloatNumber {
 
             let mut shift = (EXPONENT_MIN as isize - e) as usize;
 
+            let mut inexact = self.inexact;
+
             if self.m.round_mantissa(
                 shift,
                 rm,
                 is_positive,
                 &mut false,
                 self.m.max_bit_len(),
-                inexact,
+                &mut inexact,
             ) {
                 shift -= 1;
             }
+
+            self.inexact |= inexact;
 
             if shift > 0 {
                 self.m.shift_right(shift);
@@ -667,9 +679,11 @@ impl BigFloatNumber {
             self.m.set_zero();
             self.m.digits_mut()[0] = 1;
             self.m.set_bit_len(1);
+            self.inexact |= true;
         } else {
             self.m.set_zero();
             self.e = 0;
+            self.inexact |= true;
         }
     }
 
@@ -733,10 +747,13 @@ impl BigFloatNumber {
     ///  - ExponentOverflow: `f` is Inf.
     pub fn from_f64(p: usize, mut f: f64) -> Result<Self, Error> {
         Self::p_assertion(p)?;
-        let mut ret = BigFloatNumber::new(0)?;
+
+        let mut ret = Self::new(0)?;
+
         if f == 0.0f64 {
             return Ok(ret);
         }
+
         if f.is_infinite() {
             return Err(Error::ExponentOverflow(if f.is_sign_negative() {
                 Sign::Neg
@@ -744,9 +761,11 @@ impl BigFloatNumber {
                 Sign::Pos
             }));
         }
+
         if f.is_nan() {
             return Err(Error::InvalidArgument);
         }
+
         if f < 0.0f64 {
             ret.s = Sign::Neg;
             f = -f;
@@ -772,14 +791,17 @@ impl BigFloatNumber {
     }
 
     /// Converts a number to f64 value.
+    /// Conversion rounds `self` to zero.
     #[cfg(test)]
     pub(crate) fn to_f64(&self) -> f64 {
         if self.m.is_zero() {
             return 0.0;
         }
+
         let mantissa = self.m.to_u64();
         let mut e: isize = self.e as isize + 0b1111111111;
         let mut ret = 0;
+
         if e >= 0b11111111111 {
             match self.s {
                 Sign::Pos => f64::INFINITY,
@@ -826,6 +848,7 @@ impl BigFloatNumber {
     }
 
     /// Converts a number to f32 value.
+    /// self is converted to f64 first (rounding to zero), and then to f32 (rounding is default for built-in types).
     #[inline]
     #[cfg(test)]
     pub(crate) fn to_f32(&self) -> f32 {
@@ -838,11 +861,14 @@ impl BigFloatNumber {
         self.m.is_subnormal()
     }
 
-    /// Decomposes `self` into raw parts. The function returns a reference to a slice of words representing mantissa, numbers of significant bits in the mantissa, sign, and exponent.
+    /// Decomposes `self` into raw parts.
+    /// The function returns a reference to a slice of words representing mantissa,
+    /// numbers of significant bits in the mantissa,
+    /// sign, exponent, and a bool value which specify whether the number is inexact.
     #[inline]
-    pub fn as_raw_parts(&self) -> (&[Word], usize, Sign, Exponent) {
-        let (m, n) = self.m.to_raw_parts();
-        (m, n, self.s, self.e)
+    pub fn as_raw_parts(&self) -> (&[Word], usize, Sign, Exponent, bool) {
+        let (m, n) = self.m.as_raw_parts();
+        (m, n, self.s, self.e, self.inexact)
     }
 
     /// Constructs a number from the raw parts:
@@ -851,6 +877,7 @@ impl BigFloatNumber {
     ///  - `n` is the number of significant bits in mantissa.
     ///  - `s` is the sign.
     ///  - `e` is the exponent.
+    ///  - `inexact` specify whether number is inexact.
     ///
     /// ## Errors
     ///
@@ -859,7 +886,13 @@ impl BigFloatNumber {
     /// `n` is smaller than the number of bits in `m`, but `m` does not represent corresponding subnormal number mantissa;
     /// `n` is smaller than the number of bits in `m`, but `e` is not the minimum possible exponent;
     /// `n` or the size of `m` is too large (larger than isize::MAX / 2 + EXPONENT_MIN).
-    pub fn from_raw_parts(m: &[Word], n: usize, s: Sign, mut e: Exponent) -> Result<Self, Error> {
+    pub fn from_raw_parts(
+        m: &[Word],
+        n: usize,
+        s: Sign,
+        mut e: Exponent,
+        inexact: bool,
+    ) -> Result<Self, Error> {
         let p = m.len() * WORD_BIT_SIZE;
         Self::p_assertion(p)?;
 
@@ -880,7 +913,7 @@ impl BigFloatNumber {
                 e = 0;
             }
 
-            Ok(BigFloatNumber { e, s, m })
+            Ok(BigFloatNumber { e, s, m, inexact })
         }
     }
 
@@ -915,7 +948,12 @@ impl BigFloatNumber {
             m.set_bit_len(bl + shift);
         }
 
-        Ok(BigFloatNumber { e, s, m })
+        Ok(BigFloatNumber {
+            e,
+            s,
+            m,
+            inexact: false,
+        })
     }
 
     /// Returns the sign of a number.
@@ -985,13 +1023,23 @@ impl BigFloatNumber {
             if (self.e as usize) < self.m.max_bit_len() {
                 // remove integer part of mantissa & normalize at the same time
                 if let Some(shift) = self.m.find_one_from(self.e as usize) {
-                    ret.m.shift_left(shift);
-                    ret.e = -((shift - self.e as usize) as Exponent);
+                    let mut e = self.e as isize - shift as isize;
+                    if e < EXPONENT_MIN as isize {
+                        let shift1 = (self.e as isize - EXPONENT_MIN as isize) as usize;
+                        ret.m.shift_left(shift1);
+                        ret.m.mask_bits(shift - shift1, true);
+                        e = EXPONENT_MIN as isize;
+                    } else {
+                        ret.m.shift_left(shift);
+                    }
+                    ret.e = e as Exponent;
                 } else {
-                    return Self::new(self.m.max_bit_len());
+                    ret.m.set_zero();
+                    ret.e = 0;
                 }
             } else {
-                return Self::new(self.m.max_bit_len());
+                ret.m.set_zero();
+                ret.e = 0;
             }
         }
         Ok(ret)
@@ -1004,18 +1052,23 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     pub fn int(&self) -> Result<Self, Error> {
         let mut ret = self.clone()?;
+
         if self.e > 0 {
             if (self.e as usize) < self.m.max_bit_len() {
-                ret.m.mask_bits(self.m.max_bit_len() - self.e as usize)
+                ret.m
+                    .mask_bits(self.m.max_bit_len() - self.e as usize, false)
             }
-            return Ok(ret);
+        } else {
+            ret.m.set_zero();
+            ret.e = 0;
         }
-        Self::new(self.m.max_bit_len())
+
+        Ok(ret)
     }
 
     /// Returns integer part as a word.
     pub(crate) fn int_as_word(&self) -> Word {
-        if self.e > 0 && WORD_BIT_SIZE > self.e as usize {
+        if self.e > 0 && WORD_BIT_SIZE >= self.e as usize {
             let d = self.m.most_significant_word();
             let shift = WORD_BIT_SIZE - self.e as usize;
             d >> shift
@@ -1107,35 +1160,78 @@ impl BigFloatNumber {
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - ExponentOverflow: rounding causes exponent overflow.
+    ///  - InvalidArgument: `n` is too large.
     pub fn round(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+        Self::p_assertion(n)?;
+
         let mut ret = self.clone()?;
+
         let e = self.mantissa_max_bit_len() as isize - self.e as isize;
-        if e > 0 && e as usize > n {
+
+        if e > 0 && e as usize > n && !self.is_zero() {
             let m = e as usize - n;
-            if m == self.mantissa_max_bit_len() {
-                return Self::new(self.mantissa_max_bit_len());
+
+            if m >= self.mantissa_max_bit_len() {
+                let is_positive = self.is_positive();
+                let msb_set = self.m.most_significant_word() & WORD_SIGNIFICANT_BIT != 0;
+
+                ret.m.set_zero();
+
+                if rm == RoundingMode::FromZero
+                    || (is_positive && rm == RoundingMode::Up)
+                    || (!is_positive && rm == RoundingMode::Down)
+                    || (m == self.mantissa_max_bit_len()
+                        && ((msb_set && rm == RoundingMode::ToOdd)
+                            || (rm == RoundingMode::ToEven
+                                && msb_set
+                                && count_leading_zeroes_skip_first(self.mantissa_digits())
+                                    != self.mantissa_max_bit_len())))
+                {
+                    // non zero for directed rounding modes,
+                    // non zero for rounding to even/odd when msb of self is the rounding bit
+                    *ret.m.digits_mut().last_mut().unwrap() = WORD_SIGNIFICANT_BIT;
+
+                    let e = -(n as isize - 1);
+                    if e < EXPONENT_MIN as isize {
+                        ret.e = EXPONENT_MIN;
+                        ret.subnormalize(e, rm);
+                    } else {
+                        ret.e = e as Exponent;
+                    }
+                } else {
+                    ret.e = 0;
+                }
+
+                ret.inexact |= true; // self was not zero
             } else {
-                if ret.m.round_mantissa(
+                let mut inexact = ret.inexact;
+
+                let ovf = ret.m.round_mantissa(
                     m,
                     rm,
                     self.is_positive(),
                     &mut false,
                     ret.m.max_bit_len(),
-                    &mut true,
-                ) {
+                    &mut inexact,
+                );
+
+                ret.inexact |= inexact;
+
+                if ovf {
                     if ret.e == EXPONENT_MAX {
                         return Err(Error::ExponentOverflow(ret.s));
                     }
+
                     ret.e += 1;
-                }
-                if ret.m.is_all_zero() {
-                    return Self::new(self.mantissa_max_bit_len());
-                }
-                if ret.m.is_subnormal() {
+                } else if ret.m.is_all_zero() {
+                    ret.m.set_bit_len(0);
+                    ret.e = 0;
+                } else if ret.m.is_subnormal() {
                     ret.m.update_bit_len();
                 }
             }
         }
+
         Ok(ret)
     }
 
@@ -1160,7 +1256,12 @@ impl BigFloatNumber {
             exp_from
         };
         let s = if rand::random::<u8>() & 1 == 0 { Sign::Pos } else { Sign::Neg };
-        Ok(BigFloatNumber { e, s, m })
+        Ok(BigFloatNumber {
+            e,
+            s,
+            m,
+            inexact: false,
+        })
     }
 
     /// Clones the number.
@@ -1173,6 +1274,7 @@ impl BigFloatNumber {
             e: self.e,
             s: self.s,
             m: self.m.clone()?,
+            inexact: self.inexact,
         })
     }
 
@@ -1184,24 +1286,7 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - InvalidArgument: the precision is incorrect.
     pub fn set_precision(&mut self, p: usize, rm: RoundingMode) -> Result<(), Error> {
-        self.set_precision_internal(p, rm, false, self.mantissa_max_bit_len(), &mut true)
-            .map(|_| {})
-    }
-
-    /// Sets the precision of `self` to `p`, and returns true if number became inexact representation of self.
-    /// If the new precision is smaller than the existing one, the number is rounded using specified rounding mode `rm`.
-    ///
-    /// ## Errors
-    ///
-    ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    ///  - InvalidArgument: the precision is incorrect.
-    pub fn set_precision_inexact(
-        &mut self,
-        p: usize,
-        rm: RoundingMode,
-        inexact: &mut bool,
-    ) -> Result<(), Error> {
-        self.set_precision_internal(p, rm, false, self.mantissa_max_bit_len(), inexact)
+        self.set_precision_internal(p, rm, false, self.mantissa_max_bit_len())
             .map(|_| {})
     }
 
@@ -1218,7 +1303,7 @@ impl BigFloatNumber {
         rm: RoundingMode,
         s: usize,
     ) -> Result<bool, Error> {
-        self.set_precision_internal(p, rm, true, s, &mut false)
+        self.set_precision_internal(p, rm, true, s)
     }
 
     fn set_precision_internal(
@@ -1227,32 +1312,28 @@ impl BigFloatNumber {
         rm: RoundingMode,
         mut check_roundable: bool,
         s: usize,
-        inexact: &mut bool,
     ) -> Result<bool, Error> {
         Self::p_assertion(p)?;
 
         if self.mantissa_max_bit_len() > p && p > 0 {
-            if rm == RoundingMode::None {
-                // rounding function will not check for inexactness, so check it here
-                if self
-                    .m
-                    .find_one_from(self.mantissa_max_bit_len() - p)
-                    .is_some()
-                {
-                    *inexact = true;
-                }
-            }
-            if self.m.round_mantissa(
+            let mut inexact = self.inexact;
+
+            let ovf = self.m.round_mantissa(
                 self.mantissa_max_bit_len() - p,
                 rm,
                 self.is_positive(),
                 &mut check_roundable,
                 s,
-                inexact,
-            ) {
+                &mut inexact,
+            );
+
+            self.inexact |= inexact;
+
+            if ovf {
                 if self.e == EXPONENT_MAX {
                     return Err(Error::ExponentOverflow(self.s));
                 }
+
                 self.e += 1;
             } else if self.m.is_all_zero() {
                 self.m.set_bit_len(0);
@@ -1266,6 +1347,8 @@ impl BigFloatNumber {
                     self.m.update_bit_len();
                 }
             }
+        } else if p == 0 && !self.is_zero() {
+            self.inexact |= true;
         }
 
         self.m.set_length(p)?;
@@ -1305,7 +1388,12 @@ impl BigFloatNumber {
         let s = Sign::Pos;
         let e = (m.max_bit_len() - shift) as Exponent;
 
-        Ok(BigFloatNumber { m, s, e })
+        Ok(BigFloatNumber {
+            m,
+            s,
+            e,
+            inexact: false,
+        })
     }
 
     /// Returns the raw mantissa words of a number.
@@ -1362,6 +1450,7 @@ impl BigFloatNumber {
                 m: Mantissa::from_words(p, &words)?,
                 e: (SZ - shift) as Exponent,
                 s: Sign::Pos,
+                inexact: false,
             })
         }
     }
@@ -1379,10 +1468,20 @@ impl BigFloatNumber {
     pub(crate) fn div_by_2(&mut self, rm: RoundingMode) {
         let e = self.exponent();
         if e == EXPONENT_MIN {
-            self.subnormalize(e as isize - 1, rm, &mut true);
+            self.subnormalize(e as isize - 1, rm);
         } else {
             self.set_exponent(e - 1);
         }
+    }
+
+    /// Returns true if self is `inexact`.
+    pub fn inexact(&self) -> bool {
+        self.inexact
+    }
+
+    /// Marks self as inexact if `inexact` is true, or exact otherwise.
+    pub fn set_inexact(&mut self, inexact: bool) {
+        self.inexact = inexact;
     }
 }
 
@@ -1471,6 +1570,7 @@ mod tests {
             WORD_BIT_SIZE * 3,
             Sign::Pos,
             123,
+            false,
         )
         .unwrap();
         d2 = BigFloatNumber::from_raw_parts(
@@ -1478,6 +1578,7 @@ mod tests {
             WORD_BIT_SIZE * 2,
             Sign::Pos,
             123,
+            false,
         )
         .unwrap();
         assert!(d1.cmp(&d1) == 0);
@@ -1506,6 +1607,7 @@ mod tests {
             WORD_BIT_SIZE * 2 + 1,
             Sign::Pos,
             EXPONENT_MIN,
+            false,
         )
         .unwrap();
         d2 = BigFloatNumber::from_raw_parts(
@@ -1513,6 +1615,7 @@ mod tests {
             WORD_BIT_SIZE * 2 + 2,
             Sign::Pos,
             EXPONENT_MIN,
+            false,
         )
         .unwrap();
         assert!(d1.cmp(&d1) == 0);
@@ -1529,6 +1632,7 @@ mod tests {
             WORD_BIT_SIZE * 2,
             Sign::Pos,
             123,
+            false,
         )
         .unwrap();
         d2 = BigFloatNumber::from_raw_parts(
@@ -1536,6 +1640,7 @@ mod tests {
             WORD_BIT_SIZE * 3,
             Sign::Pos,
             123,
+            false,
         )
         .unwrap();
 
@@ -1567,6 +1672,7 @@ mod tests {
             WORD_BIT_SIZE * 2 + 1,
             Sign::Pos,
             EXPONENT_MIN,
+            false,
         )
         .unwrap();
         d2 = BigFloatNumber::from_raw_parts(
@@ -1574,6 +1680,7 @@ mod tests {
             WORD_BIT_SIZE * 2 + 2,
             Sign::Neg,
             EXPONENT_MIN,
+            false,
         )
         .unwrap();
         assert!(d1.abs_cmp(&d1) == 0);
@@ -1744,13 +1851,20 @@ mod tests {
 
         // cancellation
         let w = WORD_MAX ^ 1 ^ 4 ^ 16;
-        d1 = BigFloatNumber::from_raw_parts(&[WORD_MAX, WORD_MAX], WORD_BIT_SIZE * 2, Sign::Pos, 0)
-            .unwrap();
+        d1 = BigFloatNumber::from_raw_parts(
+            &[WORD_MAX, WORD_MAX],
+            WORD_BIT_SIZE * 2,
+            Sign::Pos,
+            0,
+            false,
+        )
+        .unwrap();
         d2 = BigFloatNumber::from_raw_parts(
             &[w, WORD_MAX, WORD_MAX],
             WORD_BIT_SIZE * 3,
             Sign::Pos,
             0,
+            false,
         )
         .unwrap();
 
@@ -1764,6 +1878,7 @@ mod tests {
             WORD_BIT_SIZE * 3,
             Sign::Pos,
             0,
+            false,
         )
         .unwrap();
         d2 = BigFloatNumber::from_raw_parts(
@@ -1771,6 +1886,7 @@ mod tests {
             WORD_BIT_SIZE * 3,
             Sign::Pos,
             -16,
+            false,
         )
         .unwrap();
 
@@ -1783,6 +1899,7 @@ mod tests {
             WORD_BIT_SIZE * 2,
             Sign::Pos,
             0,
+            false,
         )
         .unwrap();
         d2 = BigFloatNumber::from_raw_parts(
@@ -1790,6 +1907,7 @@ mod tests {
             WORD_BIT_SIZE * 2,
             Sign::Pos,
             -16,
+            false,
         )
         .unwrap();
         let d4 = d1
@@ -1804,6 +1922,7 @@ mod tests {
             WORD_BIT_SIZE * 3,
             Sign::Pos,
             0,
+            false,
         )
         .unwrap();
         d2 = BigFloatNumber::from_raw_parts(
@@ -1811,6 +1930,7 @@ mod tests {
             WORD_BIT_SIZE * 3,
             Sign::Pos,
             -16,
+            false,
         )
         .unwrap();
 
@@ -1823,6 +1943,7 @@ mod tests {
             WORD_BIT_SIZE * 2,
             Sign::Pos,
             0,
+            false,
         )
         .unwrap();
         d2 = BigFloatNumber::from_raw_parts(
@@ -1830,6 +1951,7 @@ mod tests {
             WORD_BIT_SIZE * 2,
             Sign::Pos,
             -16,
+            false,
         )
         .unwrap();
         let d4 = d1
@@ -1845,6 +1967,7 @@ mod tests {
             WORD_BIT_SIZE * 3,
             Sign::Pos,
             0,
+            false,
         )
         .unwrap();
         d2 = BigFloatNumber::from_raw_parts(
@@ -1852,6 +1975,7 @@ mod tests {
             WORD_BIT_SIZE * 3,
             Sign::Pos,
             -16,
+            false,
         )
         .unwrap();
         d3 = d1.add(&d2, WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
@@ -2006,6 +2130,7 @@ mod tests {
             WORD_BIT_SIZE * 2,
             Sign::Pos,
             0,
+            false,
         )
         .unwrap();
         d2 = BigFloatNumber::from_raw_parts(
@@ -2013,6 +2138,7 @@ mod tests {
             WORD_BIT_SIZE * 2,
             Sign::Pos,
             -16,
+            false,
         )
         .unwrap();
 
@@ -2233,44 +2359,53 @@ mod tests {
         // decompose and compose
         let f1 = random_f64_exp(50, 25);
         d1 = BigFloatNumber::from_f64(p, f1).unwrap();
-        let (m, n, s, e) = d1.as_raw_parts();
-        d2 = BigFloatNumber::from_raw_parts(m, n, s, e).unwrap();
+        let (m, n, s, e, inexact) = d1.as_raw_parts();
+        d2 = BigFloatNumber::from_raw_parts(m, n, s, e, inexact).unwrap();
         assert!(d1.cmp(&d2) == 0);
         assert!(BigFloatNumber::from_raw_parts(
             &[1, WORD_SIGNIFICANT_BIT],
             WORD_BIT_SIZE * 3,
             Sign::Pos,
-            123
+            123,
+            false,
         )
         .is_err());
         assert!(BigFloatNumber::from_raw_parts(
             &[1, WORD_SIGNIFICANT_BIT],
             WORD_BIT_SIZE * 2,
             Sign::Pos,
-            123
+            123,
+            false,
         )
         .is_ok());
         assert!(BigFloatNumber::from_raw_parts(
             &[1, WORD_SIGNIFICANT_BIT],
             WORD_BIT_SIZE,
             Sign::Pos,
-            123
+            123,
+            false,
         )
         .is_err());
-        assert!(BigFloatNumber::from_raw_parts(&[0, 0], 0, Sign::Pos, 0).is_ok());
-        assert!(BigFloatNumber::from_raw_parts(&[1, 0], 0, Sign::Pos, 0).is_err());
+        assert!(BigFloatNumber::from_raw_parts(&[0, 0], 0, Sign::Pos, 0, false).is_ok());
+        assert!(BigFloatNumber::from_raw_parts(&[1, 0], 0, Sign::Pos, 0, false).is_err());
+        assert!(BigFloatNumber::from_raw_parts(
+            &[1, 2],
+            WORD_BIT_SIZE,
+            Sign::Pos,
+            EXPONENT_MIN,
+            false
+        )
+        .is_err());
         assert!(
-            BigFloatNumber::from_raw_parts(&[1, 2], WORD_BIT_SIZE, Sign::Pos, EXPONENT_MIN)
+            BigFloatNumber::from_raw_parts(&[1, 2], WORD_BIT_SIZE + 2, Sign::Pos, 123, false)
                 .is_err()
-        );
-        assert!(
-            BigFloatNumber::from_raw_parts(&[1, 2], WORD_BIT_SIZE + 2, Sign::Pos, 123).is_err()
         );
         assert!(BigFloatNumber::from_raw_parts(
             &[1, 2],
             WORD_BIT_SIZE + 2,
             Sign::Pos,
-            EXPONENT_MIN
+            EXPONENT_MIN,
+            false
         )
         .is_ok());
 
@@ -2734,9 +2869,9 @@ mod tests {
             for (rm, expected_mantissas) in rr.iter() {
                 for (m1, m2) in mantissas.iter().zip(expected_mantissas.iter()) {
                     // rounding
-                    let d1 = BigFloatNumber::from_raw_parts(m1, 128, sign, 64).unwrap();
+                    let d1 = BigFloatNumber::from_raw_parts(m1, 128, sign, 64, false).unwrap();
                     let d2 = d1.round(60, *rm).unwrap();
-                    let d3 = BigFloatNumber::from_raw_parts(m2, 128, sign, 64).unwrap();
+                    let d3 = BigFloatNumber::from_raw_parts(m2, 128, sign, 64, false).unwrap();
 
                     //println!("\n{:?} {:?}\nresult {:?}\nexpect {:?}", sign, rm, d2.m, d3.m);
 
@@ -2744,6 +2879,311 @@ mod tests {
                 }
             }
         }
+
+        // special cases
+        let testset = [
+            (
+                [0, WORD_SIGNIFICANT_BIT],
+                Sign::Pos,
+                -99,
+                99,
+                RoundingMode::None,
+                [0, 0],
+                0,
+            ),
+            (
+                [0, WORD_SIGNIFICANT_BIT],
+                Sign::Pos,
+                -99,
+                99,
+                RoundingMode::Up,
+                [0, WORD_SIGNIFICANT_BIT],
+                -98,
+            ),
+            (
+                [0, WORD_SIGNIFICANT_BIT],
+                Sign::Pos,
+                -99,
+                99,
+                RoundingMode::ToOdd,
+                [0, WORD_SIGNIFICANT_BIT],
+                -98,
+            ),
+            (
+                [0, WORD_SIGNIFICANT_BIT],
+                Sign::Pos,
+                -99,
+                99,
+                RoundingMode::ToEven,
+                [0, 0],
+                0,
+            ),
+            (
+                [1, WORD_SIGNIFICANT_BIT],
+                Sign::Pos,
+                -99,
+                99,
+                RoundingMode::ToEven,
+                [0, WORD_SIGNIFICANT_BIT],
+                -98,
+            ),
+            (
+                [1, WORD_SIGNIFICANT_BIT],
+                Sign::Pos,
+                -99,
+                99,
+                RoundingMode::Down,
+                [0, 0],
+                0,
+            ),
+            (
+                [0, WORD_SIGNIFICANT_BIT],
+                Sign::Neg,
+                -99,
+                99,
+                RoundingMode::Down,
+                [0, WORD_SIGNIFICANT_BIT],
+                -98,
+            ),
+            (
+                [1, WORD_SIGNIFICANT_BIT],
+                Sign::Pos,
+                -100,
+                99,
+                RoundingMode::ToEven,
+                [0, 0],
+                0,
+            ),
+            (
+                [1, WORD_SIGNIFICANT_BIT],
+                Sign::Pos,
+                -100,
+                99,
+                RoundingMode::ToOdd,
+                [0, 0],
+                0,
+            ),
+            (
+                [1, WORD_SIGNIFICANT_BIT],
+                Sign::Pos,
+                -100,
+                99,
+                RoundingMode::Down,
+                [0, 0],
+                0,
+            ),
+            (
+                [0, WORD_SIGNIFICANT_BIT],
+                Sign::Pos,
+                -100,
+                99,
+                RoundingMode::Up,
+                [0, WORD_SIGNIFICANT_BIT],
+                -98,
+            ),
+            (
+                [1, 1],
+                Sign::Pos,
+                EXPONENT_MIN,
+                EXPONENT_MIN.unsigned_abs() as usize + 63,
+                RoundingMode::Up,
+                [0, 2],
+                EXPONENT_MIN,
+            ),
+            (
+                [1, 1],
+                Sign::Pos,
+                EXPONENT_MIN,
+                EXPONENT_MIN.unsigned_abs() as usize + 63,
+                RoundingMode::Down,
+                [0, 0],
+                0,
+            ),
+            (
+                [1, 1],
+                Sign::Pos,
+                EXPONENT_MIN,
+                EXPONENT_MIN.unsigned_abs() as usize + 63,
+                RoundingMode::ToEven,
+                [0, 2],
+                EXPONENT_MIN,
+            ),
+            (
+                [0, 1],
+                Sign::Pos,
+                EXPONENT_MIN,
+                EXPONENT_MIN.unsigned_abs() as usize + 63,
+                RoundingMode::ToEven,
+                [0, 0],
+                0,
+            ),
+            (
+                [1, 1],
+                Sign::Pos,
+                EXPONENT_MIN,
+                EXPONENT_MIN.unsigned_abs() as usize + 63,
+                RoundingMode::ToOdd,
+                [0, 2],
+                EXPONENT_MIN,
+            ),
+            (
+                [0, 1],
+                Sign::Pos,
+                EXPONENT_MIN,
+                EXPONENT_MIN.unsigned_abs() as usize + 63,
+                RoundingMode::ToOdd,
+                [0, 2],
+                EXPONENT_MIN,
+            ),
+        ];
+        for (m1, s, e1, n, rm, m2, e2) in testset {
+            let d1 = BigFloatNumber::from_words(&m1, s, e1).unwrap();
+            let d2 = d1.round(n, rm).unwrap();
+            assert_eq!(d2.mantissa_digits(), m2);
+            assert_eq!(d2.sign(), s);
+            assert_eq!(d2.exponent(), e2);
+            assert!(!d1.inexact());
+            assert!(d2.inexact());
+        }
+    }
+
+    #[test]
+    fn test_inexact() {
+        // any arg is inexact
+        let mut d1 =
+            BigFloatNumber::from_words(&[0, 18 << (WORD_BIT_SIZE - 5)], Sign::Pos, 5).unwrap();
+        let mut d2 =
+            BigFloatNumber::from_words(&[0, 6 << (WORD_BIT_SIZE - 3)], Sign::Pos, 3).unwrap();
+
+        for op in [
+            BigFloatNumber::add,
+            BigFloatNumber::sub,
+            BigFloatNumber::mul,
+            BigFloatNumber::div,
+        ] {
+            let d3 = op(&d1, &d2, 256, RoundingMode::None).unwrap();
+            assert!(!d3.inexact());
+
+            d1.set_inexact(true);
+            let d3 = op(&d1, &d2, 256, RoundingMode::None).unwrap();
+            assert!(d3.inexact());
+
+            d2.set_inexact(true);
+            let d3 = op(&d1, &d2, 256, RoundingMode::None).unwrap();
+            assert!(d3.inexact());
+
+            d1.set_inexact(false);
+            let d3 = op(&d1, &d2, 256, RoundingMode::None).unwrap();
+            assert!(d3.inexact());
+
+            d2.set_inexact(false);
+        }
+
+        let d3 = d1.rem(&d2).unwrap();
+        assert!(!d3.inexact());
+
+        d1.set_inexact(true);
+        let d3 = d1.rem(&d2).unwrap();
+        assert!(d3.inexact());
+
+        d2.set_inexact(true);
+        let d3 = d1.rem(&d2).unwrap();
+        assert!(d3.inexact());
+
+        d1.set_inexact(false);
+        let d3 = d1.rem(&d2).unwrap();
+        assert!(d3.inexact());
+
+        // inexact because of rounding
+        let d1 = BigFloatNumber::from_words(&[2, 18 << (WORD_BIT_SIZE - 5)], Sign::Pos, 5).unwrap();
+        let d2 = BigFloatNumber::from_words(&[1, 6 << (WORD_BIT_SIZE - 3)], Sign::Pos, 3).unwrap();
+
+        assert!(!d1.inexact());
+        assert!(!d2.inexact());
+
+        for op in [
+            BigFloatNumber::add,
+            BigFloatNumber::sub,
+            BigFloatNumber::mul,
+            BigFloatNumber::div,
+        ] {
+            let d3 = op(&d1, &d2, 128, RoundingMode::None).unwrap();
+            assert!(d3.inexact());
+            let d3 = op(&d2, &d1, 128, RoundingMode::None).unwrap();
+            assert!(d3.inexact());
+        }
+
+        // inexact because of subnormalization
+        let d1 =
+            BigFloatNumber::from_words(&[1, WORD_SIGNIFICANT_BIT], Sign::Pos, EXPONENT_MIN / 2 - 1)
+                .unwrap();
+        let d2 =
+            BigFloatNumber::from_words(&[1, WORD_SIGNIFICANT_BIT], Sign::Pos, EXPONENT_MIN / 2)
+                .unwrap();
+
+        assert!(!d1.inexact());
+        assert!(!d2.inexact());
+
+        let d3 = d1.mul(&d2, 256, RoundingMode::None).unwrap();
+        assert!(d3.inexact());
+
+        let d1 = BigFloatNumber::from_words(&[1, WORD_SIGNIFICANT_BIT], Sign::Pos, EXPONENT_MIN)
+            .unwrap();
+        let d2 = BigFloatNumber::from_words(&[1, WORD_SIGNIFICANT_BIT], Sign::Pos, EXPONENT_MIN)
+            .unwrap();
+
+        assert!(!d1.inexact());
+        assert!(!d2.inexact());
+
+        let d3 = d1.mul(&d2, 256, RoundingMode::Up).unwrap();
+        assert!(d3.inexact());
+
+        let d3 = d1.mul(&d2, 256, RoundingMode::None).unwrap();
+        assert!(d3.inexact());
+
+        // set precision
+        let mut d1 = BigFloatNumber::from_words(&[0, WORD_MAX], Sign::Pos, 0).unwrap();
+        assert!(!d1.inexact());
+        d1.set_precision(WORD_BIT_SIZE, RoundingMode::ToEven)
+            .unwrap();
+        assert!(!d1.inexact());
+
+        let mut d1 = BigFloatNumber::from_words(&[0, WORD_MAX], Sign::Pos, 0).unwrap();
+        d1.set_inexact(true);
+        assert!(d1.inexact());
+        d1.set_precision(WORD_BIT_SIZE, RoundingMode::ToEven)
+            .unwrap();
+        assert!(d1.inexact());
+
+        let mut d1 =
+            BigFloatNumber::from_words(&[WORD_SIGNIFICANT_BIT, WORD_MAX], Sign::Pos, 0).unwrap();
+        assert!(!d1.inexact());
+        d1.set_precision(WORD_BIT_SIZE, RoundingMode::ToEven)
+            .unwrap();
+        assert!(d1.inexact());
+
+        // round
+        let d1 = BigFloatNumber::from_words(&[0, WORD_MAX], Sign::Pos, 0).unwrap();
+        assert!(!d1.inexact());
+        let d2 = d1.round(WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
+        assert!(!d2.inexact());
+
+        let mut d1 = BigFloatNumber::from_words(&[0, WORD_MAX], Sign::Pos, 0).unwrap();
+        d1.set_inexact(true);
+        assert!(d1.inexact());
+        let d2 = d1.round(WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
+        assert!(d2.inexact());
+
+        let d1 =
+            BigFloatNumber::from_words(&[WORD_SIGNIFICANT_BIT, WORD_MAX], Sign::Pos, 0).unwrap();
+        assert!(!d1.inexact());
+        let d2 = d1.round(WORD_BIT_SIZE, RoundingMode::None).unwrap();
+        assert!(d2.inexact());
+
+        let d1 = BigFloatNumber::from_words(&[0, WORD_MAX], Sign::Pos, -2).unwrap();
+        assert!(!d1.inexact());
+        let d2 = d1.round(1, RoundingMode::None).unwrap();
+        assert!(d2.inexact());
     }
 
     #[ignore]

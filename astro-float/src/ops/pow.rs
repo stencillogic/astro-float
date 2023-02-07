@@ -171,19 +171,6 @@ impl BigFloatNumber {
         e_int.mul(&e_fract, p, RoundingMode::FromZero)
     }
 
-    /// Compute the power of `self` to the integer `n` with precision `p`. The result is rounded using the rounding mode `rm`.
-    /// Precision is rounded upwards to the word size.
-    ///
-    /// ## Errors
-    ///
-    ///  - ExponentOverflow: the result is too large or too small number.
-    ///  - MemoryAllocation: failed to allocate memory.
-    ///  - InvalidArgument: the precision is incorrect.
-    pub fn powi(&self, n: usize, p: usize, rm: RoundingMode) -> Result<Self, Error> {
-        let mut inexact = false;
-        self.powi_internal(n, p, rm, &mut inexact)
-    }
-
     /// Compute the power of `self` to the signed integer `n` with precision `p`. The result is rounded using the rounding mode `rm`.
     /// Precision is rounded upwards to the word size.
     ///
@@ -213,11 +200,9 @@ impl BigFloatNumber {
             loop {
                 let p_x = p_wrk + 2;
 
-                let mut inexact = false;
-                let x =
-                    self.powi_internal(n.unsigned_abs(), p_x, RoundingMode::None, &mut inexact)?;
+                let x = self.powi(n.unsigned_abs(), p_x, RoundingMode::None)?;
 
-                if inexact {
+                if x.inexact {
                     let mut ret = ONE.div(&x, p_x, RoundingMode::None)?;
 
                     if ret.try_set_precision(p, rm, p_wrk)? {
@@ -233,14 +218,15 @@ impl BigFloatNumber {
         }
     }
 
-    /// Compute self^n, set inexact to true if the result is inexact.
-    fn powi_internal(
-        &self,
-        n: usize,
-        p: usize,
-        rm: RoundingMode,
-        inexact: &mut bool,
-    ) -> Result<Self, Error> {
+    /// Compute the power of `self` to the integer `n` with precision `p`. The result is rounded using the rounding mode `rm`.
+    /// Precision is rounded upwards to the word size.
+    ///
+    /// ## Errors
+    ///
+    ///  - ExponentOverflow: the result is too large or too small number.
+    ///  - MemoryAllocation: failed to allocate memory.
+    ///  - InvalidArgument: the precision is incorrect.
+    pub fn powi(&self, n: usize, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         let p = round_p(p);
 
         let mut i = n;
@@ -278,7 +264,7 @@ impl BigFloatNumber {
             let mut ret = || -> Result<Self, Error> {
                 let mut x = self.clone()?;
 
-                x.set_precision_inexact(p_x, RoundingMode::FromZero, inexact)?;
+                x.set_precision(p_x, RoundingMode::FromZero)?;
 
                 // TODO: consider windowing and precomputed values.
                 let mut bp = bit_pos;
@@ -286,10 +272,10 @@ impl BigFloatNumber {
                 while bp > 0 {
                     bp -= 1;
 
-                    x = x.mul_inexact(&x, p_x, RoundingMode::FromZero, inexact)?;
+                    x = x.mul(&x, p_x, RoundingMode::FromZero)?;
 
                     if j & WORD_SIGNIFICANT_BIT as usize != 0 {
-                        x = x.mul_inexact(self, p_x, RoundingMode::FromZero, inexact)?;
+                        x = x.mul(self, p_x, RoundingMode::FromZero)?;
                     }
 
                     j <<= 1;
@@ -309,7 +295,7 @@ impl BigFloatNumber {
                 }
             })?;
 
-            if *inexact {
+            if ret.inexact {
                 if ret.try_set_precision(p, rm, p_wrk)? {
                     return Ok(ret);
                 }

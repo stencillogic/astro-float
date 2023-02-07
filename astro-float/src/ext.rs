@@ -110,7 +110,7 @@ impl BigFloat {
     /// Returns the associated with `NaN` error, if any.
     pub fn err(&self) -> Option<Error> {
         match &self.inner {
-            Flavor::NaN(Some(e)) => Some(e.clone()),
+            Flavor::NaN(Some(e)) => Some(*e),
             _ => None,
         }
     }
@@ -816,8 +816,10 @@ impl BigFloat {
     }
 
     /// Decomposes `self` into raw parts.
-    /// The function returns a reference to a slice of words representing mantissa, numbers of significant bits in the mantissa, sign, and exponent.
-    pub fn as_raw_parts(&self) -> Option<(&[Word], usize, Sign, Exponent)> {
+    /// The function returns a reference to a slice of words representing mantissa,
+    /// numbers of significant bits in the mantissa, sign, exponent,
+    /// and a bool value which specify whether the number is inexact.
+    pub fn as_raw_parts(&self) -> Option<(&[Word], usize, Sign, Exponent, bool)> {
         if let Flavor::Value(v) = &self.inner {
             Some(v.as_raw_parts())
         } else {
@@ -831,6 +833,7 @@ impl BigFloat {
     ///  - `n` is the number of significant bits in mantissa.
     ///  - `s` is the sign.
     ///  - `e` is the exponent.
+    ///  - `inexact` specify whether number is inexact.
     ///
     /// This function returns NaN in the following situations:
     ///
@@ -838,8 +841,12 @@ impl BigFloat {
     /// - `n` is smaller than the number of bits in `m`, but `m` does not represent corresponding subnormal number mantissa.
     /// - `n` is smaller than the number of bits in `m`, but `e` is not the minimum possible exponent.
     /// - `n` or the size of `m` is too large (larger than isize::MAX / 2 + EXPONENT_MIN).
-    pub fn from_raw_parts(m: &[Word], n: usize, s: Sign, e: Exponent) -> Self {
-        Self::result_to_ext(BigFloatNumber::from_raw_parts(m, n, s, e), false, true)
+    pub fn from_raw_parts(m: &[Word], n: usize, s: Sign, e: Exponent, inexact: bool) -> Self {
+        Self::result_to_ext(
+            BigFloatNumber::from_raw_parts(m, n, s, e, inexact),
+            false,
+            true,
+        )
     }
 
     /// Constructs a number from the slice of words:
@@ -1028,6 +1035,23 @@ impl BigFloat {
             Flavor::Value(v) => v.convert_to_radix(rdx, rm),
             Flavor::NaN(_) => Err(Error::InvalidArgument),
             Flavor::Inf(_) => Err(Error::InvalidArgument),
+        }
+    }
+
+    /// Returns true if `self` is inexact. The function returns false if `self` is Inf or NaN.
+    pub fn inexact(&self) -> bool {
+        if let Flavor::Value(v) = &self.inner {
+            v.inexact()
+        } else {
+            false
+        }
+    }
+
+    /// Marks `self` as inexact if `inexact` is true, or exact otherwise.
+    /// The function has no effect if `self` is Inf or NaN.
+    pub fn set_inexact(&mut self, inexact: bool) {
+        if let Flavor::Value(v) = &mut self.inner {
+            v.set_inexact(inexact);
         }
     }
 }
@@ -2124,7 +2148,7 @@ mod tests {
         );
 
         let d1str = format!("{}", d1);
-        assert_eq!(&d1str, "1.234567890123456789012345678901234567889e-2");
+        assert_eq!(&d1str, "1.234567890123456789012345678901234567888e-2");
         assert!(BigFloat::from_str(&d1str).unwrap() == d1);
 
         let d1 = BigFloat::parse(
@@ -2134,7 +2158,7 @@ mod tests {
             RoundingMode::None,
         );
         let d1str = format!("{}", d1);
-        assert_eq!(&d1str, "-1.23456789012345678901234567890123456788918e+2");
+        assert_eq!(&d1str, "-1.23456789012345678901234567890123456788917e+2");
         assert_eq!(BigFloat::from_str(&d1str).unwrap(), d1);
 
         let d1str = format!("{}", INF_POS);

@@ -75,6 +75,10 @@ impl Mantissa {
     pub fn from_word(p: usize, mut d: Word) -> Result<Self, Error> {
         let mut m = Self::reserve_new(Self::bit_len_to_word_len(p))?;
 
+        if m.len() == 0 {
+            return Err(Error::InvalidArgument);
+        }
+
         m.fill(0);
 
         let l = m.len();
@@ -774,21 +778,35 @@ impl Mantissa {
         Self::maximize(&mut self.m)
     }
 
-    /// Set n bits to 0 from the right.
-    pub fn mask_bits(&mut self, mut n: usize) {
-        for v in self.m.iter_mut() {
-            if n >= WORD_BIT_SIZE {
-                *v = 0;
-                n -= WORD_BIT_SIZE;
-            } else {
-                let mask = WORD_MAX << n;
-                *v &= mask;
+    /// Set n bits to 0 from the left/right.
+    pub fn mask_bits(&mut self, mut n: usize, from_left: bool) {
+        if from_left {
+            for v in self.m.iter_mut().rev() {
+                if n >= WORD_BIT_SIZE {
+                    *v = 0;
+                    n -= WORD_BIT_SIZE;
+                } else {
+                    let mask = WORD_MAX >> n;
+                    *v &= mask;
+                    break;
+                }
+            }
+        } else {
+            for v in self.m.iter_mut() {
+                if n >= WORD_BIT_SIZE {
+                    *v = 0;
+                    n -= WORD_BIT_SIZE;
+                } else {
+                    let mask = WORD_MAX << n;
+                    *v &= mask;
+                    break;
+                }
             }
         }
     }
 
     /// Decompose to raw parts.
-    pub fn to_raw_parts(&self) -> (&[Word], usize) {
+    pub fn as_raw_parts(&self) -> (&[Word], usize) {
         (&self.m, self.n)
     }
 
