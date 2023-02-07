@@ -1475,11 +1475,13 @@ impl BigFloatNumber {
     }
 
     /// Returns true if self is `inexact`.
+    #[inline]
     pub fn inexact(&self) -> bool {
         self.inexact
     }
 
     /// Marks self as inexact if `inexact` is true, or exact otherwise.
+    #[inline]
     pub fn set_inexact(&mut self, inexact: bool) {
         self.inexact = inexact;
     }

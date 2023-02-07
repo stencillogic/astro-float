@@ -216,7 +216,7 @@ impl BigFloatNumber {
 
                 num.subnormalize(e, RoundingMode::None);
 
-                if num.inexact {
+                if num.inexact() {
                     num.m.digits_mut()[0] |= 1; // sticky for correct rounding when calling set_precision()
                 }
 

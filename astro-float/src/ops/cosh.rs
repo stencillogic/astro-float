@@ -23,7 +23,9 @@ impl BigFloatNumber {
         let p = round_p(p);
 
         if self.is_zero() {
-            return Self::from_word(1, p);
+            let mut ret = Self::from_word(1, p)?;
+            ret.set_inexact(self.inexact());
+            return Ok(ret);
         }
 
         compute_small_exp!(ONE, self.exponent() as isize * 2 - 1, false, p, rm);

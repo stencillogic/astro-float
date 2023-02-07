@@ -7,6 +7,7 @@ use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
 use crate::Consts;
+use crate::Sign;
 use crate::EXPONENT_MAX;
 use crate::WORD_BIT_SIZE;
 
@@ -25,7 +26,7 @@ impl BigFloatNumber {
 
         let cmpone = self.cmp(&ONE);
         if cmpone == 0 {
-            return Self::new(p);
+            return Self::new2(p, Sign::Pos, self.inexact());
         } else if cmpone < 0 {
             return Err(Error::InvalidArgument);
         }

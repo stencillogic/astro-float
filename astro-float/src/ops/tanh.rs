@@ -24,9 +24,7 @@ impl BigFloatNumber {
         let p = round_p(p);
 
         if self.is_zero() {
-            let mut ret = Self::new(p)?;
-            ret.set_sign(self.sign());
-            return Ok(ret);
+            return Self::new2(p, self.sign(), self.inexact());
         }
 
         // prevent overflow
@@ -61,14 +59,18 @@ impl BigFloatNumber {
                 Ok(v) => Ok(v),
                 Err(e) => match e {
                     Error::ExponentOverflow(_) => {
-                        if rm as u32 & 0b1100 != 0 {
+                        let mut ret = if rm as u32 & 0b1100 != 0 {
                             // rounding down or to zero
                             let mut ret = BigFloatNumber::max_value(p)?;
                             ret.set_exponent(0);
-                            return Ok(ret);
+                            ret
                         } else {
-                            return Self::from_i8(1, p);
-                        }
+                            Self::from_i8(1, p)?
+                        };
+
+                        ret.set_inexact(true);
+
+                        return Ok(ret);
                     }
                     Error::DivisionByZero => Err(Error::DivisionByZero),
                     Error::InvalidArgument => Err(Error::InvalidArgument),
@@ -77,14 +79,18 @@ impl BigFloatNumber {
             }?;
 
             if xexp.is_zero() {
-                if rm as u32 & 0b1010 != 0 {
+                let mut ret = if rm as u32 & 0b1010 != 0 {
                     // rounding up or to zero
                     let mut ret = BigFloatNumber::min_value(p)?;
                     ret.set_exponent(0);
-                    return Ok(ret);
+                    ret
                 } else {
-                    return Self::from_i8(-1, p);
-                }
+                    Self::from_i8(-1, p)?
+                };
+
+                ret.set_inexact(true);
+
+                return Ok(ret);
             }
 
             let d1 = xexp.sub(&ONE, p_x, RoundingMode::Down)?;

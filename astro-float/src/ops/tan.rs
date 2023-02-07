@@ -73,9 +73,7 @@ impl BigFloatNumber {
         let p = round_p(p);
 
         if self.is_zero() {
-            let mut ret = self.clone()?;
-            ret.set_precision(p, RoundingMode::None)?;
-            return Ok(ret);
+            return Self::new2(p, self.sign(), self.inexact());
         }
 
         compute_small_exp!(self, self.exponent() as isize * 2 - 1, false, p, rm);

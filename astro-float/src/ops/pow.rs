@@ -95,7 +95,9 @@ impl BigFloatNumber {
         let p = round_p(p);
 
         if self.is_zero() {
-            return Self::from_word(1, p);
+            let mut ret = Self::from_word(1, p)?;
+            ret.set_inexact(self.inexact());
+            return Ok(ret);
         }
 
         compute_small_exp!(ONE, self.exponent() as isize, self.is_negative(), p, rm);
@@ -202,7 +204,7 @@ impl BigFloatNumber {
 
                 let x = self.powi(n.unsigned_abs(), p_x, RoundingMode::None)?;
 
-                if x.inexact {
+                if x.inexact() {
                     let mut ret = ONE.div(&x, p_x, RoundingMode::None)?;
 
                     if ret.try_set_precision(p, rm, p_wrk)? {
@@ -263,6 +265,7 @@ impl BigFloatNumber {
 
             let mut ret = || -> Result<Self, Error> {
                 let mut x = self.clone()?;
+                x.set_inexact(false);
 
                 x.set_precision(p_x, RoundingMode::FromZero)?;
 
@@ -295,11 +298,12 @@ impl BigFloatNumber {
                 }
             })?;
 
-            if ret.inexact {
+            if ret.inexact() {
                 if ret.try_set_precision(p, rm, p_wrk)? {
                     return Ok(ret);
                 }
             } else {
+                ret.set_inexact(self.inexact());
                 ret.set_precision(p, rm)?;
                 return Ok(ret);
             }
@@ -405,7 +409,9 @@ impl BigFloatNumber {
         cc: &mut Consts,
     ) -> Result<Self, Error> {
         if n.is_zero() {
-            return Self::from_word(1, p);
+            let mut ret = Self::from_word(1, p)?;
+            ret.set_inexact(n.inexact());
+            return Ok(ret);
         } else if self.is_zero() {
             return if n.is_negative() {
                 if n.is_odd_int() {
@@ -414,18 +420,20 @@ impl BigFloatNumber {
                     Err(Error::ExponentOverflow(Sign::Pos))
                 }
             } else {
-                let mut ret = Self::new(p)?;
-                if n.is_odd_int() {
-                    ret.set_sign(self.sign());
-                }
-                Ok(ret)
+                let s = if n.is_odd_int() { self.sign() } else { Sign::Pos };
+                Self::new2(p, s, self.inexact())
             };
         } else if self.exponent() == 1 && self.abs_cmp(&ONE) == 0 {
-            return if n.is_odd_int() {
-                Self::from_i8(self.sign().to_int(), p)
+            // 1^n or (-1)^n
+            if n.is_odd_int() {
+                let mut ret = Self::from_i8(self.sign().to_int(), p)?;
+                ret.set_inexact(self.inexact() || n.inexact());
+                return Ok(ret);
             } else {
                 if self.is_positive() || n.is_int() {
-                    Self::from_word(1, p)
+                    let mut ret = Self::from_word(1, p)?;
+                    ret.set_inexact(self.inexact() || n.inexact());
+                    return Ok(ret);
                 } else {
                     return Err(Error::InvalidArgument);
                 }
@@ -443,7 +451,11 @@ impl BigFloatNumber {
 
                 let int = int as isize * n.sign().to_int() as isize;
 
-                return self.powsi(int, p, rm);
+                let mut ret = self.powsi(int, p, rm)?;
+
+                ret.set_inexact(ret.inexact() || n.inexact());
+
+                return Ok(ret);
             } else {
                 return Err(Error::InvalidArgument);
             }
@@ -451,9 +463,12 @@ impl BigFloatNumber {
             if n.is_positive() {
                 let mut ret = self.clone()?;
                 ret.set_precision(p, rm)?;
+                ret.set_inexact(ret.inexact() || n.inexact());
                 return Ok(ret);
             } else {
-                return ONE.div(self, p, rm);
+                let mut ret = ONE.div(self, p, rm)?;
+                ret.set_inexact(ret.inexact() || n.inexact());
+                return Ok(ret);
             }
         }
 
@@ -472,7 +487,7 @@ impl BigFloatNumber {
             Ok(v) => Ok(v),
             Err(e) => match e {
                 Error::ExponentOverflow(Sign::Neg) => {
-                    return Self::new(p);
+                    return Self::new2(p, Sign::Pos, n.inexact() || ln.inexact());
                 }
                 Error::ExponentOverflow(Sign::Pos) => Err(Error::ExponentOverflow(Sign::Pos)),
                 Error::DivisionByZero => Err(Error::DivisionByZero),

@@ -31,7 +31,7 @@ impl BigFloatNumber {
         let (e1, m1_opt) = self.normalize()?;
         let m1_normalized = m1_opt.as_ref().unwrap_or(&self.m);
 
-        let mut inexact = self.inexact;
+        let mut inexact = self.inexact();
 
         let (e_shift, m3) = m1_normalized.sqrt(p, rm, true, &mut inexact, e1 & 1 == 1)?;
 

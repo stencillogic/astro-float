@@ -24,9 +24,7 @@ impl BigFloatNumber {
         let p = round_p(p);
 
         if self.is_zero() {
-            let mut ret = Self::new(p)?;
-            ret.set_sign(self.sign());
-            return Ok(ret);
+            return Self::new2(p, self.sign(), self.inexact());
         }
 
         let onecmp = self.abs_cmp(&ONE);
@@ -39,6 +37,8 @@ impl BigFloatNumber {
 
             pi.set_exponent(pi.exponent() - 1);
             pi.set_sign(self.sign());
+
+            debug_assert!(pi.inexact());
 
             return Ok(pi);
         }

@@ -120,7 +120,7 @@ impl BigFloatNumber {
 
         // test for one.
         if e == 1 && additional_prec == m.mantissa_max_bit_len() + 5 {
-            return Self::new(p);
+            return Self::new2(p, Sign::Pos, self.inexact());
         }
 
         let mut p_inc = WORD_BIT_SIZE;
@@ -238,6 +238,7 @@ impl BigFloatNumber {
             }
 
             ret.set_precision(p, rm)?;
+            ret.set_inexact(m.inexact());
 
             return Ok(ret);
         }

@@ -36,7 +36,7 @@ impl BigFloatNumber {
             0
         };
 
-        let mut inexact = self.inexact;
+        let mut inexact = self.inexact();
 
         let (e_shift, m3) = m1_normalized.cbrt(p, rm, self.is_positive(), &mut inexact, exp_add)?;
 
