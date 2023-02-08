@@ -15,7 +15,8 @@ proc-macro = true
 [dependencies]
 quote = { version = "1", default-features = false }
 syn = { version = "1", default-features = false, features = ["parsing", "proc-macro", "full", "extra-traits", "printing"] }
+astro-float = { version = "0.5.0", default-features = false }
+proc-macro2 = { version = "1", default-features = false }
 
 [dev-dependencies]
-astro-float = "0.5.0"
 trybuild = "1.0"
