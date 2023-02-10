@@ -26,6 +26,9 @@ struct MacroInput {
 
 impl Parse for MacroInput {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let expr = input.parse()?;
+        input.parse::<Token![,]>()?;
+
         let p = input.parse()?;
         input.parse::<Token![,]>()?;
 
@@ -33,9 +36,6 @@ impl Parse for MacroInput {
         input.parse::<Token![,]>()?;
 
         let cc = input.parse()?;
-        input.parse::<Token![,]>()?;
-
-        let expr = input.parse()?;
 
         Ok(MacroInput { p, rm, cc, expr })
     }
@@ -490,7 +490,7 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let mut ret: astro_float::BigFloat = (#expr).into();
 
             if ret.inexact() {
-                if ret.try_set_precision(p, #rm, p_wrk) {
+                if ret.try_set_precision(p, #rm, p_rnd) {
                     break ret;
                 }
             } else {
