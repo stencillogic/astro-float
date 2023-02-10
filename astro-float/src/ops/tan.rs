@@ -181,8 +181,8 @@ impl BigFloatNumber {
             }
         }
 
-        let n0 = p2.mul(self, p, rm)?;
-        let n1 = n0.mul(&q1, p, rm)?;
+        let n0 = p2.mul(&q1, p, rm)?;
+        let n1 = n0.mul(self, p, rm)?;
         let n2 = p1.mul(&q2, p, rm)?;
 
         n1.div(&n2, p, rm)

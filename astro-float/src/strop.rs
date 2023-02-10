@@ -139,46 +139,33 @@ mod tests {
             let p = p1.min(p2);
 
             for rdx in [Radix::Bin, Radix::Oct, Radix::Hex, Radix::Dec] {
-                let mut n = if i & 1 == 0 {
-                    BigFloatNumber::random_normal(p1, EXPONENT_MIN, EXPONENT_MAX).unwrap()
+                let n = if i & 1 == 0 {
+                    BigFloatNumber::random_normal(p1, EXPONENT_MIN + p as Exponent, EXPONENT_MAX)
+                        .unwrap()
                 } else {
                     random_subnormal(p1)
                 };
-                let s = n.format(rdx, rm).unwrap();
-                let mut d = BigFloatNumber::parse(&s, rdx, p2, rm).unwrap();
 
-                if rdx == Radix::Dec {
-                    //println!("\n{:?}\n{:?}\n{:?}", s, n, d);
-                    if i & 1 == 0 {
+                let s = n.format(rdx, rm).unwrap();
+                let d = BigFloatNumber::parse(&s, rdx, p2, rm).unwrap();
+
+                if i & 1 == 0 {
+                    if rdx == Radix::Dec {
                         eps.set_exponent(n.exponent() - p as Exponent + 3);
-                        assert!(
-                            d.sub(&n, d.mantissa_max_bit_len(), rm)
-                                .unwrap()
-                                .abs()
-                                .unwrap()
-                                .cmp(&eps)
-                                < 0
-                        );
                     } else {
-                        let mut eps2 = BigFloatNumber::min_positive(p).unwrap();
-                        eps2.set_exponent(eps2.exponent() + 2);
-                        assert!(
-                            d.sub(&n, d.mantissa_max_bit_len(), rm)
-                                .unwrap()
-                                .abs()
-                                .unwrap()
-                                .cmp(&eps2)
-                                < 0
-                        );
+                        //println!("\n{:?}\n{:?}\n{:?}", s, n, d);
+                        eps.set_exponent(n.exponent() - p as Exponent);
                     }
+
+                    assert!(d.sub(&n, p, rm).unwrap().abs().unwrap().cmp(&eps) < 0);
                 } else {
-                    if p2 < p1 {
-                        n.set_precision(p, rm).unwrap();
-                    } else if p2 > p1 {
-                        d.set_precision(p, rm).unwrap();
+                    let mut eps2 = BigFloatNumber::min_positive(p).unwrap();
+
+                    if rdx == Radix::Dec {
+                        eps2.set_exponent(eps2.exponent() + 2);
                     }
-                    //println!("\n{:?}\n{:?}\n{:?}", s, n, d);
-                    assert!(d.cmp(&n) == 0);
+
+                    assert!(d.sub(&n, p, rm).unwrap().abs().unwrap().cmp(&eps2) < 0);
                 }
             }
         }

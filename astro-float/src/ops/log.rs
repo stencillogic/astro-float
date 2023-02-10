@@ -213,10 +213,7 @@ impl BigFloatNumber {
     pub fn log2(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
         let p = round_p(p);
 
-        // factoring: log2(self) = ln(x * 2^n) / ln(2) = ln(x) / ln(2) + n, 0.5 <= x < 1
-        // reduction: ln(x) = 2 * ln(sqrt(x))
-        // replacement: ln(x) = 2*atanh((x-1)/(x+1))
-        // atanh(x) = x + x^3/3 + x^5/5 + ...
+        // log2(self) = ln(x * 2^n) / ln(2) = ln(x) / ln(2) + n, 0.5 <= x < 1
 
         if self.is_zero() || self.is_negative() {
             return Err(Error::InvalidArgument);
