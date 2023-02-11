@@ -133,6 +133,9 @@ pub use crate::ops::consts::Consts;
 pub use crate::defs::EXPONENT_MAX;
 pub use crate::defs::EXPONENT_MIN;
 pub use crate::defs::WORD_BIT_SIZE;
+pub use crate::defs::WORD_MAX;
+pub use crate::defs::WORD_SIGNIFICANT_BIT;
+pub use crate::defs::WORD_BASE;
 
 #[cfg(test)]
 mod tests {
