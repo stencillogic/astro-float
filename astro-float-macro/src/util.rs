@@ -13,7 +13,9 @@ pub fn str_to_bigfloat_expr(s: &str, span: Span) -> Result<TokenStream, Error> {
     let f = BigFloat::from_str(s)
         .map_err(|_| Error::new(span, format!("failed to parse BigFloat from {}", s)))?;
 
-    let q = if let Some((m, n, s, e, inexact)) = f.as_raw_parts() {
+    let q = if f.inexact() {
+        quote!(astro_float::BigFloat::parse(#s, astro_float::Radix::Dec, p_wrk, astro_float::RoundingMode::None))
+    } else if let Some((m, n, s, e, inexact)) = f.as_raw_parts() {
         let stoken = if s.is_positive() {
             quote!(astro_float::Sign::Pos)
         } else {

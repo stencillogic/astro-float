@@ -41,6 +41,7 @@ impl Parse for MacroInput {
     }
 }
 
+// Algorithm of error computation.
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum ErrAlgo {
     None,
@@ -61,14 +62,7 @@ fn traverse_binary(expr: &ExprBinary, err: &mut Vec<usize>) -> Result<TokenStrea
             quote!(astro_float::BigFloat::add(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
         }
         BinOp::Sub(_) => {
-            let errs_idx = err.len();
-            quote!({
-                let (n, c) = sub_checked(&(#left_expr), &(#right_expr), &mut errs[#errs_idx], p_wrk);
-                if c {
-                    continue;
-                }
-                n
-            })
+            quote!(astro_float::BigFloat::sub(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
         }
         BinOp::Mul(_) => {
             quote!(astro_float::BigFloat::mul(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
@@ -83,11 +77,7 @@ fn traverse_binary(expr: &ExprBinary, err: &mut Vec<usize>) -> Result<TokenStrea
         )),
     };
 
-    if matches!(expr.op, BinOp::Sub(_)) {
-        err.push(SPEC_ADD_ERR);
-    } else {
-        err.push(1);
-    }
+    err.push(1);
 
     Ok(ts)
 }
@@ -195,7 +185,6 @@ fn two_arg_fun_cc(
             let newerr1 = compute_added_err_near_one(&arg1, p_wrk);
             let newerr2 = compute_added_err_near_one(&arg2, p_wrk);
             let newerr = newerr1 + newerr2 + 2;
-
             if errs[#errs_id] < newerr {
                 errs[#errs_id] = newerr;
                 continue;
@@ -442,43 +431,28 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let mut p_rnd = p + p_inc;
         let mut errs: [usize; #err_sz] = [#(#err, )*];
 
-        fn sub_checked(left: &BigFloat, right: &BigFloat, errs: &mut usize, p: usize) -> (BigFloat, bool) {
-            let tmp = astro_float::BigFloat::sub(&left, &right, p, astro_float::RoundingMode::None);
-
-            if tmp.is_zero() && tmp.inexact() {
-                *errs += p;
-                return (tmp, true);
-            } else if let Some(e) = tmp.exponent() {
-                if let Some(e1) = left.exponent() {
-                    if let Some(e2) = right.exponent() {
-                        let emax = e1.max(e2);
-                        if (emax as isize - e as isize) > (*errs as isize) {
-                            *errs = (emax - e) as usize;
-                            return (tmp, true);
-                        }
-                    }
-                }
-            }
-
-            (tmp, false)
-        }
-
         fn compute_added_err_near_one(arg: &astro_float::BigFloat, p: usize) -> usize {
             let d: astro_float::BigFloat;
-            let one = astro_float::BigFloat::from_word(1, 1);
-
-            if let Some(0) = arg.exponent() {
-                d = one.sub(&arg, p, astro_float::RoundingMode::None);
-            } else if let Some(1) = arg.exponent() {
-                d = arg.sub(&one, p, astro_float::RoundingMode::None);
-            } else {
+            if arg.is_zero() {
                 return 0;
             }
 
-            if d.is_zero() && d.inexact() {
-                return p;
-            } else if let Some(e) = d.exponent() {
-                return (-e) as usize;
+            if let Some(arg_sign) = arg.sign() {
+                let one = astro_float::BigFloat::from(arg_sign.to_int());
+
+                if let Some(0) = arg.exponent() {
+                    d = one.sub(&arg, p, astro_float::RoundingMode::None);
+                } else if let Some(1) = arg.exponent() {
+                    d = arg.sub(&one, p, astro_float::RoundingMode::None);
+                } else {
+                    return 0;
+                }
+
+                if d.is_zero() && d.inexact() {
+                    return p;
+                } else if let Some(e) = d.exponent() {
+                    return (-e) as usize;
+                }
             }
 
             return 0;
@@ -486,7 +460,6 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
         loop {
             let p_wrk = p_rnd.saturating_add(errs.iter().sum());
-
             let mut ret: astro_float::BigFloat = (#expr).into();
 
             if ret.inexact() {
