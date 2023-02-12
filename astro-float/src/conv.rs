@@ -246,7 +246,8 @@ impl BigFloatNumber {
         // mantissa part
         let leadzeroes = digits.iter().take_while(|&&x| x == 0).count();
 
-        let pf = round_p(((digits.len() - leadzeroes) * 3321928095 / 1000000000).max(p) + WORD_BIT_SIZE);
+        let pf =
+            round_p(((digits.len() - leadzeroes) * 3321928095 / 1000000000).max(p) + WORD_BIT_SIZE);
 
         let mut f = Self::new(pf)?;
 
@@ -561,7 +562,6 @@ mod tests {
 
     #[test]
     fn test_conv() {
-
         // basic tests
         let n = BigFloatNumber::from_f64(64, 0.031256789f64).unwrap();
 

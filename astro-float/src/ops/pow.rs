@@ -4,6 +4,7 @@ use crate::common::consts::{FOUR, THREE};
 use crate::common::util::{calc_add_cost, calc_mul_cost, round_p};
 use crate::ops::consts::Consts;
 use crate::ops::util::compute_small_exp;
+use crate::EXPONENT_MIN;
 use crate::{
     common::consts::ONE,
     defs::{Error, WORD_BIT_SIZE, WORD_SIGNIFICANT_BIT},
@@ -297,6 +298,11 @@ impl BigFloatNumber {
                     e
                 }
             })?;
+
+            if ret.exponent() == EXPONENT_MIN && ret.precision() == 1 {
+                ret.set_precision(p, rm)?;
+                return Ok(ret);
+            }
 
             if ret.inexact() {
                 if ret.try_set_precision(p, rm, p_wrk)? {

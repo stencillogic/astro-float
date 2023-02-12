@@ -866,6 +866,7 @@ impl Mantissa {
                     *inexact |= true;
                 }
             }
+
             return false;
         }
 

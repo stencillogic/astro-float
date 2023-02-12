@@ -1328,6 +1328,10 @@ impl BigFloatNumber {
 
             self.inexact |= inexact;
 
+            if check_roundable && self.inexact {
+                return Ok(false);
+            }
+
             if ovf {
                 if self.e == EXPONENT_MAX {
                     return Err(Error::ExponentOverflow(self.s));
@@ -1337,17 +1341,17 @@ impl BigFloatNumber {
             } else if self.m.is_all_zero() {
                 self.m.set_bit_len(0);
                 self.e = 0;
-            } else {
-                if check_roundable {
+            } else if self.is_subnormal() {
+                self.m.update_bit_len();
+            }
+        } else if p == 0 {
+            if self.is_zero() {
+                if check_roundable && self.inexact {
                     return Ok(false);
                 }
-
-                if self.is_subnormal() {
-                    self.m.update_bit_len();
-                }
+            } else {
+                self.inexact |= true;
             }
-        } else if p == 0 && !self.is_zero() {
-            self.inexact |= true;
         }
 
         self.m.set_length(p)?;

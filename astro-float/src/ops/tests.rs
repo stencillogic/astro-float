@@ -2,9 +2,7 @@
 
 use crate::common::consts::ONE;
 use crate::common::util::{count_leading_ones, count_leading_zeroes_skip_first, log2_floor};
-use crate::defs::{
-    RoundingMode, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE
-};
+use crate::defs::{RoundingMode, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
 use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
 use crate::{Exponent, Sign};
@@ -16,88 +14,9 @@ fn ttt() {
     let mut cc = Consts::new().unwrap();
     let mut eps = ONE.clone().unwrap();
 
-    let n = BigFloatNumber::from_words(&[1, WORD_MAX], Sign::Pos, -1).unwrap();
-    let m = n.atanh(128, RoundingMode::None, &mut cc).unwrap();
+    let n = BigFloatNumber::from_words(&[5361406682109507759, 14757395258802583785, 14757395258967641292, 14757395258967641292, 1921915347148, 0, 0, 18436087589833277440, 18446744073709551615, 18446744073709551615, 17726168133330272255], Sign::Pos, -100).unwrap();
+    let m = n.asin(12*64, RoundingMode::None, &mut cc).unwrap();
     println!("{:?}", m);
-
-    let n = BigFloatNumber::from_words(&[2, WORD_MAX], Sign::Pos, -1).unwrap();
-    let m = n.atanh(128, RoundingMode::None, &mut cc).unwrap();
-
-    println!("{:?}", m);
-    return;
-
-    for e1 in [0, -1, 30000, -2] {
-        for e2 in [0, -1, -30, 30000] {
-        for i in 0..1000 {
-            let p = (rand::random::<usize>() % 5 + 1) * WORD_BIT_SIZE;
-            let mut n = BigFloatNumber::random_normal(p, p as Exponent, p as Exponent).unwrap();
-            if i % 10 == 0 {
-                *n.m.digits_mut().last_mut().unwrap() |= WORD_MAX << 1;
-            } else if i % 10 == 1 {
-                *n.m.digits_mut().last_mut().unwrap() &= WORD_SIGNIFICANT_BIT | (WORD_MAX >> 1);
-            }
-            let mut m = n.add(&ONE, p, RoundingMode::None).unwrap();
-            n.set_exponent(n.exponent() - p as Exponent - e1);
-            m.set_exponent(m.exponent() - p as Exponent - e1);
-
-
-            let mut b = BigFloatNumber::random_normal(p, p as Exponent, p as Exponent).unwrap();
-            if i % 9 == 0 {
-                *b.m.digits_mut().last_mut().unwrap() |= WORD_MAX << 1;
-            } else if i % 9 == 1 {
-                *b.m.digits_mut().last_mut().unwrap() &= WORD_SIGNIFICANT_BIT | (WORD_MAX >> 1);
-            }
-            let mut c = b.add(&ONE, p, RoundingMode::None).unwrap();
-            b.set_exponent(b.exponent() - p as Exponent - e2);
-            c.set_exponent(c.exponent() - p as Exponent - e2);
-
-            let mut err = 6;
-            if e2 == 0 {
-                err += count_leading_ones(b.mantissa_digits());
-            } else if e2 == -1 {
-                err += count_leading_zeroes_skip_first(c.mantissa_digits());
-            }
-
-            println!("\n{:?}", n.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-            println!("{:?}", m.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-
-            println!("{:?}", b.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-            println!("{:?}", c.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-
-            if b.cmp(&ONE) == 0 || c.cmp(&ONE) == 0 { continue; }
-
-            let x = b.abs().unwrap().pow(&n.abs().unwrap(), p, RoundingMode::None, &mut cc).unwrap();
-            let y = c.abs().unwrap().pow(&m.abs().unwrap(), p, RoundingMode::None, &mut cc).unwrap();
-
-            let d = x.sub(&y, p, RoundingMode::None).unwrap().abs().unwrap();
-
-            eps.set_exponent(x.exponent() - p as Exponent + err as Exponent);
-
-            println!("{:?}", x.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-            println!("{:?}", y.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-            println!("{:?}", d.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-            println!("{:?}", eps.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-
-            assert!(d.cmp(&eps) < 0);
-        }
-        }
-    }
-    return;
-
-    let m = BigFloatNumber::from_words(&[2, WORD_MAX], Sign::Pos, 0).unwrap();
-
-    let s = "-1.101001010111011110101111111010101001101110111011100101111100000e-110001111001001101100110000000";
-    let n1 = BigFloatNumber::parse(s, crate::Radix::Bin, 128, RoundingMode::None).unwrap();
-    let s = "1.111101001011010100001110000111010010000001101110101001000000000010110100001111110011110010001110100111111011110000110011101101010011010110010011010011000010101100011100010110001101011111101000101010111110110001000100011001010101000111000111110011010110110111100101010101011100111110110010101011110111110101000100011101011000011001010101101111011000110010010000010010010011010100100001000101111100011001111111010101001101100000111101000010010000101010111100110101001100110111010010010101111101000100000111001101010111111010011111010110001000011010011111000010001000011011100111101101001000110101001100010100010010101001110000110111001010100100111110101010100111100010110010101101010101000001000100110100010000110100111100101110110101011110010111010110000000011011100111110101100110011100011000000001110101001010010111111101110111011111000000001101000111001000110111010000111010110010101001101101011111110001100001110000011001110000000101100011111010100001011110101100111111101011100100110101011010010101000001010111110110111011011101011100001000111101000010001100011110000010100011110000010010010100101111011001110011100001111001000010101100111111011000110000110101100011001100111001010101111100100101101101101110001100010111001110000110101011000001000100110000010001011010100011110110000011010100011101101001111111100010011010101000100011101011110100010010110001110101010100000100101111111010011000010010111001010001011111110111100011110110110110011000011101111110100001010010010000010110101000010101010010000000100011100001011000101010100111110010111011110001010110101011110000100011110010011010010111011010011010011100110111000111000011100011010111001111110010110100011000010111100101001001010111100101101101100100011100110000100111101101101010011111110110101101100000111100011100110010110100010001111101000101000001000011100010010101011000000001000111001101101010110100010111101111001000000011111010000101001000101001100110010010101010010001101110011000011100101010010100000010111000000110011100111010110011001101111101010100110001011101101101001000111000011111000111000110111000110011100111001111001000010001100110000100110111000001000000110100111011010011000010010011011011111111111010101111110011111001001101001101000101000110101100110001110011100001101101100110000101011110100100111010100001100100011110001111110000101001110111110011110110010000110011111101011100110111000110010011010011010000111111011000010111011111111111001000101101001110110010111100110000010001110000011110010001000110010111110001011111010101011000001100001101001101010001011101011e-101011";
-    let n2 = BigFloatNumber::parse(s, crate::Radix::Bin, 2560, RoundingMode::None).unwrap();
-
-    //let v = cc.pi(1984, RoundingMode::ToEven).unwrap();
-    let mut eps = ONE.clone().unwrap();
-
-    //let v = n2.sin(2496, RoundingMode::ToEven, &mut cc).unwrap();
-    //println!("{:?}", v);
-    //println!("{}", n1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-    //println!("{}", v.format(crate::Radix::Bin, RoundingMode::ToEven).unwrap());
 } */
 
 const fn get_prec_rng() -> usize {

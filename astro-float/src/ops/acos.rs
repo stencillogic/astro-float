@@ -1,11 +1,13 @@
 //! Arccosine.
 
+use crate::common::consts::ONE;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
 use crate::ops::consts::Consts;
 use crate::Exponent;
+use crate::Sign;
 use crate::WORD_BIT_SIZE;
 
 const ACOS_EXP_THRES: Exponent = -32;
@@ -21,6 +23,13 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     pub fn acos(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
         let p = round_p(p);
+
+        let cmpone = self.cmp(&ONE);
+        if cmpone == 0 {
+            return Self::new2(p, Sign::Pos, self.inexact());
+        } else if cmpone > 0 {
+            return Err(Error::InvalidArgument);
+        }
 
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
