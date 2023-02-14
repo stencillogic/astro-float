@@ -1,8 +1,8 @@
 //! BigFloat including finite numbers, `NaN`, and `Inf`.
 
-use crate::defs::DEFAULT_RM;
 use crate::defs::SignedWord;
 use crate::defs::DEFAULT_P;
+use crate::defs::DEFAULT_RM;
 use crate::num::BigFloatNumber;
 use crate::Consts;
 use crate::Error;
