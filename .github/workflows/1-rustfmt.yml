@@ -19,4 +19,4 @@ jobs:
     - name: Check formatting astro-float
       run: rustfmt --check ./astro-float/src/*.rs ./astro-float/tests/*.rs
     - name: Check formatting astro-float-macro
-      run: rustfmt --check ./astro-float-macro/src/*.rs
+      run: rustfmt --check ./astro-float-macro/src/*.rs ./astro-float-macro/tests/*.rs

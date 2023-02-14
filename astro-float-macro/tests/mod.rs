@@ -127,7 +127,7 @@ fn macro_run_err_test() {
     // exp
     for x in [
         BigFloat::from_words(&[234, 0, WORD_SIGNIFICANT_BIT], Sign::Pos, 1000000),
-        BigFloat::from_words(&[234, 0, WORD_SIGNIFICANT_BIT], Sign::Pos, 1000000),
+        BigFloat::from_words(&[234, 0, WORD_SIGNIFICANT_BIT], Sign::Pos, -1000000),
     ] {
         let y1 = x.ln(p * 3, RoundingMode::None, &mut cc);
         let mut z1 = y1.exp(p * 3, RoundingMode::None, &mut cc);
@@ -316,6 +316,107 @@ fn macro_run_err_test() {
     y2.set_precision(p, rm).unwrap();
 
     let z = expr!(tan(atan(x)), p, rm, &mut cc);
+
+    assert_ne!(y1, z);
+    assert_eq!(y2, z);
+
+    // sinh
+    let x = BigFloat::from_words(&[234, 0, WORD_SIGNIFICANT_BIT], Sign::Pos, 1000000);
+    let y1 = x.asinh(p * 3, RoundingMode::None, &mut cc);
+    let mut z1 = y1.sinh(p * 3, RoundingMode::None, &mut cc);
+    z1.set_precision(p, rm).unwrap();
+
+    let y2 = x.asinh(p, RoundingMode::None, &mut cc);
+    let z2 = y2.sinh(p, rm, &mut cc);
+
+    let y = expr!(sinh(asinh(x)), p, rm, &mut cc);
+
+    assert_eq!(z1, y);
+    assert_ne!(z2, y);
+
+    // cosh
+    let x = BigFloat::from_words(&[234, 0, WORD_SIGNIFICANT_BIT], Sign::Pos, 1000000);
+    let y1 = x.acosh(p * 3, RoundingMode::None, &mut cc);
+    let mut z1 = y1.cosh(p * 3, RoundingMode::None, &mut cc);
+    z1.set_precision(p, rm).unwrap();
+
+    let y2 = x.acosh(p, RoundingMode::None, &mut cc);
+    let z2 = y2.cosh(p, rm, &mut cc);
+
+    let y = expr!(cosh(acosh(x)), p, rm, &mut cc);
+
+    assert_eq!(z1, y);
+    assert_ne!(z2, y);
+
+    // tanh
+    let x = BigFloat::from_words(
+        &[
+            9236992107743244213,
+            15337583864450254957,
+            14091965535849219585,
+            16039319970605309248,
+        ],
+        Sign::Pos,
+        -98,
+    );
+    let y1 = x.tanh(p, rm, &mut cc);
+
+    let mut y2 = x.tanh(p + 1, RoundingMode::None, &mut cc);
+    y2.set_precision(p, rm).unwrap();
+
+    let z = expr!(tanh(x), p, rm, &mut cc);
+
+    assert_ne!(y1, z);
+    assert_eq!(y2, z);
+
+    // asinh
+    let x = BigFloat::from_words(
+        &[
+            15072532489182604725,
+            17813245450760625462,
+            6342009188451080896,
+            16404240047229715662,
+        ],
+        Sign::Pos,
+        -57,
+    );
+
+    let y1 = x.asinh(p, rm, &mut cc);
+
+    let mut y2 = x.asinh(p + 1, RoundingMode::None, &mut cc);
+    y2.set_precision(p, rm).unwrap();
+
+    let z = expr!(asinh(x), p, rm, &mut cc);
+
+    assert_ne!(y1, z);
+    assert_eq!(y2, z);
+
+    // acosh
+    let x = BigFloat::from_words(&[123, 123, WORD_SIGNIFICANT_BIT], Sign::Pos, -100);
+
+    let z = x.cosh(p + 1, RoundingMode::None, &mut cc);
+    let y1 = z.acosh(p, rm, &mut cc);
+
+    let z = x.cosh(p + 256, RoundingMode::None, &mut cc);
+    let mut y2 = z.acosh(p + 256, RoundingMode::None, &mut cc);
+    y2.set_precision(p, rm).unwrap();
+
+    let z = expr!(acosh(cosh(x)), p, rm, &mut cc);
+
+    assert_ne!(y1, z);
+    assert_eq!(y2, z);
+
+    // atanh
+    let x = BigFloat::from_words(&[123, 123, WORD_SIGNIFICANT_BIT], Sign::Pos, 7);
+
+    let z = x.tanh(p + 1, RoundingMode::None, &mut cc);
+    let y1 = z.atanh(p, rm, &mut cc);
+
+    let z = x.tanh(p + 256, RoundingMode::None, &mut cc);
+    let mut y2 = z.atanh(p + 256, RoundingMode::None, &mut cc);
+    y2.set_precision(p, rm).unwrap();
+
+    let z = expr!(atanh(tanh(x)), p, rm, &mut cc);
 
     assert_ne!(y1, z);
     assert_eq!(y2, z);
