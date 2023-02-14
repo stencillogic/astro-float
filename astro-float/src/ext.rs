@@ -1410,162 +1410,184 @@ impl From<BigFloatNumber> for BigFloat {
     }
 }
 
-impl From<&str> for BigFloat {
-    fn from(src: &str) -> Self {
-        BigFloat::parse(src, Radix::Dec, DEFAULT_P, DEFAULT_RM)
+use core::fmt::Binary;
+use core::fmt::Octal;
+use core::fmt::UpperHex;
+use core::{
+    cmp::Eq, cmp::Ordering, cmp::PartialEq, cmp::PartialOrd, fmt::Display, fmt::Formatter,
+    ops::Neg, str::FromStr,
+};
+
+impl Neg for BigFloat {
+    type Output = BigFloat;
+    fn neg(mut self) -> Self::Output {
+        self.inv_sign();
+        self
     }
 }
 
-/// Standard library features
-pub mod ops {
+impl Neg for &BigFloat {
+    type Output = BigFloat;
+    fn neg(self) -> Self::Output {
+        let mut ret = self.clone();
+        ret.inv_sign();
+        ret
+    }
+}
 
-    use crate::defs::DEFAULT_P;
-    use crate::defs::DEFAULT_RM;
-    use crate::BigFloat;
-    use crate::Radix;
+//
+// ordering traits
+//
 
-    use core::fmt::Binary;
-    use core::fmt::Octal;
-    use core::fmt::UpperHex;
-    use core::{
-        cmp::Eq, cmp::Ordering, cmp::PartialEq, cmp::PartialOrd, fmt::Display, fmt::Formatter,
-        ops::Neg, str::FromStr,
-    };
+impl PartialEq for BigFloat {
+    fn eq(&self, other: &Self) -> bool {
+        let cmp_result = BigFloat::cmp(self, other);
+        matches!(cmp_result, Some(0))
+    }
+}
 
-    impl Neg for BigFloat {
-        type Output = BigFloat;
-        fn neg(mut self) -> Self::Output {
-            self.inv_sign();
-            self
+impl<'a> PartialEq<&'a BigFloat> for BigFloat {
+    fn eq(&self, other: &&'a BigFloat) -> bool {
+        let cmp_result = BigFloat::cmp(self, other);
+        matches!(cmp_result, Some(0))
+    }
+}
+
+impl Eq for BigFloat {}
+
+impl PartialOrd for BigFloat {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let cmp_result = BigFloat::cmp(self, other);
+        match cmp_result {
+            Some(v) => {
+                if v > 0 {
+                    Some(Ordering::Greater)
+                } else if v < 0 {
+                    Some(Ordering::Less)
+                } else {
+                    Some(Ordering::Equal)
+                }
+            }
+            None => None,
         }
     }
+}
 
-    impl Neg for &BigFloat {
-        type Output = BigFloat;
-        fn neg(self) -> Self::Output {
-            let mut ret = self.clone();
-            ret.inv_sign();
+impl<'a> PartialOrd<&'a BigFloat> for BigFloat {
+    fn partial_cmp(&self, other: &&'a BigFloat) -> Option<Ordering> {
+        let cmp_result = BigFloat::cmp(self, other);
+        match cmp_result {
+            Some(v) => {
+                if v > 0 {
+                    Some(Ordering::Greater)
+                } else if v < 0 {
+                    Some(Ordering::Less)
+                } else {
+                    Some(Ordering::Equal)
+                }
+            }
+            None => None,
+        }
+    }
+}
+
+impl Default for BigFloat {
+    fn default() -> BigFloat {
+        BigFloat::new(DEFAULT_P)
+    }
+}
+
+impl FromStr for BigFloat {
+    type Err = ();
+
+    /// Returns parsed number or NAN in case of error.
+    fn from_str(src: &str) -> Result<BigFloat, Self::Err> {
+        Ok(BigFloat::parse(src, Radix::Dec, DEFAULT_P, DEFAULT_RM))
+    }
+}
+
+macro_rules! impl_from {
+    ($tt:ty, $fn:ident) => {
+        impl From<$tt> for BigFloat {
+            fn from(v: $tt) -> Self {
+                BigFloat::$fn(v, DEFAULT_P)
+            }
+        }
+    };
+}
+
+impl_from!(f32, from_f32);
+impl_from!(f64, from_f64);
+impl_from!(i8, from_i8);
+impl_from!(i16, from_i16);
+impl_from!(i32, from_i32);
+impl_from!(i64, from_i64);
+impl_from!(i128, from_i128);
+impl_from!(u8, from_u8);
+impl_from!(u16, from_u16);
+impl_from!(u32, from_u32);
+impl_from!(u64, from_u64);
+impl_from!(u128, from_u128);
+
+macro_rules! impl_format_rdx {
+    ($trait:ty, $rdx:path) => {
+        impl $trait for BigFloat {
+            fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
+                self.write_str(f, $rdx, DEFAULT_RM)
+            }
+        }
+    };
+}
+
+impl_format_rdx!(Binary, Radix::Bin);
+impl_format_rdx!(Octal, Radix::Oct);
+impl_format_rdx!(Display, Radix::Dec);
+impl_format_rdx!(UpperHex, Radix::Hex);
+
+/// A trait for conversion with additional arguments.
+pub trait FromExt<T> {
+    /// Convert `v` to BigFloat with precision `p` using rounding mode `rm`.
+    fn from_ext(v: T, p: usize, rm: RoundingMode) -> Self;
+}
+
+impl<T> FromExt<T> for BigFloat
+where
+    BigFloat: From<T>,
+{
+    fn from_ext(v: T, p: usize, rm: RoundingMode) -> Self {
+        let mut ret = BigFloat::from(v);
+        if let Err(err) = ret.set_precision(p, rm) {
+            BigFloat::nan(Some(err))
+        } else {
             ret
         }
     }
+}
 
-    //
-    // ordering traits
-    //
-
-    impl PartialEq for BigFloat {
-        fn eq(&self, other: &Self) -> bool {
-            let cmp_result = BigFloat::cmp(self, other);
-            matches!(cmp_result, Some(0))
-        }
+impl FromExt<&str> for BigFloat {
+    fn from_ext(v: &str, p: usize, rm: RoundingMode) -> Self {
+        BigFloat::parse(v, crate::Radix::Dec, p, rm)
     }
-
-    impl<'a> PartialEq<&'a BigFloat> for BigFloat {
-        fn eq(&self, other: &&'a BigFloat) -> bool {
-            let cmp_result = BigFloat::cmp(self, other);
-            matches!(cmp_result, Some(0))
-        }
-    }
-
-    impl Eq for BigFloat {}
-
-    impl PartialOrd for BigFloat {
-        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-            let cmp_result = BigFloat::cmp(self, other);
-            match cmp_result {
-                Some(v) => {
-                    if v > 0 {
-                        Some(Ordering::Greater)
-                    } else if v < 0 {
-                        Some(Ordering::Less)
-                    } else {
-                        Some(Ordering::Equal)
-                    }
-                }
-                None => None,
-            }
-        }
-    }
-
-    impl<'a> PartialOrd<&'a BigFloat> for BigFloat {
-        fn partial_cmp(&self, other: &&'a BigFloat) -> Option<Ordering> {
-            let cmp_result = BigFloat::cmp(self, other);
-            match cmp_result {
-                Some(v) => {
-                    if v > 0 {
-                        Some(Ordering::Greater)
-                    } else if v < 0 {
-                        Some(Ordering::Less)
-                    } else {
-                        Some(Ordering::Equal)
-                    }
-                }
-                None => None,
-            }
-        }
-    }
-
-    impl Default for BigFloat {
-        fn default() -> BigFloat {
-            BigFloat::new(DEFAULT_P)
-        }
-    }
-
-    impl FromStr for BigFloat {
-        type Err = ();
-
-        /// Returns parsed number or NAN in case of error.
-        fn from_str(src: &str) -> Result<BigFloat, Self::Err> {
-            Ok(BigFloat::parse(src, Radix::Dec, DEFAULT_P, DEFAULT_RM))
-        }
-    }
-
-    macro_rules! impl_from {
-        ($tt:ty, $fn:ident) => {
-            impl From<$tt> for BigFloat {
-                fn from(v: $tt) -> Self {
-                    BigFloat::$fn(v, DEFAULT_P)
-                }
-            }
-        };
-    }
-
-    impl_from!(f32, from_f32);
-    impl_from!(f64, from_f64);
-    impl_from!(i8, from_i8);
-    impl_from!(i16, from_i16);
-    impl_from!(i32, from_i32);
-    impl_from!(i64, from_i64);
-    impl_from!(i128, from_i128);
-    impl_from!(u8, from_u8);
-    impl_from!(u16, from_u16);
-    impl_from!(u32, from_u32);
-    impl_from!(u64, from_u64);
-    impl_from!(u128, from_u128);
-
-    macro_rules! impl_format_rdx {
-        ($trait:ty, $rdx:path) => {
-            impl $trait for BigFloat {
-                fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-                    self.write_str(f, $rdx, DEFAULT_RM)
-                }
-            }
-        };
-    }
-
-    impl_format_rdx!(Binary, Radix::Bin);
-    impl_format_rdx!(Octal, Radix::Oct);
-    impl_format_rdx!(Display, Radix::Dec);
-    impl_format_rdx!(UpperHex, Radix::Hex);
 }
 
 #[cfg(test)]
 mod tests {
 
-    use super::*;
     use crate::common::util::rand_p;
+    use crate::defs::DEFAULT_P;
+    use crate::ext::ONE;
+    use crate::ext::TWO;
+    use crate::BigFloat;
+    use crate::Consts;
+    use crate::Error;
+    use crate::Radix;
+    use crate::Sign;
+    use crate::INF_NEG;
+    use crate::INF_POS;
+    use crate::NAN;
     use crate::{defs::RoundingMode, WORD_BIT_SIZE};
 
+    use core::num::FpCategory;
     #[cfg(feature = "std")]
     use std::str::FromStr;
 

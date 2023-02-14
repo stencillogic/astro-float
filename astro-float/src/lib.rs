@@ -125,6 +125,7 @@ pub use crate::defs::RoundingMode;
 pub use crate::defs::Sign;
 pub use crate::defs::Word;
 pub use crate::ext::BigFloat;
+pub use crate::ext::FromExt;
 pub use crate::ext::INF_NEG;
 pub use crate::ext::INF_POS;
 pub use crate::ext::NAN;
