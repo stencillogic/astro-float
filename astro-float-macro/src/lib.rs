@@ -115,8 +115,9 @@ fn one_arg_fun_cc(
             let ret = #fun(&arg, p_wrk, astro_float::RoundingMode::None, cc);
 
             if let Some(e) = ret.exponent() {
-                if (errs[#errs_id] as isize) < 2 * (e as isize) - p as isize {
-                    errs[#errs_id] = 2 * (e as usize) - p;
+                let h = 2 * (e.unsigned_abs() as isize) - p as isize;
+                if (errs[#errs_id] as isize) < h {
+                    errs[#errs_id] = h as usize;
                     continue;
                 }
             }
@@ -191,8 +192,17 @@ fn two_arg_fun_cc(
             }
         }),
         ErrAlgo::Pow => quote!({
-            let newerr1 = compute_added_err_near_one(&arg1, p_wrk);
-            let newerr = newerr1 + EXPONENT_BIT_SIZE + 2;
+            let mut newerr = EXPONENT_BIT_SIZE + 2;
+            if let Some(en) = arg2.exponent() {
+                if let Some(1 | 0) = arg1.exponent() {
+                    if en > 0 {
+                        let c = compute_added_err_near_one(&arg1, p_wrk);
+                        if en as usize <= c + EXPONENT_BIT_SIZE {
+                            newerr += en as usize;
+                        } // result is zero or inf otherwise
+                    }
+                }
+            }
             if errs[#errs_id] < newerr {
                 errs[#errs_id] = newerr;
                 continue;
@@ -380,7 +390,9 @@ fn traverse_paren(expr: &ExprParen, err: &mut Vec<usize>) -> Result<TokenStream,
 }
 
 fn traverse_path(expr: &ExprPath) -> Result<TokenStream, Error> {
-    Ok(quote!(astro_float::BigFloat::from((#expr).clone())))
+    Ok(
+        quote!(astro_float::BigFloat::from_ext((#expr).clone(), p_wrk, astro_float::RoundingMode::None)),
+    )
 }
 
 fn traverse_unary(expr: &ExprUnary, err: &mut Vec<usize>) -> Result<TokenStream, Error> {
@@ -422,6 +434,8 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let err_sz = err.len();
 
     let ret = quote!({
+        use astro_float::FromExt;
+
         const EXPONENT_BIT_SIZE: usize = core::mem::size_of::<astro_float::Exponent>() * 8;
 
         let p: usize = #p;
@@ -460,6 +474,7 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
         loop {
             let p_wrk = p_rnd.saturating_add(errs.iter().sum());
+
             let mut ret: astro_float::BigFloat = (#expr).into();
 
             if ret.inexact() {

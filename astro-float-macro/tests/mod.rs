@@ -1,4 +1,6 @@
-use astro_float::{BigFloat, Consts, RoundingMode, Sign, WORD_MAX, WORD_SIGNIFICANT_BIT};
+use astro_float::{
+    BigFloat, Consts, RoundingMode, Sign, WORD_BIT_SIZE, WORD_MAX, WORD_SIGNIFICANT_BIT,
+};
 use astro_float_macro::expr;
 
 #[test]
@@ -106,15 +108,15 @@ fn macro_run_err_test() {
 
     // ln
     for x in [
-        BigFloat::from_words(&[234, WORD_SIGNIFICANT_BIT], Sign::Pos, -123),
-        BigFloat::from_words(&[234, WORD_SIGNIFICANT_BIT], Sign::Neg, -123),
+        BigFloat::from_words(&[234, 0, WORD_SIGNIFICANT_BIT], Sign::Pos, -123),
+        BigFloat::from_words(&[234, 0, WORD_SIGNIFICANT_BIT], Sign::Neg, -123),
     ] {
-        let y1 = x.exp(p * 2, RoundingMode::None, &mut cc);
-        let mut z1 = y1.ln(p * 2, RoundingMode::None, &mut cc);
+        let y1 = x.exp(p * 3, RoundingMode::None, &mut cc);
+        let mut z1 = y1.ln(p * 3, RoundingMode::None, &mut cc);
         z1.set_precision(p, rm).unwrap();
 
-        let y2 = x.exp(p, RoundingMode::None, &mut cc);
-        let z2 = y2.ln(p, RoundingMode::None, &mut cc);
+        let y2 = x.exp(p + 1, RoundingMode::None, &mut cc);
+        let z2 = y2.ln(p, rm, &mut cc);
 
         let y = expr!(ln(exp(x)), p, rm, &mut cc);
 
@@ -124,15 +126,15 @@ fn macro_run_err_test() {
 
     // exp
     for x in [
-        BigFloat::from_words(&[234, WORD_SIGNIFICANT_BIT], Sign::Pos, 1000000),
-        BigFloat::from_words(&[234, WORD_SIGNIFICANT_BIT], Sign::Pos, 1000000),
+        BigFloat::from_words(&[234, 0, WORD_SIGNIFICANT_BIT], Sign::Pos, 1000000),
+        BigFloat::from_words(&[234, 0, WORD_SIGNIFICANT_BIT], Sign::Pos, 1000000),
     ] {
-        let y1 = x.ln(p * 2, RoundingMode::None, &mut cc);
-        let mut z1 = y1.exp(p * 2, RoundingMode::None, &mut cc);
+        let y1 = x.ln(p * 3, RoundingMode::None, &mut cc);
+        let mut z1 = y1.exp(p * 3, RoundingMode::None, &mut cc);
         z1.set_precision(p, rm).unwrap();
 
         let y2 = x.ln(p, RoundingMode::None, &mut cc);
-        let z2 = y2.exp(p, RoundingMode::None, &mut cc);
+        let z2 = y2.exp(p, rm, &mut cc);
 
         let y = expr!(exp(ln(x)), p, rm, &mut cc);
 
@@ -149,8 +151,8 @@ fn macro_run_err_test() {
         let mut z1 = y1.log2(p * 2, RoundingMode::None, &mut cc);
         z1.set_precision(p, rm).unwrap();
 
-        let y2 = two.pow(&x, p, RoundingMode::None, &mut cc);
-        let z2 = y2.log2(p, RoundingMode::None, &mut cc);
+        let y2 = two.pow(&x, p + 1, RoundingMode::None, &mut cc);
+        let z2 = y2.log2(p, rm, &mut cc);
 
         let y = expr!(log2(pow(2, x)), p, rm, &mut cc);
 
@@ -167,8 +169,8 @@ fn macro_run_err_test() {
         let mut z1 = y1.log10(p * 2, RoundingMode::None, &mut cc);
         z1.set_precision(p, rm).unwrap();
 
-        let y2 = ten.pow(&x, p, RoundingMode::None, &mut cc);
-        let z2 = y2.log10(p, RoundingMode::None, &mut cc);
+        let y2 = ten.pow(&x, p + 1, RoundingMode::None, &mut cc);
+        let z2 = y2.log10(p, rm, &mut cc);
 
         let y = expr!(log10(pow(10, x)), p, rm, &mut cc);
 
@@ -189,8 +191,8 @@ fn macro_run_err_test() {
             let mut z1 = y1.log(&b, p * 4, RoundingMode::None, &mut cc);
             z1.set_precision(p, rm).unwrap();
 
-            let y2 = b.pow(&x, p, RoundingMode::None, &mut cc);
-            let z2 = y2.log(&b, p, RoundingMode::None, &mut cc);
+            let y2 = b.pow(&x, p + 1, RoundingMode::None, &mut cc);
+            let z2 = y2.log(&b, p, rm, &mut cc);
 
             let y = expr!(log(pow(b, x), b), p, rm, &mut cc);
 
@@ -199,69 +201,121 @@ fn macro_run_err_test() {
         }
     }
 
-    // pow
-    for x in [
-        BigFloat::from_words(&[234, WORD_SIGNIFICANT_BIT], Sign::Pos, 1000000),
-        BigFloat::from_words(&[234, WORD_SIGNIFICANT_BIT], Sign::Pos, -1000000),
-    ] {
-        for b in [
-            BigFloat::from_words(&[123, WORD_MAX], Sign::Pos, 0),
-            BigFloat::from_words(&[123, WORD_SIGNIFICANT_BIT], Sign::Pos, 1),
-        ] {
-            let y1 = x.log(&b, p * 4, RoundingMode::None, &mut cc);
-            let mut z1 = b.pow(&y1, p * 4, RoundingMode::None, &mut cc);
-            z1.set_precision(p, rm).unwrap();
+    let s1 = "1.0000000000000000023456";
+    let s2 = "1.234567890123456789e+20";
+    let b = BigFloat::parse(s1, astro_float::Radix::Dec, p + 192, RoundingMode::None);
+    let n = BigFloat::parse(s2, astro_float::Radix::Dec, p + 192, RoundingMode::None);
+    let y1 = b.pow(&n, p, rm, &mut cc);
+    let mut y2 = b.pow(&n, p + 192, RoundingMode::None, &mut cc);
+    y2.set_precision(p, rm).unwrap();
 
-            let y2 = x.log(&b, p, RoundingMode::None, &mut cc);
-            let z2 = b.pow(&y2, p, RoundingMode::None, &mut cc);
+    let z = expr!(pow(s1, s2), p, rm, &mut cc);
 
-            let y = expr!(pow(b, log(x, b)), p, rm, &mut cc);
+    assert_eq!(y2, z);
+    assert_ne!(y1, z);
 
-            assert_eq!(z1, y);
-            assert_ne!(z2, y);
-        }
-    }
+    let s1 = "0.9999999999999999923456";
+    let s2 = "-1.234567890123456789e+25";
+    let b = BigFloat::parse(s1, astro_float::Radix::Dec, p + 192, RoundingMode::None);
+    let n = BigFloat::parse(s2, astro_float::Radix::Dec, p + 192, RoundingMode::None);
+    let y1 = b.pow(&n, p, rm, &mut cc);
+    let mut y2 = b.pow(&n, p + 192, RoundingMode::None, &mut cc);
+    y2.set_precision(p, rm).unwrap();
+
+    let z = expr!(pow(s1, s2), p, rm, &mut cc);
+
+    assert_eq!(y2, z);
+    assert_ne!(y1, z);
 
     // sin
-    let n = BigFloat::parse(
-        "1.234567890123456789e+77",
-        astro_float::Radix::Dec,
-        128,
-        RoundingMode::None,
-    );
+    let s1 = "1.234567890123456789e+77";
+    let n = BigFloat::parse(s1, astro_float::Radix::Dec, 128, RoundingMode::None);
     let y1 = n.sin(128, rm, &mut cc);
-    let n = BigFloat::parse(
-        "1.234567890123456789e+77",
-        astro_float::Radix::Dec,
-        320,
-        RoundingMode::None,
-    );
-    let mut y2 = n.sin(320, rm, &mut cc);
+    let n = BigFloat::parse(s1, astro_float::Radix::Dec, 320, RoundingMode::None);
+    let mut y2 = n.sin(320, RoundingMode::None, &mut cc);
     y2.set_precision(128, rm).unwrap();
 
-    let z = expr!(sin("1.234567890123456789e+77"), 128, rm, &mut cc);
+    let z = expr!(sin(s1), 128, rm, &mut cc);
 
     assert_ne!(y1, z);
     assert_eq!(y2, z);
 
     // cos
-    let n = BigFloat::parse(
-        "1.234567890123456789e+77",
-        astro_float::Radix::Dec,
-        128,
-        RoundingMode::None,
-    );
+    let n = BigFloat::parse(s1, astro_float::Radix::Dec, 128, RoundingMode::None);
     let y1 = n.cos(128, rm, &mut cc);
-    let n = BigFloat::parse(
-        "1.234567890123456789e+77",
-        astro_float::Radix::Dec,
-        320,
-        RoundingMode::None,
-    );
-    let mut y2 = n.cos(320, rm, &mut cc);
+    let n = BigFloat::parse(s1, astro_float::Radix::Dec, 320, RoundingMode::None);
+    let mut y2 = n.cos(320, RoundingMode::None, &mut cc);
     y2.set_precision(128, rm).unwrap();
 
-    let z = expr!(cos("1.234567890123456789e+77"), 128, rm, &mut cc);
+    let z = expr!(cos(s1), 128, rm, &mut cc);
+
+    assert_ne!(y1, z);
+    assert_eq!(y2, z);
+
+    // tan
+    let s1 = "1.1001001000011111101101010100010001000010110100011000010001101001100010011000110011000101000101110000000110111000001110011010001e+0";
+    let n = BigFloat::parse(s1, astro_float::Radix::Bin, p, RoundingMode::None);
+    let y1 = n.tan(p, rm, &mut cc);
+
+    let n = BigFloat::parse(
+        s1,
+        astro_float::Radix::Dec,
+        y1.exponent().unwrap() as usize * 2 + p,
+        RoundingMode::None,
+    );
+    let mut y2 = n.tan(
+        y1.exponent().unwrap() as usize * 2 + p,
+        RoundingMode::None,
+        &mut cc,
+    );
+    y2.set_precision(p, rm).unwrap();
+
+    let z = expr!(tan(s1), p, rm, &mut cc);
+
+    assert_ne!(y1, z);
+    assert_eq!(y2, z);
+
+    // asin
+    let mut x = cc.pi(p - WORD_BIT_SIZE, RoundingMode::None);
+    x.set_exponent(1);
+
+    let z = x.sin(p + 1, RoundingMode::None, &mut cc);
+    let y1 = z.asin(p, rm, &mut cc);
+
+    let z = x.sin(p * 2, RoundingMode::None, &mut cc);
+    let mut y2 = z.asin(p * 2, RoundingMode::None, &mut cc);
+    y2.set_precision(p, rm).unwrap();
+
+    let z = expr!(asin(sin(x)), p, rm, &mut cc);
+
+    assert_ne!(y1, z);
+    assert_eq!(y2, z);
+
+    // acos
+    let x = BigFloat::from_words(&[234, WORD_MAX], Sign::Pos, -100);
+
+    let z = x.cos(p + 1, RoundingMode::None, &mut cc);
+    let y1 = z.acos(p, rm, &mut cc);
+
+    let z = x.cos(p * 3, RoundingMode::None, &mut cc);
+    let mut y2 = z.acos(p * 3, RoundingMode::None, &mut cc);
+    y2.set_precision(p, rm).unwrap();
+
+    let z = expr!(acos(cos(x)), p, rm, &mut cc);
+
+    assert_ne!(y1, z);
+    assert_eq!(y2, z);
+
+    // atan
+    let x = BigFloat::from_words(&[234, WORD_MAX], Sign::Neg, 128);
+    let z = x.atan(p + 1, RoundingMode::None, &mut cc);
+    let y1 = z.tan(p, rm, &mut cc);
+
+    let z = x.atan(p + 256, RoundingMode::None, &mut cc);
+    let mut y2 = z.tan(p + 256, RoundingMode::None, &mut cc);
+    y2.set_precision(p, rm).unwrap();
+
+    let z = expr!(tan(atan(x)), p, rm, &mut cc);
 
     assert_ne!(y1, z);
     assert_eq!(y2, z);
