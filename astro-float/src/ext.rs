@@ -1,5 +1,6 @@
 //! BigFloat including finite numbers, `NaN`, and `Inf`.
 
+use crate::defs::DEFAULT_RM;
 use crate::defs::SignedWord;
 use crate::defs::DEFAULT_P;
 use crate::num::BigFloatNumber;
@@ -1406,6 +1407,12 @@ impl From<BigFloatNumber> for BigFloat {
         BigFloat {
             inner: Flavor::Value(x),
         }
+    }
+}
+
+impl From<&str> for BigFloat {
+    fn from(src: &str) -> Self {
+        BigFloat::parse(src, Radix::Dec, DEFAULT_P, DEFAULT_RM)
     }
 }
 

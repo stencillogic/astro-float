@@ -312,6 +312,8 @@ pub fn count_leading_ones(m: &[Word]) -> usize {
                 v <<= 1;
                 ret += 1;
             }
+
+            break;
         }
     }
 
