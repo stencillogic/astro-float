@@ -15,8 +15,7 @@ proc-macro = true
 [dependencies]
 quote = { version = "1", default-features = false }
 syn = { version = "1", default-features = false, features = ["parsing", "proc-macro", "full", "extra-traits", "printing"] }
-#astro-float = { version = "0.5.0", default-features = false }
-astro-float = { git = "https://github.com/stencillogic/astro-float", rev = "4214a894bfb36f3d5de717ecf74fc1d0fdec35f0" }
+astro-float = { version = "0.6.0", default-features = false }
 proc-macro2 = { version = "1", default-features = false }
 
 [dev-dependencies]
