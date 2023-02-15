@@ -1,5 +1,11 @@
 # Release notes
 
+**0.6.0**
+
+ - `expr!` macro implemented.
+ - BigFloat stores information about its inexactness.
+ - `FromExt` conversion trait added for BigFloat.
+
 **0.5.0**
 
  - Release notes introduction.
