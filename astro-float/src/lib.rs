@@ -21,6 +21,10 @@
 //! Before the result is returned to the user, the result is rounded according to the rounding mode and reduced to the expected precision.
 //!
 //!
+//! The result of an operation is marked as inexact if some of the bits were rounded when producing the result,
+//! or if any of the operation's arguments were marked as inexact. The information about exactness is used to achieve correct rounding.
+//!
+//!
 //! `BigFloat` can be parsed from a string and formatted into a string using binary, octal, decimal, or hexadecimal representation.
 //!
 //!
@@ -103,7 +107,7 @@ extern crate alloc;
 
 mod common;
 mod conv;
-//mod ctx;
+pub mod ctx;
 mod defs;
 mod ext;
 mod for_3rd;
@@ -113,11 +117,6 @@ mod ops;
 mod parser;
 mod strop;
 
-//pub use crate::ctx::with_consts;
-//pub use crate::ctx::with_precision;
-//pub use crate::ctx::with_rounding_mode;
-//pub use crate::ctx::with_value;
-//pub use crate::ctx::Context;
 pub use crate::defs::Error;
 pub use crate::defs::Exponent;
 pub use crate::defs::Radix;

@@ -1546,7 +1546,7 @@ impl_format_rdx!(UpperHex, Radix::Hex);
 
 /// A trait for conversion with additional arguments.
 pub trait FromExt<T> {
-    /// Convert `v` to BigFloat with precision `p` using rounding mode `rm`.
+    /// Converts `v` to BigFloat with precision `p` using rounding mode `rm`.
     fn from_ext(v: T, p: usize, rm: RoundingMode) -> Self;
 }
 
