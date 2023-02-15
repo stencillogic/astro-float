@@ -1,6 +1,6 @@
-use astro_float::BigFloat;
-use astro_float::Consts;
-use astro_float::RoundingMode;
+use astro_float_num::BigFloat;
+use astro_float_num::Consts;
+use astro_float_num::RoundingMode;
 use astro_float_macro::expr;
 
 fn main() {

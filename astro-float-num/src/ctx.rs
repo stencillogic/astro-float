@@ -98,7 +98,6 @@ impl Context {
 /// # use astro_float_num::RoundingMode;
 /// # use astro_float_num::Consts;
 /// # use astro_float_num::ctx::Contextable;
-///
 /// let p = 123;
 /// let rm = RoundingMode::Down;
 /// let mut cc = Consts::new().expect("Constants cache allocated");

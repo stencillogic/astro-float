@@ -139,4 +139,4 @@
 extern crate alloc;
 
 pub use astro_float_macro::*;
-pub use astro_float::*;
+pub use astro_float_num::*;

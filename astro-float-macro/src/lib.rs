@@ -1,10 +1,10 @@
 //! Macros for multiple precision floating point numbers library `astro-float`.
-//! 
+//!
 //! See main crate [docs](https://docs.rs/astro-float/latest/astro_float/).
 
 mod util;
 
-use astro_float::Exponent;
+use astro_float_num::Exponent;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
@@ -53,18 +53,18 @@ fn traverse_binary(expr: &ExprBinary, err: &mut Vec<usize>) -> Result<TokenStrea
 
     let ts = match expr.op {
         BinOp::Add(_) => {
-            quote!(astro_float::BigFloat::add(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
+            quote!(astro_float_num::BigFloat::add(&(#left_expr), &(#right_expr), p_wrk, astro_float_num::RoundingMode::None))
         }
         BinOp::Sub(_) => {
-            quote!(astro_float::BigFloat::sub(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
+            quote!(astro_float_num::BigFloat::sub(&(#left_expr), &(#right_expr), p_wrk, astro_float_num::RoundingMode::None))
         }
         BinOp::Mul(_) => {
-            quote!(astro_float::BigFloat::mul(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
+            quote!(astro_float_num::BigFloat::mul(&(#left_expr), &(#right_expr), p_wrk, astro_float_num::RoundingMode::None))
         }
         BinOp::Div(_) => {
-            quote!(astro_float::BigFloat::div(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
+            quote!(astro_float_num::BigFloat::div(&(#left_expr), &(#right_expr), p_wrk, astro_float_num::RoundingMode::None))
         }
-        BinOp::Rem(_) => quote!(astro_float::BigFloat::rem(&(#left_expr), &(#right_expr))),
+        BinOp::Rem(_) => quote!(astro_float_num::BigFloat::rem(&(#left_expr), &(#right_expr))),
         _ => return Err(Error::new(
             expr.span(),
             "unexpected binary operator. Only \"+\", \"-\", \"*\", \"/\", and \"%\" are allowed.",
@@ -85,7 +85,7 @@ fn one_arg_fun(
     check_arg_num(1, expr)?;
     let arg = traverse_expr(&expr.args[0], err)?;
     err.push(added_err);
-    Ok(quote!(#fun(&(#arg), p_wrk, astro_float::RoundingMode::None)))
+    Ok(quote!(#fun(&(#arg), p_wrk, astro_float_num::RoundingMode::None)))
 }
 
 fn one_arg_fun_cc(
@@ -106,7 +106,7 @@ fn one_arg_fun_cc(
         let ts = quote!({
             let arg = #arg;
 
-            let ret = #fun(&arg, p_wrk, astro_float::RoundingMode::None, cc);
+            let ret = #fun(&arg, p_wrk, astro_float_num::RoundingMode::None, cc);
 
             if let Some(e) = ret.exponent() {
                 let h = 2 * (e.unsigned_abs() as isize) - p as isize;
@@ -157,7 +157,7 @@ fn one_arg_fun_cc(
 
             #errcheck
 
-            #fun(&arg, p_wrk, astro_float::RoundingMode::None, cc)
+            #fun(&arg, p_wrk, astro_float_num::RoundingMode::None, cc)
         }))
     }
 }
@@ -213,7 +213,7 @@ fn two_arg_fun_cc(
 
         #errcheck
 
-        #fun(&arg1, &arg2, p_wrk, astro_float::RoundingMode::None, cc)
+        #fun(&arg1, &arg2, p_wrk, astro_float_num::RoundingMode::None, cc)
     }))
 }
 
@@ -223,130 +223,130 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
     if let Expr::Path(fun) = expr.func.as_ref() {
         if let Some(fname) = fun.path.get_ident() {
             let ts = match fname.to_string().as_str() {
-                "recip" => one_arg_fun(quote!(astro_float::BigFloat::reciprocal), expr, 2, err),
-                "sqrt" => one_arg_fun(quote!(astro_float::BigFloat::sqrt), expr, 1, err),
-                "cbrt" => one_arg_fun(quote!(astro_float::BigFloat::cbrt), expr, 1, err),
+                "recip" => one_arg_fun(quote!(astro_float_num::BigFloat::reciprocal), expr, 2, err),
+                "sqrt" => one_arg_fun(quote!(astro_float_num::BigFloat::sqrt), expr, 1, err),
+                "cbrt" => one_arg_fun(quote!(astro_float_num::BigFloat::cbrt), expr, 1, err),
                 "ln" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::ln),
+                    quote!(astro_float_num::BigFloat::ln),
                     expr,
                     SPEC_ADD_ERR,
                     err,
                     ErrAlgo::Log,
                 ),
                 "log2" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::log2),
+                    quote!(astro_float_num::BigFloat::log2),
                     expr,
                     SPEC_ADD_ERR,
                     err,
                     ErrAlgo::Log,
                 ),
                 "log10" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::log10),
+                    quote!(astro_float_num::BigFloat::log10),
                     expr,
                     SPEC_ADD_ERR,
                     err,
                     ErrAlgo::Log,
                 ),
                 "log" => two_arg_fun_cc(
-                    quote!(astro_float::BigFloat::log),
+                    quote!(astro_float_num::BigFloat::log),
                     expr,
                     SPEC_ADD_ERR * 2,
                     err,
                     ErrAlgo::Log2,
                 ),
                 "exp" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::exp),
+                    quote!(astro_float_num::BigFloat::exp),
                     expr,
                     EXPONENT_BIT_SIZE,
                     err,
                     ErrAlgo::None,
                 ),
                 "pow" => two_arg_fun_cc(
-                    quote!(astro_float::BigFloat::pow),
+                    quote!(astro_float_num::BigFloat::pow),
                     expr,
                     EXPONENT_BIT_SIZE + SPEC_ADD_ERR,
                     err,
                     ErrAlgo::Pow,
                 ),
                 "sin" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::sin),
+                    quote!(astro_float_num::BigFloat::sin),
                     expr,
                     SPEC_ADD_ERR,
                     err,
                     ErrAlgo::SinCos,
                 ),
                 "cos" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::cos),
+                    quote!(astro_float_num::BigFloat::cos),
                     expr,
                     SPEC_ADD_ERR,
                     err,
                     ErrAlgo::SinCos,
                 ),
                 "tan" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::tan),
+                    quote!(astro_float_num::BigFloat::tan),
                     expr,
                     2 * SPEC_ADD_ERR,
                     err,
                     ErrAlgo::Tan,
                 ),
                 "asin" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::asin),
+                    quote!(astro_float_num::BigFloat::asin),
                     expr,
                     SPEC_ADD_ERR / 2,
                     err,
                     ErrAlgo::AsinAcos,
                 ),
                 "acos" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::acos),
+                    quote!(astro_float_num::BigFloat::acos),
                     expr,
                     SPEC_ADD_ERR / 2,
                     err,
                     ErrAlgo::AsinAcos,
                 ),
                 "atan" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::atan),
+                    quote!(astro_float_num::BigFloat::atan),
                     expr,
                     1,
                     err,
                     ErrAlgo::None,
                 ),
                 "sinh" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::sinh),
+                    quote!(astro_float_num::BigFloat::sinh),
                     expr,
                     EXPONENT_BIT_SIZE,
                     err,
                     ErrAlgo::None,
                 ),
                 "cosh" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::cosh),
+                    quote!(astro_float_num::BigFloat::cosh),
                     expr,
                     EXPONENT_BIT_SIZE,
                     err,
                     ErrAlgo::None,
                 ),
                 "tanh" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::tanh),
+                    quote!(astro_float_num::BigFloat::tanh),
                     expr,
                     1,
                     err,
                     ErrAlgo::None,
                 ),
                 "asinh" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::asinh),
+                    quote!(astro_float_num::BigFloat::asinh),
                     expr,
                     2,
                     err,
                     ErrAlgo::None,
                 ),
                 "acosh" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::acosh),
+                    quote!(astro_float_num::BigFloat::acosh),
                     expr,
                     SPEC_ADD_ERR,
                     err,
                     ErrAlgo::Log,
                 ),
                 "atanh" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::atanh),
+                    quote!(astro_float_num::BigFloat::atanh),
                     expr,
                     SPEC_ADD_ERR,
                     err,
@@ -385,7 +385,7 @@ fn traverse_paren(expr: &ExprParen, err: &mut Vec<usize>) -> Result<TokenStream,
 
 fn traverse_path(expr: &ExprPath) -> Result<TokenStream, Error> {
     Ok(
-        quote!(astro_float::BigFloat::from_ext((#expr).clone(), p_wrk, astro_float::RoundingMode::None)),
+        quote!(astro_float_num::BigFloat::from_ext((#expr).clone(), p_wrk, astro_float_num::RoundingMode::None)),
     )
 }
 
@@ -393,7 +393,7 @@ fn traverse_unary(expr: &ExprUnary, err: &mut Vec<usize>) -> Result<TokenStream,
     let op_expr = traverse_expr(&expr.expr, err)?;
 
     match expr.op {
-        UnOp::Neg(_) => Ok(quote!(astro_float::BigFloat::neg(&(#op_expr)))),
+        UnOp::Neg(_) => Ok(quote!(astro_float_num::BigFloat::neg(&(#op_expr)))),
         _ => Err(Error::new(
             expr.span(),
             "unexpected unary operator. Only \"-\" is allowed.",
@@ -415,10 +415,10 @@ fn traverse_expr(expr: &Expr, err: &mut Vec<usize>) -> Result<TokenStream, Error
 }
 
 /// Computes an expression with the specified precision and rounding mode.
-/// 
+///
 /// The macro accepts an expression to compute and a context.
 /// In the expression you can specify:
-/// 
+///
 ///  - Path expressions: variable names, constant names, etc.
 ///  - Integer literals, e.g. `123`, `-5`.
 ///  - Floating point literals, e.g. `1.234e-567`.
@@ -427,17 +427,17 @@ fn traverse_expr(expr: &Expr, err: &mut Vec<usize>) -> Result<TokenStream, Error
 ///  - Unary `-` operator.
 ///  - Mathematical functions.
 ///  - Grouping with `(` and `)`.
-/// 
+///
 /// Supported binary operators:
-/// 
+///
 ///  - `+`: addition.
 ///  - `-`: subtraction.
 ///  - `*`: multiplication.
 ///  - `/`: division.
 ///  - `%`: modular division.
-/// 
+///
 /// Supported mathematical functions:
-/// 
+///
 ///  - `recip(x)`: reciprocal of `x`.
 ///  - `sqrt(x)`: square root of `x`.
 ///  - `cbrt(x)`: cube root of `x`.
@@ -459,58 +459,57 @@ fn traverse_expr(expr: &Expr, err: &mut Vec<usize>) -> Result<TokenStream, Error
 ///  - `asinh(x)`: hyperbolic arcsine of `x`.
 ///  - `acosh(x)`: hyperbolic arccosine of `x`.
 ///  - `atanh(x)`: hyperbolic arctangent of `x`.
-/// 
+///
 /// The context determines the precision, the rounding mode of the result, and also contains the cache of constants.
 /// Tuple `(usize, RoundingMode, &mut Consts)` can also be used as a temporary context (see example below).
-/// 
-/// The macro will determine additional precision needed to compensate error and perform correct rounding. 
+///
+/// The macro will determine additional precision needed to compensate error and perform correct rounding.
 /// It will also try to eliminate cancellation which may appear when expression is computed.
-/// 
-/// 
-/// **Avoid passing expressions which contain mathematical identity if you need correctly rounded result**. 
-/// 
+///
+///
+/// **Avoid passing expressions which contain mathematical identity if you need correctly rounded result**.
+///
 /// Examples of such expressions:
-/// 
+///
 ///  - `expr!(sin(x) - sin(x), ctx)`
 ///  - `expr!(ln(exp(x)), ctx)`,
 ///  - `expr!(sin(x) * sin(x) / (1 - cos(x) * cos(x)), ctx)`,
-/// 
+///
 /// Macro does not analyze the expression for presense of identity and will increase the precision infinitely and will never return.
-/// 
+///
 /// Although, you can specify rounding mode `None`. In this case, macro will return even if you pass an identity expression.
-/// 
+///
 /// ## Examples
-/// 
+///
 /// ```
-/// use astro_float_macro::expr;
-/// use astro_float::RoundingMode;
-/// use astro_float::Consts;
-/// use astro_float::BigFloat;
-/// use astro_float::ctx::Context;
-/// 
+/// # use astro_float_macro::expr;
+/// # use astro_float_num::RoundingMode;
+/// # use astro_float_num::Consts;
+/// # use astro_float_num::BigFloat;
+/// # use astro_float_num::ctx::Context;
 /// // Precision, rounding mode, and constants cache.
 /// let p = 128;
 /// let rm = RoundingMode::Up;
 /// let mut cc = Consts::new().expect("Failed to allocate constants cache");
-/// 
+///
 /// // Create a context.
 /// let mut ctx = Context::new(p, rm, cc);
-/// 
+///
 /// let x = 123;
 /// let y = "2345";
 /// let z = 234.5e+1;
-/// 
+///
 /// // Compute an expression.
 /// let ret = expr!(x + y / z - ("120" - 120), &mut ctx);
-/// 
+///
 /// assert_eq!(ret, BigFloat::from(124));
-/// 
+///
 /// // Destructure context.
 /// let (p, rm, mut cc) = ctx.to_raw_parts();
-/// 
+///
 /// // Compute an expression using temporary context.
 /// let ret = expr!(x + y / z, (p, rm, &mut cc));
-/// 
+///
 /// assert_eq!(ret, BigFloat::from(124));
 /// ```
 #[proc_macro]
@@ -526,33 +525,33 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let err_sz = err.len();
 
     let ret = quote!({
-        use astro_float::FromExt;
-        use astro_float::ctx::Contextable;
+        use astro_float_num::FromExt;
+        use astro_float_num::ctx::Contextable;
 
-        const EXPONENT_BIT_SIZE: usize = core::mem::size_of::<astro_float::Exponent>() * 8;
+        const EXPONENT_BIT_SIZE: usize = core::mem::size_of::<astro_float_num::Exponent>() * 8;
 
         let mut ctx = &mut (#ctx);
         let p: usize = ctx.precision();
         let rm = ctx.rounding_mode();
         let cc = ctx.consts();
 
-        let mut p_inc = astro_float::WORD_BIT_SIZE;
+        let mut p_inc = astro_float_num::WORD_BIT_SIZE;
         let mut p_rnd = p + p_inc;
         let mut errs: [usize; #err_sz] = [#(#err, )*];
 
-        fn compute_added_err_near_one(arg: &astro_float::BigFloat, p: usize) -> usize {
-            let d: astro_float::BigFloat;
+        fn compute_added_err_near_one(arg: &astro_float_num::BigFloat, p: usize) -> usize {
+            let d: astro_float_num::BigFloat;
             if arg.is_zero() {
                 return 0;
             }
 
             if let Some(arg_sign) = arg.sign() {
-                let one = astro_float::BigFloat::from(arg_sign.to_int());
+                let one = astro_float_num::BigFloat::from(arg_sign.to_int());
 
                 if let Some(0) = arg.exponent() {
-                    d = one.sub(&arg, p, astro_float::RoundingMode::None);
+                    d = one.sub(&arg, p, astro_float_num::RoundingMode::None);
                 } else if let Some(1) = arg.exponent() {
-                    d = arg.sub(&one, p, astro_float::RoundingMode::None);
+                    d = arg.sub(&one, p, astro_float_num::RoundingMode::None);
                 } else {
                     return 0;
                 }
@@ -570,7 +569,7 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         loop {
             let p_wrk = p_rnd.saturating_add(errs.iter().sum());
 
-            let mut ret: astro_float::BigFloat = (#expr).into();
+            let mut ret: astro_float_num::BigFloat = (#expr).into();
 
             if ret.inexact() {
                 if ret.try_set_precision(p, rm, p_rnd) {
@@ -581,7 +580,7 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             }
 
             p_rnd = p_rnd.saturating_add(p_inc);
-            p_inc = (((p_rnd / 5).saturating_add(astro_float::WORD_BIT_SIZE - 1)) / astro_float::WORD_BIT_SIZE) * astro_float::WORD_BIT_SIZE;
+            p_inc = (((p_rnd / 5).saturating_add(astro_float_num::WORD_BIT_SIZE - 1)) / astro_float_num::WORD_BIT_SIZE) * astro_float_num::WORD_BIT_SIZE;
         }
     });
 
