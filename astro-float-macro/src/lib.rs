@@ -18,10 +18,8 @@ const EXPONENT_BIT_SIZE: usize = core::mem::size_of::<Exponent>() * 8;
 const SPEC_ADD_ERR: usize = 32;
 
 struct MacroInput {
-    p: Expr,
-    rm: Expr,
-    cc: Expr,
     expr: Expr,
+    ctx: Expr,
 }
 
 impl Parse for MacroInput {
@@ -29,15 +27,9 @@ impl Parse for MacroInput {
         let expr = input.parse()?;
         input.parse::<Token![,]>()?;
 
-        let p = input.parse()?;
-        input.parse::<Token![,]>()?;
+        let ctx = input.parse()?;
 
-        let rm = input.parse()?;
-        input.parse::<Token![,]>()?;
-
-        let cc = input.parse()?;
-
-        Ok(MacroInput { p, rm, cc, expr })
+        Ok(MacroInput { expr, ctx })
     }
 }
 
@@ -425,7 +417,7 @@ fn traverse_expr(expr: &Expr, err: &mut Vec<usize>) -> Result<TokenStream, Error
 pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let pmi = syn::parse_macro_input!(input as MacroInput);
 
-    let MacroInput { p, rm, cc, expr } = pmi;
+    let MacroInput { expr, ctx } = pmi;
 
     let mut err = Vec::new();
 
@@ -435,11 +427,14 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let ret = quote!({
         use astro_float::FromExt;
+        use astro_float::ctx::Contextable;
 
         const EXPONENT_BIT_SIZE: usize = core::mem::size_of::<astro_float::Exponent>() * 8;
 
-        let p: usize = #p;
-        let cc = #cc;
+        let mut ctx = &mut (#ctx);
+        let p: usize = ctx.precision();
+        let rm = ctx.rounding_mode();
+        let cc = ctx.consts();
 
         let mut p_inc = astro_float::WORD_BIT_SIZE;
         let mut p_rnd = p + p_inc;
@@ -478,7 +473,7 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let mut ret: astro_float::BigFloat = (#expr).into();
 
             if ret.inexact() {
-                if ret.try_set_precision(p, #rm, p_rnd) {
+                if ret.try_set_precision(p, rm, p_rnd) {
                     break ret;
                 }
             } else {
