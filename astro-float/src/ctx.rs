@@ -49,9 +49,14 @@ impl Context {
         self.rm
     }
 
-    /// Returns the constant cache of the context.
+    /// Returns a reference to the constant cache of the context.
     pub fn consts(&self) -> &Consts {
         &self.cc
+    }
+
+    /// Returns a mutable reference to the constant cache of the context.
+    pub fn consts_mut(&mut self) -> &mut Consts {
+        &mut self.cc
     }
 
     /// Clones `self` and returns the cloned context.
