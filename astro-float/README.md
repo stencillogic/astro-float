@@ -17,43 +17,27 @@ Below is an example of using the library.
 For more information please refer to the library documentation: https://docs.rs/astro-float/latest/astro_float/
 
 
-Calculate Pi with 1024 bit precision:
+Calculate Pi with 1024 bit precision rounded to even.
 
 ``` rust
-use astro_float::BigFloat;
 use astro_float::Consts;
 use astro_float::RoundingMode;
+use astro_float::ctx::Context;
+use astro_float_macro::expr;
 
-// Precision with some space for error.
-let p = 1024 + 8;
-
-// Rounding of all operations
-let rm = RoundingMode::ToEven;
-
-// Initialize mathematical constants cache
-let mut cc = Consts::new().unwrap();
+// Create a context with precision 1024, and rounding to even.
+let mut ctx = Context::new(1024, RoundingMode::ToEven, 
+    Consts::new().expect("Contants cache initialized"));
 
 // Compute pi: pi = 6*arctan(1/sqrt(3))
-let six = BigFloat::from_word(6, 1);
-let three = BigFloat::from_word(3, p);
+let pi = expr!(6 * atan(1 / sqrt(3)), &mut ctx);
 
-let n = three.sqrt(p, rm);
-let n = n.reciprocal(p, rm);
-let n = n.atan(p, rm, &mut cc);
-let mut pi = six.mul(&n, p, rm);
-
-// Reduce precision to 1024
-pi.set_precision(1024, rm).expect("Precision updated");
-
-// Use library's constant for verifying the result
-let pi_lib = cc.pi(1024, rm);
+// Use library's constant value for verifying the result.
+let pi_lib = ctx.const_pi();
 
 // Compare computed constant with library's constant
 assert_eq!(pi.cmp(&pi_lib), Some(0));
-
-// Print using decimal radix.
-println!("{}", pi);
-```
+``` 
 
 ## Performance
 

@@ -44,10 +44,43 @@
 //!
 //! **Correctness**
 //!
-//! Results of all arithmetic operations, mathematical functions, and constant values are correctly rounded.
-//!  
+//! Results of all arithmetic operations, mathematical functions, and constant values are correctly rounded
+//! (A result is correctly rounded if it is equal to the result computed with infinite precision and then rounded).
+//!
 //!
 //! ## Examples
+//!
+//! The example below computes value of Pi with precision 1024 rounded to even using `expr!` macro.
+//! Macro simplifies syntax, takes care of the error and correct rounding of the result.
+//! Although, macro has certain pitfalls to avoid. Check the macro documentation for more details.
+//!
+//! ```
+//! use astro_float::Consts;
+//! use astro_float::RoundingMode;
+//! use astro_float::ctx::Context;
+//! use astro_float_macro::expr;
+//!
+//! // Create a context with precision 1024, and rounding to even.
+//! let mut ctx = Context::new(1024, RoundingMode::ToEven,
+//!     Consts::new().expect("Contants cache initialized"));
+//!
+//! // Compute pi: pi = 6*arctan(1/sqrt(3))
+//! let pi = expr!(6 * atan(1 / sqrt(3)), &mut ctx);
+//!
+//! // Use library's constant value for verifying the result.
+//! let pi_lib = ctx.const_pi();
+//!
+//! // Compare computed constant with library's constant
+//! assert_eq!(pi.cmp(&pi_lib), Some(0));
+//!
+//! // Print using decimal radix.
+//! println!("{}", pi);
+//!
+//! // output: 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458699748e+0
+//! ```
+//!
+//! The example below computes value of Pi with precision 1024 rounded to even using `BigFloat` directly.
+//! In this case, we will take care of error, and we will not check wether the resul is correctly rounded.
 //!
 //! ``` rust
 //! use astro_float::BigFloat;
@@ -136,6 +169,8 @@ pub use crate::defs::WORD_BASE;
 pub use crate::defs::WORD_BIT_SIZE;
 pub use crate::defs::WORD_MAX;
 pub use crate::defs::WORD_SIGNIFICANT_BIT;
+
+pub use astro_float_macro::expr;
 
 #[cfg(test)]
 mod tests {

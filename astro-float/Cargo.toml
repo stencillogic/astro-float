@@ -22,6 +22,7 @@ rand = { version = "0.8.5", optional = true }
 lazy_static = { version = "1.4.0", default-features = false, features = [] }
 itertools = { version = "0.10.3", default-features = false, features = [] }
 smallvec = { version = "1.9.0", default-features = false, features = [] }
+astro-float-macro = { version = "0.1.0", features = [] }
 
 [features]
 default = ["std", "random", "serde"]
