@@ -1,6 +1,6 @@
 [package]
 name = "astro-float"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 authors = ["stencillogic <stencillogic@gmail.com>"]
 license = "MIT"
@@ -10,22 +10,12 @@ keywords = ["bigfloat", "numeric", "mathematics", "bignum"]
 readme = "README.md"
 repository = "https://github.com/stencillogic/astro-float"
 
-[dev-dependencies]
-rand = "0.8.5"
-serde_json = "1.0.89"
-rug = { version = "1.17.0", features = ["float", "rand"] }
-gmp-mpfr-sys = { version = "1.4.12", features = [] }
-
 [dependencies]
-serde = { version = "1.0.147", optional = true }
-rand = { version = "0.8.5", optional = true }
-lazy_static = { version = "1.4.0", default-features = false, features = [] }
-itertools = { version = "0.10.3", default-features = false, features = [] }
-smallvec = { version = "1.9.0", default-features = false, features = [] }
-astro-float-macro = { version = "0.1.0", features = [] }
+astro-float = "0.6.0"
+astro-float-macro = "0.1.0"
 
 [features]
 default = ["std", "random", "serde"]
 std = []
-random = ["dep:rand"]
-serde = ["dep:serde"]
+random = ["astro-float/random"]
+serde = ["astro-float/serde"]

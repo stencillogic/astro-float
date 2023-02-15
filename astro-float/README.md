@@ -37,7 +37,7 @@ let pi_lib = ctx.const_pi();
 
 // Compare computed constant with library's constant
 assert_eq!(pi.cmp(&pi_lib), Some(0));
-``` 
+```
 
 ## Performance
 

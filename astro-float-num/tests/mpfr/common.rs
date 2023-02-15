@@ -1,6 +1,6 @@
 //! Components used in MPFR integration tests
 
-use astro_float::{BigFloat, Exponent, Radix, RoundingMode, Sign, Word, WORD_BIT_SIZE};
+use astro_float_num::{BigFloat, Exponent, Radix, RoundingMode, Sign, Word, WORD_BIT_SIZE};
 use gmp_mpfr_sys::mpfr::{self, rnd_t};
 use rand::random;
 use rug::Float;

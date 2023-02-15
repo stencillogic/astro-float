@@ -6,7 +6,7 @@ use std::ops::Add;
 use crate::mpfr::common::get_prec_rng;
 use crate::mpfr::common::test_astro_op;
 use crate::mpfr::common::{assert_float_close, get_float_pair, get_random_rnd_pair};
-use astro_float::{BigFloat, Consts, Exponent, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
+use astro_float_num::{BigFloat, Consts, Exponent, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
 use gmp_mpfr_sys::{gmp::exp_t, mpfr};
 use rand::random;
 use rug::{

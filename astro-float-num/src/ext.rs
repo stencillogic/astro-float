@@ -591,9 +591,9 @@ impl BigFloat {
     /// ## Examples
     ///
     /// ```
-    /// use astro_float::BigFloat;
-    /// use astro_float::Radix;
-    /// use astro_float::RoundingMode;
+    /// # use astro_float_num::BigFloat;
+    /// # use astro_float_num::Radix;
+    /// # use astro_float_num::RoundingMode;
     ///
     /// let n = BigFloat::parse("0.0", Radix::Bin, 64, RoundingMode::ToEven);
     /// assert!(n.is_zero());
@@ -875,8 +875,8 @@ impl BigFloat {
     /// ## Examples
     ///
     /// ```
-    /// use astro_float::BigFloat;
-    /// use astro_float::EXPONENT_MIN;
+    /// # use astro_float_num::BigFloat;
+    /// # use astro_float_num::EXPONENT_MIN;
     ///
     /// // construct a subnormal value.
     /// let mut n = BigFloat::min_positive(128);
@@ -966,7 +966,7 @@ impl BigFloat {
     /// Code below converts `-0.1234567₈ × 10₈^3₈` given in radix 8 to BigFloat.
     ///
     /// ``` rust
-    /// use astro_float::{BigFloat, Sign, RoundingMode, Radix};
+    /// # use astro_float_num::{BigFloat, Sign, RoundingMode, Radix};
     ///
     /// let g = BigFloat::convert_from_radix(
     ///     Sign::Neg,
@@ -1011,7 +1011,7 @@ impl BigFloat {
     /// ## Examples
     ///
     /// ``` rust
-    /// use astro_float::{BigFloat, Sign, RoundingMode, Radix};
+    /// # use astro_float_num::{BigFloat, Sign, RoundingMode, Radix};
     ///
     /// let n = BigFloat::from_f64(0.00012345678f64, 64);
     ///

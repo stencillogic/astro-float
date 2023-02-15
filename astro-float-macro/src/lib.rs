@@ -1,4 +1,6 @@
 //! Macros for multiple precision floating point numbers library `astro-float`.
+//! 
+//! See main crate [docs](https://docs.rs/astro-float/latest/astro_float/).
 
 mod util;
 
@@ -412,7 +414,105 @@ fn traverse_expr(expr: &Expr, err: &mut Vec<usize>) -> Result<TokenStream, Error
     }
 }
 
-/// Compute an expression with given precision and rounding mode.
+/// Computes an expression with the specified precision and rounding mode.
+/// 
+/// The macro accepts an expression to compute and a context.
+/// In the expression you can specify:
+/// 
+///  - Path expressions: variable names, constant names, etc.
+///  - Integer literals, e.g. `123`, `-5`.
+///  - Floating point literals, e.g. `1.234e-567`.
+///  - String literals, e.g. `"-1.234_e-567"`.
+///  - Binary operators.
+///  - Unary `-` operator.
+///  - Mathematical functions.
+///  - Grouping with `(` and `)`.
+/// 
+/// Supported binary operators:
+/// 
+///  - `+`: addition.
+///  - `-`: subtraction.
+///  - `*`: multiplication.
+///  - `/`: division.
+///  - `%`: modular division.
+/// 
+/// Supported mathematical functions:
+/// 
+///  - `recip(x)`: reciprocal of `x`.
+///  - `sqrt(x)`: square root of `x`.
+///  - `cbrt(x)`: cube root of `x`.
+///  - `ln(x)`: natural logarithm of `x`.
+///  - `log2(x)`: logarithm base 2 of `x`.
+///  - `log10(x)`: logarithm base 10 of `x`.
+///  - `log(x, b)`: logarithm with base `b` of `x`.
+///  - `exp(x)`: `e` to the power of `x`.
+///  - `pow(b, x)`: `b` to the power of `x`.
+///  - `sin(x)`: sine of `x`.
+///  - `cos(x)`: cosine of `x`.
+///  - `tan(x)`: tangent of `x`.
+///  - `asin(x)`: arcsine of `x`.
+///  - `acos(x)`: arccosine of `x`.
+///  - `atan(x)`: arctangent of `x`.
+///  - `sinh(x)`: hyperbolic sine of `x`.
+///  - `cosh(x)`: hyperbolic cosine of `x`.
+///  - `tanh(x)`: hyperbolic tangent of `x`.
+///  - `asinh(x)`: hyperbolic arcsine of `x`.
+///  - `acosh(x)`: hyperbolic arccosine of `x`.
+///  - `atanh(x)`: hyperbolic arctangent of `x`.
+/// 
+/// The context determines the precision, the rounding mode of the result, and also contains the cache of constants.
+/// Tuple `(usize, RoundingMode, &mut Consts)` can also be used as a temporary context (see example below).
+/// 
+/// The macro will determine additional precision needed to compensate error and perform correct rounding. 
+/// It will also try to eliminate cancellation which may appear when expression is computed.
+/// 
+/// 
+/// **Avoid passing expressions which contain mathematical identity if you need correctly rounded result**. 
+/// 
+/// Examples of such expressions:
+/// 
+///  - `expr!(sin(x) - sin(x), ctx)`
+///  - `expr!(ln(exp(x)), ctx)`,
+///  - `expr!(sin(x) * sin(x) / (1 - cos(x) * cos(x)), ctx)`,
+/// 
+/// Macro does not analyze the expression for presense of identity and will increase the precision infinitely and will never return.
+/// 
+/// Although, you can specify rounding mode `None`. In this case, macro will return even if you pass an identity expression.
+/// 
+/// ## Examples
+/// 
+/// ```
+/// use astro_float_macro::expr;
+/// use astro_float::RoundingMode;
+/// use astro_float::Consts;
+/// use astro_float::BigFloat;
+/// use astro_float::ctx::Context;
+/// 
+/// // Precision, rounding mode, and constants cache.
+/// let p = 128;
+/// let rm = RoundingMode::Up;
+/// let mut cc = Consts::new().expect("Failed to allocate constants cache");
+/// 
+/// // Create a context.
+/// let mut ctx = Context::new(p, rm, cc);
+/// 
+/// let x = 123;
+/// let y = "2345";
+/// let z = 234.5e+1;
+/// 
+/// // Compute an expression.
+/// let ret = expr!(x + y / z - ("120" - 120), &mut ctx);
+/// 
+/// assert_eq!(ret, BigFloat::from(124));
+/// 
+/// // Destructure context.
+/// let (p, rm, mut cc) = ctx.to_raw_parts();
+/// 
+/// // Compute an expression using temporary context.
+/// let ret = expr!(x + y / z, (p, rm, &mut cc));
+/// 
+/// assert_eq!(ret, BigFloat::from(124));
+/// ```
 #[proc_macro]
 pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let pmi = syn::parse_macro_input!(input as MacroInput);

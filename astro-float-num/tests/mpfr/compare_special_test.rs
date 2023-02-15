@@ -8,7 +8,7 @@ use crate::mpfr::common::{
     get_random_rnd_pair,
 };
 use crate::mpfr::common::{get_prec_rng, test_astro_op};
-use astro_float::{BigFloat, Consts, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
+use astro_float_num::{BigFloat, Consts, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
 use gmp_mpfr_sys::{gmp::exp_t, mpfr};
 use rand::random;
 use rug::{

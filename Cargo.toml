@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "astro-float",
+    "astro-float-num",
     "astro-float-macro",
 ]
 

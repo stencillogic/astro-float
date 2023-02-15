@@ -1,11 +1,11 @@
-//! Context is used in expressions returning BigFloat.
+//! Context is used in expressions returning `BigFloat`.
 
 use crate::BigFloat;
 use crate::Consts;
 use crate::Error;
 use crate::RoundingMode;
 
-/// Context contains parameters, like rounding mode and precision, as well as constant values.
+/// Context contains parameters, like rounding mode and precision, as well as constant values, and is used with `expr!` macro.
 #[derive(Debug)]
 pub struct Context {
     cc: Consts,
@@ -90,14 +90,14 @@ impl Context {
     }
 }
 
-/// Represents a type that can be used as context in expressions.
+/// Represents a type that can be used as context in `expr!` macro.
 ///
 /// ## Examples
 ///
 /// ```
-/// use astro_float::RoundingMode;
-/// use astro_float::Consts;
-/// use astro_float::ctx::Contextable;
+/// # use astro_float_num::RoundingMode;
+/// # use astro_float_num::Consts;
+/// # use astro_float_num::ctx::Contextable;
 ///
 /// let p = 123;
 /// let rm = RoundingMode::Down;

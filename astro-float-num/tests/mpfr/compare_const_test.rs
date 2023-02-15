@@ -3,7 +3,7 @@
 use crate::mpfr::common::get_prec_rng;
 use crate::mpfr::common::test_astro_const;
 use crate::mpfr::common::{assert_float_close, get_random_rnd_pair};
-use astro_float::{BigFloat, Consts, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
+use astro_float_num::{BigFloat, Consts, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
 use gmp_mpfr_sys::{
     gmp::exp_t,
     mpfr::{self, rnd_t},
