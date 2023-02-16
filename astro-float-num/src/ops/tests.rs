@@ -75,8 +75,18 @@ fn test_ln_exp() {
             //println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
             // d2 - ulp(d2)/2 <= ln(d1) <= d2 + ulp(d2)/2  ->  d3 / e^(ulp(d2)/2) <= d1 <= d3 * e^(ulp(d2)/2)
-            assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0, "{} {:?}", prec, d1);
-            assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0, "{} {:?}", prec, d1);
+            assert!(
+                d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0,
+                "{} {:?}",
+                prec,
+                d1
+            );
+            assert!(
+                d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0,
+                "{} {:?}",
+                prec,
+                d1
+            );
         } else {
             let emax = log2_floor(EXPONENT_MAX as usize) as Exponent;
             let emin = -emax;
@@ -108,8 +118,10 @@ fn test_ln_exp() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    <= 0, 
-                    "{} {:?}", prec, d1
+                    <= 0,
+                "{} {:?}",
+                prec,
+                d1
             );
         }
     }
@@ -183,14 +195,34 @@ fn test_log2_log10_pow() {
             eps.set_exponent(d2.exponent() - prec as Exponent);
             let err = two.pow(&eps, prec, RoundingMode::Up, &mut cc).unwrap();
 
-            assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0, "{} {:?}", prec, d1);
-            assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0, "{} {:?}", prec, d1);
+            assert!(
+                d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0,
+                "{} {:?}",
+                prec,
+                d1
+            );
+            assert!(
+                d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0,
+                "{} {:?}",
+                prec,
+                d1
+            );
 
             eps.set_exponent(d4.exponent() - prec as Exponent);
             let err = ten.pow(&eps, prec, RoundingMode::Up, &mut cc).unwrap();
 
-            assert!(d1.cmp(&d5.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0, "{} {:?}", prec, d1);
-            assert!(d1.cmp(&d5.div(&err, prec, RoundingMode::Down).unwrap()) >= 0, "{} {:?}", prec, d1);
+            assert!(
+                d1.cmp(&d5.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0,
+                "{} {:?}",
+                prec,
+                d1
+            );
+            assert!(
+                d1.cmp(&d5.div(&err, prec, RoundingMode::Down).unwrap()) >= 0,
+                "{} {:?}",
+                prec,
+                d1
+            );
         } else {
             let emax = log2_floor(EXPONENT_MAX as usize) as Exponent;
             let emin = -emax;
@@ -230,7 +262,10 @@ fn test_log2_log10_pow() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0, "{} {:?}", prec, d1
+                    < 0,
+                "{} {:?}",
+                prec,
+                d1
             );
 
             set_eps(d4.mantissa_digits(), &mut eps);
@@ -241,7 +276,10 @@ fn test_log2_log10_pow() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0, "{} {:?}", prec, d1
+                    < 0,
+                "{} {:?}",
+                prec,
+                d1
             );
         }
     }
@@ -277,11 +315,35 @@ fn test_log_pow() {
             let err = b.pow(&eps, prec, RoundingMode::Up, &mut cc).unwrap();
 
             if b.exponent() > 0 {
-                assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0, "{} {:?} {:?}", prec, d1, b);
-                assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0, "{} {:?} {:?}", prec, d1, b);
+                assert!(
+                    d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0,
+                    "{} {:?} {:?}",
+                    prec,
+                    d1,
+                    b
+                );
+                assert!(
+                    d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0,
+                    "{} {:?} {:?}",
+                    prec,
+                    d1,
+                    b
+                );
             } else {
-                assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) <= 0, "{} {:?} {:?}", prec, d1, b);
-                assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) >= 0, "{} {:?} {:?}", prec, d1, b);
+                assert!(
+                    d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) <= 0,
+                    "{} {:?} {:?}",
+                    prec,
+                    d1,
+                    b
+                );
+                assert!(
+                    d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) >= 0,
+                    "{} {:?} {:?}",
+                    prec,
+                    d1,
+                    b
+                );
             }
         } else {
             let mut b = BigFloatNumber::random_normal(p2, EXPONENT_MIN, EXPONENT_MAX).unwrap();
@@ -332,7 +394,11 @@ fn test_log_pow() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0, "{} {:?} {:?}", prec, d1, b
+                    < 0,
+                "{} {:?} {:?}",
+                prec,
+                d1,
+                b
             );
         }
     }
@@ -407,7 +473,10 @@ fn test_sin_asin() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0, "{} {:?}", prec, d1
+                    < 0,
+                "{} {:?}",
+                prec,
+                d1
             );
         } else {
             let d1 = BigFloatNumber::random_normal(p1, -(prec as Exponent), 0).unwrap();
@@ -427,7 +496,10 @@ fn test_sin_asin() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0, "{} {:?}", prec, d1
+                    < 0,
+                "{} {:?}",
+                prec,
+                d1
             );
         }
     }
@@ -489,7 +561,10 @@ fn test_sin_asin() {
                         .abs()
                         .unwrap()
                         .cmp(&eps)
-                        < 0, "{} {:?}", prec, d1
+                        < 0,
+                "{} {:?}",
+                prec,
+                d1
             );
         }
     }
@@ -563,7 +638,10 @@ fn test_cos_acos() {
                         .abs()
                         .unwrap()
                         .cmp(&eps)
-                        < 0, "{} {:?}", prec, d1
+                        < 0,
+                    "{} {:?}",
+                    prec,
+                    d1
                 );
             }
         } else {
@@ -591,7 +669,10 @@ fn test_cos_acos() {
                         .abs()
                         .unwrap()
                         .cmp(&eps)
-                        < 0, "{} {:?}", prec, d1
+                        < 0,
+                    "{} {:?}",
+                    prec,
+                    d1
                 );
             }
         }
@@ -644,7 +725,10 @@ fn test_tan_atan() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0, "{} {:?}", prec, d1
+                    < 0,
+                "{} {:?}",
+                prec,
+                d1
             );
         } else {
             let d1 = BigFloatNumber::random_normal(p1, EXPONENT_MIN, EXPONENT_MAX).unwrap();
@@ -669,7 +753,10 @@ fn test_tan_atan() {
                         .abs()
                         .unwrap()
                         .cmp(&eps)
-                        < 0, "{} {:?}", prec, d1
+                        < 0,
+                    "{} {:?}",
+                    prec,
+                    d1
                 );
             }
         }
@@ -705,7 +792,10 @@ fn test_sinh_asinh() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0, "{} {:?}", prec, d1
+                    < 0,
+                "{} {:?}",
+                prec,
+                d1
             );
         } else {
             let mut d1 = BigFloatNumber::random_normal(p1, EXPONENT_MIN, EXPONENT_MAX).unwrap();
@@ -769,7 +859,10 @@ fn test_cosh_acosh() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0, "{} {:?}", prec, d1
+                    < 0,
+                "{} {:?}",
+                prec,
+                d1
             );
         } else {
             let mut d1 = BigFloatNumber::random_normal(p1, 1, EXPONENT_MAX).unwrap();
@@ -841,7 +934,10 @@ fn test_tanh_atanh() {
                 .abs()
                 .unwrap()
                 .cmp(&eps)
-                < 0, "{} {:?}", prec, d1
+                < 0,
+            "{} {:?}",
+            prec,
+            d1
         );
     }
 }
