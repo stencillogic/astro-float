@@ -190,11 +190,8 @@ pub fn shift_slice_left(m: &mut [Word], n: usize) {
         }
         m[0..idx].fill(0);
     } else if idx > 0 {
-        let dst = m[idx..].as_mut_ptr();
-        let src = m.as_ptr();
-        unsafe {
-            core::intrinsics::copy(src, dst, m.len() - idx);
-        };
+        let r = m.len() - idx;
+        m.copy_within(0..r, idx);
         m[..idx].fill(0);
     }
 }
@@ -261,13 +258,9 @@ pub fn shift_slice_right(m: &mut [Word], n: usize) {
         }
         m[l - idx..].fill(0);
     } else if idx > 0 {
-        let src = m[idx..].as_ptr();
-        let dst = m.as_mut_ptr();
-        let cnt = m.len() - idx;
-        unsafe {
-            core::intrinsics::copy(src, dst, cnt);
-        };
-        m[cnt..].fill(0);
+        let r = m.len() - idx;
+        m.copy_within(idx.., 0);
+        m[r..].fill(0);
     }
 }
 
