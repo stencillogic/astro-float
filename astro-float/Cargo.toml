@@ -19,3 +19,6 @@ default = ["std", "random", "serde"]
 std = []
 random = ["astro-float-num/random"]
 serde = ["astro-float-num/serde"]
+
+[dev-dependencies]
+trybuild = "1.0"

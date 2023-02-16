@@ -7,6 +7,12 @@ use astro_float_num::{
 };
 
 #[test]
+fn macro_compile_tests() {
+    let t = trybuild::TestCases::new();
+    t.pass("./tests/tests/expr.rs");
+}
+
+#[test]
 fn macro_run_basic_tests() {
     let p = 320;
     let rm = RoundingMode::None;

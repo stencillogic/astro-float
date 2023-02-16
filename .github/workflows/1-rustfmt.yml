@@ -21,4 +21,4 @@ jobs:
     - name: Check formatting astro-float-num
       run: rustfmt --check ./astro-float-num/src/*.rs ./astro-float-num/tests/*.rs
     - name: Check formatting astro-float-macro
-      run: rustfmt --check ./astro-float-macro/src/*.rs ./astro-float-macro/tests/*.rs
+      run: rustfmt --check ./astro-float-macro/src/*.rs
