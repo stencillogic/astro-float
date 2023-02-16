@@ -770,7 +770,10 @@ mod tests {
                         .abs()
                         .unwrap()
                         .cmp(&eps)
-                        <= 0, "{:?} {:?}", n, g
+                        <= 0,
+                    "{:?} {:?}",
+                    n,
+                    g
                 );
             } else {
                 if p2 < p1 {
