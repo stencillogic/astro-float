@@ -14,9 +14,17 @@ fn ttt() {
     let mut cc = Consts::new().unwrap();
     let mut eps = ONE.clone().unwrap();
 
-    let n = BigFloatNumber::from_words(&[5361406682109507759, 14757395258802583785, 14757395258967641292, 14757395258967641292, 1921915347148, 0, 0, 18436087589833277440, 18446744073709551615, 18446744073709551615, 17726168133330272255], Sign::Pos, -100).unwrap();
-    let m = n.asin(12*64, RoundingMode::None, &mut cc).unwrap();
-    println!("{:?}", m);
+    let d1 = BigFloatNumber::from_words(&[8989757817563553100, 9960697139706764983, 4461789623920097378, 4048258091399009682, 15464606670643512760, 9875382408717259940, 10070282779479903256, 11346922698242740396, 7055884551283505420, 6195649625391668719, 9941326960957212395, 408098056138429120, 10677522237329915935, 8769086603579977608, 18414592371109898304], Sign::Neg, -1).unwrap();
+
+    let prec = 1856;
+
+    let d2 = d1.exp(prec, RoundingMode::ToEven, &mut cc).unwrap();
+
+    let d3 = d2.ln(prec, RoundingMode::ToEven, &mut cc).unwrap();
+
+    println!("{:?}", d1.format(crate::Radix::Bin, RoundingMode::None));
+    println!("{:?}", d2.format(crate::Radix::Bin, RoundingMode::None));
+    println!("{:?}", d3.format(crate::Radix::Bin, RoundingMode::None));
 } */
 
 const fn get_prec_rng() -> usize {
@@ -67,8 +75,8 @@ fn test_ln_exp() {
             //println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
             // d2 - ulp(d2)/2 <= ln(d1) <= d2 + ulp(d2)/2  ->  d3 / e^(ulp(d2)/2) <= d1 <= d3 * e^(ulp(d2)/2)
-            assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0);
-            assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0);
+            assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0, "{} {:?}", prec, d1);
+            assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0, "{} {:?}", prec, d1);
         } else {
             let emax = log2_floor(EXPONENT_MAX as usize) as Exponent;
             let emin = -emax;
@@ -100,7 +108,8 @@ fn test_ln_exp() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0
+                    <= 0, 
+                    "{} {:?}", prec, d1
             );
         }
     }
@@ -139,7 +148,7 @@ fn test_powi() {
         // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("i {}", i);
 
-        assert!(d3.cmp(&d2) == 0);
+        assert!(d3.cmp(&d2) == 0, "{} {} {:?}", i, prec, d1);
     }
 }
 
@@ -174,14 +183,14 @@ fn test_log2_log10_pow() {
             eps.set_exponent(d2.exponent() - prec as Exponent);
             let err = two.pow(&eps, prec, RoundingMode::Up, &mut cc).unwrap();
 
-            assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0);
-            assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0);
+            assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0, "{} {:?}", prec, d1);
+            assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0, "{} {:?}", prec, d1);
 
             eps.set_exponent(d4.exponent() - prec as Exponent);
             let err = ten.pow(&eps, prec, RoundingMode::Up, &mut cc).unwrap();
 
-            assert!(d1.cmp(&d5.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0);
-            assert!(d1.cmp(&d5.div(&err, prec, RoundingMode::Down).unwrap()) >= 0);
+            assert!(d1.cmp(&d5.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0, "{} {:?}", prec, d1);
+            assert!(d1.cmp(&d5.div(&err, prec, RoundingMode::Down).unwrap()) >= 0, "{} {:?}", prec, d1);
         } else {
             let emax = log2_floor(EXPONENT_MAX as usize) as Exponent;
             let emin = -emax;
@@ -221,7 +230,7 @@ fn test_log2_log10_pow() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0
+                    < 0, "{} {:?}", prec, d1
             );
 
             set_eps(d4.mantissa_digits(), &mut eps);
@@ -232,7 +241,7 @@ fn test_log2_log10_pow() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0
+                    < 0, "{} {:?}", prec, d1
             );
         }
     }
@@ -268,11 +277,11 @@ fn test_log_pow() {
             let err = b.pow(&eps, prec, RoundingMode::Up, &mut cc).unwrap();
 
             if b.exponent() > 0 {
-                assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0);
-                assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0);
+                assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) <= 0, "{} {:?} {:?}", prec, d1, b);
+                assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) >= 0, "{} {:?} {:?}", prec, d1, b);
             } else {
-                assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) <= 0);
-                assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) >= 0);
+                assert!(d1.cmp(&d3.div(&err, prec, RoundingMode::Down).unwrap()) <= 0, "{} {:?} {:?}", prec, d1, b);
+                assert!(d1.cmp(&d3.mul(&err, prec, RoundingMode::Up).unwrap()) >= 0, "{} {:?} {:?}", prec, d1, b);
             }
         } else {
             let mut b = BigFloatNumber::random_normal(p2, EXPONENT_MIN, EXPONENT_MAX).unwrap();
@@ -323,7 +332,7 @@ fn test_log_pow() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0
+                    < 0, "{} {:?} {:?}", prec, d1, b
             );
         }
     }
@@ -398,7 +407,7 @@ fn test_sin_asin() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0
+                    < 0, "{} {:?}", prec, d1
             );
         } else {
             let d1 = BigFloatNumber::random_normal(p1, -(prec as Exponent), 0).unwrap();
@@ -418,7 +427,7 @@ fn test_sin_asin() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0
+                    < 0, "{} {:?}", prec, d1
             );
         }
     }
@@ -480,7 +489,7 @@ fn test_sin_asin() {
                         .abs()
                         .unwrap()
                         .cmp(&eps)
-                        < 0
+                        < 0, "{} {:?}", prec, d1
             );
         }
     }
@@ -554,7 +563,7 @@ fn test_cos_acos() {
                         .abs()
                         .unwrap()
                         .cmp(&eps)
-                        < 0
+                        < 0, "{} {:?}", prec, d1
                 );
             }
         } else {
@@ -582,7 +591,7 @@ fn test_cos_acos() {
                         .abs()
                         .unwrap()
                         .cmp(&eps)
-                        < 0
+                        < 0, "{} {:?}", prec, d1
                 );
             }
         }
@@ -635,7 +644,7 @@ fn test_tan_atan() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0
+                    < 0, "{} {:?}", prec, d1
             );
         } else {
             let d1 = BigFloatNumber::random_normal(p1, EXPONENT_MIN, EXPONENT_MAX).unwrap();
@@ -660,7 +669,7 @@ fn test_tan_atan() {
                         .abs()
                         .unwrap()
                         .cmp(&eps)
-                        < 0
+                        < 0, "{} {:?}", prec, d1
                 );
             }
         }
@@ -696,7 +705,7 @@ fn test_sinh_asinh() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0
+                    < 0, "{} {:?}", prec, d1
             );
         } else {
             let mut d1 = BigFloatNumber::random_normal(p1, EXPONENT_MIN, EXPONENT_MAX).unwrap();
@@ -708,8 +717,8 @@ fn test_sinh_asinh() {
                 // both asinh and sinh are linear near 0
                 d1.set_precision(prec, RoundingMode::ToEven).unwrap();
 
-                assert!(d1.cmp(&d2) == 0);
-                assert!(d2.cmp(&d3) == 0);
+                assert!(d1.cmp(&d2) == 0, "{} {:?}", prec, d1);
+                assert!(d2.cmp(&d3) == 0, "{} {:?}", prec, d1);
             } else {
                 let exp = d2.exp(prec + 1, RoundingMode::ToEven, &mut cc).unwrap();
                 let expr = exp.reciprocal(prec + 1, RoundingMode::ToEven).unwrap();
@@ -723,7 +732,7 @@ fn test_sinh_asinh() {
                 // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
                 // println!("d4 {}", d4.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-                assert!(d3.cmp(&d4) == 0);
+                assert!(d3.cmp(&d4) == 0, "{} {:?}", prec, d1);
             }
         }
     }
@@ -760,7 +769,7 @@ fn test_cosh_acosh() {
                     .abs()
                     .unwrap()
                     .cmp(&eps)
-                    < 0
+                    < 0, "{} {:?}", prec, d1
             );
         } else {
             let mut d1 = BigFloatNumber::random_normal(p1, 1, EXPONENT_MAX).unwrap();
@@ -781,7 +790,7 @@ fn test_cosh_acosh() {
             // println!("d3 {}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
             // println!("d4 {}", d4.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-            assert!(d3.cmp(&d4) == 0);
+            assert!(d3.cmp(&d4) == 0, "{} {:?}", prec, d1);
         };
     }
 }
@@ -832,7 +841,7 @@ fn test_tanh_atanh() {
                 .abs()
                 .unwrap()
                 .cmp(&eps)
-                < 0
+                < 0, "{} {:?}", prec, d1
         );
     }
 }
