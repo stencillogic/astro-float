@@ -17,7 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Check formatting astro-float
-      run: rustfmt --check ./astro-float/src/*.rs
+      run: rustfmt --check ./astro-float/src/*.rs ./astro-float/tests/*.rs
     - name: Check formatting astro-float-num
       run: rustfmt --check ./astro-float-num/src/*.rs ./astro-float-num/tests/*.rs
     - name: Check formatting astro-float-macro
