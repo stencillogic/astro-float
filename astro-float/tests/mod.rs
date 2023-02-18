@@ -214,8 +214,8 @@ fn macro_run_err_test() {
     let b = BigFloat::parse(s1, astro_float_num::Radix::Dec, p, RoundingMode::None);
     let n = BigFloat::parse(s2, astro_float_num::Radix::Dec, p, RoundingMode::None);
     let y1 = b.pow(&n, p, rm, &mut cc);
-    let b = BigFloat::parse(s1, astro_float_num::Radix::Dec, p+128, RoundingMode::None);
-    let n = BigFloat::parse(s2, astro_float_num::Radix::Dec, p+128, RoundingMode::None);
+    let b = BigFloat::parse(s1, astro_float_num::Radix::Dec, p + 128, RoundingMode::None);
+    let n = BigFloat::parse(s2, astro_float_num::Radix::Dec, p + 128, RoundingMode::None);
     let mut y2 = b.pow(&n, p + 128, RoundingMode::None, &mut cc);
     y2.set_precision(p, rm).unwrap();
 
