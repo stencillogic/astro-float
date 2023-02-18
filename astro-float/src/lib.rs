@@ -44,8 +44,7 @@
 //!
 //! **Correctness**
 //!
-//! Results of all arithmetic operations, mathematical functions, and constant values are correctly rounded
-//! (A result is correctly rounded if it is equal to the result computed with infinite precision and then rounded).
+//! Results of all arithmetic operations, mathematical functions, and constant values are __mostly__ correctly rounded.
 //!
 //!
 //! ## Examples
@@ -191,7 +190,7 @@ extern crate alloc;
 /// It will also try to eliminate cancellation which may appear when expression is computed.
 ///
 ///
-/// **Avoid passing expressions which contain mathematical identity if you need correctly rounded result**.
+/// **Avoid passing expressions which contain mathematical identity if you expect a correctly rounded result**.
 ///
 /// Examples of such expressions:
 ///
