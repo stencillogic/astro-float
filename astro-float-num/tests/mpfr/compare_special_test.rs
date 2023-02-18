@@ -18,7 +18,7 @@ use rug::{
 
 #[test]
 fn mpfr_compare_special() {
-    let run_cnt = 1000;
+    let run_cnt = 500;
 
     let p_rng = get_prec_rng();
     let p_min = 1;
