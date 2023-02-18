@@ -1,6 +1,7 @@
 //! Hyperbolic arctangent.
 
 use crate::common::consts::ONE;
+use crate::common::util::count_leading_ones;
 use crate::common::util::round_p;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
@@ -28,8 +29,14 @@ impl BigFloatNumber {
             return Ok(ret);
         }
 
-        if self.exponent() == 1 && self.abs_cmp(&ONE) == 0 {
-            return Err(Error::ExponentOverflow(self.sign()));
+        if self.exponent() == 1 {
+            if self.abs_cmp(&ONE) == 0 {
+                return Err(Error::ExponentOverflow(self.sign()));
+            } else {
+                return Err(Error::InvalidArgument);
+            }
+        } else if self.exponent() > 1 {
+            return Err(Error::InvalidArgument);
         }
 
         compute_small_exp!(self, self.exponent() as isize * 2 - 1, false, p, rm);
@@ -39,14 +46,16 @@ impl BigFloatNumber {
         let mut additional_prec = 4;
         if self.exponent() < 0 {
             additional_prec += self.exponent().unsigned_abs() as usize;
+        } else {
+            additional_prec += count_leading_ones(self.mantissa_digits());
         }
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+
+        let mut x = self.clone()?;
 
         loop {
-            let mut x = self.clone()?;
-
             let p_x = p_wrk + additional_prec;
             x.set_precision(p_x, RoundingMode::None)?;
 

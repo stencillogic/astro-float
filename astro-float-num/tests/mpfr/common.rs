@@ -1,12 +1,14 @@
 //! Components used in MPFR integration tests
 
-use astro_float_num::{BigFloat, Exponent, Radix, RoundingMode, Sign, Word, WORD_BIT_SIZE};
+use astro_float_num::{
+    BigFloat, Exponent, Radix, RoundingMode, Sign, Word, WORD_BIT_SIZE, WORD_SIGNIFICANT_BIT,
+};
 use gmp_mpfr_sys::mpfr::{self, rnd_t};
 use rand::random;
 use rug::Float;
 
 macro_rules! test_astro_op {
-    ($eq:literal, $n1:ident, $n2:ident, $astro_op:ident, $f1:ident, $f2:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_name:literal $(, $cc:ident)?) => {
+    ($eq:literal, $n1:ident, $n2:ident, $astro_op:ident, $f1:ident, $f2:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_info:expr $(, $cc:ident)?) => {
         let n3 = BigFloat::$astro_op(&($n1), &($n2), $p, $rm$(, &mut $cc)?);
 
         let mut f3 = Float::with_val($p as u32, 1);
@@ -17,9 +19,9 @@ macro_rules! test_astro_op {
         //println!("\n{:b}\n{}", $n1, $f1.to_string_radix(2, None));
         //println!("\n{:b}\n{}", n3, f3.to_string_radix(2, None));
 
-        assert_float_close(n3, f3, $p, $op_name, $eq);
+        assert_float_close(n3, f3, $p, &format!("{:?}", $op_info), $eq);
     };
-    ($eq:literal, $n1:ident, $astro_op:ident, $f1:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_name:literal) => {
+    ($eq:literal, $n1:ident, $astro_op:ident, $f1:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_info:expr) => {
         let n3 = BigFloat::$astro_op(&($n1), $p, $rm);
 
         let mut f3 = Float::with_val($p as u32, 1);
@@ -29,9 +31,9 @@ macro_rules! test_astro_op {
         // println!("\n{:b}\n{}", $n1, $f1.to_string_radix(2, None));
         // println!("\n{:b}\n{}", n3, f3.to_string_radix(2, None));
 
-        assert_float_close(n3, f3, $p, $op_name, $eq);
+        assert_float_close(n3, f3, $p, &format!("{:?}", $op_info), $eq);
     };
-    ($eq:literal, $n1:ident, $astro_op:ident, $f1:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_name:literal, $cc:ident) => {
+    ($eq:literal, $n1:ident, $astro_op:ident, $f1:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_info:expr, $cc:ident) => {
         let n3 = BigFloat::$astro_op(&($n1), $p, $rm, &mut $cc);
 
         let mut f3 = Float::with_val($p as u32, 1);
@@ -41,13 +43,13 @@ macro_rules! test_astro_op {
         // println!("\n{:b}\n{}", $n1, $f1.to_string_radix(2, None));
         // println!("\n{:b}\n{}", n3, f3.to_string_radix(2, None));
 
-        assert_float_close(n3, f3, $p, $op_name, $eq);
+        assert_float_close(n3, f3, $p, &format!("{:?}", $op_info), $eq);
     };
 }
 
 // test constant value match
 macro_rules! test_astro_const {
-    ($astro_const:ident, $mpfr_const:ident, $p:ident, $rm:ident, $rnd:ident, $op_name:literal, $cc:ident) => {
+    ($astro_const:ident, $mpfr_const:ident, $p:ident, $rm:ident, $rnd:ident, $op_info:expr, $cc:ident) => {
         let n1: BigFloat = $cc.$astro_const($p, $rm);
 
         let mut f1 = Float::with_val($p as u32, 1);
@@ -56,7 +58,7 @@ macro_rules! test_astro_const {
             mpfr::$mpfr_const(f1.as_raw_mut(), $rnd);
         }
 
-        assert_float_close(n1, f1, $p, $op_name, true);
+        assert_float_close(n1, f1, $p, &format!("{:?}", $op_info), true);
     };
 }
 
@@ -224,6 +226,28 @@ pub fn get_last_zero(p: usize, exp_from: Exponent, exp_to: Exponent) -> BigFloat
     m1[0] = Word::MAX - 1;
 
     bf_from_mantissa_and_exp_rng(&m1, exp_from, exp_to)
+}
+
+// Generates a number near 1.
+pub fn get_near_one(p: usize) -> BigFloat {
+    let e = (rand::random::<u8>() & 1) as Exponent;
+
+    let random_bits = random::<usize>() % (p - 1);
+    let i = random_bits / WORD_BIT_SIZE;
+
+    let mut m1;
+    if e == 0 {
+        m1 = vec![Word::MAX; p / WORD_BIT_SIZE];
+    } else {
+        m1 = vec![0; p / WORD_BIT_SIZE];
+    }
+    m1[i] ^= random::<Word>() >> (random_bits % WORD_BIT_SIZE);
+
+    m1.iter_mut().take(i).for_each(|v| *v = random());
+
+    *m1.last_mut().unwrap() |= WORD_SIGNIFICANT_BIT;
+
+    bf_from_mantissa_and_exp_rng(&m1, e, e)
 }
 
 pub fn bf_from_mantissa_and_exp_rng(m: &[Word], exp_from: Exponent, exp_to: Exponent) -> BigFloat {

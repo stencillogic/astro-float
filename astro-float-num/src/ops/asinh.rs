@@ -10,6 +10,7 @@ use crate::ops::util::compute_small_exp;
 use crate::Consts;
 use crate::Sign;
 use crate::EXPONENT_MAX;
+use crate::WORD_BIT_SIZE;
 
 impl BigFloatNumber {
     /// Computes the hyperbolic arcsine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
@@ -42,12 +43,25 @@ impl BigFloatNumber {
 
                 if self.exponent() == EXPONENT_MAX {
                     // ln(2 * |x|) = ln(2) + ln(|x|)
+                    let mut p_inc = WORD_BIT_SIZE;
+                    let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
-                    let lnx = x.ln(p + 1, RoundingMode::None, cc)?;
+                    loop {
+                        let p_x = p_wrk + 2;
 
-                    let ln2 = cc.ln_2_num(p + 1, RoundingMode::None)?;
+                        let lnx = x.ln(p_x, RoundingMode::None, cc)?;
 
-                    ln2.add(&lnx, p, rm)
+                        let ln2 = cc.ln_2_num(p_x, RoundingMode::None)?;
+
+                        let mut ret = ln2.add(&lnx, p_x, RoundingMode::None)?;
+
+                        if ret.try_set_precision(p, rm, p_wrk)? {
+                            break Ok(ret);
+                        }
+
+                        p_wrk += p_inc;
+                        p_inc = round_p(p_wrk / 5);
+                    }
                 } else {
                     x.set_exponent(x.exponent() + 1);
 
@@ -56,18 +70,30 @@ impl BigFloatNumber {
             } else {
                 // ln(|x| + sqrt(x*x + 1)) * signum(x)
 
-                let p_x = p + self.exponent().unsigned_abs() as usize + 5;
-                x.set_precision(p_x, RoundingMode::None)?;
+                let mut p_inc = WORD_BIT_SIZE;
+                let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
-                let xx = x.mul(&x, p_x, RoundingMode::None)?;
+                loop {
+                    let p_x = p_wrk + self.exponent().unsigned_abs() as usize + 6;
+                    x.set_precision(p_x, RoundingMode::None)?;
 
-                let d1 = xx.add(&ONE, p_x, RoundingMode::None)?;
+                    let xx = x.mul(&x, p_x, RoundingMode::None)?;
 
-                let d2 = d1.sqrt(p_x, RoundingMode::None)?;
+                    let d1 = xx.add(&ONE, p_x, RoundingMode::None)?;
 
-                let d3 = d2.add(&x, p_x, RoundingMode::None)?;
+                    let d2 = d1.sqrt(p_x, RoundingMode::None)?;
 
-                d3.ln(p, rm, cc)
+                    let d3 = d2.add(&x, p_x, RoundingMode::None)?;
+
+                    let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
+
+                    if ret.try_set_precision(p, rm, p_wrk)? {
+                        break Ok(ret);
+                    }
+
+                    p_wrk += p_inc;
+                    p_inc = round_p(p_wrk / 5);
+                }
             }?;
 
         ret.set_sign(self.sign());

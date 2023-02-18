@@ -37,11 +37,11 @@ impl BigFloatNumber {
                 // ln(2) + ln(x)
 
                 let mut p_inc = WORD_BIT_SIZE;
-                let mut p_wrk = p + p_inc;
+                let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+
+                let mut x = self.clone()?;
 
                 loop {
-                    let mut x = self.clone()?;
-
                     let p_x = p_wrk + 3;
                     x.set_precision(p_x, RoundingMode::None)?;
 
@@ -71,20 +71,32 @@ impl BigFloatNumber {
                 additional_prec = count_leading_zeroes_skip_first(self.m.digits());
             }
 
+            let mut p_inc = WORD_BIT_SIZE;
+            let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+
             let mut x = self.clone()?;
 
-            let p_x = p + 3 + additional_prec;
-            x.set_precision(p_x, RoundingMode::None)?;
+            loop {
+                let p_x = p_wrk + 6 + additional_prec;
+                x.set_precision(p_x, RoundingMode::None)?;
 
-            let xx = x.mul(&x, p_x, RoundingMode::None)?;
+                let xx = x.mul(&x, p_x, RoundingMode::None)?;
 
-            let d1 = xx.sub(&ONE, p_x, RoundingMode::None)?;
+                let d1 = xx.sub(&ONE, p_x, RoundingMode::None)?;
 
-            let d2 = d1.sqrt(p_x, RoundingMode::None)?;
+                let d2 = d1.sqrt(p_x, RoundingMode::None)?;
 
-            let d3 = d2.add(&x, p_x, RoundingMode::None)?;
+                let d3 = d2.add(&x, p_x, RoundingMode::None)?;
 
-            d3.ln(p, rm, cc)
+                let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
+
+                if ret.try_set_precision(p, rm, p_wrk)? {
+                    return Ok(ret);
+                }
+
+                p_wrk += p_inc;
+                p_inc = round_p(p_wrk / 5);
+            }
         }
     }
 }
@@ -98,12 +110,13 @@ mod tests {
 
     #[test]
     fn test_acosh() {
-        let p = 320;
         let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;
-        let n1 = BigFloatNumber::from_word(2, p).unwrap();
-        let _n2 = n1.acosh(p, rm, &mut cc).unwrap();
+        /* let n1 = BigFloatNumber::from_words(&[144, 9223372036854775808], Sign::Pos, 1).unwrap();
+        let n2 = n1.acosh(128, RoundingMode::Down, &mut cc).unwrap();
+        println!("{:?}", n2);
         //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
+        return; */
 
         // near 1
         let p = 448;

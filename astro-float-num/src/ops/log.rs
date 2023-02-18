@@ -124,7 +124,7 @@ impl BigFloatNumber {
         }
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
         loop {
             let mut x = m.clone()?;
@@ -137,15 +137,15 @@ impl BigFloatNumber {
             let mut ret = if e == 0 {
                 p1
             } else {
-                let p2 = cc.ln_2_num(p_x, RoundingMode::None)?;
+                let p2 = cc.ln_2_num(p1.mantissa_max_bit_len(), RoundingMode::None)?;
 
                 let mut n = Self::from_usize(e.unsigned_abs())?;
                 if e < 0 {
                     n.set_sign(Sign::Neg);
                 }
 
-                let p2n = p2.mul(&n, p_x, RoundingMode::None)?;
-                p1.add(&p2n, p_x, RoundingMode::None)?
+                let p2n = p2.mul(&n, p1.mantissa_max_bit_len(), RoundingMode::None)?;
+                p1.add(&p2n, p1.mantissa_max_bit_len(), RoundingMode::None)?
             };
 
             if ret.try_set_precision(p, rm, p_wrk)? {
@@ -249,7 +249,7 @@ impl BigFloatNumber {
         } + 5;
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
         loop {
             let mut x = m.clone()?;
@@ -293,11 +293,11 @@ impl BigFloatNumber {
         // ln(self) / ln(10)
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+
+        let mut x = self.clone()?;
 
         loop {
-            let mut x = self.clone()?;
-
             let p_x = p_wrk + 5;
             x.set_precision(p_x, RoundingMode::None)?;
 
@@ -353,15 +353,14 @@ impl BigFloatNumber {
         // ln(self) / ln(n)
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len().max(n.mantissa_max_bit_len())) + p_inc;
+
+        let mut x = self.clone()?;
+        let mut n = n.clone()?;
 
         loop {
-            let mut x = self.clone()?;
-
             let p_x = p_wrk + 5;
             x.set_precision(p_x, RoundingMode::None)?;
-
-            let mut n = n.clone()?;
             n.set_precision(p_x, RoundingMode::None)?;
 
             let p1 = x.ln(p_x, RoundingMode::None, cc)?;
@@ -415,13 +414,12 @@ mod tests {
         let mut cc = Consts::new().unwrap();
 
         let rm = RoundingMode::ToEven;
-        let p = 3200;
-        let n1 = BigFloatNumber::from_word(123, p).unwrap();
+        /* let n1 = BigFloatNumber::from_words(&[3, 0, 9223372036854775808], Sign::Pos, 1).unwrap();
 
-        let mut n2 = n1.ln(p, rm, &mut cc).unwrap();
-        n2.set_sign(Sign::Pos);
+        let n2 = n1.ln(576, rm, &mut cc).unwrap();
 
-        //println!("{:?}", n2.fp3(crate::Radix::Dec, rm).unwrap());
+        println!("{:?}", n2);
+        return; */
 
         // near 1
         let p = 320;

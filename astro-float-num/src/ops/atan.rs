@@ -97,7 +97,7 @@ impl BigFloatNumber {
         compute_small_exp!(self, self.exponent() as isize * 2 - 1, true, p, rm);
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
         loop {
             let mut x = self.clone()?;

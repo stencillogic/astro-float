@@ -24,20 +24,21 @@ impl BigFloatNumber {
     pub fn acos(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Result<Self, Error> {
         let p = round_p(p);
 
-        let cmpone = self.cmp(&ONE);
-        if cmpone == 0 {
+        let cmpone = self.abs_cmp(&ONE);
+        if cmpone == 0 && self.is_positive() {
             return Self::new2(p, Sign::Pos, self.inexact());
         } else if cmpone > 0 {
             return Err(Error::InvalidArgument);
         }
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
         let mut add_p = (1 - ACOS_EXP_THRES) as usize;
-        loop {
-            let mut x = self.clone()?;
 
+        let mut x = self.clone()?;
+
+        loop {
             let p_x = p_wrk + add_p;
             x.set_precision(p_x, RoundingMode::None)?;
 
@@ -46,9 +47,14 @@ impl BigFloatNumber {
             let mut pi = cc.pi_num(p_x, RoundingMode::None)?;
             pi.set_exponent(pi.exponent() - 1);
 
+            let ret2 = pi.add(&ret, p_x, RoundingMode::None)?;
             ret = pi.sub(&ret, p_x, RoundingMode::None)?;
 
-            let t = ret.exponent().unsigned_abs() as usize + 1; // ret near pi / 2 gives cancellation
+            let t = ret
+                .exponent()
+                .unsigned_abs()
+                .max(ret2.exponent().unsigned_abs()) as usize
+                + 1; // ret near pi / 2 gives cancellation
             if add_p < t {
                 add_p = t;
             } else {

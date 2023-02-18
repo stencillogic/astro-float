@@ -25,6 +25,32 @@ fn ttt() {
     println!("{:?}", d1.format(crate::Radix::Bin, RoundingMode::None));
     println!("{:?}", d2.format(crate::Radix::Bin, RoundingMode::None));
     println!("{:?}", d3.format(crate::Radix::Bin, RoundingMode::None));
+
+    for _ in 0..1000 {
+        let mut n = BigFloatNumber::random_normal(128 + 64, -1000, 1000).unwrap();
+        n.set_sign(Sign::Pos);
+        let mut n1 = n.clone().unwrap();
+        n.m.digits_mut()[0] = 0;
+        n1.m.digits_mut()[0] = WORD_MAX;
+
+        let err_e = (n.exponent() + 8) / 9 + 1 - 128;
+
+        for _ in 0..2 {
+            n = n.cbrt(128, RoundingMode::None).unwrap();
+            n1 = n1.cbrt(128, RoundingMode::None).unwrap();
+        }
+
+        //println!("{:?}", n);
+        //println!("{:?}", n1);
+
+        let s = n1.sub_full_prec(&n).unwrap();
+
+        if !s.is_zero() {
+            println!("\n{:?}", s.exponent());
+            println!("{:?}", err_e);
+            assert!(s.exponent() <= err_e);
+        }
+    }
 } */
 
 const fn get_prec_rng() -> usize {

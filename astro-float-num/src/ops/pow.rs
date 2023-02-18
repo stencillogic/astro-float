@@ -104,7 +104,7 @@ impl BigFloatNumber {
         compute_small_exp!(ONE, self.exponent() as isize, self.is_negative(), p, rm);
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
         loop {
             let p_x = p_wrk + 2;
@@ -166,7 +166,7 @@ impl BigFloatNumber {
         let e_fract = if !fract.is_zero() {
             fract.set_precision(p_work, RoundingMode::None)?;
             fract.set_sign(Sign::Pos);
-            fract.expf(RoundingMode::None)
+            fract.expf()
         } else {
             ONE.clone()
         }?;
@@ -198,7 +198,7 @@ impl BigFloatNumber {
             }
 
             let mut p_inc = WORD_BIT_SIZE;
-            let mut p_wrk = p + p_inc;
+            let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
             loop {
                 let p_x = p_wrk + 2;
@@ -246,20 +246,21 @@ impl BigFloatNumber {
 
         let mut bit_pos = WORD_BIT_SIZE;
         while bit_pos > 0 {
-            bit_pos -= 1;
-            i <<= 1;
             if i & WORD_SIGNIFICANT_BIT as usize != 0 {
                 bit_pos -= 1;
                 i <<= 1;
                 break;
             }
+
+            bit_pos -= 1;
+            i <<= 1;
         }
         let bit_pos = bit_pos; // make immutable
 
         let p = round_p(p);
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
         loop {
             let p_x = p_wrk + bit_pos * 2;
@@ -320,17 +321,17 @@ impl BigFloatNumber {
     }
 
     // e^self for |self| < 1.
-    fn expf(self, rm: RoundingMode) -> Result<Self, Error> {
+    fn expf(self) -> Result<Self, Error> {
         debug_assert!(!self.is_zero());
 
         let p = self.mantissa_max_bit_len();
 
-        let sh = self.sinh_series(p, rm)?; // faster convergence than direct series
+        let sh = self.sinh_series(p, RoundingMode::None)?; // faster convergence than direct series
 
         // e = sh + sqrt(sh^2 + 1)
-        let sq = sh.mul(&sh, p, rm)?;
-        let sq2 = sq.add(&ONE, p, rm)?;
-        let sq3 = sq2.sqrt(p, rm)?;
+        let sq = sh.mul(&sh, p, RoundingMode::None)?;
+        let sq2 = sq.add(&ONE, p, RoundingMode::None)?;
+        let sq3 = sq2.sqrt(p, RoundingMode::None)?;
         sq3.add(&sh, p, RoundingMode::FromZero)
     }
 
@@ -484,25 +485,44 @@ impl BigFloatNumber {
 
         let mut x = self.clone()?;
 
-        let p_ext = p + 2;
-        x.set_precision(p_ext, RoundingMode::None)?;
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len().max(n.mantissa_max_bit_len())) + p_inc;
 
-        let ln = x.ln(p_ext, RoundingMode::None, cc)?;
+        loop {
+            let p_ext = p_wrk + 2;
+            x.set_precision(p_ext, RoundingMode::None)?;
 
-        let m = match n.mul(&ln, p_ext, RoundingMode::None) {
-            Ok(v) => Ok(v),
-            Err(e) => match e {
-                Error::ExponentOverflow(Sign::Neg) => {
-                    return Self::new2(p, Sign::Pos, n.inexact() || ln.inexact());
+            let ln = x.ln(p_ext, RoundingMode::None, cc)?;
+
+            let m = match n.mul(&ln, p_ext, RoundingMode::None) {
+                Ok(v) => Ok(v),
+                Err(e) => match e {
+                    Error::ExponentOverflow(Sign::Neg) => {
+                        return Self::new2(p, Sign::Pos, n.inexact() || ln.inexact());
+                    }
+                    Error::ExponentOverflow(Sign::Pos) => Err(Error::ExponentOverflow(Sign::Pos)),
+                    Error::DivisionByZero => Err(Error::DivisionByZero),
+                    Error::InvalidArgument => Err(Error::InvalidArgument),
+                    Error::MemoryAllocation => Err(Error::MemoryAllocation),
+                },
+            }?;
+
+            compute_small_exp!(ONE, m.exponent() as isize, m.is_negative(), p, rm);
+
+            let mut ret = m.exp(p_ext, RoundingMode::None, cc)?;
+
+            if ret.inexact() {
+                if ret.try_set_precision(p, rm, p_wrk)? {
+                    return Ok(ret);
                 }
-                Error::ExponentOverflow(Sign::Pos) => Err(Error::ExponentOverflow(Sign::Pos)),
-                Error::DivisionByZero => Err(Error::DivisionByZero),
-                Error::InvalidArgument => Err(Error::InvalidArgument),
-                Error::MemoryAllocation => Err(Error::MemoryAllocation),
-            },
-        }?;
+            } else {
+                ret.set_precision(p, rm)?;
+                return Ok(ret);
+            }
 
-        m.exp(p, rm, cc)
+            p_wrk += p_inc;
+            p_inc = round_p(p_wrk / 5);
+        }
     }
 }
 
@@ -517,8 +537,9 @@ mod test {
     fn test_power() {
         let mut cc = Consts::new().unwrap();
 
-        /*         let n1 = BigFloatNumber::from_words(&[3, 0, 0, 0, 13835058055282163712], Sign::Pos, 245552510).unwrap();
-        let ret = n1.powi(2, 320, RoundingMode::ToEven).unwrap();
+        /* let n1 = BigFloatNumber::from_words(&[18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615], Sign::Pos, 2147483647).unwrap();
+        let n2 = BigFloatNumber::from_words(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9223372036854775808], Sign::Neg, -2147483648).unwrap();
+        let ret = n1.pow(&n2, 1024, RoundingMode::Up, &mut cc).unwrap();
         println!("{:?}", ret);
         return; */
 

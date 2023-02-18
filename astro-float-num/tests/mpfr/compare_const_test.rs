@@ -61,8 +61,8 @@ fn mpfr_compare_const() {
             let (rm, rnd) = get_random_rnd_pair();
 
             // pi, ln(2)
-            test_astro_const!(pi, const_pi, p, rm, rnd, "const pi", cc);
-            test_astro_const!(ln_2, const_log2, p, rm, rnd, "const ln(2)", cc);
+            test_astro_const!(pi, const_pi, p, rm, rnd, (p, rm, "const pi"), cc);
+            test_astro_const!(ln_2, const_log2, p, rm, rnd, (p, rm, "const ln(2)"), cc);
 
             // e
             let n1 = cc.e(p, rm);
@@ -71,7 +71,7 @@ fn mpfr_compare_const() {
                 mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd);
             }
 
-            assert_float_close(n1, f1, p, "const e", true);
+            assert_float_close(n1, f1, p, &format!("{:?}", (p, rm, "const e")), true);
 
             // ln(10)
             let n1 = cc.ln_10(p, rm);
@@ -80,7 +80,7 @@ fn mpfr_compare_const() {
                 mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd);
             }
 
-            assert_float_close(n1, f1, p, "const ln(10)", true);
+            assert_float_close(n1, f1, p, &format!("{:?}", (p, rm, "const ln(10)")), true);
         }
     }
 }
