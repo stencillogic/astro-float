@@ -197,6 +197,64 @@ where
     }
 }
 
+/* #[inline]
+fn bitle(mut v: Word) -> usize {
+    let mut bitle = 0;
+    while v > 0 {
+        v >>= 1;
+        bitle += 1;
+    }
+    bitle
+}
+
+/// Prepare an initial value for calculating n-root of an argument m.
+pub fn root_estimate(m: &[Word], n: usize) -> Result<WordBuf, Error> {
+    debug_assert!(!m.is_empty());
+    debug_assert!(*m.last().unwrap() != 0);
+
+    let last = *m.last().unwrap();
+
+    if m.len() < 2 {
+        let mut buf = WordBuf::new(1)?;
+        buf[0] = nroot_int(last, n) + 1;
+        return Ok(buf);
+    }
+
+    let last_bits = bitle(last);
+    let shift_bits = WORD_BIT_SIZE - last_bits;
+    let all_bits = (m.len() - 1) * WORD_BIT_SIZE + last_bits;
+
+    let mut val = m[m.len() - 1] << shift_bits | if last_bits < WORD_BIT_SIZE { m[m.len() - 2] >> last_bits } else { 0 };
+
+    let sub_bits = all_bits % n;
+    let zero_bits = all_bits / n + usize::from(sub_bits != 0);
+
+    val >>= sub_bits;
+
+    let root = if val == WORD_MAX {
+        1 << (WORD_BIT_SIZE / 2)
+    } else {
+        nroot_int(val + 1, n)
+    };
+
+    let root_bits = bitle(root);
+    let l = root_bits + zero_bits;
+
+    let mut buf = WordBuf::new((l + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE)?;
+    buf.fill(0);
+
+    let idx = zero_bits / WORD_BIT_SIZE;
+    let shift_bits = zero_bits % WORD_BIT_SIZE;
+
+    buf[idx] = root << shift_bits;
+    if root_bits > WORD_BIT_SIZE - shift_bits {
+        buf[idx + 1] = root >> (WORD_BIT_SIZE - shift_bits);
+    }
+
+    Ok(buf)
+}
+ */
+
 /// Prepare an initial value for calculating n-root of an argument m.
 pub fn root_estimate(m: &[Word], n: usize) -> Result<WordBuf, Error> {
     let mut buf = WordBuf::new(m.len() / n + 1)?;

@@ -250,4 +250,27 @@ mod tests {
         s1[l - 1] |= WORD_SIGNIFICANT_BIT;
         s1
     }
+
+    #[ignore]
+    #[test]
+    #[cfg(feature = "std")]
+    fn cbrt_perf() {
+        for _ in 0..5 {
+            let sz = 34;
+            let mut n = vec![];
+            let l = 10000;
+            for _ in 0..l {
+                let v = random_normalized_slice(sz, sz);
+                n.push(v);
+            }
+
+            let start_time = std::time::Instant::now();
+            for ni in n.drain(..) {
+                Mantissa::cbrt_rem(ni).unwrap();
+            }
+
+            let time = start_time.elapsed();
+            println!("cbrt {}", time.as_millis());
+        }
+    }
 }

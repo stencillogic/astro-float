@@ -8,6 +8,7 @@ use crate::common::util::sqrt_int;
 use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
+use crate::Word;
 use smallvec::SmallVec;
 
 const MAX_CACHE: usize = 128;
@@ -366,7 +367,7 @@ fn ndim_series<T: PolycoeffGen>(
 
     // build cache
     let mut cache = SmallVec::<[BigFloatNumber; MAX_CACHE]>::new();
-    let cache_dim_sz = nroot_int(niter as u32, n) as usize - 1;
+    let cache_dim_sz = nroot_int(niter as Word, n) as usize - 1;
     let cache_dim_sz = cache_dim_sz.min(MAX_CACHE / (n - 1));
     let mut x_pow = x_step.clone()?;
 
