@@ -91,7 +91,6 @@ fn mpfr_compare_const() {
     let rm = RoundingMode::ToEven;
     let rnd = rnd_t::RNDN;
 
-
     let mut mpfr_e = Float::with_val(p as u32, 1);
     unsafe {
         mpfr::exp(

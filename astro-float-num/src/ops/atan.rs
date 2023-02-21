@@ -151,14 +151,10 @@ impl BigFloatNumber {
         // Reduction gives 2^(-p+8) per iteration.
         // e_eff compensates error of the series and gives 2^(-p+2).
         let add_prec = reduction_times as isize * 8 + 2 - e_eff as isize;
-        let p_arg = p + if add_prec > 0 { add_prec as usize } else {0};
+        let p_arg = p + if add_prec > 0 { add_prec as usize } else { 0 };
         self.set_precision(p_arg, rm)?;
 
-        let arg = if reduction_times > 0 {
-            self.atan_arg_reduce(reduction_times)?
-        } else {
-            self
-        };
+        let arg = if reduction_times > 0 { self.atan_arg_reduce(reduction_times)? } else { self };
 
         let acc = arg.clone()?; // x
         let x_step = arg.mul(&arg, p_arg, rm)?; // x^2

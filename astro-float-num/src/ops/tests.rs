@@ -942,7 +942,6 @@ fn test_tanh_atanh() {
     }
 }
 
-
 // Test operations error.
 /* #[test]
 fn test_err() {

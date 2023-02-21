@@ -349,10 +349,10 @@ impl BigFloatNumber {
         );
 
         // Argument reduction gives error 2^(-p+5) per step, and 2^(-p+3) once.
-        // First parts of the series give 2^(-p+5). 
+        // First parts of the series give 2^(-p+5).
         // The error of the remaining parts of the series is compensated (see doc/README.md).
         let add_prec = reduction_times as isize * 5 + 8 - e_eff as isize;
-        let p_arg = p + if add_prec > 0 { add_prec as usize } else {0};
+        let p_arg = p + if add_prec > 0 { add_prec as usize } else { 0 };
         self.set_precision(p_arg, rm)?;
 
         let arg = if reduction_times > 0 {
@@ -739,7 +739,7 @@ mod test {
         }
     }
 
-/* test the polynimial generator error
+    /* test the polynimial generator error
     #[test]
     fn poly_sinh() {
         let mut e = 0;

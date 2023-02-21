@@ -116,7 +116,7 @@ impl BigFloatNumber {
             count_leading_zeroes_skip_first(m.mantissa_digits())
         } else {
             0
-        } + 3;  // we need the error of adding n*ln(2) not to be considered by try_set_precision, so add 3 here.
+        } + 3; // we need the error of adding n*ln(2) not to be considered by try_set_precision, so add 3 here.
 
         // test for one.
         if e == 1 && additional_prec == m.mantissa_max_bit_len() + 3 {
@@ -172,7 +172,7 @@ impl BigFloatNumber {
         // argument substitution for atanh gives 2^(-p+5),
         // e_eff compensates error of the series and gives 2^(-p+1).
         let add_prec = 7 - e_eff as isize;
-        let p_arg = p + if add_prec > 0 { add_prec as usize } else {0};
+        let p_arg = p + if add_prec > 0 { add_prec as usize } else { 0 };
         x.set_precision(p_arg, rm)?;
 
         let arg = if reduction_times > 0 {
@@ -254,7 +254,7 @@ impl BigFloatNumber {
             zeroes_cnt
         } else {
             0
-        } + 3;  // add 3 to avoid error being accounted by try_set_precision
+        } + 3; // add 3 to avoid error being accounted by try_set_precision
 
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
