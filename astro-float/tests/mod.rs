@@ -219,9 +219,6 @@ fn macro_run_err_test() {
     let mut y2 = b.pow(&n, p + 128, RoundingMode::None, &mut cc);
     y2.set_precision(p, rm).unwrap();
 
-    println!("{:?}", b);
-    println!("{:?}", n);
-
     let z = expr!(pow(s1, s2), &mut ctx);
 
     assert_eq!(y2, z);

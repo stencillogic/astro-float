@@ -135,7 +135,7 @@ impl BigFloatNumber {
 
         let p = self.mantissa_max_bit_len();
         let mut polycoeff_gen = AtanPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<AtanArgReductionEstimator>(
+        let (mut reduction_times, niter, e_eff) = series_cost_optimize::<AtanArgReductionEstimator>(
             p,
             &polycoeff_gen,
             -(self.e as isize),
@@ -143,11 +143,19 @@ impl BigFloatNumber {
             false,
         );
 
-        let p_arg = self.mantissa_max_bit_len() + 1 + reduction_times * 3;
+        // to avoid diverging error e_eff must be large enough
+        if e_eff < 3 {
+            reduction_times += 3 - e_eff;
+        }
+
+        // Reduction gives 2^(-p+8) per iteration.
+        // e_eff compensates error of the series and gives 2^(-p+2).
+        let add_prec = reduction_times as isize * 8 + 2 - e_eff as isize;
+        let p_arg = p + if add_prec > 0 { add_prec as usize } else {0};
         self.set_precision(p_arg, rm)?;
 
         let arg = if reduction_times > 0 {
-            self.atan_arg_reduce(reduction_times, rm)?
+            self.atan_arg_reduce(reduction_times)?
         } else {
             self
         };
@@ -166,17 +174,17 @@ impl BigFloatNumber {
     }
 
     // reduce argument n times.
-    fn atan_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+    fn atan_arg_reduce(&self, n: usize) -> Result<Self, Error> {
         // y = x / (1 + sqrt(1 + x*x))
         let mut ret = self.clone()?;
         let p = ret.mantissa_max_bit_len();
 
         for _ in 0..n {
-            let xx = ret.mul(&ret, p, rm)?;
-            let n0 = xx.add(&ONE, p, rm)?;
-            let n1 = n0.sqrt(p, rm)?;
-            let n2 = n1.add(&ONE, p, rm)?;
-            ret = ret.div(&n2, p, rm)?;
+            let xx = ret.mul(&ret, p, RoundingMode::None)?;
+            let n0 = xx.add(&ONE, p, RoundingMode::None)?;
+            let n1 = n0.sqrt(p, RoundingMode::None)?;
+            let n2 = n1.add(&ONE, p, RoundingMode::None)?;
+            ret = ret.div(&n2, p, RoundingMode::FromZero)?;
         }
 
         Ok(ret)

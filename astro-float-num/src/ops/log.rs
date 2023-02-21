@@ -116,10 +116,10 @@ impl BigFloatNumber {
             count_leading_zeroes_skip_first(m.mantissa_digits())
         } else {
             0
-        } + 5;
+        } + 3;  // we need the error of adding n*ln(2) not to be considered by try_set_precision, so add 3 here.
 
         // test for one.
-        if e == 1 && additional_prec == m.mantissa_max_bit_len() + 5 {
+        if e == 1 && additional_prec == m.mantissa_max_bit_len() + 3 {
             return Self::new2(p, Sign::Pos, self.inexact());
         }
 
@@ -160,12 +160,20 @@ impl BigFloatNumber {
     fn ln_series(mut x: Self, rm: RoundingMode) -> Result<Self, Error> {
         let p = x.mantissa_max_bit_len();
         let mut polycoeff_gen = AtanhPolycoeffGen::new(p)?;
-        let (reduction_times, niter) =
+        let (mut reduction_times, niter, e_eff) =
             series_cost_optimize::<LnArgReductionEstimator>(p, &polycoeff_gen, 0, 2, false);
 
-        let err = reduction_times + 4;
-        let p = x.mantissa_max_bit_len() + err;
-        x.set_precision(p, rm)?;
+        // to avoid diverging error e_eff must be large enough
+        if e_eff < 3 {
+            reduction_times += 3 - e_eff;
+        }
+
+        // n-th root gives error not more than 2^(-p+1),
+        // argument substitution for atanh gives 2^(-p+5),
+        // e_eff compensates error of the series and gives 2^(-p+1).
+        let add_prec = 7 - e_eff as isize;
+        let p_arg = p + if add_prec > 0 { add_prec as usize } else {0};
+        x.set_precision(p_arg, rm)?;
 
         let arg = if reduction_times > 0 {
             Self::ln_arg_reduce(x, reduction_times, rm)?
@@ -187,9 +195,9 @@ impl BigFloatNumber {
     }
 
     // reduce argument n times.
-    fn ln_arg_reduce(mut x: Self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+    fn ln_arg_reduce(mut x: Self, n: usize, _rm: RoundingMode) -> Result<Self, Error> {
         for _ in 0..n {
-            x = x.sqrt(x.mantissa_max_bit_len(), rm)?;
+            x = x.sqrt(x.mantissa_max_bit_len(), RoundingMode::Up)?;
         }
 
         Ok(x)
@@ -246,7 +254,7 @@ impl BigFloatNumber {
             zeroes_cnt
         } else {
             0
-        } + 5;
+        } + 3;  // add 3 to avoid error being accounted by try_set_precision
 
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
@@ -298,7 +306,7 @@ impl BigFloatNumber {
         let mut x = self.clone()?;
 
         loop {
-            let p_x = p_wrk + 5;
+            let p_x = p_wrk + 3; // add 3 to avoid error being accounted by try_set_precision
             x.set_precision(p_x, RoundingMode::None)?;
 
             let p1 = x.ln(p_x, RoundingMode::None, cc)?;
@@ -359,7 +367,7 @@ impl BigFloatNumber {
         let mut n = n.clone()?;
 
         loop {
-            let p_x = p_wrk + 5;
+            let p_x = p_wrk + 3;
             x.set_precision(p_x, RoundingMode::None)?;
             n.set_precision(p_x, RoundingMode::None)?;
 
@@ -414,9 +422,9 @@ mod tests {
         let mut cc = Consts::new().unwrap();
 
         let rm = RoundingMode::ToEven;
-        /* let n1 = BigFloatNumber::from_words(&[3, 0, 9223372036854775808], Sign::Pos, 1).unwrap();
+        /* let n1 = BigFloatNumber::from_words(&[12370883450309161062, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9223372036854775808], Sign::Pos, 1).unwrap();
 
-        let n2 = n1.ln(576, rm, &mut cc).unwrap();
+        let n2 = n1.ln(1024, RoundingMode::FromZero, &mut cc).unwrap();
 
         println!("{:?}", n2);
         return; */

@@ -104,7 +104,7 @@ impl BigFloatNumber {
         let p = self.mantissa_max_bit_len();
 
         let polycoeff_gen = TanPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<TanArgReductionEstimator>(
+        let (reduction_times, _niter, e_eff) = series_cost_optimize::<TanArgReductionEstimator>(
             p,
             &polycoeff_gen,
             -(self.e as isize),
@@ -112,12 +112,13 @@ impl BigFloatNumber {
             true,
         );
 
-        let p_arg = p + reduction_times * 3 + niter * 7 + 4;
+        let add_prec = reduction_times as isize * 4 + 9 - e_eff as isize;
+        let p_arg = p + if add_prec > 0 { add_prec as usize } else {0};
         self.set_precision(p_arg, rm)?;
 
         let arg_holder;
         let arg = if reduction_times > 0 {
-            arg_holder = self.tan_arg_reduce(reduction_times, rm)?;
+            arg_holder = self.tan_arg_reduce(reduction_times)?;
             &arg_holder
         } else {
             &self
@@ -189,14 +190,14 @@ impl BigFloatNumber {
     }
 
     // reduce argument n times.
-    fn tan_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+    fn tan_arg_reduce(&self, n: usize) -> Result<Self, Error> {
         // tan(3*x) = 3*tan(x) - tan(x)^3 / (1 - 3*tan(x)^2)
         let mut ret = self.clone()?;
         let p = ret.mantissa_max_bit_len();
         if ret.exponent() < EXPONENT_MIN + n as Exponent {
             ret.set_exponent(EXPONENT_MIN);
             for _ in 0..n - (ret.exponent() - EXPONENT_MIN) as usize {
-                ret = ret.div(&TWO, p, rm)?;
+                ret = ret.div(&TWO, p, RoundingMode::FromZero)?;
             }
         } else {
             ret.set_exponent(ret.exponent() - n as Exponent);
@@ -230,7 +231,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_tan() {
+    fn test_tangent() {
         let p = 320;
         let mut cc = Consts::new().unwrap();
         let rm = RoundingMode::ToEven;

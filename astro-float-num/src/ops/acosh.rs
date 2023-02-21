@@ -86,7 +86,7 @@ impl BigFloatNumber {
 
                 let d2 = d1.sqrt(p_x, RoundingMode::None)?;
 
-                let d3 = d2.add(&x, p_x, RoundingMode::None)?;
+                let d3 = d2.add(&x, p_x, RoundingMode::FromZero)?;
 
                 let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
 

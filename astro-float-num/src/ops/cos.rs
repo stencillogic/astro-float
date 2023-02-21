@@ -153,7 +153,7 @@ impl BigFloatNumber {
 
         let p = self.mantissa_max_bit_len();
         let mut polycoeff_gen = CosPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<CosArgReductionEstimator>(
+        let (reduction_times, niter, e_eff) = series_cost_optimize::<CosArgReductionEstimator>(
             p,
             &polycoeff_gen,
             -(self.e as isize),
@@ -161,11 +161,16 @@ impl BigFloatNumber {
             false,
         );
 
-        let p_arg = p + niter * 4 + reduction_times * 3;
+        // Reduction gives 2^(-p+1) per iteration.
+        // Restore gives 2^(-p+5) per iteration.
+        // First parts of the series for any e_eff >= 0 give 2^(-p+6) at most.
+        // The error of the remaining parts of the series is compensated (see doc/README.md).
+        let add_prec = reduction_times as isize * 6 + 6 - e_eff as isize;
+        let p_arg = p + if add_prec > 0 { add_prec as usize } else {0};
         self.set_precision(p_arg, rm)?;
 
         let arg = if reduction_times > 0 {
-            self.cos_arg_reduce(reduction_times, rm)?
+            self.cos_arg_reduce(reduction_times)?
         } else {
             self
         };
@@ -177,7 +182,7 @@ impl BigFloatNumber {
         let ret = series_run(acc, x_first, x_step, niter, &mut polycoeff_gen)?;
 
         if reduction_times > 0 {
-            ret.cos_arg_restore(reduction_times, rm)
+            ret.cos_arg_restore(reduction_times)
         } else {
             Ok(ret)
         }
@@ -185,14 +190,14 @@ impl BigFloatNumber {
 
     // reduce argument n times.
     // cost: n * O(add)
-    fn cos_arg_reduce(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+    fn cos_arg_reduce(&self, n: usize) -> Result<Self, Error> {
         // cos(2*x) = 2*cos(x)^2 - 1
         let mut ret = self.clone()?;
         let p = ret.mantissa_max_bit_len();
         if ret.exponent() < EXPONENT_MIN + n as Exponent {
             ret.set_exponent(EXPONENT_MIN);
             for _ in 0..n - (ret.exponent() - EXPONENT_MIN) as usize {
-                ret = ret.div(&TWO, p, rm)?;
+                ret = ret.div(&TWO, p, RoundingMode::FromZero)?;
             }
         } else {
             ret.set_exponent(ret.exponent() - n as Exponent);
@@ -202,15 +207,15 @@ impl BigFloatNumber {
 
     // restore value for the argument reduced n times.
     // cost: n * (4*O(mul) + O(add))
-    fn cos_arg_restore(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
+    fn cos_arg_restore(&self, n: usize) -> Result<Self, Error> {
         // cos(2*x) = 2*cos(x)^2 - 1
         let mut cos = self.clone()?;
         let p = cos.mantissa_max_bit_len();
 
         for _ in 0..n {
-            let mut cos2 = cos.mul(&cos, p, rm)?;
+            let mut cos2 = cos.mul(&cos, p, RoundingMode::None)?;
             cos2.set_exponent(cos2.exponent() + 1);
-            cos = cos2.sub(&ONE, p, rm)?;
+            cos = cos2.sub(&ONE, p, RoundingMode::None)?;
         }
 
         Ok(cos)
@@ -294,4 +299,30 @@ mod tests {
             println!("{}", time.as_millis());
         }
     }
+
+/* test the polynimial generator error   
+    #[test]
+    fn poly_cos() {
+        let mut e = 0;
+        for p in 1..100 {
+            let p = p * 64;
+            let n = 3;
+            let mut pcg1 = CosPolycoeffGen::new(p).unwrap();
+            let mut pcg2 = CosPolycoeffGen::new(p + 8*n).unwrap();
+            for _ in 0..n {
+                let c1 = pcg1.next(RoundingMode::None).unwrap();
+                let c2 = pcg2.next(RoundingMode::None).unwrap();
+
+                let d = c1.sub_full_prec(c2).unwrap();
+
+                if !d.is_zero() {
+                    if e < p - (c1.exponent() - d.exponent()) as usize {
+                        e = p - (c1.exponent() - d.exponent()) as usize;
+                    }
+                }
+            }
+        }
+        println!("{:?}", e);
+    } */
+
 }

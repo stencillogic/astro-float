@@ -3,6 +3,7 @@
 use crate::mpfr::common::get_prec_rng;
 use crate::mpfr::common::test_astro_const;
 use crate::mpfr::common::{assert_float_close, get_random_rnd_pair};
+use astro_float_num::RoundingMode;
 use astro_float_num::{BigFloat, Consts, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
 use gmp_mpfr_sys::{
     gmp::exp_t,
@@ -83,4 +84,51 @@ fn mpfr_compare_const() {
             assert_float_close(n1, f1, p, &format!("{:?}", (p, rm, "const ln(10)")), true);
         }
     }
+
+    // large prec
+    let p = 1000000;
+    let mut cc = Consts::new().unwrap();
+    let rm = RoundingMode::ToEven;
+    let rnd = rnd_t::RNDN;
+
+
+    let mut mpfr_e = Float::with_val(p as u32, 1);
+    unsafe {
+        mpfr::exp(
+            mpfr_e.as_raw_mut(),
+            Float::with_val(1, 1).as_raw(),
+            rnd_t::RNDN,
+        );
+    }
+
+    let mut mpfr_ln10 = Float::with_val(p as u32, 1);
+    unsafe {
+        mpfr::log(
+            mpfr_ln10.as_raw_mut(),
+            Float::with_val(32, 10).as_raw(),
+            rnd_t::RNDN,
+        );
+    }
+
+    // pi, ln(2)
+    test_astro_const!(pi, const_pi, p, rm, rnd, (p, rm, "const pi"), cc);
+    test_astro_const!(ln_2, const_log2, p, rm, rnd, (p, rm, "const ln(2)"), cc);
+
+    // e
+    let n1 = cc.e(p, rm);
+    let mut f1 = mpfr_e.clone();
+    unsafe {
+        mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd);
+    }
+
+    assert_float_close(n1, f1, p, &format!("{:?}", (p, rm, "const e")), true);
+
+    // ln(10)
+    let n1 = cc.ln_10(p, rm);
+    f1 = mpfr_ln10.clone();
+    unsafe {
+        mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd);
+    }
+
+    assert_float_close(n1, f1, p, &format!("{:?}", (p, rm, "const ln(10)")), true);
 }

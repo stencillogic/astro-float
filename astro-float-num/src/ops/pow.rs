@@ -340,7 +340,7 @@ impl BigFloatNumber {
         // sinh:  x + x^3/3! + x^5/5! + x^7/7! + ...
 
         let mut polycoeff_gen = SinhPolycoeffGen::new(p)?;
-        let (reduction_times, niter) = series_cost_optimize::<SinhArgReductionEstimator>(
+        let (reduction_times, niter, e_eff) = series_cost_optimize::<SinhArgReductionEstimator>(
             p,
             &polycoeff_gen,
             -(self.e as isize),
@@ -348,7 +348,11 @@ impl BigFloatNumber {
             false,
         );
 
-        let p_arg = p + 1 + reduction_times * 3;
+        // Argument reduction gives error 2^(-p+5) per step, and 2^(-p+3) once.
+        // First parts of the series give 2^(-p+5). 
+        // The error of the remaining parts of the series is compensated (see doc/README.md).
+        let add_prec = reduction_times as isize * 5 + 8 - e_eff as isize;
+        let p_arg = p + if add_prec > 0 { add_prec as usize } else {0};
         self.set_precision(p_arg, rm)?;
 
         let arg = if reduction_times > 0 {
@@ -734,4 +738,27 @@ mod test {
             println!("{}", time.as_millis());
         }
     }
+
+/* test the polynimial generator error
+    #[test]
+    fn poly_sinh() {
+        let mut e = 0;
+        for p in 1..100 {
+            let p = p*64;
+            let n = 3;
+            let mut pcg1 = SinhPolycoeffGen::new(p).unwrap();
+            let mut pcg2 = SinhPolycoeffGen::new(p + 8*n).unwrap();
+            for _ in 0..n {
+                let c1 = pcg1.next(RoundingMode::None).unwrap();
+                let c2 = pcg2.next(RoundingMode::None).unwrap();
+
+                let d = c1.sub_full_prec(c2).unwrap();
+
+                if e < p - (c1.exponent() - d.exponent()) as usize {
+                    e = p - (c1.exponent() - d.exponent()) as usize;
+                }
+            }
+        }
+        println!("{:?}", e);
+    } */
 }

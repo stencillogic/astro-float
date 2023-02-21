@@ -74,7 +74,7 @@ impl BigFloatNumber {
                 let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
                 loop {
-                    let p_x = p_wrk + self.exponent().unsigned_abs() as usize + 6;
+                    let p_x = p_wrk + self.exponent().unsigned_abs() as usize + 5;
                     x.set_precision(p_x, RoundingMode::None)?;
 
                     let xx = x.mul(&x, p_x, RoundingMode::None)?;
@@ -83,7 +83,7 @@ impl BigFloatNumber {
 
                     let d2 = d1.sqrt(p_x, RoundingMode::None)?;
 
-                    let d3 = d2.add(&x, p_x, RoundingMode::None)?;
+                    let d3 = d2.add(&x, p_x, RoundingMode::FromZero)?;
 
                     let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
 

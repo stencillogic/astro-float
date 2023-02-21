@@ -25,32 +25,6 @@ fn ttt() {
     println!("{:?}", d1.format(crate::Radix::Bin, RoundingMode::None));
     println!("{:?}", d2.format(crate::Radix::Bin, RoundingMode::None));
     println!("{:?}", d3.format(crate::Radix::Bin, RoundingMode::None));
-
-    for _ in 0..1000 {
-        let mut n = BigFloatNumber::random_normal(128 + 64, -1000, 1000).unwrap();
-        n.set_sign(Sign::Pos);
-        let mut n1 = n.clone().unwrap();
-        n.m.digits_mut()[0] = 0;
-        n1.m.digits_mut()[0] = WORD_MAX;
-
-        let err_e = (n.exponent() + 8) / 9 + 1 - 128;
-
-        for _ in 0..2 {
-            n = n.cbrt(128, RoundingMode::None).unwrap();
-            n1 = n1.cbrt(128, RoundingMode::None).unwrap();
-        }
-
-        //println!("{:?}", n);
-        //println!("{:?}", n1);
-
-        let s = n1.sub_full_prec(&n).unwrap();
-
-        if !s.is_zero() {
-            println!("\n{:?}", s.exponent());
-            println!("{:?}", err_e);
-            assert!(s.exponent() <= err_e);
-        }
-    }
 } */
 
 const fn get_prec_rng() -> usize {
@@ -967,3 +941,65 @@ fn test_tanh_atanh() {
         );
     }
 }
+
+
+// Test operations error.
+/* #[test]
+fn test_err() {
+
+    let mut n = BigFloatNumber::from_words(&[0, 0, 0, 0, 0, 0, 0, crate::WORD_SIGNIFICANT_BIT], Sign::Pos, 1).unwrap();
+    let mut n1 = n.clone().unwrap();
+    n1.m.digits_mut()[0] = crate::WORD_MAX;
+
+    let p = n.mantissa_max_bit_len();
+    for _ in 0..50 {
+        n = n.sqrt(p, RoundingMode::None).unwrap();
+        n1 = n1.sqrt(p, RoundingMode::None).unwrap();
+    }
+
+    //println!("{:?}", n);
+    //println!("{:?}", n1);
+
+    let s = n.sub_full_prec(&n1).unwrap();
+    println!("{:?}", n);
+    println!("{:?}", n1);
+    println!("{}", 128 - (n.exponent() - s.exponent()));
+    return;
+
+    let mut maxeer = -1000;
+    for _ in 0..10000 {
+        let mut n = BigFloatNumber::random_normal(128 + 64, -10, 10).unwrap();
+        n.set_sign(Sign::Pos);
+        let mut n1 = n.clone().unwrap();
+        n.m.digits_mut()[0] = 0;
+        n.m.digits_mut()[1] |= 0;
+        n1.m.digits_mut()[0] = crate::WORD_MAX;
+        n1.m.digits_mut()[1] |= 127;
+
+        let mut d = BigFloatNumber::random_normal(128 + 64, -10, 10).unwrap();
+        d.set_sign(Sign::Pos);
+        let mut d1 = d.clone().unwrap();
+        d.m.digits_mut()[0] = 0;
+        d.m.digits_mut()[1] |= 0;
+        d1.m.digits_mut()[0] = crate::WORD_MAX;
+        d1.m.digits_mut()[1] |= 0;
+
+        for _ in 0..1 {
+            d = n.add(&d, 128, RoundingMode::None).unwrap();
+            d1 = n1.add(&d1, 128, RoundingMode::None).unwrap();
+        }
+
+        //println!("{:?}", n);
+        //println!("{:?}", n1);
+
+        let s = d1.sub_full_prec(&d).unwrap();
+
+        if !s.is_zero() {
+            let err = 128 - (n.exponent().max(d.exponent()) - s.exponent());
+            if err > maxeer {
+                maxeer = err;
+            }
+        }
+    }
+    println!("maxerr {}", maxeer);
+} */

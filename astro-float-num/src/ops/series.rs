@@ -53,7 +53,7 @@ pub(crate) fn series_cost_optimize<S: ArgReductionEstimator>(
     m: isize,
     pwr_step: usize,
     ext: bool,
-) -> (usize, usize) {
+) -> (usize, usize, usize) {
     let reduction_num_step = log2_floor(p) / 2;
 
     let mut reduction_times = if reduction_num_step as isize > m {
@@ -77,7 +77,7 @@ pub(crate) fn series_cost_optimize<S: ArgReductionEstimator>(
             cost1 = cost2;
             reduction_times += reduction_num_step;
         } else {
-            return (reduction_times - reduction_num_step, niter);
+            return (reduction_times - reduction_num_step, niter, m_eff);
         }
     }
 }
