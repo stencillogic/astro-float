@@ -75,9 +75,9 @@ impl ECache {
 
     fn b_factor(x: usize) -> usize {
         // If we compute n elements of the series 1 + 1/1! + 1/2! + ...
-        // then 1/(n!) is greater than the remaining part: sum(1/(k!)), k = n+1 .. +inf
+        // then 1/(n!) is greater than the remaining terms: sum(1/(k!)), k = n+1 .. +inf
         // (we can see it if we divide sum(1/(k!)) by 1/(n!)).
-        // So, for n parts the error is less than 1/(n!).
+        // So, for n terms the error is less than 1/(n!).
         // Let p be the precision we need.
         // From Stirling's approximation: 1/(n!) < (e/n)^n.
         // From (e/n)^n < 1/(2^p) follows simplified, but more strict, inequality n*(log2(n) - 2) > p.
