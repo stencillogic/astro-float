@@ -17,10 +17,29 @@ use rug::{
 #[test]
 fn mpfr_compare_ops() {
     let run_cnt = 1000;
-
     let p_rng = get_prec_rng();
     let p_min = 1;
 
+    run_compare_ops(run_cnt, p_rng, p_min);
+
+    let run_cnt_large = 5;
+    let p_rng_large = 1;
+    let p_min_large;
+
+    #[cfg(not(debug_assertions))]
+    {
+        p_min_large = 1563;
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        p_min_large = 156;
+    }
+
+    run_compare_ops(run_cnt_large, p_rng_large, p_min_large);
+}
+
+fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
     let mut cc = Consts::new().unwrap();
 
     unsafe {

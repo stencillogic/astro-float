@@ -163,8 +163,8 @@ impl BigFloatNumber {
 
         // Reduction gives 2^(-p+1) per iteration.
         // Restore gives 2^(-p+5) per iteration.
-        // First parts of the series for any e_eff >= 0 give 2^(-p+6) at most.
-        // The error of the remaining parts of the series is compensated (see doc/README.md).
+        // First terms of the series for any e_eff >= 0 give 2^(-p+6) at most.
+        // The error of the remaining terms of the series is compensated (see doc/README.md).
         let add_prec = reduction_times as isize * 6 + 6 - e_eff as isize;
         let p_arg = p + if add_prec > 0 { add_prec as usize } else { 0 };
         self.set_precision(p_arg, rm)?;

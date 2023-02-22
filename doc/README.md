@@ -50,7 +50,7 @@ Error `err = nroot(m * 2^e + 2^(e - p)) - nroot(m * 2^e)` <= (does not exceed) *
 
 7. Error for series of sin, cos and sinh.
 
-Error of Maclaurin series M(x) of a function f(x) for x < 1 in which absolute value of the function derivatives near 0 never exceeds 1 need to be estimated only for several first parts of the series.
+Error of Maclaurin series M(x) of a function f(x) for x < 1 in which absolute value of the function derivatives near 0 never exceeds 1 need to be estimated only for several first terms of the series.
 
 Proof.
 
@@ -78,7 +78,7 @@ follows `2^(n - p) / n! < 2^(n - p) * (e/n)^n = 2^(-p) * (2 * e / n)^n`.
 The residual error of the series can be received from Lagrange's error bound,
 and it is smaller than `2^(-p) * (2 * e / (n + 1))^(n + 1)`.
 
-For n+1 parts of the series `err < 2^(-p) * sum((2 * e / k)^k), k=1..n+1`.
+For n+1 terms of the series `err < 2^(-p) * sum((2 * e / k)^k), k=1..n+1`.
 
 Starting from k = 6 `sum((2 * e / k)^k) < 1` and `err < 2^(-p)`.
 
