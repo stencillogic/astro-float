@@ -424,8 +424,7 @@ pub fn rand_p() -> usize {
 }
 
 // test add_carry and sub_borrow performance.
-#[ignore]
-#[test]
+/* #[test]
 fn test_carry() {
     for _ in 0..5 {
         let mut v = vec![];
@@ -465,3 +464,4 @@ fn test_carry() {
         println!("{}", time.as_millis());
     }
 }
+ */
