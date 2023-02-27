@@ -423,10 +423,10 @@ pub fn rand_p() -> usize {
     rand::random::<usize>() % 1000 + crate::defs::DEFAULT_P
 }
 
-
+// test add_carry and sub_borrow performance.
+#[ignore]
 #[test]
 fn test_carry() {
-            
     for _ in 0..5 {
         let mut v = vec![];
         for _ in 0..100000 {
@@ -438,9 +438,9 @@ fn test_carry() {
         }
 
         let start_time = std::time::Instant::now();
- 
+
         for slice in v.iter_mut() {
-            shift_slice_right(slice, rand::random::<usize>()%1000);
+            shift_slice_right(slice, rand::random::<usize>() % 1000);
         }
 
         let time = start_time.elapsed();
@@ -456,11 +456,11 @@ fn test_carry() {
         }
 
         let start_time = std::time::Instant::now();
- 
+
         for slice in v.iter_mut() {
-            shift_slice_left(slice, rand::random::<usize>()%1000);
+            shift_slice_left(slice, rand::random::<usize>() % 1000);
         }
-        
+
         let time = start_time.elapsed();
         println!("{}", time.as_millis());
     }
