@@ -131,6 +131,9 @@ pub fn add_carry(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
 
     #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
     {
+        use crate::defs::DoubleWord;
+        use crate::defs::WORD_BASE;
+
         let mut s = c as DoubleWord + a as DoubleWord + b as DoubleWord;
         if s >= WORD_BASE {
             s -= WORD_BASE;
@@ -159,6 +162,9 @@ pub fn sub_borrow(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
 
     #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
     {
+        use crate::defs::DoubleWord;
+        use crate::defs::WORD_BASE;
+
         let v1 = a as DoubleWord;
         let v2 = b as DoubleWord + c as DoubleWord;
 
@@ -415,4 +421,47 @@ pub(crate) fn random_subnormal(p: usize) -> BigFloatNumber {
 #[inline]
 pub fn rand_p() -> usize {
     rand::random::<usize>() % 1000 + crate::defs::DEFAULT_P
+}
+
+
+#[test]
+fn test_carry() {
+            
+    for _ in 0..5 {
+        let mut v = vec![];
+        for _ in 0..100000 {
+            let mut t = vec![];
+            for _ in 0..1024 {
+                t.push(rand::random::<Word>());
+            }
+            v.push(t);
+        }
+
+        let start_time = std::time::Instant::now();
+ 
+        for slice in v.iter_mut() {
+            shift_slice_right(slice, rand::random::<usize>()%1000);
+        }
+
+        let time = start_time.elapsed();
+        println!("{}", time.as_millis());
+
+        let mut v = vec![];
+        for _ in 0..100000 {
+            let mut t = vec![];
+            for _ in 0..1024 {
+                t.push(rand::random::<Word>());
+            }
+            v.push(t);
+        }
+
+        let start_time = std::time::Instant::now();
+ 
+        for slice in v.iter_mut() {
+            shift_slice_left(slice, rand::random::<usize>()%1000);
+        }
+        
+        let time = start_time.elapsed();
+        println!("{}", time.as_millis());
+    }
 }
