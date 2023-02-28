@@ -305,8 +305,8 @@ fn series_horner<T: PolycoeffGen>(
     x_step: BigFloatNumber,
     polycoeff_gen: &mut T,
 ) -> Result<BigFloatNumber, Error> {
-    debug_assert!(x_first.e <= 0);
-    debug_assert!(x_step.e <= 0);
+    debug_assert!(x_first.exponent() <= 0);
+    debug_assert!(x_step.exponent() <= 0);
     debug_assert!(!polycoeff_gen.is_div());
 
     let p = add
@@ -316,13 +316,13 @@ fn series_horner<T: PolycoeffGen>(
 
     // determine number of parts and cache plynomial coeffs.
     let mut cache = SmallVec::<[BigFloatNumber; MAX_CACHE]>::new();
-    let mut x_p = -(x_first.e as isize) - x_step.e as isize;
+    let mut x_p = -(x_first.exponent() as isize) - x_step.exponent() as isize;
     let mut coef_p = 0;
 
     while x_p + coef_p < p as isize - add.exponent() as isize {
         let coeff = polycoeff_gen.next(RoundingMode::None)?;
-        coef_p = -coeff.e as isize;
-        x_p += -x_step.e as isize;
+        coef_p = -coeff.exponent() as isize;
+        x_p += -x_step.exponent() as isize;
         cache.push(coeff.clone()?);
     }
 

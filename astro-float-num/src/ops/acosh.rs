@@ -68,7 +68,7 @@ impl BigFloatNumber {
 
             let mut additional_prec = 0;
             if self.exponent() == 1 {
-                additional_prec = count_leading_zeroes_skip_first(self.m.digits());
+                additional_prec = count_leading_zeroes_skip_first(self.mantissa().digits());
             }
 
             let mut p_inc = WORD_BIT_SIZE;

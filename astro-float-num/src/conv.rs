@@ -99,12 +99,7 @@ impl BigFloatNumber {
 
         mantissa.update_bit_len();
 
-        let mut ret = BigFloatNumber {
-            m: mantissa,
-            e,
-            s: sign,
-            inexact: false,
-        };
+        let mut ret = BigFloatNumber::from_raw_unchecked(mantissa, sign, e, false);
 
         ret.set_precision(p, rm)?;
 
@@ -151,12 +146,7 @@ impl BigFloatNumber {
             // mantissa is zero
             let m = Mantissa::new(p)?;
 
-            Ok(BigFloatNumber {
-                m,
-                e: 0,
-                s: sign,
-                inexact: false,
-            })
+            Ok(BigFloatNumber::from_raw_unchecked(m, sign, 0, false))
         } else {
             let mut m = Mantissa::new((digits.len() - zeroes) * shift + WORD_BIT_SIZE)?;
 
@@ -203,12 +193,7 @@ impl BigFloatNumber {
             m.set_bit_len(m.max_bit_len());
 
             let mut ret = if e < EXPONENT_MIN as isize {
-                let mut num = BigFloatNumber {
-                    m,
-                    e: EXPONENT_MIN,
-                    s: sign,
-                    inexact: false,
-                };
+                let mut num = BigFloatNumber::from_raw_unchecked(m, sign, EXPONENT_MIN, false);
 
                 if p + WORD_BIT_SIZE > num.mantissa_max_bit_len() {
                     num.set_precision(p + WORD_BIT_SIZE, RoundingMode::None)?;
@@ -217,17 +202,12 @@ impl BigFloatNumber {
                 num.subnormalize(e, RoundingMode::None);
 
                 if num.inexact() {
-                    num.m.digits_mut()[0] |= 1; // sticky for correct rounding when calling set_precision()
+                    num.mantissa_mut().digits_mut()[0] |= 1; // sticky for correct rounding when calling set_precision()
                 }
 
                 num
             } else {
-                BigFloatNumber {
-                    m,
-                    e: e as Exponent,
-                    s: sign,
-                    inexact: false,
-                }
+                BigFloatNumber::from_raw_unchecked(m, sign, e as Exponent, false)
             };
 
             ret.set_precision(p, rm)?;
@@ -405,7 +385,7 @@ impl BigFloatNumber {
         let mut ret = Vec::new();
 
         let mask = (WORD_MAX >> (WORD_BIT_SIZE - shift)) as DoubleWord;
-        let mut iter = self.mantissa_digits().iter().rev();
+        let mut iter = self.mantissa().digits().iter().rev();
 
         let mut done = WORD_BIT_SIZE - shift + e_shift;
         let mut d = *iter.next().unwrap() as DoubleWord; // iter is never empty.
@@ -445,7 +425,7 @@ impl BigFloatNumber {
     fn conv_to_binary(&self) -> Result<(Sign, Vec<u8>, Exponent), Error> {
         let mut ret = Vec::new();
 
-        for v in self.mantissa_digits().iter().rev() {
+        for v in self.mantissa().digits().iter().rev() {
             for i in (0..WORD_BIT_SIZE).rev() {
                 ret.push(((v >> i) & 1) as u8);
             }

@@ -140,7 +140,7 @@ impl BigFloatNumber {
     fn exp_positive_arg(&self, p: usize, cc: &mut Consts) -> Result<Self, Error> {
         debug_assert!(!self.is_zero());
 
-        if self.e as isize > WORD_BIT_SIZE as isize {
+        if self.exponent() as isize > WORD_BIT_SIZE as isize {
             return Err(Error::ExponentOverflow(self.sign()));
         }
 
@@ -343,7 +343,7 @@ impl BigFloatNumber {
         let (reduction_times, niter, e_eff) = series_cost_optimize::<SinhArgReductionEstimator>(
             p,
             &polycoeff_gen,
-            -(self.e as isize),
+            -(self.exponent() as isize),
             2,
             false,
         );

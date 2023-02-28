@@ -24,8 +24,8 @@ use itertools::izip;
 /// Mantissa representation.
 #[derive(Debug, Hash)]
 pub struct Mantissa {
-    pub(super) m: WordBuf,
-    pub(super) n: usize, // number of bits, 0 is for number 0
+    m: WordBuf,
+    n: usize, // number of bits, 0 is for number 0
 }
 
 impl Mantissa {

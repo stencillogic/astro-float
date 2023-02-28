@@ -111,9 +111,9 @@ impl BigFloatNumber {
 
         // cancellation when x is near 1
         let additional_prec = if e == 0 {
-            count_leading_ones(m.mantissa_digits())
+            count_leading_ones(m.mantissa().digits())
         } else if e == 1 {
-            count_leading_zeroes_skip_first(m.mantissa_digits())
+            count_leading_zeroes_skip_first(m.mantissa().digits())
         } else {
             0
         } + 3; // we need the error of adding n*ln(2) not to be considered by try_set_precision, so add 3 here.
@@ -233,7 +233,7 @@ impl BigFloatNumber {
 
         m.set_exponent(0);
 
-        let zeroes_cnt = count_leading_zeroes_skip_first(m.mantissa_digits());
+        let zeroes_cnt = count_leading_zeroes_skip_first(m.mantissa().digits());
         if zeroes_cnt == m.mantissa_max_bit_len() {
             // special case: x = 0.5
             let mut ret = Self::from_usize((e - 1).unsigned_abs())?;
@@ -249,7 +249,7 @@ impl BigFloatNumber {
         }
 
         let additional_prec = if e == 0 {
-            count_leading_ones(m.mantissa_digits())
+            count_leading_ones(m.mantissa().digits())
         } else if e == 1 {
             zeroes_cnt
         } else {

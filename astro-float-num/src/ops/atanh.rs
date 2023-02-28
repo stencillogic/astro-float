@@ -47,7 +47,7 @@ impl BigFloatNumber {
         if self.exponent() < 0 {
             additional_prec += self.exponent().unsigned_abs() as usize;
         } else {
-            additional_prec += count_leading_ones(self.mantissa_digits());
+            additional_prec += count_leading_ones(self.mantissa().digits());
         }
 
         let mut p_inc = WORD_BIT_SIZE;

@@ -18,10 +18,10 @@ use crate::mantissa::Mantissa;
 /// A finite floating point number with mantissa of an arbitrary size, an exponent, and the sign.
 #[derive(Debug, Hash)]
 pub(crate) struct BigFloatNumber {
-    pub(super) e: Exponent,
-    pub(super) s: Sign,
-    pub(super) m: Mantissa,
-    pub(super) inexact: bool,
+    e: Exponent,
+    s: Sign,
+    m: Mantissa,
+    inexact: bool,
 }
 
 impl BigFloatNumber {
@@ -770,8 +770,7 @@ impl BigFloatNumber {
             f = -f;
         }
 
-        let ptr: *const f64 = &f;
-        let u = unsafe { *(ptr as *const u64) }; // bitwise conversion to u64
+        let u = f.to_bits();
         let mut mantissa = u << 12;
         let mut exponent: Exponent = (u >> 52) as Exponent & 0b11111111111;
 
@@ -813,8 +812,7 @@ impl BigFloatNumber {
                 if self.s == Sign::Neg {
                     ret |= 0x8000000000000000u64;
                 }
-                let p: *const u64 = &ret;
-                unsafe { *(p as *const f64) } // bitwise conversion to f64
+                f64::from_bits(ret)
             } else {
                 0.0
             }
@@ -828,8 +826,7 @@ impl BigFloatNumber {
             ret |= e as u64;
             ret <<= 52;
             ret |= mantissa >> 12;
-            let p: *const u64 = &ret;
-            unsafe { *(p as *const f64) } // bitwise conversion to f64
+            f64::from_bits(ret)
         }
     }
 
@@ -914,6 +911,11 @@ impl BigFloatNumber {
 
             Ok(BigFloatNumber { e, s, m, inexact })
         }
+    }
+
+    /// Build BigFloatNumber from raw parts unchecked.
+    pub(super) fn from_raw_unchecked(m: Mantissa, s: Sign, e: Exponent, inexact: bool) -> Self {
+        BigFloatNumber { e, s, m, inexact }
     }
 
     /// Constructs a number from the slice of words:
@@ -1183,7 +1185,7 @@ impl BigFloatNumber {
                         && ((msb_set && rm == RoundingMode::ToOdd)
                             || (rm == RoundingMode::ToEven
                                 && msb_set
-                                && count_leading_zeroes_skip_first(self.mantissa_digits())
+                                && count_leading_zeroes_skip_first(self.mantissa().digits())
                                     != self.mantissa_max_bit_len())))
                 {
                     // non zero for directed rounding modes,
@@ -1400,8 +1402,13 @@ impl BigFloatNumber {
     }
 
     /// Returns the raw mantissa words of a number.
-    pub fn mantissa_digits(&self) -> &[Word] {
-        self.m.digits()
+    pub fn mantissa_mut(&mut self) -> &mut Mantissa {
+        &mut self.m
+    }
+
+    /// Returns the raw mantissa words of a number.
+    pub fn mantissa(&self) -> &Mantissa {
+        &self.m
     }
 
     /// Constructs BigFloatNumber with precision `p` from a signed integer value `i`.
@@ -1875,7 +1882,7 @@ mod tests {
 
         d3 = d1.sub(&d2, WORD_BIT_SIZE, RoundingMode::None).unwrap();
 
-        assert_eq!(w, d3.mantissa_digits()[0]);
+        assert_eq!(w, d3.mantissa().digits()[0]);
 
         // increase precision
         d1 = BigFloatNumber::from_raw_parts(
@@ -2188,7 +2195,7 @@ mod tests {
 
         assert!(d3.mantissa_max_bit_len() == WORD_BIT_SIZE * 5);
         assert!(
-            d3.mantissa_digits()
+            d3.mantissa().digits()
                 == [
                     12297829382473034411,
                     12297829382473034410,
@@ -2204,14 +2211,14 @@ mod tests {
 
         assert!(d3.mantissa_max_bit_len() == WORD_BIT_SIZE * 3);
         assert!(
-            d3.mantissa_digits()
+            d3.mantissa().digits()
                 == [12297829382473034411, 12297829382473034410, 12297829382473034410]
         );
 
         d3 = d1.div(&d2, WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
 
         assert!(d3.mantissa_max_bit_len() == WORD_BIT_SIZE);
-        assert!(d3.mantissa_digits() == [12297829382473034411]);
+        assert!(d3.mantissa().digits() == [12297829382473034411]);
 
         // reciprocal
         for _ in 0..1000 {
@@ -2276,7 +2283,7 @@ mod tests {
             .unwrap();
 
         assert!(
-            d2.mantissa_digits()
+            d2.mantissa().digits()
                 == [
                     12297829382473034411,
                     12297829382473034410,
@@ -2288,7 +2295,7 @@ mod tests {
 
         d2 = d1.reciprocal(WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
 
-        assert!(d2.mantissa_digits() == [12297829382473034411]);
+        assert!(d2.mantissa().digits() == [12297829382473034411]);
 
         // subnormal numbers basic sanity
         d1 = BigFloatNumber::min_positive(p).unwrap();
@@ -2664,7 +2671,7 @@ mod tests {
 
         let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Pos, EXPONENT_MAX).unwrap();
         assert_eq!(
-            d1.mantissa_digits(),
+            d1.mantissa().digits(),
             [0x8000000000000000u64, 0x8000000000000001u64]
         );
         assert_eq!(d1.exponent(), EXPONENT_MAX - 63);
@@ -2673,14 +2680,14 @@ mod tests {
         assert_eq!(d1.sign(), Sign::Pos);
 
         let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Neg, EXPONENT_MIN).unwrap();
-        assert_eq!(d1.mantissa_digits(), [3, 1]);
+        assert_eq!(d1.mantissa().digits(), [3, 1]);
         assert_eq!(d1.exponent(), EXPONENT_MIN);
         assert_eq!(d1.precision(), 65);
         assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
         assert_eq!(d1.sign(), Sign::Neg);
 
         let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Pos, EXPONENT_MIN + 5).unwrap();
-        assert_eq!(d1.mantissa_digits(), [3 << 5, 1 << 5]);
+        assert_eq!(d1.mantissa().digits(), [3 << 5, 1 << 5]);
         assert_eq!(d1.exponent(), EXPONENT_MIN);
         assert_eq!(d1.precision(), WORD_BIT_SIZE + 6);
         assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
@@ -2689,7 +2696,7 @@ mod tests {
         let d1 =
             BigFloatNumber::from_words(&[3, 0x8000000000000000u64], Sign::Pos, EXPONENT_MIN + 5)
                 .unwrap();
-        assert_eq!(d1.mantissa_digits(), [3, 0x8000000000000000u64]);
+        assert_eq!(d1.mantissa().digits(), [3, 0x8000000000000000u64]);
         assert_eq!(d1.exponent(), EXPONENT_MIN + 5);
         assert_eq!(d1.precision(), WORD_BIT_SIZE * 2);
         assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
@@ -3044,7 +3051,7 @@ mod tests {
         for (m1, s, e1, n, rm, m2, e2) in testset {
             let d1 = BigFloatNumber::from_words(&m1, s, e1).unwrap();
             let d2 = d1.round(n, rm).unwrap();
-            assert_eq!(d2.mantissa_digits(), m2);
+            assert_eq!(d2.mantissa().digits(), m2);
             assert_eq!(d2.sign(), s);
             assert_eq!(d2.exponent(), e2);
             assert!(!d1.inexact());

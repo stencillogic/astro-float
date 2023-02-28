@@ -101,7 +101,7 @@ fn test_ln_exp() {
                     count_leading_ones
                 } else {
                     count_leading_zeroes_skip_first
-                }(d2.mantissa_digits()) as Exponent;
+                }(d2.mantissa().digits()) as Exponent;
 
                 eps.set_exponent(d1.exponent() - prec as Exponent + addexp + 1);
             } else {
@@ -254,7 +254,7 @@ fn test_log2_log10_pow() {
             // println!("{}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
             // println!("{}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
 
-            set_eps(d2.mantissa_digits(), &mut eps);
+            set_eps(d2.mantissa().digits(), &mut eps);
 
             assert!(
                 d1.sub(&d3, prec, RoundingMode::ToEven)
@@ -268,7 +268,7 @@ fn test_log2_log10_pow() {
                 d1
             );
 
-            set_eps(d4.mantissa_digits(), &mut eps);
+            set_eps(d4.mantissa().digits(), &mut eps);
 
             assert!(
                 d1.sub(&d5, prec, RoundingMode::ToEven)
@@ -356,9 +356,9 @@ fn test_log_pow() {
             // and log_b(x) has steep derivative 1 / x / ln(b).
             let mut berr = 0;
             if b.exponent() == 0 {
-                berr = count_leading_ones(b.mantissa_digits()) as Exponent;
+                berr = count_leading_ones(b.mantissa().digits()) as Exponent;
             } else if b.exponent() == 1 {
-                berr = count_leading_zeroes_skip_first(b.mantissa_digits()) as Exponent;
+                berr = count_leading_zeroes_skip_first(b.mantissa().digits()) as Exponent;
             }
 
             let n = b.exponent().unsigned_abs() as usize;
@@ -381,7 +381,7 @@ fn test_log_pow() {
                     count_leading_ones
                 } else {
                     count_leading_zeroes_skip_first
-                }(d2.mantissa_digits()) as Exponent;
+                }(d2.mantissa().digits()) as Exponent;
 
                 eps.set_exponent(d1.exponent() - prec.min(p1) as Exponent + addexp + berr + 2);
             } else {
@@ -464,7 +464,7 @@ fn test_sin_asin() {
             eps.set_exponent(
                 d1.exponent() - prec as Exponent
                     + 1
-                    + count_leading_ones(d2.mantissa_digits()) as Exponent,
+                    + count_leading_ones(d2.mantissa().digits()) as Exponent,
             );
 
             assert!(
@@ -627,7 +627,7 @@ fn test_cos_acos() {
                 eps.set_exponent(
                     d1.exponent() - prec as Exponent
                         + 1
-                        + count_leading_ones(d2.mantissa_digits()) as Exponent,
+                        + count_leading_ones(d2.mantissa().digits()) as Exponent,
                 );
 
                 assert!(
@@ -848,7 +848,7 @@ fn test_cosh_acosh() {
             eps.set_exponent(
                 d1.exponent() - prec as Exponent
                     + 2
-                    + count_leading_zeroes_skip_first(d2.mantissa_digits()) as Exponent,
+                    + count_leading_zeroes_skip_first(d2.mantissa().digits()) as Exponent,
             );
 
             assert!(
@@ -908,7 +908,7 @@ fn test_tanh_atanh() {
             eps.set_exponent(
                 d1.exponent() - prec as Exponent
                     + 1
-                    + count_leading_ones(d2.mantissa_digits()) as Exponent,
+                    + count_leading_ones(d2.mantissa().digits()) as Exponent,
             );
 
             (d1, d3)

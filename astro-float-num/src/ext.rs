@@ -947,7 +947,7 @@ impl BigFloat {
     /// Returns the raw mantissa words of a number.
     pub fn mantissa_digits(&self) -> Option<&[Word]> {
         if let Flavor::Value(v) = &self.inner {
-            Some(v.mantissa_digits())
+            Some(v.mantissa().digits())
         } else {
             None
         }

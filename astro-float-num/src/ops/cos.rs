@@ -156,7 +156,7 @@ impl BigFloatNumber {
         let (reduction_times, niter, e_eff) = series_cost_optimize::<CosArgReductionEstimator>(
             p,
             &polycoeff_gen,
-            -(self.e as isize),
+            -(self.exponent() as isize),
             2,
             false,
         );

@@ -107,7 +107,7 @@ impl BigFloatNumber {
         let (reduction_times, _niter, e_eff) = series_cost_optimize::<TanArgReductionEstimator>(
             p,
             &polycoeff_gen,
-            -(self.e as isize),
+            -(self.exponent() as isize),
             1,
             true,
         );

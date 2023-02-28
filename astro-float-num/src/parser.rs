@@ -46,7 +46,6 @@ impl<'a> ParserState<'a> {
         self.cur_ch
     }
 
-    #[allow(dead_code)]
     pub fn is_inf(&self) -> bool {
         self.inf
     }
@@ -55,7 +54,6 @@ impl<'a> ParserState<'a> {
         self.nan
     }
 
-    #[allow(dead_code)]
     pub fn sign(&self) -> Sign {
         self.sign
     }

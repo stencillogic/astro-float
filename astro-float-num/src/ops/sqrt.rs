@@ -29,7 +29,7 @@ impl BigFloatNumber {
         }
 
         let (e1, m1_opt) = self.normalize()?;
-        let m1_normalized = m1_opt.as_ref().unwrap_or(&self.m);
+        let m1_normalized = m1_opt.as_ref().unwrap_or_else(|| self.mantissa());
 
         let mut inexact = self.inexact();
 
@@ -38,23 +38,18 @@ impl BigFloatNumber {
         let e = (e1 + (e1 & 1)) / 2 + e_shift;
 
         if e < EXPONENT_MIN as isize {
-            let mut ret = BigFloatNumber {
-                m: m3,
-                s: Sign::Pos,
-                e: EXPONENT_MIN,
-                inexact,
-            };
+            let mut ret = BigFloatNumber::from_raw_unchecked(m3, Sign::Pos, EXPONENT_MIN, inexact);
 
             ret.subnormalize(e, rm);
 
             Ok(ret)
         } else {
-            Ok(BigFloatNumber {
-                m: m3,
-                s: Sign::Pos,
-                e: e as Exponent,
+            Ok(BigFloatNumber::from_raw_unchecked(
+                m3,
+                Sign::Pos,
+                e as Exponent,
                 inexact,
-            })
+            ))
         }
     }
 }
