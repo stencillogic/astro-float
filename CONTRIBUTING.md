@@ -18,4 +18,5 @@ Rust is the primary programming language of the library. The following are recco
  - all public items (functions, structs, etc.) must be documented.
  - any pull request must pass all tests before it can be merged.
  - public api should follow [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/).
+ - library's documentation should be kept up to date.
  - common sense and proper reasoning supersede any written rule.

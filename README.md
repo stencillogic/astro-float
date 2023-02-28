@@ -46,3 +46,5 @@ Benchmark can be found here: https://github.com/stencillogic/bigfloat-bench.
 ## Contributing
 
 Issues regarding bugs or new features can be opened here: https://github.com/stencillogic/astro-float/issues 
+
+For more information please check [CONTRIBUTING.md](https://github.com/stencillogic/astro-float/blob/main/CONTRIBUTING.md)
