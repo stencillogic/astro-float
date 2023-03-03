@@ -16,7 +16,7 @@ $$\displaylines{err_a < |(m * 2^{e_1} \pm 2^{e_1 - p}) * (n * 2^{e_2} \pm 2^{e_2
 
 Relative errror:
 
-$$\displaylines{err_r < \left|\frac{err_a}{mn * 2^{e_1 + e_2}}\right| = \left|\frac{(m \pm n) * 2^{e_1 + e_2 - p} \pm 2^{e_1 + e_2 - 2 p}}{mn*2^{e_1 + e_2}}\right| = \\\\ = \left|\frac{(m \pm n) * 2^{- p}}{mn} \pm \frac{2^{ - 2 p}}{mn}\right| <= 2^{-p+2} \pm 2^{-2p+2} < 2^{-p + 3} $$
+$$\displaylines{err_r < \left|\frac{err_a}{mn * 2^{e_1 + e_2}}\right| = \left|\frac{(m \pm n) * 2^{e_1 + e_2 - p} \pm 2^{e_1 + e_2 - 2 p}}{mn*2^{e_1 + e_2}}\right| = \\\\ = \left|\frac{(m \pm n) * 2^{- p}}{mn} \pm \frac{2^{ - 2 p}}{mn}\right| <= 2^{-p+2} \pm 2^{-2p+2} < 2^{-p + 3}}$$
 
 Similarly for $k > 0$ and $p > 1$:
 
