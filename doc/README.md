@@ -2,7 +2,7 @@
 
 This document describes how error is estimated. Given an operation and arguments containing certain error the goal it to find error bound of the result of the operation. When the error of the result is known, operations can be applied sequentially to estimate error of a more complex construct.
 
-Arguments are represented as $m*2^{e_1}$, $n*2^{e_2}$, where $m$, $n$ denote the mantissa of a floating point number with $0.5 <= |n| < 1, 0.5 <= |m| < 1$, and $e_1$, $e_2$ denote exponent of a floating point number.
+Arguments are represented as $m2^{e_1}$, $n2^{e_2}$, where $m$, $n$ denote the mantissa of a floating point number with $0.5 <= |n| < 1, 0.5 <= |m| < 1$, and $e_1$, $e_2$ denote exponent of a floating point number.
 
 $p$ denotes precision of a floating point number.
 
