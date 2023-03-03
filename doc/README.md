@@ -12,7 +12,7 @@ $m * 2^{e_1} \pm 2^{e_1 - p}$ denotes an argument with absolute error of at most
 
 Absolute error $err_a$ of multiplying numbers containing relative error less than $2^{-p}$:
 
-$$err_a < |(m * 2^{e_1} \pm 2^{e_1 - p}) * (n * 2^{e_2} \pm 2^{e_2 - p}) - m * 2^{e_1} * n * 2^{e_2}| =\linebreak= |(m \pm n) * 2^{e_1 + e_2 - p} \pm 2^{e_1 + e_2 - 2 p}| < 2 ^ {e_1 + e_2 - p + 2}$$
+$$\displaylines{err_a < |(m * 2^{e_1} \pm 2^{e_1 - p}) * (n * 2^{e_2} \pm 2^{e_2 - p}) - m * 2^{e_1} * n * 2^{e_2}| =\\= |(m \pm n) * 2^{e_1 + e_2 - p} \pm 2^{e_1 + e_2 - 2 p}| < 2 ^ {e_1 + e_2 - p + 2}}$$
 
 Relative errror:
 
