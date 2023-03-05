@@ -10,6 +10,9 @@ use core::ops::IndexMut;
 use core::slice::SliceIndex;
 use smallvec::SmallVec;
 
+use crate::common::util::shift_slice_left;
+use crate::common::util::shift_slice_right;
+
 const STATIC_ALLOCATION: usize = 5;
 
 /// Buffer for holding mantissa gidits.
@@ -40,11 +43,11 @@ impl WordBuf {
         self.inner.len()
     }
 
-    /// Decrease length of the buffer to l bits. Buffer is rotated.
+    /// Decrease length of the buffer to l bits. Data is shifted.
     pub fn trunc_to(&mut self, l: usize) {
         let n = (l + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         let sz = self.len();
-        self.inner.rotate_left(sz - n);
+        shift_slice_right(&mut self.inner, (sz - n) * WORD_BIT_SIZE);
         self.inner.truncate(n);
     }
 
@@ -63,8 +66,7 @@ impl WordBuf {
             // values of the newely allocated words stay unitialized for performance reasons
             self.inner.set_len(n);
         }
-        self.inner.rotate_right(n - l);
-        self.inner[..n - l].fill(0);
+        shift_slice_left(&mut self.inner, (n - l) * WORD_BIT_SIZE);
         Ok(())
     }
 
@@ -94,7 +96,7 @@ impl WordBuf {
 
         if n > 0 {
             let sz = self.len();
-            self.inner.rotate_left(n);
+            shift_slice_right(&mut self.inner, n * WORD_BIT_SIZE);
             self.inner.truncate(sz - n);
         }
     }

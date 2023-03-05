@@ -168,11 +168,11 @@ impl BigFloatNumber {
             reduction_times += 3 - e_eff;
         }
 
-        // n-th root gives error not more than 2^(-p+1),
+        // sqrt gives error not more than 2^(-p+1),
         // argument substitution for atanh gives 2^(-p+5),
         // e_eff compensates error of the series and gives 2^(-p+1).
         let add_prec = 7 - e_eff as isize;
-        let p_arg = p + if add_prec > 0 { add_prec as usize } else { 0 };
+        let p_arg = p + if add_prec > 0 { add_prec as usize } else { 5 };
         x.set_precision(p_arg, rm)?;
 
         let arg = if reduction_times > 0 {
@@ -424,10 +424,10 @@ mod tests {
         let rm = RoundingMode::ToEven;
         /* let n1 = BigFloatNumber::from_words(&[13117232122057398758, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9223372036854775808], Sign::Pos, 1).unwrap();
 
-        let n2 = n1.ln(4416, RoundingMode::Up, &mut cc).unwrap();
+        let n2 = n1.ln(9664, RoundingMode::Down, &mut cc).unwrap();
 
         println!("{:?}", n2.format(crate::Radix::Bin, RoundingMode::None));
-        return; */
+        return;*/
 
         // near 1
         let p = 320;
