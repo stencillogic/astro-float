@@ -21,7 +21,10 @@ fn mpfr_compare_ops() {
     let p_min = 1;
 
     run_compare_ops(run_cnt, p_rng, p_min);
+}
 
+#[test]
+fn mpfr_compare_ops_large() {
     let run_cnt_large = 5;
     let p_rng_large = 1;
     let p_min_large;

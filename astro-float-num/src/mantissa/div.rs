@@ -295,6 +295,7 @@ impl Mantissa {
                 if q0l > k {
                     q1[..k].copy_from_slice(&q0[..k]);
                     let q0 = SliceWithSign::new(&q0[k..], 1);
+                    q1 = SliceWithSign::new_mut(&mut q1buf[k..], 1);
                     q1.add_assign(&q0);
                 } else {
                     q1[..q0l].copy_from_slice(&q0);
