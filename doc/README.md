@@ -101,23 +101,23 @@ Error of Maclaurin series $M(x)$ of a function $f(x)$ for $x < 1$ in which absol
 
 Proof.
 
-$$\displaylines{err = M(m 2^e + 2^{e-p}) - M(m 2^e) = 2^e M(m + 2^p) - M(m)}$$
+$${err < |M(m 2^e \pm 2^{e-p}) - M(m 2^e)| = 2^e |M(m \pm 2^p) - M(m)}|$$
 
 $0.5 <= m < 1$ and $e <= 0$.
 
-For simplisity assume $e = 0$ and the absolute value of nth derivative is 1.
+For simplisity assume $e = 0$ and the absolute value of n'th derivative is 1.
 
 Then series look like:
 
 $$M(x) = f(0) + x + \frac{x^2}{2!} + \frac{x^3}{3!} + ... + \frac{x^n}{n!}$$
 
-From binomial formula $(1 + x)^n = \sum{B_k x^k}$ follows if $x = 1$:
+From binomial formula $(1 + x)^n = \displaystyle\sum_{k=0}^{n}{B_k x^k}$ follows if $x = 1$:
 
-$$2^n = \sum{B_k}\tag{1}$$
+$$2^n = \displaystyle\sum_{k=0}^{n}{B_k}\tag{1}$$
 
-Then $(m + 2^{-p})^n <= (1 + 2^{-p})^n = \sum{B_k 2^{-p k}}$, assuming $m = 1$.
+Then $(m \pm 2^{-p})^n < (1 + 2^{-p})^n = \sum{B_k 2^{-p k}}$.
 
-Since we subtract $m^n$ from $(m + 2^{-p})^n$ to compute the absolute error, $k > 0$.
+Since we subtract $m^n$ from $(m \pm 2^{-p})^n$ to compute the absolute error, $k > 0$.
 
 Then using (1) we get:
 
@@ -131,9 +131,9 @@ $$\frac{2^{n - p}}{n!} < 2^{n - p} \left(\frac{e}{n}\right)^n = 2^{-p} \left(\fr
 The residual error of the series can be received from Lagrange's error bound,
 and it is smaller than $2^{-p} \left(\frac{2 e}{n + 1}\right)^{n + 1}$.
 
-For $n+1$ terms of the series $err < 2^{-p} \sum{\left(\frac{2 e}{k}\right)^k}, k=1..n+1$.
+For $n$ terms of the series $err < 2^{-p} \displaystyle\sum_{k=1}^{n+1}{\left(\frac{2 e}{k}\right)^k}$.
 
-Starting from $k = 6$ we have $\sum{\left(\frac{2 e}{k}\right)^k} < 1$ and $err < 2^{-p}$.
+Starting from $k = 6$ we have: $\displaystyle\sum_{k=6}^{n+1}{\left(\frac{2 e}{k}\right)^k} < 1$ and $err < 2^{-p}$.
 
 ## Error of $\arctan$, $\operatorname {arctanh}$ series.
 
@@ -143,14 +143,14 @@ $$\arctan(x) = x - \frac{x^3}{3} + \frac{x^5}{5} - ...$$
  
 $$\operatorname {arctanh}(x) = x + \frac{x^3}{3} + \frac{x^5}{5} + ...$$
 
-Assume, the series $x + a_3 x^3 + a_5 x^5 + ...$ is computed directly, and $x$ contains error less than $2^{-p}$:
+Assume, the series $x + a_3 x^3 + a_5 x^5 + ...$ is computed directly, and $x$ contains relative error less than $2^{-p}$:
 
-$a_3$, $a_5$,... have error less than $2^{-p}$ since they are the result of division of 1 by the exact number 3, 5, 7,... 
+$a_3$, $a_5$,... have relative error less than $2^{-p}$ since they are the result of division of 1 by the exact number 3, 5, 7,... 
 and their value is smaller than 0.5 by definition.
 
 If $x = m 2^e$, where $0.5 <= m < 1$ and $e = -3$, then absolute error relative to 1 for $\operatorname {arctanh}$:
 
-$$\displaylines{err = 2^{-p-3} + 2^{-p-9+3} + 2^{-p-15+5} + ... < 2^{-p-2}}$$
+$$\displaylines{err_a = 2^{-p-3} + 2^{-p-9+4} + 2^{-p-15+6} + ... < 2^{-p-2}}$$
 
 or less than $2^{-p+1}$ relative to $x$. The same is true for $e < -3$.
 
