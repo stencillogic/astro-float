@@ -16,35 +16,35 @@ $$\displaylines{err_a < |(m 2^{e_1} \pm 2^{e_1 - p}) (n 2^{e_2} \pm 2^{e_2 - p})
 
 Relative errror:
 
-$$\displaylines{err_r < |\frac{err_a}{mn 2^{e_1 + e_2}}| = \left|\frac{(m \pm n) 2^{e_1 + e_2 - p} \pm 2^{e_1 + e_2 - 2 p}}{mn 2^{e_1 + e_2}}\right| = \\\\ = \left|\frac{(m \pm n) 2^{- p}}{mn} \pm \frac{2^{ - 2 p}}{mn}\right| <= 2^{-p+2} \pm 2^{-2p+2} < 2^{-p + 3}}$$
+$$\displaylines{err_r < |\frac{err_a}{mn 2^{e_1 + e_2}}| = |\frac{(m \pm n) 2^{e_1 + e_2 - p} \pm 2^{e_1 + e_2 - 2 p}}{mn 2^{e_1 + e_2}}| = \\\\ = |\frac{(m \pm n) 2^{- p}}{mn} \pm \frac{2^{ - 2 p}}{mn}| <= 2^{-p+2} \pm 2^{-2p+2} < 2^{-p + 3}}$$
 
 Similarly for $k > 0$ and $p > 1$:
 
 $$\displaylines{err_a < |(m 2^{e_1} \pm 2^{e_1 - p + k}) (n 2^{e_2} \pm 2^{e_2 - p}) - m 2^{e_1} n 2^{e_2}| =\\\\= |(m \pm n 2^k) 2^{e_1 + e_2 - p} \pm 2^{e_1 + e_2 - 2 p + k}| =\\\\= |(m 2^{-k - 1} \pm n 2^{-1} \pm 2^{-p-1}) 2^{e_1+e_2-p+k+1}| < 2 ^ {e_1 + e_2 - p + k + 1}}$$
 
-$$\displaylines{err_r < \left|\frac{(m 2^{-k - 1} \pm n 2^{-1} \pm 2^{-p-1})}{mn} 2^{-p+k+1}\right| =\\\\= \left|\left(\frac{1}{n2^{k + 1}} \pm \frac{1}{2m} \pm \frac{1}{mn2^{p+1}}\right) 2^{-p+k+1}\right| < 2^{-p + k + 2}}$$
+$$\displaylines{err_r < |\frac{(m 2^{-k - 1} \pm n 2^{-1} \pm 2^{-p-1})}{mn} 2^{-p+k+1}| =\\\\= |\left(\frac{1}{n2^{k + 1}} \pm \frac{1}{2m} \pm \frac{1}{mn2^{p+1}}\right) 2^{-p+k+1}| < 2^{-p + k + 2}}$$
 
 
 ## Absolute error of division
 
 Absolute error of dividing numbers with error and $p > 3$:
 
-$$\displaylines{err_a < \left|\frac {m 2^{e_1} \pm 2^{e_1 - p}} {n 2^{e_2} \pm 2^{e_2 - p}} - \frac{m 2^{e_1}}{n 2^{e_2}}\right| =\\\\= \left|\frac{(n \pm m) 2^{-p}}{n^2 \pm n2^{-p}} 2^{e_1 - e_2}\right| < \left|\left(\frac{2}{1 - 2^{-p+1}} + \frac{4}{1 - 2^{-p+1}}\right) 2^{e_1 - e_2 - p}\right| < 2 ^ {e_1 - e_2 - p + 3}}$$
+$$\displaylines{err_a < |\frac {m 2^{e_1} \pm 2^{e_1 - p}} {n 2^{e_2} \pm 2^{e_2 - p}} - \frac{m 2^{e_1}}{n 2^{e_2}}| =\\\\= |\frac{(n \pm m) 2^{-p}}{n^2 \pm n2^{-p}} 2^{e_1 - e_2}| < |\left(\frac{2}{1 - 2^{-p+1}} + \frac{4}{1 - 2^{-p+1}}\right) 2^{e_1 - e_2 - p}| < 2 ^ {e_1 - e_2 - p + 3}}$$
 
 Relative error:
 
-$$\displaylines{err_r < \left|\frac{(n \pm m) 2^{-p}}{mn \pm m2^{-p}}\right| =\\\\= \left|\left(\frac{n}{m(n \pm 2^{-p})} \pm \frac{1}{n \pm 2^{-p}}\right) 2^{-p}\right| < \frac{2n + 1}{n - 2^{-p}} 2^{-p} < 2 ^ {- p + 3}}$$
+$$\displaylines{err_r < |\frac{(n \pm m) 2^{-p}}{mn \pm m2^{-p}}| =\\\\= |\left(\frac{n}{m(n \pm 2^{-p})} \pm \frac{1}{n \pm 2^{-p}}\right) 2^{-p}| < \frac{2n + 1}{n - 2^{-p}} 2^{-p} < 2 ^ {- p + 3}}$$
 
 
 For $k > 0$ and $p > 4$:
 
-$$\displaylines{err_a < \left|\frac {m 2^{e_1} \pm 2^{e_1 - p + k}} {n 2^{e_2} \pm 2^{e_2 - p}} - \frac{m 2^{e_1}}{n 2^{e_2}}\right| =\\\\= \left|\frac{(n \pm m2^{-k}) 2^{-p + k}}{n^2 \pm n2^{-p}} 2^{e_1 - e_2}\right| < \left(\frac{2}{1 - 2^{-p+1}} + \frac{4 2^{-k}}{1 - 2^{-p+1}}\right) 2^{e_1 - e_2 - p + k} < 2 ^ {e_1 - e_2 - p + k + 3}}$$
+$$\displaylines{err_a < |\frac {m 2^{e_1} \pm 2^{e_1 - p + k}} {n 2^{e_2} \pm 2^{e_2 - p}} - \frac{m 2^{e_1}}{n 2^{e_2}}| =\\\\= |\frac{(n \pm m2^{-k}) 2^{-p + k}}{n^2 \pm n2^{-p}} 2^{e_1 - e_2}| < \left(\frac{2}{1 - 2^{-p+1}} + \frac{4 2^{-k}}{1 - 2^{-p+1}}\right) 2^{e_1 - e_2 - p + k} < 2 ^ {e_1 - e_2 - p + k + 3}}$$
 
 $$\displaylines{err_r < \frac{2n + 2^{-k}}{n - 2^{-p}} 2^{-p+k} < 2 ^ {- p + k + 3}}$$
 
 and $k > 0$ and $p > 2 + k$:
 
-$$\displaylines{err_a < \left|\frac {m 2^{e_1} \pm 2^{e_1 - p}} {n 2^{e_2} \pm 2^{e_2 - p + k}} - \frac{m 2^{e_1}}{n 2^{e_2}}\right| =\\\\= \left|\frac{(n2^{-k} \pm m) 2^{-p + k}}{n^2 \pm n2^{-p+k}} 2^{e_1 - e_2}\right| < \left(\frac{2^{-k+1}}{1 - 2^{-p+1+k}} + \frac{4}{1 - 2^{-p+1+k}}\right) 2^{e_1 - e_2 - p + k} < 2 ^ {e_1 - e_2 - p + k + 3}}$$
+$$\displaylines{err_a < |\frac {m 2^{e_1} \pm 2^{e_1 - p}} {n 2^{e_2} \pm 2^{e_2 - p + k}} - \frac{m 2^{e_1}}{n 2^{e_2}}| =\\\\= |\frac{(n2^{-k} \pm m) 2^{-p + k}}{n^2 \pm n2^{-p+k}} 2^{e_1 - e_2}| < \left(\frac{2^{-k+1}}{1 - 2^{-p+1+k}} + \frac{4}{1 - 2^{-p+1+k}}\right) 2^{e_1 - e_2 - p + k} < 2 ^ {e_1 - e_2 - p + k + 3}}$$
 
 $$\displaylines{err_r < \frac{n2^{-k+1} + 1}{n - 2^{-p+k}} 2^{-p+k} < 2 ^ {- p + k + 3}}$$
 
@@ -62,7 +62,7 @@ Note: subtraction can cause borrow which increases relative error.
 
 For $k > 0$:
 
-$$\displaylines{err_a = \left|(m 2^{e_1} \pm 2^{e_1 - p + k}) - (n 2^{e_2} \pm 2^{e_2 - p}) - (m 2^{e_1} - n 2^{e_2})\right| < 2 ^ {max(e_1,e_2) - p + k + 1}}$$
+$$\displaylines{err_a = |(m 2^{e_1} \pm 2^{e_1 - p + k}) - (n 2^{e_2} \pm 2^{e_2 - p}) - (m 2^{e_1} - n 2^{e_2})| < 2 ^ {max(e_1,e_2) - p + k + 1}}$$
 
 $$\displaylines{err_r < 2^{-p+k+2}}$$
 
@@ -78,7 +78,7 @@ $$\displaylines{err_r <= 2^{-p+1}}$$
 
 For $k > 0$:
 
-$$\displaylines{err_a = \left|(m 2^{e_1} \pm 2^{e_1 - p + k}) + (n 2^{e_2} \pm 2^{e_2 - p}) - (m 2^{e_1} + n 2^{e_2})\right| < 2 ^ {max(e_1,e_2) - p + k + 1}}$$
+$$\displaylines{err_a = |(m 2^{e_1} \pm 2^{e_1 - p + k}) + (n 2^{e_2} \pm 2^{e_2 - p}) - (m 2^{e_1} + n 2^{e_2})| < 2 ^ {max(e_1,e_2) - p + k + 1}}$$
 
 $$\displaylines{err_r < 2^{-p+k+1}}$$
 
@@ -87,9 +87,9 @@ $$\displaylines{err_r < 2^{-p+k+1}}$$
 
 Absolute error of the square root of a number with error:
 
-$$\displaylines{err_a < \left|\sqrt{m 2^e \pm 2^{e - p}} - \sqrt{m 2^e}\right| =\\\\= \sqrt{m 2^e}\left|\sqrt{\frac{m2^e \pm 2^{e-p}}{m2^e}} - 1\right| =\\\\= \sqrt{m 2^e}\left|\sqrt{1 \pm \frac{2^{-p}}{m}} - 1\right| < 2^{- p} \sqrt{m2^e} <= 2 ^ {\lceil{e/2}\rceil - p}}$$
+$$\displaylines{err_a < |\sqrt{m 2^e \pm 2^{e - p}} - \sqrt{m 2^e}| =\\\\= \sqrt{m 2^e}|\sqrt{\frac{m2^e \pm 2^{e-p}}{m2^e}} - 1| =\\\\= \sqrt{m 2^e}|\sqrt{1 \pm \frac{2^{-p}}{m}} - 1| < 2^{- p} \sqrt{m2^e} <= 2 ^ {\lceil{e/2}\rceil - p}}$$
 
-(because no solution exists for $\left|\sqrt{1 \pm \frac{2^{-p}}{m}} - 1\right| >= 2^{- p}$).
+(because no solution exists for $|\sqrt{1 \pm \frac{2^{-p}}{m}} - 1| >= 2^{- p}$).
 
 Relative error:
 
