@@ -2,7 +2,6 @@
 //!
 //! See main crate [docs](https://docs.rs/astro-float/latest/astro_float/).
 
-
 #![deny(missing_docs)]
 #![deny(clippy::suspicious)]
 
