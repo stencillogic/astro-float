@@ -318,7 +318,7 @@ impl BigFloat {
     pub fn cmp(&self, d2: &BigFloat) -> Option<SignedWord> {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
-                Flavor::Value(v2) => Some(v1.cmp(&v2)),
+                Flavor::Value(v2) => Some(v1.cmp(v2)),
                 Flavor::Inf(s2) => {
                     if *s2 == Sign::Pos {
                         Some(-1)
@@ -342,7 +342,7 @@ impl BigFloat {
     pub fn abs_cmp(&self, d2: &Self) -> Option<SignedWord> {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
-                Flavor::Value(v2) => Some(v1.cmp(&v2)),
+                Flavor::Value(v2) => Some(v1.cmp(v2)),
                 Flavor::Inf(_) => Some(-1),
                 Flavor::NaN(_) => None,
             },

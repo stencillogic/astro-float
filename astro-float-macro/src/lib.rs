@@ -2,6 +2,10 @@
 //!
 //! See main crate [docs](https://docs.rs/astro-float/latest/astro_float/).
 
+
+#![deny(missing_docs)]
+#![deny(clippy::suspicious)]
+
 mod util;
 
 use astro_float_num::Exponent;

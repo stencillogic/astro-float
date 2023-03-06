@@ -861,7 +861,7 @@ impl Mantissa {
             *check_roundable = false;
 
             // inexact?
-            if *inexact == false && n > 0 && n < self.max_bit_len() {
+            if !(*inexact) && n > 0 && n < self.max_bit_len() {
                 if self.find_one_from(self.max_bit_len() - n).is_some() {
                     *inexact |= true;
                 }
