@@ -150,7 +150,7 @@ and their value is smaller than 0.5 by definition.
 
 If $x = m 2^e$, where $0.5 <= m < 1$ and $e = -3$, then absolute error relative to 1 for $\operatorname {arctanh}$:
 
-$$\displaylines{err_a = 2^{-p-3} + 2^{-p-9+4} + 2^{-p-15+6} + ... < 2^{-p-2}}$$
+$$\displaylines{err_a < 2^{-p-3} + 2^{-p-9+4} + 2^{-p-15+6} + ... < 2^{-p-2}}$$
 
 or less than $2^{-p+1}$ relative to $x$. The same is true for $e < -3$.
 
