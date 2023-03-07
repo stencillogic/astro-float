@@ -23,7 +23,7 @@ Calculate Pi with 1024 bit precision rounded to even.
 use astro_float::Consts;
 use astro_float::RoundingMode;
 use astro_float::ctx::Context;
-use astro_float_macro::expr;
+use astro_float::expr;
 
 // Create a context with precision 1024, and rounding to even.
 let mut ctx = Context::new(1024, RoundingMode::ToEven, 
