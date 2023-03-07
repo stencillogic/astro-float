@@ -126,7 +126,7 @@
 //!
 //! ``` toml
 //! [dependencies]
-//! astro-float = { version = "0.6.1", default-features = false }
+//! astro-float = { version = "0.6.7", default-features = false }
 //! ```
 //!
 
