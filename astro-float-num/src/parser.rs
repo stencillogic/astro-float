@@ -1,7 +1,5 @@
 //! Parser parses numbers represented in scientific format.
 
-use smallvec::SmallVec;
-
 use crate::defs::Exponent;
 use crate::defs::Sign;
 use crate::defs::EXPONENT_MAX;
@@ -10,12 +8,15 @@ use crate::Radix;
 use crate::EXPONENT_MIN;
 use core::str::Chars;
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 pub struct ParserState<'a> {
     chars: Chars<'a>,
     cur_ch: Option<char>,
     s_len: usize,
     sign: Sign,
-    mantissa_bytes: SmallVec<[u8; 1]>,
+    mantissa_bytes: Vec<u8>,
     e: isize,
     inf: bool,
     nan: bool,
@@ -28,7 +29,7 @@ impl<'a> ParserState<'a> {
             s_len: s.len(),
             cur_ch: None,
             sign: Sign::Pos,
-            mantissa_bytes: SmallVec::new(),
+            mantissa_bytes: Vec::new(),
             e: 0,
             inf: false,
             nan: true,
@@ -146,7 +147,7 @@ fn parse_num(parser_state: &mut ParserState, rdx: Radix) -> Result<(), Error> {
         }
 
         if parser_state.e < EXPONENT_MIN as isize {
-            let mut zero = SmallVec::new();
+            let mut zero = Vec::new();
             zero.try_reserve_exact(1)?;
             zero.push(0);
             parser_state.mantissa_bytes = zero;

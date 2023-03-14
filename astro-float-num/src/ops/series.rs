@@ -9,7 +9,9 @@ use crate::defs::Error;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
 use crate::Word;
-use smallvec::SmallVec;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 const MAX_CACHE: usize = 128;
 const RECT_ITER_THRESHOLD: usize = MAX_CACHE / 10 * 9;
@@ -186,7 +188,7 @@ fn series_rectangular<T: PolycoeffGen>(
     let mut acc = BigFloatNumber::new(p)?;
 
     // build cache
-    let mut cache = SmallVec::<[BigFloatNumber; MAX_CACHE]>::new();
+    let mut cache = Vec::<BigFloatNumber>::new();
     let sqrt_iter = sqrt_int(niter as u32) as usize;
     let cache_sz = MAX_CACHE.min(sqrt_iter);
     cache.try_reserve_exact(cache_sz)?;
@@ -315,7 +317,7 @@ fn series_horner<T: PolycoeffGen>(
         .max(x_step.mantissa_max_bit_len());
 
     // determine number of parts and cache plynomial coeffs.
-    let mut cache = SmallVec::<[BigFloatNumber; MAX_CACHE]>::new();
+    let mut cache = Vec::<BigFloatNumber>::new();
     let mut x_p = -(x_first.exponent() as isize) - x_step.exponent() as isize;
     let mut coef_p = 0;
 
@@ -366,7 +368,7 @@ fn ndim_series<T: PolycoeffGen>(
     let mut acc = BigFloatNumber::new(p)?;
 
     // build cache
-    let mut cache = SmallVec::<[BigFloatNumber; MAX_CACHE]>::new();
+    let mut cache = Vec::<BigFloatNumber>::new();
     let cache_dim_sz = nroot_int(niter as Word, n) as usize - 1;
     let cache_dim_sz = cache_dim_sz.min(MAX_CACHE / (n - 1));
     let mut x_pow = x_step.clone()?;

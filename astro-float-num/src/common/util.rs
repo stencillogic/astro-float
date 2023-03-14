@@ -187,7 +187,6 @@ pub fn shift_slice_left(m: &mut [Word], n: usize) {
     } else if shift > 0 {
         let l = m.len() - 1;
         let end = m.as_mut_ptr();
-        // TODO: instead of unsafe code try iterators.
         unsafe {
             // use of slices is almost 50% slower
             let mut dst = end.add(l);
@@ -255,7 +254,6 @@ pub fn shift_slice_right(m: &mut [Word], n: usize) {
     } else if shift > 0 {
         let l = m.len();
         let mut dst = m.as_mut_ptr();
-        // TODO: instead of unsafe code try iterators.
         unsafe {
             // use of slices is almost 50% slower
             let end = dst.add(l - 1);

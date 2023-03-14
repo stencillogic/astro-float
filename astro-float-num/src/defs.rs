@@ -8,8 +8,6 @@ use std::collections::TryReserveError;
 #[cfg(not(feature = "std"))]
 use alloc::collections::TryReserveError;
 
-use smallvec::CollectionAllocErr;
-
 /// A word.
 #[cfg(target_arch = "x86_64")]
 pub type Word = u64;
@@ -143,12 +141,6 @@ impl PartialEq for Error {
             (Self::ExponentOverflow(l0), Self::ExponentOverflow(r0)) => l0 == r0,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
-    }
-}
-
-impl From<CollectionAllocErr> for Error {
-    fn from(_: CollectionAllocErr) -> Self {
-        Error::MemoryAllocation
     }
 }
 

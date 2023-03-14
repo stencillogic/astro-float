@@ -8,23 +8,23 @@ use core::ops::DerefMut;
 use core::ops::Index;
 use core::ops::IndexMut;
 use core::slice::SliceIndex;
-use smallvec::SmallVec;
 
 use crate::common::util::shift_slice_left;
 use crate::common::util::shift_slice_right;
 
-const STATIC_ALLOCATION: usize = 5;
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 /// Buffer for holding mantissa gidits.
 #[derive(Debug, Hash)]
 pub struct WordBuf {
-    inner: SmallVec<[Word; STATIC_ALLOCATION]>,
+    inner: Vec<Word>,
 }
 
 impl WordBuf {
     #[inline]
     pub fn new(sz: usize) -> Result<Self, Error> {
-        let mut inner = SmallVec::new();
+        let mut inner = Vec::new();
         inner.try_reserve_exact(sz)?;
         unsafe {
             // values of the newely allocated words stay unitialized for performance reasons
@@ -61,7 +61,7 @@ impl WordBuf {
     pub fn try_extend(&mut self, p: usize) -> Result<(), Error> {
         let n = (p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         let l = self.inner.len();
-        self.inner.try_grow(n)?;
+        self.inner.try_reserve(n - l)?;
         unsafe {
             // values of the newely allocated words stay unitialized for performance reasons
             self.inner.set_len(n);

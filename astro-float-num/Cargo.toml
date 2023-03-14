@@ -21,7 +21,6 @@ serde = { version = "1.0.147", optional = true }
 rand = { version = "0.8.5", optional = true }
 lazy_static = { version = "1.4.0", default-features = false, features = [] }
 itertools = { version = "0.10.3", default-features = false, features = [] }
-smallvec = { version = "1.9.0", default-features = false, features = [] }
 
 [features]
 default = ["std", "random", "serde"]

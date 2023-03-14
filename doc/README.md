@@ -8,7 +8,7 @@ $p$ denotes precision of a floating point number.
 
 $m 2^{e_1} \pm 2^{e_1 - p}$ denotes an argument with absolute error of at most $2^{e_1-p}$, i.e. $\pm1$ ulp.
 
-## Absolute error of multiplication
+## Error of multiplication
 
 Absolute error $err_a$ of multiplying numbers containing relative error less than $2^{-p}$:
 
@@ -25,7 +25,7 @@ $$\displaylines{err_a < |(m 2^{e_1} \pm 2^{e_1 - p + k}) (n 2^{e_2} \pm 2^{e_2 -
 $$\displaylines{err_r < |\frac{(m 2^{-k - 1} \pm n 2^{-1} \pm 2^{-p-1})}{mn} 2^{-p+k+1}| =\\\\= |\left(\frac{1}{n2^{k + 1}} \pm \frac{1}{2m} \pm \frac{1}{mn2^{p+1}}\right) 2^{-p+k+1}| < 2^{-p + k + 2}}$$
 
 
-## Absolute error of division
+## Error of division
 
 Absolute error of dividing numbers with error and $p > 3$:
 
@@ -48,7 +48,7 @@ $$\displaylines{err_a < |\frac {m 2^{e_1} \pm 2^{e_1 - p}} {n 2^{e_2} \pm 2^{e_2
 
 $$\displaylines{err_r < \frac{n2^{-k+1} + 1}{n - 2^{-p+k}} 2^{-p+k} < 2 ^ {- p + k + 3}}$$
 
-## Absolute error of subtraction
+## Error of subtraction
 
 Absolute error of subtraction of numbers with the same sign:
 
@@ -66,7 +66,7 @@ $$\displaylines{err_a = |(m 2^{e_1} \pm 2^{e_1 - p + k}) - (n 2^{e_2} \pm 2^{e_2
 
 $$\displaylines{err_r < 2^{-p+k+2}}$$
 
-## Absolute error of addition
+## Error of addition
 
 Absolute error of addition of numbers with the same sign:
 
@@ -83,7 +83,7 @@ $$\displaylines{err_a = |(m 2^{e_1} \pm 2^{e_1 - p + k}) + (n 2^{e_2} \pm 2^{e_2
 $$\displaylines{err_r < 2^{-p+k+1}}$$
 
 
-## Absolute error of square root
+## Error of square root
 
 Absolute error of the square root of a number with error:
 

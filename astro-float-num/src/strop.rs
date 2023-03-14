@@ -63,7 +63,6 @@ impl BigFloatNumber {
                     Radix::Hex => 4,
                 };
 
-        // TODO: replace SmallVec with Vec.
         mstr.try_reserve_exact(mstr_sz)?;
 
         if s == Sign::Neg {

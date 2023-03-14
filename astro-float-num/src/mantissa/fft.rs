@@ -13,7 +13,9 @@ use crate::defs::WORD_BIT_SIZE;
 use crate::defs::WORD_MAX;
 use crate::mantissa::Mantissa;
 use itertools::izip;
-use smallvec::SmallVec;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 impl Mantissa {
     fn fft_w_shift(j: usize, k: usize) -> usize {
@@ -380,8 +382,8 @@ impl Mantissa {
         buf: &mut [Word],
         k1: usize,
         part_len: usize,
-    ) -> Result<SmallVec<[SliceWithSign; 0]>, Error> {
-        let mut parts = SmallVec::<[SliceWithSign; 0]>::new();
+    ) -> Result<Vec<SliceWithSign>, Error> {
+        let mut parts = Vec::<SliceWithSign>::new();
         parts.try_reserve_exact(k1)?;
 
         let mut rest = buf;
