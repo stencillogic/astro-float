@@ -1,5 +1,6 @@
 ![Rust](https://github.com/stencillogic/astro-float/workflows/Rust/badge.svg)
-![Minimum rustc version](https://img.shields.io/badge/rustc-1.62.1+-lightgray.svg)
+![Minimum rustc version](https://img.shields.io/badge/rustc-1.62.1+-blue.svg)
+![Test coverage](https://img.shields.io/badge/coverage-87.05%25-blue.svg)
 
 Astro-float (astronomically large floating point numbers) is a library that implements arbitrary precision floating point numbers with correct rounding purely in Rust.
 
@@ -46,3 +47,5 @@ Benchmark can be found here: https://github.com/stencillogic/bigfloat-bench.
 ## Contributing
 
 Issues regarding bugs or new features can be opened here: https://github.com/stencillogic/astro-float/issues 
+
+For more information please check [CONTRIBUTING.md](https://github.com/stencillogic/astro-float/blob/main/CONTRIBUTING.md)
