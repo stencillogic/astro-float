@@ -1,6 +1,6 @@
 [package]
 name = "astro-float"
-version = "0.6.7"
+version = "0.6.8"
 edition = "2021"
 authors = ["stencillogic <stencillogic@gmail.com>"]
 license = "MIT"
@@ -11,8 +11,8 @@ readme = "README.md"
 repository = "https://github.com/stencillogic/astro-float"
 
 [dependencies]
-astro-float-num = "0.1.5"
-astro-float-macro = "0.1.6"
+astro-float-num = "0.1.6"
+astro-float-macro = "0.1.7"
 
 [features]
 default = ["std", "random", "serde"]
