@@ -227,7 +227,7 @@ impl BigFloatNumber {
         let leadzeroes = digits.iter().take_while(|&&x| x == 0).count();
 
         let pf =
-            round_p(((digits.len() - leadzeroes) * 3321928095 / 1000000000).max(p) + WORD_BIT_SIZE);
+            round_p((((digits.len() - leadzeroes) as u64 * 3321928095 / 1000000000) as usize).max(p) + WORD_BIT_SIZE);
 
         let mut f = Self::new(pf)?;
 
@@ -270,7 +270,7 @@ impl BigFloatNumber {
         // exponent part
         let n = e as isize - digits.len() as isize;
 
-        let nmax = Exponent::MAX as usize * 301029995 / 1000000000;
+        let nmax = (EXPONENT_MAX as u64 * 301029995 / 1000000000) as usize;
 
         let ten = Self::from_word(10, 4)?;
 
@@ -332,8 +332,8 @@ impl BigFloatNumber {
         // let f = m / rdx^n,
         // then resulting number is F = f * rdx^n
 
-        let n = self.exponent().unsigned_abs() as usize * 3010299957 / 10000000000;
-        let l = self.mantissa_max_bit_len() * 3010299957 / 10000000000 + 1;
+        let n = (self.exponent().unsigned_abs() as u64 * 301029996 / 1000000000) as usize;
+        let l = (self.mantissa_max_bit_len() as u64 * 301029996 / 1000000000 + 1) as usize;
 
         let (digits, e_shift) = if n == 0 {
             self.conv_mantissa(l, Radix::Dec, rm)
@@ -594,6 +594,7 @@ mod tests {
                 96,
                 Sign::Pos,
                 -1,
+                false,
             )
             .unwrap();
             let (s, m, e) = n.convert_to_radix(Radix::Oct, RoundingMode::None).unwrap();
@@ -608,16 +609,17 @@ mod tests {
                 96,
                 Sign::Pos,
                 -0,
+                false,
             )
             .unwrap();
             let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).unwrap();
 
-            assert!(m == [6]);
+            assert_eq!(m, [5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 2]);
             assert!(s == Sign::Pos);
             assert!(e == 0);
 
             let g =
-                BigFloatNumber::convert_from_radix(s, &m, e, Radix::Dec, 96, RoundingMode::None)
+                BigFloatNumber::convert_from_radix(s, &m, e, Radix::Dec, 96, RoundingMode::ToEven)
                     .unwrap();
             assert!(g.cmp(&n) == 0);
         }
@@ -732,12 +734,15 @@ mod tests {
 
             let (s1, m1, e1) = n.convert_to_radix(rdx, RoundingMode::ToEven).unwrap();
 
+            println!("\n{:?}", rdx);
+            println!("{:?} {:?} {}", s1, m1, e1);
+
             let mut g =
                 BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, RoundingMode::ToEven)
                     .unwrap();
 
-            //println!("\n{:?}", rdx);
-            //println!("{:?} {:?} {}", s1, m1, e1);
+            println!("\n{:?}", rdx);
+            println!("{:?} {:?} {}", s1, m1, e1);
             //println!("{:?}\n{:?}", n, g);
 
             if rdx == Radix::Dec {

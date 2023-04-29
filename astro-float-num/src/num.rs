@@ -165,6 +165,33 @@ impl BigFloatNumber {
         }
     }
 
+    pub(crate) fn from_u64_internal(d: u64, p: usize) -> Result<Self, Error> {
+        #[cfg(target_arch = "x86_64")] {
+            Self::from_word(d, p)
+        }
+
+        #[cfg(target_arch = "x86")] {
+            Self::p_assertion(p)?;
+
+            if d == 0 {
+                Self::new(p)
+            } else {
+                let mut d = d;
+                let mut shift = 0;
+                while d < 0x8000000000000000u64 {
+                    d <<= 1;
+                    shift += 1;
+                }
+                Ok(BigFloatNumber {
+                    m: Mantissa::from_words(p, &[d as Word, (d >> WORD_BIT_SIZE) as Word])?,
+                    e: (64 - shift) as Exponent,
+                    s: Sign::Pos,
+                    inexact: false,
+                })
+            }
+        }
+    }
+
     /// Returns a copy of the number with the sign reversed.
     ///
     /// ## Errors
@@ -291,7 +318,7 @@ impl BigFloatNumber {
             &mut inexact,
         )?;
 
-        let e = e1 + e2 - e_shift;
+        let e = e1 + e2 - e_shift as isize;
 
         if e > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(s));
@@ -357,7 +384,7 @@ impl BigFloatNumber {
         let (e_shift, m3) =
             m1_normalized.div(m2_normalized, p, rm, s == Sign::Pos, &mut inexact)?;
 
-        let e = e1 - e2 + e_shift;
+        let e = e1 - e2 + e_shift as isize;
 
         if e > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(s));
@@ -416,18 +443,24 @@ impl BigFloatNumber {
                 if e < EXPONENT_MIN as isize {
                     // first, see if m3 is already subnormal, then shift accordingly
                     let mut excess = m3.max_bit_len() - m3.bit_len();
-                    let shift = (EXPONENT_MIN as isize - e) as usize;
 
-                    if excess < shift {
-                        m3.extend_subnormal(shift)?;
-                        excess = m3.max_bit_len() - m3.bit_len();
+                    if EXPONENT_MIN as isize - e > usize::MAX as isize {
+                        m3.set_zero();
+                        e = 0;
+                    } else {
+                        let shift = (EXPONENT_MIN as isize - e) as usize;
+
+                        if excess < shift {
+                            m3.extend_subnormal(shift)?;
+                            excess = m3.max_bit_len() - m3.bit_len();
+                        }
+
+                        let shift = excess - shift;
+                        m3.shift_left(shift);
+                        m3.set_bit_len(m3.bit_len() + shift);
+
+                        e = EXPONENT_MIN as isize;
                     }
-
-                    let shift = excess - shift;
-                    m3.shift_left(shift);
-                    m3.set_bit_len(m3.bit_len() + shift);
-
-                    e = EXPONENT_MIN as isize;
                 } else {
                     m3.normilize2();
                 }
@@ -498,10 +531,13 @@ impl BigFloatNumber {
         if self.is_subnormal() {
             let (shift, mantissa) = self.m.normilize()?;
 
-            debug_assert!(shift < (isize::MAX / 2 + EXPONENT_MIN as isize) as usize);
+            #[cfg(target_arch = "x86_64")] {
+                // checks for the case when usize is larger than exponent
+                debug_assert!((shift as isize) < (isize::MAX as isize / 2 + EXPONENT_MIN as isize));
 
-            if (self.e as isize) - shift as isize <= isize::MIN / 2 {
-                return Err(Error::ExponentOverflow(self.s));
+                if (self.e as isize) - shift as isize <= isize::MIN as isize / 2 {
+                    return Err(Error::ExponentOverflow(self.s));
+                }
             }
 
             Ok((self.e as isize - shift as isize, Some(mantissa)))
@@ -616,8 +652,10 @@ impl BigFloatNumber {
 
         d3.inexact |= inexact;
 
-        debug_assert!(shift <= isize::MAX / 2 && e >= isize::MIN / 2);
-        e -= shift;
+        #[cfg(target_arch="x86_64")] {
+            debug_assert!(shift <= isize::MAX / 2 && e >= isize::MIN as isize / 2);
+        }
+        e -= shift as isize;
 
         if e > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(d3.s));
@@ -1125,12 +1163,12 @@ impl BigFloatNumber {
     pub fn set_exponent(&mut self, e: Exponent) {
         if !self.is_zero() {
             if self.is_subnormal() && e > EXPONENT_MIN {
-                let ediff = (e as isize - EXPONENT_MIN as isize) as usize;
+                let ediff = (e as isize - EXPONENT_MIN as isize) as isize;
 
                 let n = self.mantissa_max_bit_len() - self.precision();
-                if n >= ediff {
-                    self.m.shift_left(ediff);
-                    self.m.set_bit_len(self.m.bit_len() + ediff);
+                if n as isize >= ediff {
+                    self.m.shift_left(ediff as usize);
+                    self.m.set_bit_len(self.m.bit_len() + ediff as usize);
                 } else {
                     self.m.shift_left(n);
                     self.m.set_bit_len(self.m.max_bit_len());
@@ -1528,7 +1566,7 @@ macro_rules! impl_int_conv {
                     return Err(Error::InvalidArgument);
                 }
 
-                Self::from_word(u as Word, p)
+                Self::from_u64_internal(u as u64, p)
             }
         }
     };
@@ -1549,6 +1587,8 @@ mod tests {
 
     #[cfg(not(feature = "std"))]
     use alloc::format;
+
+    const EXP_BIT_SZ: usize = core::mem::size_of::<Exponent>() * 8;
 
     #[test]
     fn test_number() {
@@ -2193,32 +2233,65 @@ mod tests {
             .div(&d2, WORD_BIT_SIZE * 5, RoundingMode::ToEven)
             .unwrap();
 
+        let words = {
+            #[cfg(target_arch = "x86_64")] {[
+                12297829382473034411,
+                12297829382473034410,
+                12297829382473034410,
+                12297829382473034410,
+                12297829382473034410
+            ]}
+            #[cfg(target_arch = "x86")] {[
+                2863311531,
+                2863311530,
+                2863311530,
+                2863311530,
+                2863311530
+            ]}
+        };
+
         assert!(d3.mantissa_max_bit_len() == WORD_BIT_SIZE * 5);
         assert!(
             d3.mantissa().digits()
-                == [
-                    12297829382473034411,
-                    12297829382473034410,
-                    12297829382473034410,
-                    12297829382473034410,
-                    12297829382473034410
-                ]
+                == words
         );
 
         d3 = d1
             .div(&d2, WORD_BIT_SIZE * 3, RoundingMode::ToEven)
             .unwrap();
 
+        let words = {
+            #[cfg(target_arch = "x86_64")] {[
+                12297829382473034411,
+                12297829382473034410,
+                12297829382473034410
+            ]}
+            #[cfg(target_arch = "x86")] {[
+                2863311531,
+                2863311530,
+                2863311530
+            ]}
+        };
+
         assert!(d3.mantissa_max_bit_len() == WORD_BIT_SIZE * 3);
         assert!(
             d3.mantissa().digits()
-                == [12297829382473034411, 12297829382473034410, 12297829382473034410]
+                == words
         );
 
         d3 = d1.div(&d2, WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
 
+        let words = {
+            #[cfg(target_arch = "x86_64")] {[
+                12297829382473034411
+            ]}
+            #[cfg(target_arch = "x86")] {[
+                2863311531
+            ]}
+        };
+
         assert!(d3.mantissa_max_bit_len() == WORD_BIT_SIZE);
-        assert!(d3.mantissa().digits() == [12297829382473034411]);
+        assert!(d3.mantissa().digits() == words);
 
         // reciprocal
         for _ in 0..1000 {
@@ -2282,20 +2355,40 @@ mod tests {
             .reciprocal(WORD_BIT_SIZE * 5, RoundingMode::ToEven)
             .unwrap();
 
+        let words = {
+            #[cfg(target_arch = "x86_64")] {[
+                12297829382473034411,
+                12297829382473034410,
+                12297829382473034410,
+                12297829382473034410,
+                12297829382473034410
+            ]}
+            #[cfg(target_arch = "x86")] {[
+                2863311531,
+                2863311530,
+                2863311530,
+                2863311530,
+                2863311530
+            ]}
+        };
+
         assert!(
             d2.mantissa().digits()
-                == [
-                    12297829382473034411,
-                    12297829382473034410,
-                    12297829382473034410,
-                    12297829382473034410,
-                    12297829382473034410
-                ]
+                == words
         );
 
         d2 = d1.reciprocal(WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
 
-        assert!(d2.mantissa().digits() == [12297829382473034411]);
+        let words = {
+            #[cfg(target_arch = "x86_64")] {[
+                12297829382473034411
+            ]}
+            #[cfg(target_arch = "x86")] {[
+                2863311531
+            ]}
+        };
+
+        assert!(d2.mantissa().digits() == words);
 
         // subnormal numbers basic sanity
         d1 = BigFloatNumber::min_positive(p).unwrap();
@@ -2670,11 +2763,19 @@ mod tests {
         assert_eq!(d1.sign(), Sign::Neg);
 
         let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Pos, EXPONENT_MAX).unwrap();
-        assert_eq!(
-            d1.mantissa().digits(),
-            [0x8000000000000000u64, 0x8000000000000001u64]
-        );
-        assert_eq!(d1.exponent(), EXPONENT_MAX - 63);
+        #[cfg(target_arch = "x86_64")] {
+            assert_eq!(
+                d1.mantissa().digits(),
+                [0x8000000000000000u64, 0x8000000000000001u64]
+            );
+        }
+        #[cfg(target_arch = "x86")] {
+            assert_eq!(
+                d1.mantissa().digits(),
+                [0x80000000u32, 0x80000001u32]
+            );
+        }
+        assert_eq!(d1.exponent(), EXPONENT_MAX - EXP_BIT_SZ as Exponent + 1);
         assert_eq!(d1.precision(), WORD_BIT_SIZE * 2);
         assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
         assert_eq!(d1.sign(), Sign::Pos);
@@ -2682,7 +2783,7 @@ mod tests {
         let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Neg, EXPONENT_MIN).unwrap();
         assert_eq!(d1.mantissa().digits(), [3, 1]);
         assert_eq!(d1.exponent(), EXPONENT_MIN);
-        assert_eq!(d1.precision(), 65);
+        assert_eq!(d1.precision(), EXP_BIT_SZ + 1);
         assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
         assert_eq!(d1.sign(), Sign::Neg);
 
@@ -2693,10 +2794,18 @@ mod tests {
         assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
         assert_eq!(d1.sign(), Sign::Pos);
 
+        let words = {
+            #[cfg(target_arch = "x86_64")] {
+                [3, 0x8000000000000000u64]
+            }
+            #[cfg(target_arch = "x86")] {
+                [3, 0x80000000u32]
+            }
+        };
         let d1 =
-            BigFloatNumber::from_words(&[3, 0x8000000000000000u64], Sign::Pos, EXPONENT_MIN + 5)
+            BigFloatNumber::from_words(&words, Sign::Pos, EXPONENT_MIN + 5)
                 .unwrap();
-        assert_eq!(d1.mantissa().digits(), [3, 0x8000000000000000u64]);
+        assert_eq!(d1.mantissa().digits(), words);
         assert_eq!(d1.exponent(), EXPONENT_MIN + 5);
         assert_eq!(d1.precision(), WORD_BIT_SIZE * 2);
         assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
@@ -2726,154 +2835,306 @@ mod tests {
         // 1 1000
         // 1 1001
 
-        let mantissas = [
-            [0x8000000000000000u64, 0x8000000000000000u64],
-            [0x8000000000000001u64, 0x8000000000000000u64],
-            [0x8000000000000008u64, 0x8000000000000000u64],
-            [0x8000000000000009u64, 0x8000000000000000u64],
-            [0x8000000000000018u64, 0x8000000000000000u64],
-            [0x8000000000000019u64, 0x8000000000000000u64],
-        ];
+        let mantissas = {
+            #[cfg(target_arch = "x86_64")] {
+                [[0x8000000000000000u64, 0x8000000000000000u64],
+                [0x8000000000000001u64, 0x8000000000000000u64],
+                [0x8000000000000008u64, 0x8000000000000000u64],
+                [0x8000000000000009u64, 0x8000000000000000u64],
+                [0x8000000000000018u64, 0x8000000000000000u64],
+                [0x8000000000000019u64, 0x8000000000000000u64],]
+            }
+            #[cfg(target_arch = "x86")] {
+                [[0x80000000u32, 0x80000000u32],
+                [0x80000001u32, 0x80000000u32],
+                [0x80000008u32, 0x80000000u32],
+                [0x80000009u32, 0x80000000u32],
+                [0x80000018u32, 0x80000000u32],
+                [0x80000019u32, 0x80000000u32],]
+            }
+        };
 
-        let rounding_results_posnum = [
-            (RoundingMode::None, mantissas),
-            (
-                RoundingMode::Down,
-                [
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                ],
-            ),
-            (
-                RoundingMode::Up,
-                [
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                ],
-            ),
-            (
-                RoundingMode::FromZero,
-                [
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                ],
-            ),
-            (
-                RoundingMode::ToZero,
-                [
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                ],
-            ),
-            (
-                RoundingMode::ToEven,
-                [
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                ],
-            ),
-            (
-                RoundingMode::ToOdd,
-                [
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                ],
-            ),
-        ];
+        let rounding_results_posnum = {
+            #[cfg(target_arch = "x86_64")] {[
+                (RoundingMode::None, mantissas),
+                (
+                    RoundingMode::Down,
+                    [
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                    ],
+                ),
+                (
+                    RoundingMode::Up,
+                    [
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                    ],
+                ),
+                (
+                    RoundingMode::FromZero,
+                    [
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                    ],
+                ),
+                (
+                    RoundingMode::ToZero,
+                    [
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                    ],
+                ),
+                (
+                    RoundingMode::ToEven,
+                    [
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                    ],
+                ),
+                (
+                    RoundingMode::ToOdd,
+                    [
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                    ],
+                ),
+            ]}
+            #[cfg(target_arch = "x86")] {[
+                (RoundingMode::None, mantissas),
+                (
+                    RoundingMode::Down,
+                    [
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                    ],
+                ),
+                (
+                    RoundingMode::Up,
+                    [
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                    ],
+                ),
+                (
+                    RoundingMode::FromZero,
+                    [
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                    ],
+                ),
+                (
+                    RoundingMode::ToZero,
+                    [
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                    ],
+                ),
+                (
+                    RoundingMode::ToEven,
+                    [
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                    ],
+                ),
+                (
+                    RoundingMode::ToOdd,
+                    [
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                    ],
+                ),
+            ]}
+        };
 
-        let rounding_results_negnum = [
-            (RoundingMode::None, mantissas),
-            (
-                RoundingMode::Down,
-                [
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                ],
-            ),
-            (
-                RoundingMode::Up,
-                [
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                ],
-            ),
-            (
-                RoundingMode::FromZero,
-                [
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                ],
-            ),
-            (
-                RoundingMode::ToZero,
-                [
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                ],
-            ),
-            (
-                RoundingMode::ToEven,
-                [
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                ],
-            ),
-            (
-                RoundingMode::ToOdd,
-                [
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000000u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000010u64, 0x8000000000000000u64],
-                    [0x8000000000000020u64, 0x8000000000000000u64],
-                ],
-            ),
-        ];
+        let rounding_results_negnum = {
+            #[cfg(target_arch = "x86_64")] {[
+                (RoundingMode::None, mantissas),
+                (
+                    RoundingMode::Down,
+                    [
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                    ],
+                ),
+                (
+                    RoundingMode::Up,
+                    [
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                    ],
+                ),
+                (
+                    RoundingMode::FromZero,
+                    [
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                    ],
+                ),
+                (
+                    RoundingMode::ToZero,
+                    [
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                    ],
+                ),
+                (
+                    RoundingMode::ToEven,
+                    [
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                    ],
+                ),
+                (
+                    RoundingMode::ToOdd,
+                    [
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000000u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000010u64, 0x8000000000000000u64],
+                        [0x8000000000000020u64, 0x8000000000000000u64],
+                    ],
+                ),
+            ]}
+            #[cfg(target_arch = "x86")] {[
+                (RoundingMode::None, mantissas),
+                (
+                    RoundingMode::Down,
+                    [
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                    ],
+                ),
+                (
+                    RoundingMode::Up,
+                    [
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                    ],
+                ),
+                (
+                    RoundingMode::FromZero,
+                    [
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                    ],
+                ),
+                (
+                    RoundingMode::ToZero,
+                    [
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                    ],
+                ),
+                (
+                    RoundingMode::ToEven,
+                    [
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                    ],
+                ),
+                (
+                    RoundingMode::ToOdd,
+                    [
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000000u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000010u32, 0x80000000u32],
+                        [0x80000020u32, 0x80000000u32],
+                    ],
+                ),
+            ]}
+        };
 
         for (sign, rr) in
             [(Sign::Pos, rounding_results_posnum), (Sign::Neg, rounding_results_negnum)]
@@ -2881,11 +3142,11 @@ mod tests {
             for (rm, expected_mantissas) in rr.iter() {
                 for (m1, m2) in mantissas.iter().zip(expected_mantissas.iter()) {
                     // rounding
-                    let d1 = BigFloatNumber::from_raw_parts(m1, 128, sign, 64, false).unwrap();
-                    let d2 = d1.round(60, *rm).unwrap();
-                    let d3 = BigFloatNumber::from_raw_parts(m2, 128, sign, 64, false).unwrap();
+                    let d1 = BigFloatNumber::from_raw_parts(m1, WORD_BIT_SIZE*2, sign, WORD_BIT_SIZE as Exponent, false).unwrap();
+                    let d2 = d1.round(WORD_BIT_SIZE - 4, *rm).unwrap();
+                    let d3 = BigFloatNumber::from_raw_parts(m2, WORD_BIT_SIZE*2, sign, WORD_BIT_SIZE as Exponent, false).unwrap();
 
-                    //println!("\n{:?} {:?}\nresult {:?}\nexpect {:?}", sign, rm, d2.m, d3.m);
+                    //println!("\n{:?} {:?}\n{:?}\nresult {:?}\nexpect {:?}", sign, rm, d1.m, d2.m, d3.m);
 
                     assert!(d2.cmp(&d3) == 0);
                 }
@@ -2997,7 +3258,7 @@ mod tests {
                 [1, 1],
                 Sign::Pos,
                 EXPONENT_MIN,
-                EXPONENT_MIN.unsigned_abs() as usize + 63,
+                EXPONENT_MIN.unsigned_abs() as usize + WORD_BIT_SIZE - 1,
                 RoundingMode::Up,
                 [0, 2],
                 EXPONENT_MIN,
@@ -3006,7 +3267,7 @@ mod tests {
                 [1, 1],
                 Sign::Pos,
                 EXPONENT_MIN,
-                EXPONENT_MIN.unsigned_abs() as usize + 63,
+                EXPONENT_MIN.unsigned_abs() as usize + WORD_BIT_SIZE - 1,
                 RoundingMode::Down,
                 [0, 0],
                 0,
@@ -3015,7 +3276,7 @@ mod tests {
                 [1, 1],
                 Sign::Pos,
                 EXPONENT_MIN,
-                EXPONENT_MIN.unsigned_abs() as usize + 63,
+                EXPONENT_MIN.unsigned_abs() as usize + WORD_BIT_SIZE - 1,
                 RoundingMode::ToEven,
                 [0, 2],
                 EXPONENT_MIN,
@@ -3024,7 +3285,7 @@ mod tests {
                 [0, 1],
                 Sign::Pos,
                 EXPONENT_MIN,
-                EXPONENT_MIN.unsigned_abs() as usize + 63,
+                EXPONENT_MIN.unsigned_abs() as usize + WORD_BIT_SIZE - 1,
                 RoundingMode::ToEven,
                 [0, 0],
                 0,
@@ -3033,7 +3294,7 @@ mod tests {
                 [1, 1],
                 Sign::Pos,
                 EXPONENT_MIN,
-                EXPONENT_MIN.unsigned_abs() as usize + 63,
+                EXPONENT_MIN.unsigned_abs() as usize + WORD_BIT_SIZE - 1,
                 RoundingMode::ToOdd,
                 [0, 2],
                 EXPONENT_MIN,
@@ -3042,13 +3303,14 @@ mod tests {
                 [0, 1],
                 Sign::Pos,
                 EXPONENT_MIN,
-                EXPONENT_MIN.unsigned_abs() as usize + 63,
+                EXPONENT_MIN.unsigned_abs() as usize + WORD_BIT_SIZE - 1,
                 RoundingMode::ToOdd,
                 [0, 2],
                 EXPONENT_MIN,
             ),
         ];
         for (m1, s, e1, n, rm, m2, e2) in testset {
+            //println!("{:?}", (m1, s, e1, n, rm, m2, e2));
             let d1 = BigFloatNumber::from_words(&m1, s, e1).unwrap();
             let d2 = d1.round(n, rm).unwrap();
             assert_eq!(d2.mantissa().digits(), m2);
@@ -3119,9 +3381,9 @@ mod tests {
             BigFloatNumber::mul,
             BigFloatNumber::div,
         ] {
-            let d3 = op(&d1, &d2, 128, RoundingMode::None).unwrap();
+            let d3 = op(&d1, &d2, WORD_BIT_SIZE * 2, RoundingMode::None).unwrap();
             assert!(d3.inexact());
-            let d3 = op(&d2, &d1, 128, RoundingMode::None).unwrap();
+            let d3 = op(&d2, &d1, WORD_BIT_SIZE * 2, RoundingMode::None).unwrap();
             assert!(d3.inexact());
         }
 
@@ -3136,7 +3398,7 @@ mod tests {
         assert!(!d1.inexact());
         assert!(!d2.inexact());
 
-        let d3 = d1.mul(&d2, 256, RoundingMode::None).unwrap();
+        let d3 = d1.mul(&d2, WORD_BIT_SIZE * 4, RoundingMode::None).unwrap();
         assert!(d3.inexact());
 
         let d1 = BigFloatNumber::from_words(&[1, WORD_SIGNIFICANT_BIT], Sign::Pos, EXPONENT_MIN)

@@ -5,22 +5,22 @@ use crate::defs::{Error, WORD_BIT_SIZE};
 use crate::num::BigFloatNumber;
 use crate::RoundingMode;
 
-fn pqr(a: usize, b: usize) -> Result<(BigFloatNumber, BigFloatNumber, BigFloatNumber), Error> {
+fn pqr(a: u64, b: u64) -> Result<(BigFloatNumber, BigFloatNumber, BigFloatNumber), Error> {
     if a == b - 1 {
-        let n0 = BigFloatNumber::from_usize(6 * b - 5)?;
-        let n1 = BigFloatNumber::from_usize(2 * b - 1)?;
-        let n2 = BigFloatNumber::from_usize(6 * b - 1)?;
+        let n0 = BigFloatNumber::from_u64(6 * b - 5, 64)?;
+        let n1 = BigFloatNumber::from_u64(2 * b - 1, 64)?;
+        let n2 = BigFloatNumber::from_u64(6 * b - 1, 64)?;
 
         let n3 = n0.mul_full_prec(&n1)?;
         let r = n3.mul_full_prec(&n2)?;
 
-        let n0 = BigFloatNumber::from_usize(10939058860032000)?;
-        let n1 = BigFloatNumber::from_usize(b)?;
+        let n0 = BigFloatNumber::from_u64(10939058860032000, 64)?;
+        let n1 = BigFloatNumber::from_u64(b, 64)?;
         let n2 = n1.mul_full_prec(&n1)?;
         let n3 = n2.mul_full_prec(&n1)?;
         let q = n0.mul_full_prec(&n3)?;
 
-        let n0 = BigFloatNumber::from_usize(13591409 + 545140134 * b)?;
+        let n0 = BigFloatNumber::from_u64(13591409 + 545140134 * b, 64)?;
         let mut p = r.mul_full_prec(&n0)?;
 
         if b & 1 != 0 {
@@ -48,8 +48,8 @@ fn pqr_inc(
     pa: &BigFloatNumber,
     qa: &BigFloatNumber,
     ra: &BigFloatNumber,
-    m: usize,
-) -> Result<(BigFloatNumber, BigFloatNumber, BigFloatNumber, usize), Error> {
+    m: u64,
+) -> Result<(BigFloatNumber, BigFloatNumber, BigFloatNumber, u64), Error> {
     let b = m * 2;
 
     let (pb, qb, rb) = pqr(m, b)?;
@@ -66,7 +66,7 @@ fn pqr_inc(
 /// Holds value of currently computed PI.
 #[derive(Debug)]
 pub struct PiCache {
-    b: usize,
+    b: u64,
     pk: BigFloatNumber,
     qk: BigFloatNumber,
     rk: BigFloatNumber,
@@ -115,7 +115,7 @@ impl PiCache {
         loop {
             let kext = (k + 46 + WORD_BIT_SIZE) / 47;
 
-            if self.b > kext {
+            if self.b > kext as u64 {
                 let mut ret = self.val.clone()?;
 
                 if ret.try_set_precision(k, rm, p_wrk)? {
@@ -133,11 +133,11 @@ impl PiCache {
 
             (pk, qk, rk, bb) = pqr_inc(&self.pk, &self.qk, &self.rk, self.b)?;
 
-            while bb <= kext {
+            while bb <= kext as u64 {
                 (pk, qk, rk, bb) = pqr_inc(&pk, &qk, &rk, bb)?;
             }
 
-            self.val = Self::calc_pi(&pk, &qk, bb * 47)?;
+            self.val = Self::calc_pi(&pk, &qk, bb as usize * 47)?;
 
             self.pk = pk;
             self.qk = qk;
@@ -167,6 +167,7 @@ mod tests {
             320,
             Sign::Pos,
             2,
+            false,
         )
         .unwrap();
         assert!(c.cmp(&r) == 0);

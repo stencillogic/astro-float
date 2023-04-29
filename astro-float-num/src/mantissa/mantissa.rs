@@ -678,9 +678,12 @@ impl Mantissa {
         }
 
         #[cfg(target_arch = "x86")]
-        for v in &mut m[nd..] {
-            *v = u as Word;
-            u >>= WORD_BIT_SIZE;
+        {
+            let mut u = u;
+            for v in &mut m[nd..] {
+                *v = u as Word;
+                u >>= WORD_BIT_SIZE;
+            }
         }
 
         let shift = Self::maximize(&mut m);
@@ -703,29 +706,8 @@ impl Mantissa {
             return Ok((0, ret));
         }
 
-        #[cfg(target_arch = "x86_64")]
-        {
-            m = Self::reserve_new(1)?;
-            m[0] = u as Word;
-        }
-
-        #[cfg(target_arch = "x86")]
-        {
-            let mut n = 0;
-            let mut v = u;
-
-            while v & WORD_MAX as usize != 0 {
-                v >>= WORD_BIT_SIZE;
-                n += 1;
-            }
-
-            m = Self::reserve_new(n)?;
-
-            for v in m.iter_mut() {
-                *v = u as Word;
-                u >>= WORD_BIT_SIZE;
-            }
-        }
+        m = Self::reserve_new(1)?;
+        m[0] = u as Word;
 
         let shift = Self::maximize(&mut m);
         let mut ret = Mantissa { m, n: 0 };

@@ -36,10 +36,20 @@ pub type SignedWord = i64;
 pub type Exponent = i32;
 
 /// Maximum exponent value.
+#[cfg(target_arch = "x86_64")]
 pub const EXPONENT_MAX: Exponent = Exponent::MAX;
 
+/// Maximum exponent value.
+#[cfg(target_arch = "x86")]
+pub const EXPONENT_MAX: Exponent = Exponent::MAX / 4;
+
 /// Minimum exponent value.
+#[cfg(target_arch = "x86_64")]
 pub const EXPONENT_MIN: Exponent = Exponent::MIN;
+
+/// Minimum exponent value.
+#[cfg(target_arch = "x86")]
+pub const EXPONENT_MIN: Exponent = Exponent::MIN / 4;
 
 /// Maximum value of a word.
 pub const WORD_MAX: Word = Word::MAX;
