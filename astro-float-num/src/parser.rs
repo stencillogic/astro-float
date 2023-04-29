@@ -260,15 +260,16 @@ fn parse_exp(parser_state: &mut ParserState, rdx: Radix) {
             _ => {}
         };
     }
+    let e_thres = EXPONENT_MAX.unsigned_abs().max(EXPONENT_MIN.unsigned_abs()) as isize;
     while let Some(c) = ch {
         if is_radix_digit(c, rdx) {
-            if parser_state.e
-                > EXPONENT_MAX.unsigned_abs().max(EXPONENT_MIN.unsigned_abs()) as isize
+            if parser_state.e > e_thres
             {
                 break;
             }
-            parser_state.e *= rdx as isize;
-            parser_state.e += c.to_digit(rdx as u32).unwrap() as isize; // call to unwrap() is unreachable, because c is surely a digit.
+            parser_state.e = parser_state.e.saturating_mul(rdx as isize);
+            let digit = c.to_digit(rdx as u32).unwrap(); // call to unwrap() is unreachable, because c is surely a digit.
+            parser_state.e = parser_state.e.saturating_add(digit as isize);
         } else {
             break;
         }
@@ -384,11 +385,25 @@ mod tests {
         assert!(e == -0x1f7);
 
         // large exp
-        let ps = parse("abc.def09123e_e+7FFFFFFF", Radix::Hex).unwrap();
+        let numstr;
+        #[cfg(target_arch = "x86_64")] {
+            numstr = "abc.def09123e_e+7FFFFFFF";
+        }
+        #[cfg(target_arch = "x86")] {
+            numstr = "abc.def09123e_e+1FFFFFFF";
+        }
+        let ps = parse(numstr, Radix::Hex).unwrap();
         assert!(ps.is_inf());
         assert!(ps.sign().is_positive());
 
-        let ps = parse("-abc.def09123e_e+7FFFFFFF", Radix::Hex).unwrap();
+        let numstr;
+        #[cfg(target_arch = "x86_64")] {
+            numstr = "-abc.def09123e_e+7FFFFFFF";
+        }
+        #[cfg(target_arch = "x86")] {
+            numstr = "-abc.def09123e_e+1FFFFFFF";
+        }
+        let ps = parse(numstr, Radix::Hex).unwrap();
         assert!(ps.is_inf());
         assert!(!ps.is_nan());
         assert!(ps.sign().is_negative());
@@ -402,12 +417,24 @@ mod tests {
         assert!(!ps.is_nan());
         assert!(ps.sign().is_negative());
 
-        let ps = parse("0.0000abc_e+7FFFFFFF", Radix::Hex).unwrap();
+        let numstr;
+        #[cfg(target_arch = "x86_64")] {
+            numstr = "0.0000abc_e+7FFFFFFF";
+        }
+        #[cfg(target_arch = "x86")] {
+            numstr = "0.0000abc_e+1FFFFFFF";
+        }
+        let ps = parse(numstr, Radix::Hex).unwrap();
         assert!(!ps.is_inf());
         assert!(!ps.is_nan());
         let (m, _s, e) = ps.raw_parts();
         assert_eq!(m, [0, 0, 0, 0, 0xa, 0xb, 0xc]);
-        assert_eq!(e, 0x7FFFFFFF);
+        #[cfg(target_arch = "x86_64")] {
+            assert_eq!(e, 0x7FFFFFFF);
+        }
+        #[cfg(target_arch = "x86")] {
+            assert_eq!(e, 0x1FFFFFFF);
+        }
 
         // small exp
         let ps = parse("abc.def09123e_e-80000004", Radix::Hex).unwrap();
@@ -417,7 +444,14 @@ mod tests {
         assert_eq!(m.iter().filter(|&&x| x != 0).count(), 0);
         assert!(e == 0);
 
-        let ps = parse("0.0000abcdef09123e_e-80000000", Radix::Hex).unwrap();
+        let numstr;
+        #[cfg(target_arch = "x86_64")] {
+            numstr = "0.0000abcdef09123e_e-80000000";
+        }
+        #[cfg(target_arch = "x86")] {
+            numstr = "0.0000abcdef09123e_e-20000000";
+        }
+        let ps = parse(numstr, Radix::Hex).unwrap();
         assert!(!ps.is_inf());
         assert!(!ps.is_nan());
         let (m, _s, e) = ps.raw_parts();
@@ -425,7 +459,12 @@ mod tests {
             m,
             [0, 0, 0, 0, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x0, 0x9, 0x1, 0x2, 0x3, 0xe]
         );
-        assert_eq!(e, -0x80000000);
+        #[cfg(target_arch = "x86_64")] {
+            assert_eq!(e, -0x80000000);
+        }
+        #[cfg(target_arch = "x86")] {
+            assert_eq!(e, -0x20000000);
+        }
 
         let ps = parse(
             "abc.def09123e_e-ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
