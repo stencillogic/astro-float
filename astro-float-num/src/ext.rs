@@ -1569,6 +1569,7 @@ impl FromExt<&str> for BigFloat {
 #[cfg(test)]
 mod tests {
 
+    use crate::Word;
     use crate::common::util::rand_p;
     use crate::defs::DEFAULT_P;
     use crate::ext::ONE;
@@ -2054,16 +2055,16 @@ mod tests {
 
         let d1 = ONE.clone();
         assert!(d1.exponent() == Some(1));
-        let words = {
+        let words: &[Word] = {
             #[cfg(target_arch = "x86_64")] {
-                [0, 0x8000000000000000]
+                &[0, 0x8000000000000000]
             }
             #[cfg(target_arch = "x86")] {
-                [0, 0x80000000]
+                &[0, 0, 0, 0x80000000]
             }
         };
 
-        assert!(d1.mantissa_digits() == Some(&words));
+        assert!(d1.mantissa_digits() == Some(words));
         assert!(d1.mantissa_max_bit_len() == Some(DEFAULT_P));
         assert!(d1.precision() == Some(DEFAULT_P));
         assert!(d1.sign() == Some(Sign::Pos));

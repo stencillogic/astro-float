@@ -182,12 +182,26 @@ impl BigFloatNumber {
                     d <<= 1;
                     shift += 1;
                 }
-                Ok(BigFloatNumber {
-                    m: Mantissa::from_words(p, &[d as Word, (d >> WORD_BIT_SIZE) as Word])?,
-                    e: (64 - shift) as Exponent,
-                    s: Sign::Pos,
-                    inexact: false,
-                })
+                let words = [d as Word, (d >> WORD_BIT_SIZE) as Word];
+                if p < WORD_BIT_SIZE * 2 {
+                    if words[0] != 0 {
+                        return Err(Error::InvalidArgument);
+                    } else {
+                        Ok(BigFloatNumber {
+                            m: Mantissa::from_word(p, words[1])?,
+                            e: (64 - shift) as Exponent,
+                            s: Sign::Pos,
+                            inexact: false,
+                        })
+                    }
+                } else {
+                    Ok(BigFloatNumber {
+                        m: Mantissa::from_words(p, &[d as Word, (d >> WORD_BIT_SIZE) as Word])?,
+                        e: (64 - shift) as Exponent,
+                        s: Sign::Pos,
+                        inexact: false,
+                    })
+                }
             }
         }
     }

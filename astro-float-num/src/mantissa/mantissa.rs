@@ -100,6 +100,10 @@ impl Mantissa {
     pub fn from_words(p: usize, w: &[Word]) -> Result<Self, Error> {
         let mut m = Self::reserve_new(Self::bit_len_to_word_len(p))?;
 
+        if m.len() < w.len() {
+            return Err(Error::InvalidArgument);
+        }
+
         let b = m.len() - w.len();
         (&mut m)[..b].fill(0);
         (&mut m)[b..].copy_from_slice(w);
