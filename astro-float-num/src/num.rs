@@ -1215,7 +1215,9 @@ impl BigFloatNumber {
     ///  - ExponentOverflow: rounding causes exponent overflow.
     ///  - InvalidArgument: `n` is too large.
     pub fn round(&self, n: usize, rm: RoundingMode) -> Result<Self, Error> {
-        Self::p_assertion(n)?;
+        if n >= (isize::MAX / 2) as usize {
+            return Err(Error::InvalidArgument);
+        }
 
         let mut ret = self.clone()?;
 

@@ -63,16 +63,16 @@ pub(crate) fn series_cost_optimize<S: ArgReductionEstimator>(
         0
     };
 
-    let mut cost1 = usize::MAX;
+    let mut cost1 = u64::MAX;
 
     loop {
         let m_eff = S::reduction_effect(reduction_times, m);
         let niter = series_niter(p, m_eff) / pwr_step;
         let cost2 = if ext {
-            polycoeff_gen.iter_cost() * niter
+            polycoeff_gen.iter_cost() as u64 * niter as u64
         } else {
             series_cost(niter, p, polycoeff_gen)
-        } + S::reduction_cost(reduction_times, p);
+        } + S::reduction_cost(reduction_times, p) as u64;
 
         if cost2 < cost1 {
             cost1 = cost2;
@@ -118,17 +118,16 @@ fn series_niter(p: usize, m: usize) -> usize {
 /// niter is the estimated number of series iterations
 /// p is the numbers precision
 /// polycoeff_gen is the coefficient generator
-fn series_cost<T: PolycoeffGen>(niter: usize, p: usize, polycoeff_gen: &T) -> usize {
+fn series_cost<T: PolycoeffGen>(niter: usize, p: usize, polycoeff_gen: &T) -> u64 {
     let cost_mul = calc_mul_cost(p);
     let cost_add = calc_add_cost(p);
-
-    let cost = niter * (cost_mul + cost_add + polycoeff_gen.iter_cost());
+    let cost = niter as u64 * (cost_mul + cost_add + polycoeff_gen.iter_cost()) as u64;
 
     if niter >= RECT_ITER_THRESHOLD {
         // niter * (cost(mul) + cost(add) + cost(polcoeff_gen.next)) + sqrt(niter) * cost(mul)
         // + niter / 10 * (2 * cost(mul) + cost(add) + cost(polcoeff_gen.next))
-        cost + sqrt_int(niter as u32) as usize * cost_mul
-            + niter / 10 * ((cost_mul << 1) + cost_add + polycoeff_gen.iter_cost())
+        cost + sqrt_int(niter as u32) as u64 * cost_mul as u64
+            + niter  as u64 / 10 * ((cost_mul << 1) + cost_add + polycoeff_gen.iter_cost()) as u64
     } else {
         // niter * (cost(mul) + cost(add) + cost(polycoeff_gen.next))
         cost
