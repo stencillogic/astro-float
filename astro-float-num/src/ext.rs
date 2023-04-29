@@ -2334,13 +2334,20 @@ mod tests {
 mod rand_tests {
 
     use super::*;
-    use crate::{defs::{EXPONENT_MAX}, EXPONENT_MIN};
+    use crate::defs::{EXPONENT_MAX};
 
     #[test]
     fn test_rand() {
         for _ in 0..1000 {
             let p = rand::random::<usize>() % 1000 + DEFAULT_P;
-            let exp_from = rand::random::<Exponent>() % (EXPONENT_MAX - EXPONENT_MIN) + EXPONENT_MIN;
+            let exp_from;
+            #[cfg(target_arch="x86_64")] {
+                exp_from = rand::random::<Exponent>();
+            }
+            #[cfg(target_arch="x86")] {
+                use crate::defs::EXPONENT_MIN;
+                exp_from = rand::random::<Exponent>() % (EXPONENT_MAX - EXPONENT_MIN) + EXPONENT_MIN;
+            }
             let exp_shift = if EXPONENT_MAX > exp_from {
                 rand::random::<Exponent>().abs()
                     % (EXPONENT_MAX as isize - exp_from as isize) as Exponent

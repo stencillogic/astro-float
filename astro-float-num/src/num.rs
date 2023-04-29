@@ -1604,8 +1604,6 @@ mod tests {
     #[cfg(not(feature = "std"))]
     use alloc::format;
 
-    const EXP_BIT_SZ: usize = core::mem::size_of::<Exponent>() * 8;
-
     #[test]
     fn test_number() {
         let p_rng = 10;
@@ -2791,7 +2789,7 @@ mod tests {
                 [0x80000000u32, 0x80000001u32]
             );
         }
-        assert_eq!(d1.exponent(), EXPONENT_MAX - EXP_BIT_SZ as Exponent + 1);
+        assert_eq!(d1.exponent(), EXPONENT_MAX - WORD_BIT_SIZE as Exponent + 1);
         assert_eq!(d1.precision(), WORD_BIT_SIZE * 2);
         assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
         assert_eq!(d1.sign(), Sign::Pos);
@@ -2799,7 +2797,7 @@ mod tests {
         let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Neg, EXPONENT_MIN).unwrap();
         assert_eq!(d1.mantissa().digits(), [3, 1]);
         assert_eq!(d1.exponent(), EXPONENT_MIN);
-        assert_eq!(d1.precision(), EXP_BIT_SZ + 1);
+        assert_eq!(d1.precision(), WORD_BIT_SIZE + 1);
         assert_eq!(d1.mantissa_max_bit_len(), WORD_BIT_SIZE * 2);
         assert_eq!(d1.sign(), Sign::Neg);
 

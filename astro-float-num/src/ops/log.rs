@@ -464,10 +464,10 @@ mod tests {
         let mut eps = ONE.clone().unwrap();
 
         let d1 = BigFloatNumber::max_value(prec).unwrap();
-        let d2 = d1.ln(prec, RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = d2.exp(prec, RoundingMode::ToEven, &mut cc).unwrap();
+        let d2 = d1.ln(prec, RoundingMode::Down, &mut cc).unwrap();
+        let d3 = d2.exp(prec, RoundingMode::Down, &mut cc).unwrap();
         eps.set_exponent(
-            d1.exponent() - prec as Exponent
+            d1.exponent() - prec as Exponent + 1
                 + log2_ceil(d1.exponent().unsigned_abs() as usize) as Exponent,
         );
 
