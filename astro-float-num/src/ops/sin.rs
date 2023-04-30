@@ -81,12 +81,12 @@ struct SinArgReductionEstimator {}
 
 impl ArgReductionEstimator for SinArgReductionEstimator {
     /// Estimates cost of reduction n times for number with precision p.
-    fn reduction_cost(n: usize, p: usize) -> usize {
+    fn reduction_cost(n: usize, p: usize) -> u64 {
         let cost_mul = calc_mul_cost(p);
         let cost_add = calc_add_cost(p);
         let cost_mul2 = calc_mul_cost(THREE.mantissa_max_bit_len());
 
-        n * (2 * cost_mul + 3 * cost_add + cost_mul2)
+        n as u64 * (2 * cost_mul + 3 * cost_add + cost_mul2) as u64
     }
 
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.

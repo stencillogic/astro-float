@@ -6,6 +6,7 @@ use std::ops::Add;
 use crate::mpfr::common::get_prec_rng;
 use crate::mpfr::common::test_astro_op;
 use crate::mpfr::common::{assert_float_close, get_float_pair, get_random_rnd_pair};
+use astro_float_num::Word;
 use astro_float_num::{BigFloat, Consts, Exponent, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
 use gmp_mpfr_sys::{gmp::exp_t, mpfr};
 use rand::random;
@@ -238,7 +239,7 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
 
         let mut f3 = Float::with_val(p as u32, 1);
 
-        unsafe { mpfr::pow_ui(f3.as_raw_mut(), f1.as_raw(), i as u64, rnd) };
+        unsafe { mpfr::pow_ui(f3.as_raw_mut(), f1.as_raw(), i as Word, rnd) };
 
         // println!("\n{}", i);
         // println!("{:b}\n{}", n1, f1.to_string_radix(2, None));

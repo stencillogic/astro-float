@@ -36,7 +36,7 @@ pub(crate) trait PolycoeffGen {
 /// Estimate how argument reduction influences cost.
 pub trait ArgReductionEstimator {
     /// Estimates cost of reduction n times for number with precision p.
-    fn reduction_cost(n: usize, p: usize) -> usize;
+    fn reduction_cost(n: usize, p: usize) -> u64;
 
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
     fn reduction_effect(n: usize, m: isize) -> usize;
@@ -127,7 +127,7 @@ fn series_cost<T: PolycoeffGen>(niter: usize, p: usize, polycoeff_gen: &T) -> u6
         // niter * (cost(mul) + cost(add) + cost(polcoeff_gen.next)) + sqrt(niter) * cost(mul)
         // + niter / 10 * (2 * cost(mul) + cost(add) + cost(polcoeff_gen.next))
         cost + sqrt_int(niter as u32) as u64 * cost_mul as u64
-            + niter  as u64 / 10 * ((cost_mul << 1) + cost_add + polycoeff_gen.iter_cost()) as u64
+            + niter as u64 / 10 * ((cost_mul << 1) + cost_add + polycoeff_gen.iter_cost()) as u64
     } else {
         // niter * (cost(mul) + cost(add) + cost(polycoeff_gen.next))
         cost

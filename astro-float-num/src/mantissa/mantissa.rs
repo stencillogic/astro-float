@@ -676,7 +676,7 @@ impl Mantissa {
         let nd = m.len() - size_of::<u64>() / size_of::<Word>();
         m[..nd].fill(0);
 
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(not(target_arch = "x86"))]
         {
             m[nd] = u;
         }
@@ -723,7 +723,7 @@ impl Mantissa {
 
     #[cfg(test)]
     pub fn to_u64(&self) -> u64 {
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(not(target_arch = "x86"))]
         {
             self.m[self.m.len() - 1]
         }

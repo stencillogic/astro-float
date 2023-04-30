@@ -84,11 +84,11 @@ struct CosArgReductionEstimator {}
 
 impl ArgReductionEstimator for CosArgReductionEstimator {
     /// Estimates cost of reduction n times for number with precision p.
-    fn reduction_cost(n: usize, p: usize) -> usize {
+    fn reduction_cost(n: usize, p: usize) -> u64 {
         // n * (cost(add) + cost(mul))
         let cost_mul = calc_mul_cost(p);
         let cost_add = calc_add_cost(p);
-        n * (cost_mul + cost_add)
+        n as u64 * (cost_mul + cost_add) as u64
     }
 
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.

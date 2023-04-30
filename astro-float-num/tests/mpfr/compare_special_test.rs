@@ -8,7 +8,9 @@ use crate::mpfr::common::{
     get_periodic, get_random_rnd_pair,
 };
 use crate::mpfr::common::{get_prec_rng, test_astro_op};
-use astro_float_num::{BigFloat, Consts, Exponent, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
+use astro_float_num::{
+    BigFloat, Consts, Exponent, Word, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE,
+};
 use gmp_mpfr_sys::{gmp::exp_t, mpfr};
 use rand::random;
 use rug::{
@@ -320,7 +322,7 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
 
                 let mut f3 = Float::with_val(p as u32, 1);
 
-                unsafe { mpfr::pow_ui(f3.as_raw_mut(), f.as_raw(), i as u64, rnd) };
+                unsafe { mpfr::pow_ui(f3.as_raw_mut(), f.as_raw(), i as Word, rnd) };
 
                 assert_float_close(n3, f3, p, &format!("{:?}", (n, i, p, rm, "powi")), true);
             }

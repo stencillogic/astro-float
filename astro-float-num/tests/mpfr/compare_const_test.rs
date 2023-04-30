@@ -86,7 +86,17 @@ fn mpfr_compare_const() {
     }
 
     // large prec
-    let p = 1000000;
+    let p;
+    #[cfg(not(debug_assertions))]
+    {
+        p = 1000000;
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        p = 10048;
+    }
+
     let mut cc = Consts::new().unwrap();
     let rm = RoundingMode::ToEven;
     let rnd = rnd_t::RNDN;

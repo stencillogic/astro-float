@@ -34,7 +34,8 @@ impl BigFloatNumber {
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
-    ///  - InvalidArgument: the precision is incorrect, or `digits` contains unacceptable digits for given radix.
+    ///  - InvalidArgument: the precision is incorrect, or `digits` contains unacceptable digits for given radix,
+    /// or when `e` is less than EXPONENT_MIN or greater than EXPONENT_MAX.
     pub fn convert_from_radix(
         sign: Sign,
         digits: &[u8],
@@ -48,6 +49,10 @@ impl BigFloatNumber {
 
         if p == 0 {
             return Self::new(0);
+        }
+
+        if e < EXPONENT_MIN || e > EXPONENT_MAX {
+            return Err(Error::InvalidArgument);
         }
 
         match rdx {
@@ -226,8 +231,10 @@ impl BigFloatNumber {
         // mantissa part
         let leadzeroes = digits.iter().take_while(|&&x| x == 0).count();
 
-        let pf =
-            round_p((((digits.len() - leadzeroes) as u64 * 3321928095 / 1000000000) as usize).max(p) + WORD_BIT_SIZE);
+        let pf = round_p(
+            (((digits.len() - leadzeroes) as u64 * 3321928095 / 1000000000) as usize).max(p)
+                + WORD_BIT_SIZE,
+        );
 
         let mut f = Self::new(pf)?;
 
@@ -614,7 +621,13 @@ mod tests {
             .unwrap();
             let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).unwrap();
 
-            assert_eq!(m, [5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 2]);
+            assert_eq!(
+                m,
+                [
+                    5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+                    9, 9, 9, 2
+                ]
+            );
             assert!(s == Sign::Pos);
             assert!(e == 0);
 
@@ -734,15 +747,15 @@ mod tests {
 
             let (s1, m1, e1) = n.convert_to_radix(rdx, RoundingMode::ToEven).unwrap();
 
-            println!("\n{:?}", rdx);
-            println!("{:?} {:?} {}", s1, m1, e1);
+            //println!("\n{:?}", rdx);
+            //println!("{:?} {:?} {}", s1, m1, e1);
 
             let mut g =
                 BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, RoundingMode::ToEven)
                     .unwrap();
 
-            println!("\n{:?}", rdx);
-            println!("{:?} {:?} {}", s1, m1, e1);
+            //println!("\n{:?}", rdx);
+            //println!("{:?} {:?} {}", s1, m1, e1);
             //println!("{:?}\n{:?}", n, g);
 
             if rdx == Radix::Dec {

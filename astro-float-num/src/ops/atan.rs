@@ -63,11 +63,11 @@ struct AtanArgReductionEstimator {}
 
 impl ArgReductionEstimator for AtanArgReductionEstimator {
     /// Estimates cost of reduction n times for number with precision p.
-    fn reduction_cost(n: usize, p: usize) -> usize {
+    fn reduction_cost(n: usize, p: usize) -> u64 {
         let cost_mul = calc_mul_cost(p);
         let cost_add = calc_add_cost(p);
         let sqrt_cost = calc_sqrt_cost(p, cost_mul, cost_add);
-        n * (2 * (cost_mul + cost_add) + sqrt_cost)
+        n as u64 * (2 * (cost_mul + cost_add) + sqrt_cost) as u64
     }
 
     /// Given m, the negative power of 2 of a number, returns the negative power of 2 if reduction is applied n times.
