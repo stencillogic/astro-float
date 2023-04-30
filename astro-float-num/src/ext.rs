@@ -1,4 +1,4 @@
-//! BigFloat including finite numbers, `NaN`, and `Inf`.
+//! BigFloat including finite numbers, NaN, and `Inf`.
 
 use crate::defs::SignedWord;
 use crate::defs::DEFAULT_P;
@@ -57,14 +57,14 @@ enum Flavor {
 
 impl BigFloat {
     /// Returns a new number with value of 0 and precision of `p` bits. Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn new(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::new(p), false, true)
     }
 
     /// Constructs a number with precision `p` from f64 value.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn from_f64(f: f64, p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::from_f64(p, f), false, true)
     }
@@ -77,7 +77,7 @@ impl BigFloat {
 
     /// Constructs a number with precision `p` from f32 value.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn from_f32(f: f32, p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::from_f64(p, f as f64), false, true)
     }
@@ -111,7 +111,7 @@ impl BigFloat {
         }
     }
 
-    /// Returns the associated with `NaN` error, if any.
+    /// Returns the associated with NaN error, if any.
     pub fn err(&self) -> Option<Error> {
         match &self.inner {
             Flavor::NaN(Some(e)) => Some(*e),
@@ -121,7 +121,7 @@ impl BigFloat {
 
     /// Adds `d2` to `self` and returns the result of the operation with precision `p` rounded according to `rm`.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn add(&self, d2: &Self, p: usize, rm: RoundingMode) -> Self {
         self.add_op(d2, p, rm, false)
     }
@@ -167,7 +167,7 @@ impl BigFloat {
 
     /// Subtracts `d2` from `self` and returns the result of the operation with precision `p` rounded according to `rm`.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn sub(&self, d2: &Self, p: usize, rm: RoundingMode) -> Self {
         self.sub_op(d2, p, rm, false)
     }
@@ -217,7 +217,7 @@ impl BigFloat {
 
     /// Multiplies `d2` by `self` and returns the result of the operation with precision `p` rounded according to `rm`.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn mul(&self, d2: &Self, p: usize, rm: RoundingMode) -> Self {
         self.mul_op(d2, p, rm, false)
     }
@@ -280,7 +280,7 @@ impl BigFloat {
 
     /// Divides `self` by `d2` and returns the result of the operation with precision `p` rounded according to `rm`.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn div(&self, d2: &Self, p: usize, rm: RoundingMode) -> Self {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
@@ -374,7 +374,7 @@ impl BigFloat {
     /// Compute the power of `self` to the `n` with precision `p`. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn pow(&self, n: &Self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v1) => {
@@ -434,7 +434,7 @@ impl BigFloat {
 
     /// Compute the power of `self` to the integer `n` with precision `p`. The result is rounded using the rounding mode `rm`.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn powi(&self, n: usize, p: usize, rm: RoundingMode) -> Self {
         match &self.inner {
             Flavor::Value(v1) => Self::result_to_ext(v1.powi(n, p, rm), false, true),
@@ -455,7 +455,7 @@ impl BigFloat {
     /// Computes the logarithm base `n` of a number with precision `p`. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn log(&self, n: &Self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v1) => {
@@ -673,7 +673,7 @@ impl BigFloat {
     /// Precision is rounded upwards to the word size.
     /// Function does not follow any specific distribution law.
     /// The intended use of this function is for testing.
-    /// The function returns `NaN` if the precision `p` is incorrect or when `exp_from` is less than EXPONENT_MIN or `exp_to` is greater than EXPONENT_MAX.
+    /// The function returns NaN if the precision `p` is incorrect or when `exp_from` is less than EXPONENT_MIN or `exp_to` is greater than EXPONENT_MAX.
     #[cfg(feature = "random")]
     pub fn random_normal(p: usize, exp_from: Exponent, exp_to: Exponent) -> Self {
         Self::result_to_ext(
@@ -703,7 +703,7 @@ impl BigFloat {
     /// Computes the arctangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn atan(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v) => Self::result_to_ext(v.atan(p, rm, cc), v.is_zero(), true),
@@ -715,7 +715,7 @@ impl BigFloat {
     /// Computes the hyperbolic tangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
     /// This function requires constants cache `cc` for computing the result.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn tanh(&self, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
         match &self.inner {
             Flavor::Value(v) => Self::result_to_ext(v.tanh(p, rm, cc), v.is_zero(), true),
@@ -791,13 +791,13 @@ impl BigFloat {
     /// Returns the maximum value for the specified precision `p`: all bits of the mantissa are set to 1,
     /// the exponent has the maximum possible value, and the sign is positive.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn max_value(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::max_value(p), false, true)
     }
 
     /// Returns the minimum value for the specified precision `p`: all bits of the mantissa are set to 1, the exponent has the maximum possible value, and the sign is negative. Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn min_value(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::min_value(p), false, true)
     }
@@ -806,7 +806,7 @@ impl BigFloat {
     /// only the least significant bit of the mantissa is set to 1, the exponent has
     /// the minimum possible value, and the sign is positive.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn min_positive(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::min_positive(p), false, true)
     }
@@ -815,13 +815,13 @@ impl BigFloat {
     /// only the most significant bit of the mantissa is set to 1, the exponent has
     /// the minimum possible value, and the sign is positive.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn min_positive_normal(p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::min_positive_normal(p), false, true)
     }
 
     /// Returns a new number with value `d` and the precision `p`. Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn from_word(d: Word, p: usize) -> Self {
         Self::result_to_ext(BigFloatNumber::from_word(d, p), false, true)
     }
@@ -945,7 +945,7 @@ impl BigFloat {
     /// Computes the reciprocal of a number with precision `p`.
     /// The result is rounded using the rounding mode `rm`.
     /// Precision is rounded upwards to the word size.
-    /// The function returns `NaN` if the precision `p` is incorrect.
+    /// The function returns NaN if the precision `p` is incorrect.
     pub fn reciprocal(&self, p: usize, rm: RoundingMode) -> Self {
         match &self.inner {
             Flavor::Value(v) => Self::result_to_ext(v.reciprocal(p, rm), false, v.is_positive()),
@@ -1215,7 +1215,7 @@ impl BigFloat {
     );
     gen_wrapper_arg_rm!(
         "Computes the square root of a number with precision `p`. The result is rounded using the rounding mode `rm`.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         sqrt,
         Self,
         { INF_POS },
@@ -1225,7 +1225,7 @@ impl BigFloat {
     );
     gen_wrapper_arg_rm!(
         "Computes the cube root of a number with precision `p`. The result is rounded using the rounding mode `rm`.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         cbrt,
         Self,
         { INF_POS },
@@ -1236,7 +1236,7 @@ impl BigFloat {
     gen_wrapper_log!(
         "Computes the natural logarithm of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         ln,
         Self,
         { INF_POS },
@@ -1247,7 +1247,7 @@ impl BigFloat {
     gen_wrapper_log!(
         "Computes the logarithm base 2 of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         log2,
         Self,
         { INF_POS },
@@ -1258,7 +1258,7 @@ impl BigFloat {
     gen_wrapper_log!(
         "Computes the logarithm base 10 of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         log10,
         Self,
         { INF_POS },
@@ -1269,7 +1269,7 @@ impl BigFloat {
     gen_wrapper_arg_rm_cc!(
         "Computes `e` to the power of `self` with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         exp,
         Self,
         { INF_POS },
@@ -1281,7 +1281,7 @@ impl BigFloat {
     gen_wrapper_arg_rm_cc!(
         "Computes the sine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         sin,
         Self,
         { NAN },
@@ -1292,7 +1292,7 @@ impl BigFloat {
     gen_wrapper_arg_rm_cc!(
         "Computes the cosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         cos,
         Self,
         { NAN },
@@ -1303,7 +1303,7 @@ impl BigFloat {
     gen_wrapper_arg_rm_cc!(
         "Computes the tangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         tan,
         Self,
         { NAN },
@@ -1314,7 +1314,7 @@ impl BigFloat {
     gen_wrapper_arg_rm_cc!(
         "Computes the arcsine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.", 
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.", 
         asin,
         Self,
         {NAN},
@@ -1325,7 +1325,7 @@ impl BigFloat {
     gen_wrapper_arg_rm_cc!(
         "Computes the arccosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         acos,
         Self,
         { NAN },
@@ -1337,7 +1337,7 @@ impl BigFloat {
     gen_wrapper_arg_rm_cc!(
         "Computes the hyperbolic sine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache cc for computing the result. 
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         sinh,
         Self,
         { INF_POS },
@@ -1348,7 +1348,7 @@ impl BigFloat {
     gen_wrapper_arg_rm_cc!(
         "Computes the hyperbolic cosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache cc for computing the result. 
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         cosh,
         Self,
         { INF_POS },
@@ -1359,7 +1359,7 @@ impl BigFloat {
     gen_wrapper_arg_rm_cc!(
         "Computes the hyperbolic arcsine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         asinh,
         Self,
         { INF_POS },
@@ -1370,7 +1370,7 @@ impl BigFloat {
     gen_wrapper_arg_rm_cc!(
         "Computes the hyperbolic arccosine of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         acosh,
         Self,
         { BigFloat::new(1) },
@@ -1381,7 +1381,7 @@ impl BigFloat {
     gen_wrapper_arg_rm_cc!(
         "Computes the hyperbolic arctangent of a number with precision `p`. The result is rounded using the rounding mode `rm`.
         This function requires constants cache `cc` for computing the result.
-        Precision is rounded upwards to the word size. The function returns `NaN` if the precision `p` is incorrect.",
+        Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         atanh,
         Self,
         { BigFloat::new(1) },
@@ -1396,7 +1396,7 @@ macro_rules! impl_int_conv {
         impl BigFloat {
             /// Constructs BigFloat with precision `p` from an integer value `i`.
             /// Precision is rounded upwards to the word size.
-            /// The function returns `NaN` if the precision `p` is incorrect.
+            /// The function returns NaN if the precision `p` is incorrect.
             pub fn $from_s(i: $s, p: usize) -> Self {
                 Self::result_to_ext(BigFloatNumber::$from_s(i, p), false, true)
             }
