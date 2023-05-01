@@ -1,6 +1,31 @@
+[package]
+name = "astro-float"
+version = "0.6.9"
+edition = "2021"
+authors = ["stencillogic <stencillogic@gmail.com>"]
+license = "MIT"
+description = "Multiple precision floating point numbers implemented purely in Rust."
+categories = ["algorithms", "data-structures", "science"]
+keywords = ["bigfloat", "numeric", "mathematics", "bignum"]
+readme = "README.md"
+repository = "https://github.com/stencillogic/astro-float"
+
+[dependencies]
+astro-float-num = "0.1.7"
+astro-float-macro = "0.1.8"
+
+[features]
+default = ["std", "random", "serde"]
+std = []
+random = ["astro-float-num/random"]
+serde = ["astro-float-num/serde"]
+
+[dev-dependencies]
+trybuild = "1.0"
+rusty-hook = "0.11.2"
+
 [workspace]
 members = [
-    "astro-float",
     "astro-float-num",
     "astro-float-macro",
 ]
