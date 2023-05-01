@@ -188,7 +188,6 @@ pub fn shift_slice_left(m: &mut [Word], n: usize) {
         let l = m.len() - 1;
         let end = m.as_mut_ptr();
         unsafe {
-            // use of slices is almost 50% slower
             let mut dst = end.add(l);
             let mut src = end.add(l - idx);
             loop {
@@ -255,7 +254,6 @@ pub fn shift_slice_right(m: &mut [Word], n: usize) {
         let l = m.len();
         let mut dst = m.as_mut_ptr();
         unsafe {
-            // use of slices is almost 50% slower
             let end = dst.add(l - 1);
             let mut src = dst.add(idx);
             loop {
