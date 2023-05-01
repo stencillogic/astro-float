@@ -896,10 +896,12 @@ fn test_tanh_atanh() {
     let mut cc = Consts::new().unwrap();
 
     let exp_to;
-    #[cfg(not(target_arch = "x86"))] {
+    #[cfg(not(target_arch = "x86"))]
+    {
         exp_to = 5;
     }
-    #[cfg(target_arch = "x86")] {
+    #[cfg(target_arch = "x86")]
+    {
         exp_to = 3;
     }
 
