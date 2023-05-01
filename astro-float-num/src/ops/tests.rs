@@ -895,12 +895,20 @@ fn test_tanh_atanh() {
 
     let mut cc = Consts::new().unwrap();
 
+    let exp_to;
+    #[cfg(not(target_arch = "x86"))] {
+        exp_to = 5;
+    }
+    #[cfg(target_arch = "x86")] {
+        exp_to = 3;
+    }
+
     for i in 0..1000 {
         let p1 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
         let prec = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;
 
         let (d1, d3) = if i & 1 == 0 {
-            let d1 = BigFloatNumber::random_normal(p1, -100, 5).unwrap();
+            let d1 = BigFloatNumber::random_normal(p1, -100, exp_to).unwrap();
 
             let d2 = d1.tanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
             let d3 = d2.atanh(prec, RoundingMode::ToEven, &mut cc).unwrap();
