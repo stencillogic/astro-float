@@ -166,7 +166,7 @@ impl BigFloatNumber {
     }
 
     pub(crate) fn from_u64_internal(d: u64, p: usize) -> Result<Self, Error> {
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(not(target_arch = "x86"))]
         {
             Self::from_word(d, p)
         }
@@ -547,7 +547,7 @@ impl BigFloatNumber {
         if self.is_subnormal() {
             let (shift, mantissa) = self.m.normilize()?;
 
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(not(target_arch = "x86"))]
             {
                 // checks for the case when usize is larger than exponent
                 debug_assert!((shift as isize) < (isize::MAX as isize / 2 + EXPONENT_MIN as isize));
@@ -669,7 +669,7 @@ impl BigFloatNumber {
 
         d3.inexact |= inexact;
 
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(not(target_arch = "x86"))]
         {
             debug_assert!(shift <= isize::MAX / 2 && e >= isize::MIN as isize / 2);
         }
@@ -2268,7 +2268,7 @@ mod tests {
             .unwrap();
 
         let words = {
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(not(target_arch = "x86"))]
             {
                 [
                     12297829382473034411,
@@ -2292,7 +2292,7 @@ mod tests {
             .unwrap();
 
         let words = {
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(not(target_arch = "x86"))]
             {
                 [12297829382473034411, 12297829382473034410, 12297829382473034410]
             }
@@ -2308,7 +2308,7 @@ mod tests {
         d3 = d1.div(&d2, WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
 
         let words = {
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(not(target_arch = "x86"))]
             {
                 [12297829382473034411]
             }
@@ -2384,7 +2384,7 @@ mod tests {
             .unwrap();
 
         let words = {
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(not(target_arch = "x86"))]
             {
                 [
                     12297829382473034411,
@@ -2405,7 +2405,7 @@ mod tests {
         d2 = d1.reciprocal(WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
 
         let words = {
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(not(target_arch = "x86"))]
             {
                 [12297829382473034411]
             }
@@ -2790,7 +2790,7 @@ mod tests {
         assert_eq!(d1.sign(), Sign::Neg);
 
         let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Pos, EXPONENT_MAX).unwrap();
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(not(target_arch = "x86"))]
         {
             assert_eq!(
                 d1.mantissa().digits(),
@@ -2821,7 +2821,7 @@ mod tests {
         assert_eq!(d1.sign(), Sign::Pos);
 
         let words = {
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(not(target_arch = "x86"))]
             {
                 [3, 0x8000000000000000u64]
             }
@@ -2862,7 +2862,7 @@ mod tests {
         // 1 1001
 
         let mantissas = {
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(not(target_arch = "x86"))]
             {
                 [
                     [0x8000000000000000u64, 0x8000000000000000u64],
@@ -2887,7 +2887,7 @@ mod tests {
         };
 
         let rounding_results_posnum = {
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(not(target_arch = "x86"))]
             {
                 [
                     (RoundingMode::None, mantissas),
@@ -3034,7 +3034,7 @@ mod tests {
         };
 
         let rounding_results_negnum = {
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(not(target_arch = "x86"))]
             {
                 [
                     (RoundingMode::None, mantissas),

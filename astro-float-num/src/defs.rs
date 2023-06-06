@@ -9,15 +9,15 @@ use std::collections::TryReserveError;
 use alloc::collections::TryReserveError;
 
 /// A word.
-#[cfg(target_arch = "x86_64")]
+#[cfg(not(target_arch = "x86"))]
 pub type Word = u64;
 
 /// Doubled word.
-#[cfg(target_arch = "x86_64")]
+#[cfg(not(target_arch = "x86"))]
 pub type DoubleWord = u128;
 
 /// Word with sign.
-#[cfg(target_arch = "x86_64")]
+#[cfg(not(target_arch = "x86"))]
 pub type SignedWord = i128;
 
 /// A word.
@@ -36,7 +36,7 @@ pub type SignedWord = i64;
 pub type Exponent = i32;
 
 /// Maximum exponent value.
-#[cfg(target_arch = "x86_64")]
+#[cfg(not(target_arch = "x86"))]
 pub const EXPONENT_MAX: Exponent = Exponent::MAX;
 
 /// Maximum exponent value.
@@ -44,7 +44,7 @@ pub const EXPONENT_MAX: Exponent = Exponent::MAX;
 pub const EXPONENT_MAX: Exponent = Exponent::MAX / 4;
 
 /// Minimum exponent value.
-#[cfg(target_arch = "x86_64")]
+#[cfg(not(target_arch = "x86"))]
 pub const EXPONENT_MIN: Exponent = Exponent::MIN;
 
 /// Minimum exponent value.

@@ -637,7 +637,7 @@ mod tests {
             assert!(g.cmp(&n) == 0);
         }
 
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(not(target_arch = "x86"))]
         {
             let n = BigFloatNumber::from_raw_parts(
                 &[0x9999999999999999, 0x9999999999999999, 0x9999999999999999],

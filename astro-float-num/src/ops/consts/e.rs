@@ -156,7 +156,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(not(target_arch = "x86"))]
     fn test_e_const() {
         let mut e = ECache::new().unwrap();
         let c = e.for_prec(320, RoundingMode::ToEven).unwrap();

@@ -174,7 +174,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(not(target_arch = "x86"))]
     fn test_pi_const() {
         let mut pi = PiCache::new().unwrap();
         let c = pi.for_prec(320, RoundingMode::ToEven).unwrap();

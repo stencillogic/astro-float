@@ -385,7 +385,7 @@ mod tests {
 
         // large exp
         let numstr;
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(not(target_arch = "x86"))]
         {
             numstr = "abc.def09123e_e+7FFFFFFF";
         }
@@ -398,7 +398,7 @@ mod tests {
         assert!(ps.sign().is_positive());
 
         let numstr;
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(not(target_arch = "x86"))]
         {
             numstr = "-abc.def09123e_e+7FFFFFFF";
         }
@@ -421,7 +421,7 @@ mod tests {
         assert!(ps.sign().is_negative());
 
         let numstr;
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(not(target_arch = "x86"))]
         {
             numstr = "0.0000abc_e+7FFFFFFF";
         }
@@ -434,7 +434,7 @@ mod tests {
         assert!(!ps.is_nan());
         let (m, _s, e) = ps.raw_parts();
         assert_eq!(m, [0, 0, 0, 0, 0xa, 0xb, 0xc]);
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(not(target_arch = "x86"))]
         {
             assert_eq!(e, 0x7FFFFFFF);
         }
@@ -452,7 +452,7 @@ mod tests {
         assert!(e == 0);
 
         let numstr;
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(not(target_arch = "x86"))]
         {
             numstr = "0.0000abcdef09123e_e-80000000";
         }
@@ -468,7 +468,7 @@ mod tests {
             m,
             [0, 0, 0, 0, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x0, 0x9, 0x1, 0x2, 0x3, 0xe]
         );
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(not(target_arch = "x86"))]
         {
             assert_eq!(e, -0x80000000);
         }

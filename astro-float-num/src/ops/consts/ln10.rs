@@ -153,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(not(target_arch = "x86"))]
     fn test_ln10_const() {
         let mut ln10 = Ln10Cache::new().unwrap();
         let c = ln10.for_prec(320, RoundingMode::ToEven).unwrap();

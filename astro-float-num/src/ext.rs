@@ -2082,7 +2082,7 @@ mod tests {
         let d1 = ONE.clone();
         assert!(d1.exponent() == Some(1));
         let words: &[Word] = {
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(not(target_arch = "x86"))]
             {
                 &[0, 0x8000000000000000]
             }
@@ -2369,7 +2369,7 @@ mod rand_tests {
         for _ in 0..1000 {
             let p = rand::random::<usize>() % 1000 + DEFAULT_P;
             let exp_from;
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(not(target_arch = "x86"))]
             {
                 exp_from = rand::random::<Exponent>().abs();
             }
