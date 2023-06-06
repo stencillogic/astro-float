@@ -117,7 +117,7 @@ pub fn calc_sqrt_cost(p: usize, cost_mul: usize, cost_add: usize) -> usize {
 
 #[inline(always)]
 pub fn add_carry(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
-    #[cfg(not(target_arch = "x86"))]
+    #[cfg(target_arch = "x86_64")]
     {
         // platform-specific operation
         unsafe { core::arch::x86_64::_addcarry_u64(c as u8, a, b, r) as Word }
@@ -148,7 +148,7 @@ pub fn add_carry(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
 
 #[inline(always)]
 pub fn sub_borrow(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
-    #[cfg(not(target_arch = "x86"))]
+    #[cfg(target_arch = "x86_64")]
     {
         // platform-specific operation
         unsafe { core::arch::x86_64::_subborrow_u64(c as u8, a, b, r) as Word }
