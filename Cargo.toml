@@ -1,6 +1,6 @@
 [package]
 name = "astro-float"
-version = "0.6.9"
+version = "0.7.0"
 edition = "2021"
 authors = ["stencillogic <stencillogic@gmail.com>"]
 license = "MIT"

@@ -1,5 +1,14 @@
 # Release notes
 
+**0.7.0**
+
+ - Improved integration tests.
+ - Bug fixes and code refinement.
+ - Improved portability.
+ - Test coverage badge added.
+ - Smallvec replaced with Vec.
+ - Unsafe code revisited.
+
 **0.6.0**
 
  - `expr!` macro implemented.
