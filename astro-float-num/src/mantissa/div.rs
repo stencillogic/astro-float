@@ -192,7 +192,7 @@ impl Mantissa {
 
     // recursive division correction
     fn div_correction(a: &mut SliceWithSign, q: &mut SliceWithSign, step: SliceWithSign) {
-        while a.sign() < 0 {
+        while a.sign() < 0 && !a.is_zero() {
             q.decrement_abs();
             a.add_assign(&step);
         }

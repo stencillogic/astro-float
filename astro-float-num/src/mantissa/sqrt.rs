@@ -105,7 +105,7 @@ impl Mantissa {
 
             shift_slice_left(&mut s2buf, pos);
 
-            // scale dividentaccordingly
+            // scale divident accordingly
             let scale = pos - 1;
 
             rbuf.try_extend_2((rbuf.len() + 1) * WORD_BIT_SIZE)?;
@@ -137,7 +137,7 @@ impl Mantissa {
             r.add_assign(&m0);
             r.sub_assign(&qs);
 
-            if r.sign() < 0 {
+            if r.sign() < 0 && !r.is_zero() {
                 let one = SliceWithSign::new(&[1], 1);
 
                 // r + 2s - 1
