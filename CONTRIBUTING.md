@@ -1,6 +1,6 @@
 The following is information than may be useful for contributors. The information is advisory in nature. The only mandatory requirement is a genuine interest and desire to participate from the contributor.
 
-Primary communication means are [discord](https://discord.gg/R9Md3kxhR7) and project's [github](https://docs.rs/astro-float/latest/astro_float).
+All communication is held in [issues](https://github.com/stencillogic/astro-float/issues) and [PRs](https://github.com/stencillogic/astro-float/pulls).
 
 There are several ways to contribute to the project. The list includes, but is not limited by:
 
