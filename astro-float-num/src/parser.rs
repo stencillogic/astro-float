@@ -87,17 +87,9 @@ pub fn parse(s: &str, rdx: Radix) -> Result<ParserState, Error> {
             ('i', _) => parse_inf(&mut parser_state),
             ('n', _) => parse_nan(&mut parser_state),
             ('.' | '0' | '1', Radix::Bin) => parse_num(&mut parser_state, rdx)?,
-            ('.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7', Radix::Oct) => {
-                parse_num(&mut parser_state, rdx)?
-            }
-            ('.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9', Radix::Dec) => {
-                parse_num(&mut parser_state, rdx)?
-            }
-            (
-                '.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'a' | 'b' | 'c'
-                | 'd' | 'e' | 'f',
-                Radix::Hex,
-            ) => parse_num(&mut parser_state, rdx)?,
+            ('.' | '0'..='7', Radix::Oct) => parse_num(&mut parser_state, rdx)?,
+            ('.' | '0'..='9', Radix::Dec) => parse_num(&mut parser_state, rdx)?,
+            ('.' | '0'..='9' | 'a'..='f', Radix::Hex) => parse_num(&mut parser_state, rdx)?,
             _ => {}
         };
     }
@@ -219,28 +211,14 @@ fn is_radix_digit(c: char, rdx: Radix) -> bool {
     matches!(
         (rdx, c),
         (Radix::Bin, '0' | '1')
-            | (Radix::Oct, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7')
+            | (Radix::Oct, '0'..='7')
             | (
                 Radix::Dec,
-                '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+                '0'..='9'
             )
             | (
                 Radix::Hex,
-                '0' | '1'
-                    | '2'
-                    | '3'
-                    | '4'
-                    | '5'
-                    | '6'
-                    | '7'
-                    | '8'
-                    | '9'
-                    | 'a'
-                    | 'b'
-                    | 'c'
-                    | 'd'
-                    | 'e'
-                    | 'f'
+                '0'..='9' | 'a'..='f'
             )
     )
 }
