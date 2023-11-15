@@ -27,6 +27,9 @@ mod ops;
 mod parser;
 mod strop;
 
+#[doc(hidden)]
+pub mod macro_util;
+
 pub use crate::defs::Error;
 pub use crate::defs::Exponent;
 pub use crate::defs::Radix;
@@ -42,6 +45,7 @@ pub use crate::ops::consts::Consts;
 
 pub use crate::defs::EXPONENT_MAX;
 pub use crate::defs::EXPONENT_MIN;
+pub use crate::defs::EXPONENT_BIT_SIZE;
 pub use crate::defs::WORD_BASE;
 pub use crate::defs::WORD_BIT_SIZE;
 pub use crate::defs::WORD_MAX;

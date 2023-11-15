@@ -69,6 +69,9 @@ pub const DEFAULT_RM: RoundingMode = RoundingMode::ToEven;
 /// Default precision.
 pub const DEFAULT_P: usize = 128;
 
+/// The size of exponent type in bits.
+pub const EXPONENT_BIT_SIZE: usize = core::mem::size_of::<Exponent>() * 8;
+
 /// Sign.
 #[derive(PartialEq, Eq, Copy, Clone, Debug, Hash)]
 pub enum Sign {
