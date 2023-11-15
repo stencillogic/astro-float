@@ -2,7 +2,6 @@
 
 use crate::{BigFloat, RoundingMode};
 
-
 /// Computes error for BigFloat values near 1. This function is for internal use by macro `expr`.
 pub fn compute_added_err_near_one(arg: &BigFloat, p: usize) -> usize {
     let d: BigFloat;
@@ -31,17 +30,24 @@ pub fn compute_added_err_near_one(arg: &BigFloat, p: usize) -> usize {
     return 0;
 }
 
-
 #[cfg(test)]
 mod tests {
 
-    use crate::{WORD_SIGNIFICANT_BIT, Sign, WORD_MAX, WORD_BIT_SIZE, Exponent, Word, INF_POS, INF_NEG, NAN};
+    use crate::{
+        Exponent, Sign, Word, INF_NEG, INF_POS, NAN, WORD_BIT_SIZE, WORD_MAX, WORD_SIGNIFICANT_BIT,
+    };
 
     use super::*;
 
     fn assert(expected: usize, words: &[Word], s: Sign, e: Exponent, p: usize) {
         let d = BigFloat::from_words(words, s, e);
-        assert_eq!(compute_added_err_near_one(&d, p), expected, "Expected error {} for d = {:?}", expected, d);
+        assert_eq!(
+            compute_added_err_near_one(&d, p),
+            expected,
+            "Expected error {} for d = {:?}",
+            expected,
+            d
+        );
     }
 
     #[test]
@@ -57,8 +63,14 @@ mod tests {
                 }
 
                 // close to 1
-                assert(WORD_BIT_SIZE-1, &[0, 0, WORD_MAX], s, 0, p);
-                assert(WORD_BIT_SIZE-1, &[0, WORD_MAX, WORD_SIGNIFICANT_BIT], s, 1, p);
+                assert(WORD_BIT_SIZE - 1, &[0, 0, WORD_MAX], s, 0, p);
+                assert(
+                    WORD_BIT_SIZE - 1,
+                    &[0, WORD_MAX, WORD_SIGNIFICANT_BIT],
+                    s,
+                    1,
+                    p,
+                );
 
                 // exponent is neither 0 nor 1
                 assert(0, &[0, 123, WORD_MAX], s, -1, p);
@@ -66,13 +78,31 @@ mod tests {
 
                 let mut d = BigFloat::from_words(&[WORD_SIGNIFICANT_BIT], s, 1);
                 d.set_inexact(true);
-                assert_eq!(compute_added_err_near_one(&d, p), p, "Expected error {} for d = {:?}", p, d);
+                assert_eq!(
+                    compute_added_err_near_one(&d, p),
+                    p,
+                    "Expected error {} for d = {:?}",
+                    p,
+                    d
+                );
             }
         }
 
         // inf and nan
-        assert_eq!(compute_added_err_near_one(&INF_POS, 128), 0, "Expected error 0 for INF_POS");
-        assert_eq!(compute_added_err_near_one(&INF_NEG, 128), 0, "Expected error 0 for INF_NEG");
-        assert_eq!(compute_added_err_near_one(&NAN, 128), 0, "Expected error 0 for NAN");
+        assert_eq!(
+            compute_added_err_near_one(&INF_POS, 128),
+            0,
+            "Expected error 0 for INF_POS"
+        );
+        assert_eq!(
+            compute_added_err_near_one(&INF_NEG, 128),
+            0,
+            "Expected error 0 for INF_NEG"
+        );
+        assert_eq!(
+            compute_added_err_near_one(&NAN, 128),
+            0,
+            "Expected error 0 for NAN"
+        );
     }
 }
