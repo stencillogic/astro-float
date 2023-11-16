@@ -499,9 +499,13 @@ impl BigFloatNumber {
         if e1eff > e2eff {
             // (m1 * 2^(e1eff - e2eff)) mod m2 = ((m1 mod m2) * ( 2^(e1eff - e2eff) mod m2 )) mod m2
 
-            let two = Mantissa::from_raw_parts(&[2], 2)?;
-
-            let powm = two.pow_mod((e1eff - e2eff) as usize, m2_normalized)?;
+            let mut two = Mantissa::from_raw_parts(&[2], 2)?;
+            let powm = if (e1eff - e2eff) as usize >= m2_normalized.max_bit_len() {
+                two.pow_mod((e1eff - e2eff) as usize, m2_normalized)?
+            } else {
+                two.pow2((e1eff - e2eff - 1) as usize)?;
+                two // m3 still becomes 0 in rare case when two == m2_normalized
+            };
 
             let m3 = self.m.rem(m2_normalized)?;
 
@@ -2732,6 +2736,14 @@ mod tests {
             );
         }
 
+        // special case rem
+        let d1 = BigFloatNumber::from_words(&[WORD_SIGNIFICANT_BIT], Sign::Pos, 2).unwrap();
+        let d2 = BigFloatNumber::from_words(&[WORD_SIGNIFICANT_BIT], Sign::Pos, 65).unwrap();
+
+        let d3 = d2.rem(&d1).unwrap();
+        assert!(d3.is_zero());
+
+        // is_odd_int
         let d1 = BigFloatNumber::parse("3.0", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
         assert!(d1.is_odd_int());
         let d1 = BigFloatNumber::parse("3.01", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
@@ -3599,6 +3611,50 @@ mod tests {
             }
             let time = start_time.elapsed();
             println!("div {}", time.as_millis());
+        }
+    }
+
+    #[ignore]
+    #[test]
+    #[cfg(feature = "std")]
+    fn rem_perf() {
+        for _ in 0..5 {
+            let mut d1 = vec![];
+            let mut d2 = vec![];
+            let p_rng = 10;
+            let p_min = 1;
+            for _ in 0..100000 {
+                let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+                let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+
+                let d = BigFloatNumber::random_normal(
+                    p1,
+                    EXPONENT_MIN / 2 - p1 as Exponent,
+                    EXPONENT_MAX / 2,
+                )
+                .unwrap()
+                .abs()
+                .unwrap();
+                let de = d.exponent();
+                d1.push(d);
+                d2.push(
+                    BigFloatNumber::random_normal(
+                        p2,
+                        de - (WORD_BIT_SIZE * p_rng) as Exponent,
+                        de + (WORD_BIT_SIZE * p_rng) as Exponent,
+                    )
+                    .unwrap()
+                    .abs()
+                    .unwrap(),
+                );
+            }
+
+            let start_time = std::time::Instant::now();
+            for (d1, d2) in d1.iter().zip(d2.iter()) {
+                let _ = d1.rem(d2);
+            }
+            let time = start_time.elapsed();
+            println!("rem {}", time.as_millis());
         }
     }
 }
