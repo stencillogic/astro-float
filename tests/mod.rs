@@ -425,4 +425,22 @@ fn macro_run_err_test() {
 
     assert_ne!(y1, z);
     assert_eq!(y2, z);
+
+    // assert does not hang when inexact arguments.
+    let x = BigFloat::from_raw_parts(
+        &[9441246966859219331u64, 13943995520284385473u64],
+        128,
+        Sign::Pos,
+        -5,
+        true,
+    );
+    let y = BigFloat::from_raw_parts(
+        &[145249953336295741u64, 9295997013522923649u64],
+        128,
+        Sign::Neg,
+        -3,
+        true,
+    );
+
+    let _ = expr!(y + x, &mut ctx);
 }

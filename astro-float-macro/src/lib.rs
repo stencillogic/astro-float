@@ -384,9 +384,11 @@ fn traverse_paren(expr: &ExprParen, err: &mut Vec<usize>) -> Result<TokenStream,
 }
 
 fn traverse_path(expr: &ExprPath) -> Result<TokenStream, Error> {
-    Ok(
-        quote!(astro_float::BigFloat::from_ext((#expr).clone(), p_wrk, astro_float::RoundingMode::None)),
-    )
+    Ok(quote!({
+        let mut arg = astro_float::BigFloat::from_ext((#expr).clone(), p_wrk, astro_float::RoundingMode::None);
+        arg.set_inexact(false);
+        arg
+    }))
 }
 
 fn traverse_unary(expr: &ExprUnary, err: &mut Vec<usize>) -> Result<TokenStream, Error> {
