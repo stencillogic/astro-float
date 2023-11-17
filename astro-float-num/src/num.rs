@@ -2667,6 +2667,7 @@ mod tests {
             let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
             let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
             let p = p1.max(p2);
+            let e_rng = (p_rng * WORD_BIT_SIZE) as Exponent;
 
             d1 = BigFloatNumber::random_normal(
                 p1,
@@ -2676,7 +2677,7 @@ mod tests {
             .unwrap()
             .abs()
             .unwrap();
-            d2 = BigFloatNumber::random_normal(p2, d1.exponent() - 10, d1.exponent() + 10)
+            d2 = BigFloatNumber::random_normal(p2, d1.exponent() - e_rng, d1.exponent() + e_rng)
                 .unwrap()
                 .abs()
                 .unwrap();
@@ -2685,21 +2686,21 @@ mod tests {
 
             d3 = d1
                 .sub(
-                    &d1.div(&d2, p + 1, RoundingMode::ToEven)
+                    &d1.div(&d2, p + p_rng * WORD_BIT_SIZE, RoundingMode::None)
                         .unwrap()
                         .floor()
                         .unwrap()
-                        .mul(&d2, p + 1, RoundingMode::ToEven)
+                        .mul(&d2, p + p_rng * WORD_BIT_SIZE, RoundingMode::None)
                         .unwrap(),
-                    p + 1,
+                    ret.mantissa_max_bit_len(),
                     RoundingMode::ToEven,
                 )
                 .unwrap();
 
-            // println!("\n{:?}", d1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
-            // println!("{:?}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-            // println!("{:?}", ret.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-            // println!("{:?}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            //println!("\n{:?}", d1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
+            //println!("{:?}", d2.format(crate::Radix::Dec, RoundingMode::None).unwrap());
+            //println!("{:?}", ret.format(crate::Radix::Dec, RoundingMode::None).unwrap());
+            //println!("{:?}", d3.format(crate::Radix::Dec, RoundingMode::None).unwrap());
 
             assert!(ret.sub(&d3, p, RoundingMode::ToEven).unwrap().is_zero());
 
@@ -3622,8 +3623,8 @@ mod tests {
             let mut d1 = vec![];
             let mut d2 = vec![];
             let p_rng = 10;
-            let p_min = 1;
-            for _ in 0..100000 {
+            let p_min = 100;
+            for _ in 0..1000 {
                 let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
                 let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
 

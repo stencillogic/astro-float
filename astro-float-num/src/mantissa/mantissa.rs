@@ -1,6 +1,7 @@
 //! Mantissa of a number.
 
 use crate::common::buf::WordBuf;
+use crate::common::int::SliceWithSign;
 use crate::common::util::add_carry;
 use crate::common::util::find_one_from;
 use crate::common::util::shift_slice_left;
@@ -591,6 +592,7 @@ impl Mantissa {
         }
 
         let mut x = self.clone()?;
+
         while bit_pos > 0 {
             bit_pos -= 1;
 
@@ -624,8 +626,6 @@ impl Mantissa {
 
     // self * m1 mod n
     pub fn mul_mod(&self, m1: &Self, n: &Self) -> Result<Self, Error> {
-        // TODO: consider other methods, e.g. Barrett's
-
         debug_assert!(n.m[n.len() - 1] & WORD_SIGNIFICANT_BIT != 0);
 
         let mut m = Self::reserve_new(self.len() + m1.len())?;
@@ -639,6 +639,45 @@ impl Mantissa {
         let n = Self::find_bit_len(&r);
 
         Ok(Mantissa { m: r, n })
+    }
+
+    // self * m1 mod n, where v = 2^k / n, k = 2*b, b = bitlen(n)
+    #[allow(dead_code)] // does not give performance improvement
+    fn mul_mod_barrett(&self, m1: &Self, v: &Self, n: &Self) -> Result<Self, Error> {
+        let mut m = Self::reserve_new(self.len() + m1.len())?;
+
+        Self::mul_unbalanced(&self.m, &m1.m, &mut m)?;
+
+        m.trunc_leading_zeroes();
+
+        if m.len() > n.len() {
+            let l = m.len() + v.len() - n.len();
+            if l > n.len() {
+                // q = (m / 2^b)*v
+                let mut q = Self::reserve_new(l)?;
+                Self::mul_unbalanced(&m[n.len()..], &v.m, &mut q)?;
+
+                // r = (q / 2^b)*n
+                let mut qn = Self::reserve_new(l)?;
+                Self::mul_unbalanced(&q[n.len()..], &n.m, &mut qn)?;
+
+                // m = m - r
+                let mut mm = SliceWithSign::new_mut(&mut m, 1);
+                let qq = SliceWithSign::new(&qn, 1);
+                mm.sub_assign(&qq);
+            }
+        }
+
+        // while m > n do m -= n
+        let mut mm = SliceWithSign::new_mut(&mut m, 1);
+        let nn = SliceWithSign::new(&n.m, 1);
+        while mm.cmp(&nn) >= 0 {
+            mm.sub_assign(&nn);
+        }
+
+        let bl = Self::find_bit_len(&m);
+
+        Ok(Mantissa { m, n: bl })
     }
 
     // Returns remainder of division of `self` by `n`.
