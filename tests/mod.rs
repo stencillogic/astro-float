@@ -134,6 +134,19 @@ fn macro_run_err_test() {
 
     assert_eq!(r, z);
 
+    // constants: pi, e, ln_2, ln_10
+    let x = expr!(pi, &mut ctx);
+    assert_eq!(x, ctx.const_pi());
+
+    let x = expr!(e, &mut ctx);
+    assert_eq!(x, ctx.const_e());
+
+    let x = expr!(ln_2, &mut ctx);
+    assert_eq!(x, ctx.const_ln2());
+
+    let x = expr!(ln_10, &mut ctx);
+    assert_eq!(x, ctx.const_ln10());
+
     // ln
     for x in [
         BigFloat::from_words(&[234, 0, WORD_SIGNIFICANT_BIT], Sign::Pos, -123),

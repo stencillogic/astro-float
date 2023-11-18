@@ -140,7 +140,7 @@ extern crate alloc;
 /// Computes an expression with the specified precision and rounding mode.
 ///
 /// The macro accepts an expression to compute and a context.
-/// In the expression you can specify:
+/// The expression can include:
 ///
 ///  - Path expressions: variable names, constant names, etc.
 ///  - Integer literals, e.g. `123`, `-5`.
@@ -150,8 +150,9 @@ extern crate alloc;
 ///  - Unary `-` operator.
 ///  - Mathematical functions.
 ///  - Grouping with `(` and `)`.
+///  - Constants `pi`, `e`, `ln_2`, and `ln_10`.
 ///
-/// Supported binary operators:
+/// Binary operators:
 ///
 ///  - `+`: addition.
 ///  - `-`: subtraction.
@@ -159,7 +160,7 @@ extern crate alloc;
 ///  - `/`: division.
 ///  - `%`: modular division.
 ///
-/// Supported mathematical functions:
+/// Mathematical functions:
 ///
 ///  - `recip(x)`: reciprocal of `x`.
 ///  - `sqrt(x)`: square root of `x`.
@@ -183,12 +184,20 @@ extern crate alloc;
 ///  - `acosh(x)`: hyperbolic arccosine of `x`.
 ///  - `atanh(x)`: hyperbolic arctangent of `x`.
 ///
+/// Constants:
+///  - `pi`: pi number.
+///  - `e`: Euler number.
+///  - `ln_2`: natural logarithm of 2.
+///  - `ln_10`: natural logarithm of 10.
+///
 /// The context determines the precision, the rounding mode of the result, and also contains the cache of constants.
 /// Tuple `(usize, RoundingMode, &mut Consts)` can also be used as a temporary context (see example below).
 ///
-/// The macro will determine additional precision needed to compensate error and perform correct rounding.
-/// It will also try to eliminate cancellation which may appear when expression is computed.
+/// The macro will determine additional precision needed to compensate error and perform correct rounding,
+/// also it will try to eliminate cancellation.
 ///
+/// Any input argument in the expression is interpreted as exact,
+/// For example, if an argument of an expression has type BigFloat and it is an inexact result of a previous computation.
 ///
 /// **Avoid passing expressions which contain mathematical identity if you expect a correctly rounded result**.
 ///

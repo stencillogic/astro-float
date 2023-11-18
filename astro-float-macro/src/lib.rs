@@ -420,11 +420,21 @@ fn traverse_paren(expr: &ExprParen, err: &mut Vec<usize>) -> Result<TokenStream,
 }
 
 fn traverse_path(expr: &ExprPath) -> Result<TokenStream, Error> {
-    Ok(quote!({
-        let mut arg = astro_float::BigFloat::from_ext((#expr).clone(), p_wrk, astro_float::RoundingMode::None);
-        arg.set_inexact(false);
-        arg
-    }))
+    Ok(if expr.path.is_ident("pi") {
+        quote!({ cc.pi(p_wrk, astro_float::RoundingMode::None) })
+    } else if expr.path.is_ident("e") {
+        quote!({ cc.e(p_wrk, astro_float::RoundingMode::None) })
+    } else if expr.path.is_ident("ln_2") {
+        quote!({ cc.ln_2(p_wrk, astro_float::RoundingMode::None) })
+    } else if expr.path.is_ident("ln_10") {
+        quote!({ cc.ln_10(p_wrk, astro_float::RoundingMode::None) })
+    } else {
+        quote!({
+            let mut arg = astro_float::BigFloat::from_ext((#expr).clone(), p_wrk, astro_float::RoundingMode::None);
+            arg.set_inexact(false);
+            arg
+        })
+    })
 }
 
 fn traverse_unary(expr: &ExprUnary, err: &mut Vec<usize>) -> Result<TokenStream, Error> {
