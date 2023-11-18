@@ -2,7 +2,7 @@
 
 use astro_float_macro::expr;
 use astro_float_num::{
-    ctx::Context, BigFloat, Consts, RoundingMode, Sign, WORD_BIT_SIZE, WORD_MAX,
+    ctx::Context, BigFloat, Consts, Radix, RoundingMode, Sign, WORD_BIT_SIZE, WORD_MAX,
     WORD_SIGNIFICANT_BIT,
 };
 
@@ -104,7 +104,6 @@ fn macro_run_basic_tests() {
 
 #[test]
 fn macro_run_err_test() {
-    // sub cancellation test
     let p = 192;
     let rm = RoundingMode::ToEven;
     let mut cc = Consts::new().unwrap();
@@ -113,6 +112,27 @@ fn macro_run_err_test() {
 
     let two = BigFloat::from(2);
     let ten = BigFloat::from(10);
+
+    // sub cancellation of 256 bits
+    let x = BigFloat::parse(
+        "0.00000000000000000000000000000000000001",
+        Radix::Dec,
+        p,
+        RoundingMode::None,
+    );
+    let y = BigFloat::parse(
+        "1.57079632679489661923132169163975144209",
+        Radix::Dec,
+        p,
+        RoundingMode::None,
+    );
+
+    let z = expr!(cos(x) - sin(y), &mut ctx);
+    let cx = x.cos(p + 256, RoundingMode::None, &mut cc);
+    let sy = y.sin(p + 256, RoundingMode::None, &mut cc);
+    let r = cx.sub(&sy, p, rm);
+
+    assert_eq!(r, z);
 
     // ln
     for x in [

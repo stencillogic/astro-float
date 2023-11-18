@@ -17,6 +17,8 @@ use syn::{
 use util::{check_arg_num, str_to_bigfloat_expr};
 
 // Speculative error estimation.
+// This error is added upfront, before actual error is known.
+// It helps to avoid additional recalculations due to changing error estimation.
 const SPEC_ADD_ERR: usize = 32;
 
 struct MacroInput {
@@ -51,27 +53,61 @@ fn traverse_binary(expr: &ExprBinary, err: &mut Vec<usize>) -> Result<TokenStrea
     let left_expr = traverse_expr(&expr.left, err)?;
     let right_expr = traverse_expr(&expr.right, err)?;
 
+    let errs_id = err.len();
+
     let ts = match expr.op {
         BinOp::Add(_) => {
-            quote!(astro_float::BigFloat::add(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
+            err.push(1);
+            quote!({
+                let arg1 = #left_expr;
+                let arg2 = #right_expr;
+                let ret = astro_float::BigFloat::add(&arg1, &arg2, p_wrk, astro_float::RoundingMode::None);
+                if let (Some(e1), Some(e2), Some(e3)) = (arg1.exponent(), arg2.exponent(), ret.exponent()) {
+                    if (e1 as isize - e2 as isize).abs() <= 1 && arg1.sign() != arg2.sign() {
+                        let newerr = (e1.max(e2) as isize - e3 as isize).unsigned_abs() + 1;
+                        if errs[#errs_id] < newerr {
+                            errs[#errs_id] = newerr;
+                            continue;
+                        }
+                    }
+                }
+                ret
+            })
         }
         BinOp::Sub(_) => {
-            quote!(astro_float::BigFloat::sub(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
+            err.push(1);
+            quote!({
+                let arg1 = #left_expr;
+                let arg2 = #right_expr;
+                let ret = astro_float::BigFloat::sub(&arg1, &arg2, p_wrk, astro_float::RoundingMode::None);
+                if let (Some(e1), Some(e2), Some(e3)) = (arg1.exponent(), arg2.exponent(), ret.exponent()) {
+                    if (e1 as isize - e2 as isize).abs() <= 1 && arg1.sign() == arg2.sign() {
+                        let newerr = (e1.max(e2) as isize - e3 as isize).unsigned_abs() + 1;
+                        if errs[#errs_id] < newerr {
+                            errs[#errs_id] = newerr;
+                            continue;
+                        }
+                    }
+                }
+                ret
+            })
         }
         BinOp::Mul(_) => {
+            err.push(3);
             quote!(astro_float::BigFloat::mul(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
         }
         BinOp::Div(_) => {
+            err.push(3);
             quote!(astro_float::BigFloat::div(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
         }
-        BinOp::Rem(_) => quote!(astro_float::BigFloat::rem(&(#left_expr), &(#right_expr))),
+        BinOp::Rem(_) => {
+            quote!(astro_float::BigFloat::rem(&(#left_expr), &(#right_expr)))
+        }
         _ => return Err(Error::new(
             expr.span(),
             "unexpected binary operator. Only \"+\", \"-\", \"*\", \"/\", and \"%\" are allowed.",
         )),
     };
-
-    err.push(1);
 
     Ok(ts)
 }
