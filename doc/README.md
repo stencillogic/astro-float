@@ -135,20 +135,20 @@ For $n$ terms of the series $err < 2^{-p} \displaystyle\sum_{k=1}^{n+1}{\left(\f
 
 Starting from $k = 6$ we have: $\displaystyle\sum_{k=6}^{n+1}{\left(\frac{2 e}{k}\right)^k} < 1$ and $err < 2^{-p}$.
 
-## Error of $\arctan$, $\operatorname {arctanh}$ series.
+## Error of $\arctan$, $\mathop{\text{arctanh}}$ series.
 
 Series:
 
 $$\arctan(x) = x - \frac{x^3}{3} + \frac{x^5}{5} - ...$$
  
-$$\operatorname {arctanh}(x) = x + \frac{x^3}{3} + \frac{x^5}{5} + ...$$
+$$\mathop{\text{arctanh}}(x) = x + \frac{x^3}{3} + \frac{x^5}{5} + ...$$
 
 Assume, the series $x + a_3 x^3 + a_5 x^5 + ...$ is computed directly, and $x$ contains relative error less than $2^{-p}$:
 
 $a_3$, $a_5$,... have relative error less than $2^{-p}$ since they are the result of division of 1 by the exact number 3, 5, 7,... 
 and their value is smaller than 0.5 by definition.
 
-If $x = m 2^e$, where $0.5 <= m < 1$ and $e = -3$, then absolute error relative to 1 for $\operatorname {arctanh}$:
+If $x = m 2^e$, where $0.5 <= m < 1$ and $e = -3$, then absolute error relative to 1 for $\mathop{\text{arctanh}}$:
 
 $$\displaylines{err_a < 2^{-p-3} + 2^{-p-9+4} + 2^{-p-15+6} + ... < 2^{-p-2}}$$
 

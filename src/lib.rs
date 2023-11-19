@@ -44,13 +44,13 @@
 //!
 //! **Correctness**
 //!
-//! Results of all arithmetic operations, mathematical functions, and constant values are __mostly__ correctly rounded.
+//! Results of all arithmetic operations, mathematical functions, and constant values are correctly rounded.
 //!
 //!
 //! ## Examples
 //!
 //! The example below computes value of Pi with precision 1024 rounded to even using `expr!` macro.
-//! Macro simplifies syntax, takes care of the error and correct rounding of the result.
+//! Macro simplifies syntax, takes care of the error and rounding of the result.
 //! Although, macro has certain pitfalls to avoid. Check the macro documentation for more details.
 //!
 //! ```
@@ -79,7 +79,7 @@
 //! ```
 //!
 //! The example below computes value of Pi with precision 1024 rounded to even using `BigFloat` directly.
-//! In this case, we will take care of error, and we will not check wether the resul is correctly rounded.
+//! In this case, we will take care of error, and we will not check wether the result is correctly rounded.
 //!
 //! ``` rust
 //! use astro_float::BigFloat;
@@ -126,7 +126,7 @@
 //!
 //! ``` toml
 //! [dependencies]
-//! astro-float = { version = "0.6.7", default-features = false }
+//! astro-float = { version = "0.7.2", default-features = false }
 //! ```
 //!
 
@@ -138,6 +138,16 @@
 extern crate alloc;
 
 /// Computes an expression with the specified precision and rounding mode.
+/// Macro takes into account 3 aspects.
+///
+/// 1. Code simplification. Macro simplifies code and improves its readability by allowing to specify simple and concise expression
+/// and process input arguments transparently.
+///
+/// 2. Error compensation. Macro compensates error caused by [catastrophic cancellation](https://en.wikipedia.org/wiki/Catastrophic_cancellation)
+/// and some other situations where precision can be lost by automatically increasing the working precision internally.
+///
+/// 3. Correct rounding. Sometimes it is necessary to increase working precision to have enough information to perform rounding correctly.
+/// Macro does this automatically for rounding modes different from `RoundingMode::None`.
 ///
 /// The macro accepts an expression to compute and a context.
 /// The expression can include:
@@ -208,8 +218,6 @@ extern crate alloc;
 ///  - `expr!(sin(x) * sin(x) / (1 - cos(x) * cos(x)), ctx)`,
 ///
 /// Macro does not analyze the expression for presense of identity and will increase the precision infinitely and will never return.
-///
-/// Although, you can specify rounding mode `None`. In this case, macro will return even if you pass an identity expression.
 ///
 /// ## Examples
 ///
