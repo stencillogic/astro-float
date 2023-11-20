@@ -22,7 +22,7 @@ pub struct Consts {
     e: ECache,
     ln2: Ln2Cache,
     ln10: Ln10Cache,
-    tenpowers: Vec<(WordBuf, usize)>,
+    tenpowers: Vec<(WordBuf, WordBuf, usize)>,
 }
 
 /// In an ideal situation, the `Consts` structure is initialized with `Consts::new` only once,
@@ -132,7 +132,7 @@ impl Consts {
     }
 
     /// Return powers of 10: 100, 10000, 100000000, ...
-    pub(crate) fn tenpowers(&mut self, p: usize) -> Result<&[(WordBuf, usize)], Error> {
+    pub(crate) fn tenpowers(&mut self, p: usize) -> Result<&[(WordBuf, WordBuf, usize)], Error> {
         if p >= self.tenpowers.len() {
             Mantissa::compute_tenpowers(&mut self.tenpowers, p)?;
         }
