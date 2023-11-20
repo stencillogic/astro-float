@@ -3,7 +3,9 @@ mod ln10;
 mod ln2;
 mod pi;
 
+use crate::common::buf::WordBuf;
 use crate::common::util::round_p;
+use crate::mantissa::Mantissa;
 use crate::num::BigFloatNumber;
 use crate::ops::consts::e::ECache;
 use crate::ops::consts::ln10::Ln10Cache;
@@ -20,6 +22,7 @@ pub struct Consts {
     e: ECache,
     ln2: Ln2Cache,
     ln10: Ln10Cache,
+    tenpowers: Vec<(WordBuf, usize)>,
 }
 
 /// In an ideal situation, the `Consts` structure is initialized with `Consts::new` only once,
@@ -36,6 +39,7 @@ impl Consts {
             e: ECache::new()?,
             ln2: Ln2Cache::new()?,
             ln10: Ln10Cache::new()?,
+            tenpowers: Vec::new(),
         })
     }
 
@@ -125,5 +129,14 @@ impl Consts {
             Ok(v) => v.into(),
             Err(e) => BigFloat::nan(Some(e)),
         }
+    }
+
+    /// Return powers of 10: 100, 10000, 100000000, ...
+    pub(crate) fn tenpowers(&mut self, p: usize) -> Result<&[(WordBuf, usize)], Error> {
+        if p >= self.tenpowers.len() {
+            Mantissa::compute_tenpowers(&mut self.tenpowers, p)?;
+        }
+
+        Ok(&self.tenpowers)
     }
 }

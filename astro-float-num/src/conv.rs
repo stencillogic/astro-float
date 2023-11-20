@@ -5,6 +5,7 @@ use crate::common::consts::SIXTEEN;
 use crate::common::consts::TEN;
 use crate::common::consts::TEN_POW_9;
 use crate::common::consts::TWO;
+use crate::common::util::log2_ceil;
 use crate::common::util::round_p;
 use crate::defs::DoubleWord;
 use crate::defs::Error;
@@ -17,6 +18,7 @@ use crate::defs::WORD_BIT_SIZE;
 use crate::defs::WORD_MAX;
 use crate::mantissa::Mantissa;
 use crate::num::BigFloatNumber;
+use crate::Consts;
 use crate::EXPONENT_MAX;
 use crate::EXPONENT_MIN;
 
@@ -331,6 +333,22 @@ impl BigFloatNumber {
             Radix::Dec => self.conv_to_dec(rm),
             Radix::Hex => self.conv_to_commensurable(4),
         }
+    }
+
+    fn conv_to_dec2(&self, cc: &mut Consts) -> Result<Vec<u8>, Error> {
+        if self.precision() == 0 {
+            return Ok(Vec::new());
+        }
+
+        let l = (self.precision() as u64 * 301029996 / 1000000000) as usize + 1;
+
+        let p = log2_ceil(l);
+
+        let tenpowers = cc.tenpowers(p)?;
+
+        let mut m = self.mantissa().clone()?;
+
+        m.conv_to_dec(1 << p, tenpowers, p - 1)
     }
 
     fn conv_to_dec(&self, rm: RoundingMode) -> Result<(Sign, Vec<u8>, Exponent), Error> {

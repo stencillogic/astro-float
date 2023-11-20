@@ -150,7 +150,7 @@ impl Mantissa {
     }
 
     /// Shift to the left, returns exponent shift as positive value.
-    fn maximize(m: &mut [Word]) -> usize {
+    pub(crate) fn maximize(m: &mut [Word]) -> usize {
         let mut shift = 0;
         let mut d = 0;
 
@@ -1135,6 +1135,20 @@ impl Mantissa {
         Ok(())
     }
 
+    /// Shift to the left by n bits and increase or decrease precision if needed just to fit the data.
+    pub fn shift_left_resize(&mut self, n: usize) -> Result<(), Error> {
+        if self.max_bit_len() >= self.bit_len() + n {
+            self.shift_left(n);
+            self.m.trunc_leading_zeroes();
+        } else {
+            self.m.try_extend_3(self.bit_len() + n, n)?;
+        }
+
+        self.n += n;
+
+        Ok(())
+    }
+
     pub fn most_significant_word(&self) -> Word {
         if self.n > 0 {
             self.m[(self.n - 1) / WORD_BIT_SIZE]
@@ -1345,5 +1359,10 @@ impl Mantissa {
         m3.n = m3.max_bit_len();
 
         Ok((e_shift, m3))
+    }
+
+    pub fn from_word_buf(m: WordBuf) -> Self {
+        let n = Self::find_bit_len(&m);
+        Mantissa { m, n }
     }
 }

@@ -317,7 +317,8 @@ impl Mantissa {
     // general case division
     pub(super) fn div_unbalanced(m1: &[Word], m2: &[Word]) -> Result<(WordBuf, WordBuf), Error> {
         if m1.len() < m2.len() {
-            let q = WordBuf::new(1)?;
+            let mut q = WordBuf::new(1)?;
+            q[0] = 0;
             let mut r = WordBuf::new(m1.len())?;
             r.copy_from_slice(m1);
 
