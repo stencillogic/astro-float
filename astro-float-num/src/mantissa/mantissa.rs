@@ -864,7 +864,7 @@ impl Mantissa {
         self.len() * WORD_BIT_SIZE
     }
 
-    /// Round n positions, return true if exponent is to be incremented.
+    /// Round `n` positions, return true if exponent is to be incremented.
     /// If `check_roundable` is true on input, the function verifies whether the mantissa is roundable, given it contains `s` correct digits.
     /// If `check_roundable` is set to false on return, in any case it means rounding was successful.
     /// If some bits set to 1 during rounding were set to 0, `inexact` will take value true.
@@ -879,7 +879,7 @@ impl Mantissa {
     ) -> bool {
         debug_assert!(s % WORD_BIT_SIZE == 0); // assume s is aligned to the word size.
 
-        // TODO: this function is too complex, because it combines rounding for all rounding modes
+        // This function is so complex, because it combines rounding for all rounding modes
         // and checks for roundability at the same time.
 
         if rm == RoundingMode::None {

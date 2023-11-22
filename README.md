@@ -28,7 +28,7 @@ use astro_float::expr;
 
 // Create a context with precision 1024, and rounding to even.
 let mut ctx = Context::new(1024, RoundingMode::ToEven, 
-    Consts::new().expect("Contants cache initialized"));
+    Consts::new().expect("Constants cache initialized"));
 
 // Compute pi: pi = 6*arctan(1/sqrt(3))
 let pi = expr!(6 * atan(1 / sqrt(3)), &mut ctx);

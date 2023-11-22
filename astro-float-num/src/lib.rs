@@ -67,7 +67,7 @@ mod tests {
         let rm = RoundingMode::ToEven;
 
         // Initialize mathematical constants cache
-        let mut cc = Consts::new().expect("An error occured when initializing contants");
+        let mut cc = Consts::new().expect("An error occured when initializing constants");
 
         // Compute pi: pi = 6*arctan(1/sqrt(3))
         let six = BigFloat::from_word(6, 1);

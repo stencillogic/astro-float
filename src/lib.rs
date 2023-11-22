@@ -61,7 +61,7 @@
 //!
 //! // Create a context with precision 1024, and rounding to even.
 //! let mut ctx = Context::new(1024, RoundingMode::ToEven,
-//!     Consts::new().expect("Contants cache initialized"));
+//!     Consts::new().expect("Constants cache initialized"));
 //!
 //! // Compute pi: pi = 6*arctan(1/sqrt(3))
 //! let pi = expr!(6 * atan(1 / sqrt(3)), &mut ctx);
@@ -93,7 +93,7 @@
 //! let rm = RoundingMode::ToEven;
 //!
 //! // Initialize mathematical constants cache
-//! let mut cc = Consts::new().expect("An error occured when initializing contants");
+//! let mut cc = Consts::new().expect("An error occured when initializing constants");
 //!
 //! // Compute pi: pi = 6*arctan(1/sqrt(3))
 //! let six = BigFloat::from_word(6, 1);
