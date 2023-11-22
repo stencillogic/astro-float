@@ -280,7 +280,9 @@ impl BigFloatNumber {
                     x = x.mul(&x, p_x, RoundingMode::FromZero)?;
 
                     if j & WORD_SIGNIFICANT_BIT as usize != 0 {
+                        let x_inex = x.inexact();
                         x = x.mul(self, p_x, RoundingMode::FromZero)?;
+                        x.set_inexact(x_inex);
                     }
 
                     j <<= 1;
