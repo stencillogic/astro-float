@@ -6,26 +6,53 @@ use crate::common::util::shift_slice_right;
 use crate::mantissa::Mantissa;
 use crate::{Error, Word, WORD_BIT_SIZE};
 
+// Number of decimal digits per word.
+const WORD_TENPOWER_LEN: usize = if WORD_BIT_SIZE < 64 { 8 } else { 16 };
+
+// A starting id in tenpowers cache depending on the word size.
+const TENPOWER_START_ID: usize = if WORD_BIT_SIZE < 64 { 3 } else { 4 };
+
 impl Mantissa {
-    /// Convert `input` words to an array of decimal digits with divide and conquer algorithm.
+    /// Convert `self` to an array of decimal digits with divide and conquer algorithm.
     /// `l` is the number of decimal digits in the input ceiled to a power of 10.
     /// `p` is the current depth of `tenpowers` for the given `input`.
+    /// `most_significant` true if `self` contains the most significant part.
     pub(crate) fn conv_to_dec(
         &mut self,
         l: usize,
         tenpowers: &[(WordBuf, WordBuf, usize)],
         p: usize,
+        most_significant: bool,
     ) -> Result<Vec<u8>, Error> {
-        if self.bit_len() == 0 {
-            Ok(Vec::new())
+        if self.is_zero() {
+            if most_significant {
+                Ok(Vec::new())
+            } else {
+                let mut ret = Vec::new();
+                ret.try_reserve_exact(l)?;
+                ret.resize(l, 0);
+                Ok(ret)
+            }
         } else if self.bit_len() <= WORD_BIT_SIZE {
             let mut ret = Vec::new();
             ret.try_reserve_exact(l)?;
 
             let mut v = self.digits()[0];
-            for _ in 0..l {
-                ret.push((v % 10) as u8);
-                v /= 10;
+            if most_significant {
+                while v != 0 {
+                    ret.push((v % 10) as u8);
+                    v /= 10;
+                }
+                ret.reverse(); // happens just once
+            } else {
+                unsafe {
+                    // for better performance
+                    ret.set_len(l);
+                }
+                for d in ret.iter_mut().rev() {
+                    *d = (v % 10) as u8;
+                    v /= 10;
+                }
             }
 
             Ok(ret)
@@ -41,13 +68,20 @@ impl Mantissa {
             let mut q = Mantissa::from_word_buf(q);
             let mut r = Mantissa::from_word_buf(r);
 
-            let mut part1 = Self::conv_to_dec(&mut r, l / 2, tenpowers, p - 1)?;
-            let mut part2 = Self::conv_to_dec(&mut q, l / 2, tenpowers, p - 1)?;
+            if q.is_zero() {
+                let part1 = Self::conv_to_dec(&mut r, l / 2, tenpowers, p - 1, most_significant)?;
 
-            part1.try_reserve_exact(part2.len())?;
-            part1.append(&mut part2);
+                Ok(part1)
+            } else {
+                let mut part1 = Self::conv_to_dec(&mut r, l / 2, tenpowers, p - 1, false)?;
+                let mut part2 =
+                    Self::conv_to_dec(&mut q, l / 2, tenpowers, p - 1, most_significant)?;
 
-            Ok(part1)
+                part2.try_reserve_exact(part1.len())?;
+                part2.append(&mut part1);
+
+                Ok(part2)
+            }
         }
     }
 
@@ -94,19 +128,15 @@ impl Mantissa {
         input: &[u8],
         tenpowers: &[(WordBuf, WordBuf, usize)],
     ) -> Result<Self, Error> {
-        let leadzeroes = input.iter().take_while(|&&x| x == 0).count();
-
-        const WORD_TENPOWER: usize = if WORD_BIT_SIZE < 64 { 8 } else { 16 };
-
-        const TENPOWER_START_ID: usize = if WORD_BIT_SIZE < 64 { 3 } else { 4 };
+        debug_assert!(input[0] != 0);
 
         let mut chunks = Vec::new();
-        chunks.try_reserve_exact((input.len() + WORD_TENPOWER - 1) / WORD_TENPOWER)?;
+        chunks.try_reserve_exact((input.len() + WORD_TENPOWER_LEN - 1) / WORD_TENPOWER_LEN)?;
 
         let mut word: Word = 0;
         let mut i = 0;
         let mut t = 1;
-        for &v in input.iter().skip(leadzeroes).rev() {
+        for &v in input.iter().rev() {
             if v > 9 {
                 return Err(Error::InvalidArgument);
             }
@@ -115,7 +145,7 @@ impl Mantissa {
             t *= 10;
             i += 1;
 
-            if i == WORD_TENPOWER {
+            if i == WORD_TENPOWER_LEN {
                 let mut wb = WordBuf::new(1)?;
                 wb[0] = word;
                 chunks.push(wb);
@@ -253,12 +283,14 @@ mod tests {
         let ten = [10];
 
         let test_input = |input: WordBuf| {
+            let l = input.len();
             let mut expected = Vec::new();
             let (mut t, mut s) = Mantissa::div_basic(&input, &ten).unwrap();
             loop {
                 expected.push(s[0] as u8);
                 t.trunc_leading_zeroes();
                 if t.len() == 0 {
+                    expected.reverse();
                     break;
                 }
                 let (q, r) = Mantissa::div_basic(&t, &ten).unwrap();
@@ -269,25 +301,21 @@ mod tests {
             let mut m = Mantissa::from_word_buf(input);
 
             // from vec<u8>
-            let input: Vec<u8> = expected.iter().rev().map(|x| *x).collect();
-
-            let m2 = Mantissa::conv_from_dec(&input, &tenpowers).unwrap();
+            let m2 = Mantissa::conv_from_dec(&expected, &tenpowers).unwrap();
 
             assert_eq!(m.digits(), m2.digits());
 
             // to vec<u8>
-            let k = ((input.len() * WORD_BIT_SIZE) as u64 * 301029996 / 1000000000) as usize + 1;
+            let k = ((l * WORD_BIT_SIZE) as u64 * 301029996 / 1000000000) as usize + 1;
 
             let p = log2_ceil(k);
 
-            let ret = m.conv_to_dec(1 << p, &tenpowers, p - 1).unwrap();
+            let ret = m.conv_to_dec(1 << p, &tenpowers, p - 1, true).unwrap();
 
-            let nz = ret.len() - ret.iter().rev().take_while(|x| **x == 0).count();
-
-            assert_eq!(ret[..nz], expected);
+            assert_eq!(ret, expected);
         };
 
-        /* let tst = [10973181860370429208, 10870792224498257307];
+        /* let tst = [0x9999999999999999, 0x9999999999999999, 0x9999999999999999];
         let mut input = WordBuf::new(tst.len()).unwrap();
         input.copy_from_slice(&tst);
         test_input(input);
@@ -363,7 +391,7 @@ mod tests {
 
                 let p = log2_ceil(k);
 
-                let _ = input.conv_to_dec(1 << p, &tenpowers, p - 1).unwrap();
+                let _ = input.conv_to_dec(1 << p, &tenpowers, p - 1, true).unwrap();
             }
 
             let time = start_time.elapsed();

@@ -927,9 +927,17 @@ impl BigFloatNumber {
         (m, n, self.s, self.e, self.inexact)
     }
 
+    /// Consumes `self` and decomposes into raw parts.
+    /// The function returns mantissa,
+    /// sign, exponent, and a bool value which specify whether the number is inexact.
+    #[inline]
+    pub fn to_raw_parts(self) -> (Mantissa, Sign, Exponent, bool) {
+        (self.m, self.s, self.e, self.inexact)
+    }
+
     /// Constructs a number from the raw parts:
     ///
-    ///  - `m` is the mantisaa.
+    ///  - `m` is the mantissa.
     ///  - `n` is the number of significant bits in mantissa.
     ///  - `s` is the sign.
     ///  - `e` is the exponent.
@@ -1135,17 +1143,6 @@ impl BigFloatNumber {
         }
 
         Ok(ret)
-    }
-
-    /// Returns integer part as a word.
-    pub(crate) fn int_as_word(&self) -> Word {
-        if self.e > 0 && WORD_BIT_SIZE >= self.e as usize {
-            let d = self.m.most_significant_word();
-            let shift = WORD_BIT_SIZE - self.e as usize;
-            d >> shift
-        } else {
-            0
-        }
     }
 
     /// Returns true if `self` is odd integer number.
@@ -1382,7 +1379,7 @@ impl BigFloatNumber {
         rm: RoundingMode,
         s: usize,
     ) -> Result<bool, Error> {
-        self.set_precision_internal(p, rm, true, s)
+        self.set_precision_internal(p, rm, self.inexact(), s)
     }
 
     fn set_precision_internal(
@@ -2745,20 +2742,23 @@ mod tests {
         assert!(d3.is_zero());
 
         // is_odd_int
-        let d1 = BigFloatNumber::parse("3.0", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
+        let d1 =
+            BigFloatNumber::parse("3.0", crate::Radix::Dec, 128, RoundingMode::ToEven).unwrap();
         assert!(d1.is_odd_int());
-        let d1 = BigFloatNumber::parse("3.01", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
-        assert!(!d1.is_odd_int());
-        let d1 = BigFloatNumber::parse("32.0", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
+        let d1 =
+            BigFloatNumber::parse("3.01", crate::Radix::Dec, 128, RoundingMode::ToEven).unwrap();
         assert!(!d1.is_odd_int());
         let d1 =
-            BigFloatNumber::parse("32.01", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
+            BigFloatNumber::parse("32.0", crate::Radix::Dec, 128, RoundingMode::ToEven).unwrap();
+        assert!(!d1.is_odd_int());
+        let d1 =
+            BigFloatNumber::parse("32.01", crate::Radix::Dec, 128, RoundingMode::ToEven).unwrap();
         assert!(!d1.is_odd_int());
         let d1 = BigFloatNumber::parse(
             "0.00000000000000000000001",
             crate::Radix::Dec,
             256,
-            RoundingMode::None,
+            RoundingMode::ToEven,
         )
         .unwrap();
         assert!(!d1.is_odd_int());
@@ -2766,7 +2766,7 @@ mod tests {
             "5.00000000000000000000001",
             crate::Radix::Dec,
             256,
-            RoundingMode::None,
+            RoundingMode::ToEven,
         )
         .unwrap();
         assert!(!d1.is_odd_int());
@@ -2774,7 +2774,7 @@ mod tests {
             "10000000000000000000001.0",
             crate::Radix::Dec,
             256,
-            RoundingMode::None,
+            RoundingMode::ToEven,
         )
         .unwrap();
         assert!(d1.is_odd_int());
@@ -2782,7 +2782,7 @@ mod tests {
             "10000000000000000000001.0000000000000000001",
             crate::Radix::Dec,
             256,
-            RoundingMode::None,
+            RoundingMode::ToEven,
         )
         .unwrap();
         assert!(!d1.is_odd_int());

@@ -22,7 +22,6 @@ pub struct Consts {
     e: ECache,
     ln2: Ln2Cache,
     ln10: Ln10Cache,
-    tenpowers: Vec<(WordBuf, WordBuf, usize)>,
 }
 
 /// In an ideal situation, the `Consts` structure is initialized with `Consts::new` only once,
@@ -39,7 +38,6 @@ impl Consts {
             e: ECache::new()?,
             ln2: Ln2Cache::new()?,
             ln10: Ln10Cache::new()?,
-            tenpowers: Vec::new(),
         })
     }
 
@@ -128,6 +126,20 @@ impl Consts {
         match self.ln_10_num(p, rm) {
             Ok(v) => v.into(),
             Err(e) => BigFloat::nan(Some(e)),
+        }
+    }
+}
+
+/// Cache of powers of 10 for parsing and printing in decimal radix.
+#[derive(Debug)]
+pub struct TenPowers {
+    tenpowers: Vec<(WordBuf, WordBuf, usize)>,
+}
+
+impl TenPowers {
+    pub fn new() -> Self {
+        TenPowers {
+            tenpowers: Vec::new(),
         }
     }
 

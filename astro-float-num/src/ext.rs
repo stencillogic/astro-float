@@ -1038,7 +1038,7 @@ impl BigFloat {
     /// let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).expect("Conversion failed");
     ///
     /// assert_eq!(s, Sign::Pos);
-    /// assert_eq!(m, [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4, 2]);
+    /// assert_eq!(m, [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4]);
     /// assert_eq!(e, -3);
     /// ```
     ///
@@ -2226,7 +2226,7 @@ mod tests {
         );
 
         let d1str = format!("{}", d1);
-        assert_eq!(&d1str, "1.234567890123456789012345678901234567888e-2");
+        assert_eq!(&d1str, "1.23456789012345678901234567890123456789e-2");
         assert!(BigFloat::from_str(&d1str).unwrap() == d1);
 
         let d1 = BigFloat::parse(
@@ -2236,7 +2236,7 @@ mod tests {
             RoundingMode::None,
         );
         let d1str = format!("{}", d1);
-        assert_eq!(&d1str, "-1.23456789012345678901234567890123456788917e+2");
+        assert_eq!(&d1str, "-1.23456789012345678901234567890123456789e+2");
         assert_eq!(BigFloat::from_str(&d1str).unwrap(), d1);
 
         let d1str = format!("{}", INF_POS);

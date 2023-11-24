@@ -1,7 +1,8 @@
 //! Static constants.
 
-use crate::{defs::DEFAULT_P, num::BigFloatNumber};
+use crate::{defs::DEFAULT_P, num::BigFloatNumber, ops::consts::TenPowers};
 use lazy_static::lazy_static;
+use std::cell::RefCell;
 
 lazy_static! {
 
@@ -43,7 +44,8 @@ lazy_static! {
 
     /// 120
     pub(crate) static ref C120: BigFloatNumber = BigFloatNumber::from_word(120, DEFAULT_P).expect("Constant C24 initialization.");
+}
 
-    /// 10^9
-    pub(crate) static ref TEN_POW_9: BigFloatNumber = BigFloatNumber::from_word(1000000000, DEFAULT_P).expect("Constant TEN_POW_9 initialization.");
+thread_local! {
+    pub static TENPOWERS: RefCell<TenPowers> = RefCell::new(TenPowers::new());
 }
