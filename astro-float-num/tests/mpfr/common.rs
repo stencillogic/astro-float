@@ -150,7 +150,11 @@ pub fn assert_float_close(n: BigFloat, f: Float, p: usize, op: &str, eq: bool) {
 }
 
 pub fn conv_str_to_mpfr_compat(s: String) -> String {
-    let (sig, exp) = s.split_at(s.find('e').unwrap() + 1);
+    let (sig, exp) = if let Some(pos) = s.find('e') {
+        s.split_at(pos + 1)
+    } else {
+        (s.as_str(), "0")
+    };
     let expn = i64::from_str_radix(exp, 2).unwrap();
     sig.to_owned() + &expn.to_string()
 }

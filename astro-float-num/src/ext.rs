@@ -597,6 +597,7 @@ impl BigFloat {
 
     /// Parses a number from the string `s`.
     /// The function expects `s` to be a number in scientific format in base 10, or +-Inf, or NaN.
+    /// if `p` equals to usize::MAX then the precision of the resulting number is determined automatically from the input.
     ///
     /// ## Examples
     ///
@@ -981,6 +982,7 @@ impl BigFloat {
     /// The first element in `digits` is the most significant digit.
     /// `e` is the exponent part of the number, such that the number can be represented as `digits` * `rdx` ^ `e`.
     /// Precision is rounded upwards to the word size.
+    /// if `p` equals usize::MAX then the precision of the resulting number is determined automatically from the input.
     ///
     /// ## Examples
     ///
@@ -1524,7 +1526,7 @@ impl FromStr for BigFloat {
 
     /// Returns parsed number or NAN in case of error.
     fn from_str(src: &str) -> Result<BigFloat, Self::Err> {
-        Ok(BigFloat::parse(src, Radix::Dec, DEFAULT_P, DEFAULT_RM))
+        Ok(BigFloat::parse(src, Radix::Dec, usize::MAX, DEFAULT_RM))
     }
 }
 
@@ -2198,7 +2200,7 @@ mod tests {
             &[],
             0,
             Radix::Dec,
-            usize::MAX,
+            usize::MAX - 1,
             RoundingMode::None,
         );
         assert!(n1.is_nan());
@@ -2227,7 +2229,9 @@ mod tests {
 
         let d1str = format!("{}", d1);
         assert_eq!(&d1str, "1.23456789012345678901234567890123456789e-2");
-        assert!(BigFloat::from_str(&d1str).unwrap() == d1);
+        let mut d2 = BigFloat::from_str(&d1str).unwrap();
+        d2.set_precision(DEFAULT_P, RoundingMode::ToEven).unwrap();
+        assert_eq!(d2, d1);
 
         let d1 = BigFloat::parse(
             "-123.456789012345678901234567890123456789",
@@ -2237,7 +2241,9 @@ mod tests {
         );
         let d1str = format!("{}", d1);
         assert_eq!(&d1str, "-1.23456789012345678901234567890123456789e+2");
-        assert_eq!(BigFloat::from_str(&d1str).unwrap(), d1);
+        let mut d2 = BigFloat::from_str(&d1str).unwrap();
+        d2.set_precision(DEFAULT_P, RoundingMode::ToEven).unwrap();
+        assert_eq!(d2, d1);
 
         let d1str = format!("{}", INF_POS);
         assert_eq!(d1str, "Inf");

@@ -619,7 +619,7 @@ impl Mantissa {
         Ok(())
     }
 
-    /// Add n bits of precision, data is not moved
+    /// Add at least n bits of precision, data is not moved
     pub fn extend_subnormal(&mut self, n: usize) -> Result<(), Error> {
         self.m.try_extend_2(self.n + n)
     }

@@ -11,6 +11,7 @@ use crate::defs::Radix;
 use crate::defs::RoundingMode;
 use crate::defs::Sign;
 use crate::defs::Word;
+use crate::defs::DEFAULT_P;
 use crate::defs::WORD_BIT_SIZE;
 use crate::defs::WORD_MAX;
 use crate::mantissa::Mantissa;
@@ -30,6 +31,7 @@ impl BigFloatNumber {
     /// The first element in `digits` is the most significant digit.
     /// `e` is the exponent part of the number, such that the number can be represented as `digits` * `rdx` ^ `e`.
     /// Precision is rounded upwards to the word size.
+    /// if `p` equals usize::MAX then the precision of the resulting number is determined automatically from the input.
     ///
     /// ## Errors
     ///
@@ -42,14 +44,16 @@ impl BigFloatNumber {
         digits: &[u8],
         e: Exponent,
         rdx: Radix,
-        p: usize,
+        mut p: usize,
         rm: RoundingMode,
     ) -> Result<Self, Error> {
-        let p = round_p(p);
-        Self::p_assertion(p)?;
+        if p < usize::MAX {
+            p = round_p(p);
+            Self::p_assertion(p)?;
 
-        if p == 0 {
-            return Self::new(0);
+            if p == 0 {
+                return Self::new(0);
+            }
         }
 
         if e < EXPONENT_MIN || e > EXPONENT_MAX {
@@ -67,13 +71,15 @@ impl BigFloatNumber {
     fn conv_from_binary(
         sign: Sign,
         digits: &[u8],
-        e: Exponent,
+        mut e: Exponent,
         p: usize,
         rm: RoundingMode,
     ) -> Result<Self, Error> {
         if digits.is_empty() {
-            return Self::new(p);
+            return Self::new(if p < usize::MAX { p } else { DEFAULT_P });
         }
+
+        Self::p_assertion(round_p(digits.len()))?;
 
         let mut mantissa = Mantissa::new(digits.len())?;
         let mut d = 0;
@@ -105,11 +111,32 @@ impl BigFloatNumber {
 
         mantissa.update_bit_len();
 
-        let mut ret = BigFloatNumber::from_raw_unchecked(mantissa, sign, e, false);
+        if p < usize::MAX {
+            let mut ret = BigFloatNumber::from_raw_unchecked(mantissa, sign, e, false);
 
-        ret.set_precision(p, rm)?;
+            ret.set_precision(p, rm)?;
 
-        Ok(ret)
+            Ok(ret)
+        } else {
+            let shift = mantissa.max_bit_len() - mantissa.bit_len();
+
+            if shift > 0 {
+                if e > EXPONENT_MIN {
+                    let e_shift = (e - EXPONENT_MIN) as usize;
+
+                    if e_shift >= shift {
+                        mantissa.normilize2();
+                        e -= shift as Exponent;
+                    } else {
+                        mantissa.shift_left(e_shift);
+                        mantissa.set_bit_len(mantissa.bit_len() + e_shift);
+                        e = EXPONENT_MIN;
+                    }
+                }
+            }
+
+            Ok(BigFloatNumber::from_raw_unchecked(mantissa, sign, e, false))
+        }
     }
 
     // radix is power of 2.
@@ -150,11 +177,15 @@ impl BigFloatNumber {
 
         if zeroes == digits.len() {
             // mantissa is zero
-            let m = Mantissa::new(p)?;
+            let m = Mantissa::new(if p < usize::MAX { p } else { DEFAULT_P })?;
 
             Ok(BigFloatNumber::from_raw_unchecked(m, sign, 0, false))
         } else {
-            let mut m = Mantissa::new((digits.len() - zeroes) * shift + WORD_BIT_SIZE)?;
+            let msz = round_p((digits.len() - zeroes) * shift + WORD_BIT_SIZE);
+
+            Self::p_assertion(msz)?;
+
+            let mut m = Mantissa::new(msz)?;
 
             // exponent
             let e = e as isize * shift as isize + e_shift;
@@ -199,24 +230,40 @@ impl BigFloatNumber {
             m.set_bit_len(m.max_bit_len());
 
             let mut ret = if e < EXPONENT_MIN as isize {
-                let mut num = BigFloatNumber::from_raw_unchecked(m, sign, EXPONENT_MIN, false);
+                if p < usize::MAX {
+                    let mut num = BigFloatNumber::from_raw_unchecked(m, sign, EXPONENT_MIN, false);
 
-                if p + WORD_BIT_SIZE > num.mantissa_max_bit_len() {
-                    num.set_precision(p + WORD_BIT_SIZE, RoundingMode::None)?;
+                    if p + WORD_BIT_SIZE > num.mantissa_max_bit_len() {
+                        num.set_precision(p + WORD_BIT_SIZE, RoundingMode::None)?;
+                    }
+
+                    num.subnormalize(e, RoundingMode::None);
+
+                    if num.inexact() {
+                        num.mantissa_mut().digits_mut()[0] |= 1; // sticky for correct rounding when calling set_precision()
+                    }
+
+                    num
+                } else {
+                    let e_shift = (EXPONENT_MIN as isize - e) as usize;
+                    let newbitlen = m.bit_len().saturating_add(e_shift);
+
+                    Self::p_assertion(round_p(newbitlen))?;
+
+                    m.extend_subnormal(e_shift)?;
+
+                    let leftshift = m.max_bit_len() - newbitlen;
+                    m.shift_left(leftshift);
+
+                    BigFloatNumber::from_raw_unchecked(m, sign, EXPONENT_MIN, false)
                 }
-
-                num.subnormalize(e, RoundingMode::None);
-
-                if num.inexact() {
-                    num.mantissa_mut().digits_mut()[0] |= 1; // sticky for correct rounding when calling set_precision()
-                }
-
-                num
             } else {
                 BigFloatNumber::from_raw_unchecked(m, sign, e as Exponent, false)
             };
 
-            ret.set_precision(p, rm)?;
+            if p < usize::MAX {
+                ret.set_precision(p, rm)?;
+            }
 
             Ok(ret)
         }
@@ -233,7 +280,7 @@ impl BigFloatNumber {
         let leadzeroes = digits.iter().take_while(|&&x| x == 0).count();
 
         if digits.len() - leadzeroes == 0 {
-            return Self::new(p);
+            return Self::new(if p < usize::MAX { p } else { DEFAULT_P });
         }
 
         let k = log2_ceil(digits.len() - leadzeroes);
@@ -254,6 +301,15 @@ impl BigFloatNumber {
 
         // exponent part
         let n = e as isize - digits.len() as isize;
+
+        let p = if p < usize::MAX {
+            p
+        } else {
+            // determine from the input
+            let p = round_p((digits.len() as u64 * 3321928095 / 1000000000) as usize + 1);
+            Self::p_assertion(p)?;
+            p
+        };
 
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p + p_inc;
@@ -616,15 +672,23 @@ impl BigFloatNumber {
         }
 
         let mut ret = Vec::new();
+        ret.try_reserve_exact(self.mantissa_max_bit_len() / shift)?;
 
         let mask = (WORD_MAX >> (WORD_BIT_SIZE - shift)) as DoubleWord;
         let mut iter = self.mantissa().digits().iter().rev();
 
         let mut done = WORD_BIT_SIZE - shift + e_shift;
         let mut d = *iter.next().unwrap() as DoubleWord; // iter is never empty.
+        let mut cnt = 0;
 
         loop {
             let digit = ((d >> done) & mask) as u8;
+
+            if digit == 0 {
+                cnt += 1;
+            } else {
+                cnt = 0;
+            }
 
             ret.push(digit);
 
@@ -649,20 +713,36 @@ impl BigFloatNumber {
             }
 
             let digit = ((d >> done) & mask) as u8;
-            ret.push(digit);
+            if digit > 0 {
+                cnt = 0;
+                ret.push(digit);
+            }
         }
+
+        ret.resize(ret.len() - cnt, 0);
 
         Ok((self.sign(), ret, e))
     }
 
     fn conv_to_binary(&self) -> Result<(Sign, Vec<u8>, Exponent), Error> {
         let mut ret = Vec::new();
+        ret.try_reserve_exact(self.mantissa_max_bit_len())?;
+        let mut cnt = 0;
 
         for v in self.mantissa().digits().iter().rev() {
             for i in (0..WORD_BIT_SIZE).rev() {
-                ret.push(((v >> i) & 1) as u8);
+                let val = ((v >> i) & 1) as u8;
+                if val == 1 {
+                    cnt = 0;
+                } else {
+                    cnt += 1;
+                }
+                ret.push(val);
             }
         }
+
+        // cut off trailing zeroes
+        ret.resize(ret.len() - cnt, 0);
 
         Ok((self.sign(), ret, self.exponent()))
     }
@@ -688,8 +768,7 @@ mod tests {
             m,
             [
                 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0,
-                1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0
+                1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1
             ]
         );
         assert_eq!(s, Sign::Pos);
@@ -1033,6 +1112,233 @@ mod tests {
                 .is_zero());
             }
         }
+
+        // unkonwn p: binary, octal, hexadecimal
+        for (s1, exp, rdx) in [
+            // Bin
+            (
+                vec![
+                    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1,
+                ],
+                123,
+                Radix::Bin,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0,
+                    0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1,
+                ],
+                EXPONENT_MIN + 3,
+                Radix::Bin,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0,
+                    0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1,
+                ],
+                EXPONENT_MIN,
+                Radix::Bin,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0,
+                    0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1,
+                ],
+                EXPONENT_MIN + 256,
+                Radix::Bin,
+            ),
+            // Oct
+            (
+                vec![
+                    7, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                123,
+                Radix::Oct,
+            ),
+            (
+                vec![
+                    7, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 3 - 123,
+                Radix::Oct,
+            ),
+            (
+                vec![
+                    3, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 3 + 123,
+                Radix::Oct,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 3, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1,
+                    1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0,
+                    0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 3 - 123,
+                Radix::Oct,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 3, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1,
+                    1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0,
+                    0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 3 + 123,
+                Radix::Oct,
+            ),
+            // Hex
+            (
+                vec![
+                    0xF, 0, 2, 0, 0, 0, 0, 0, 0xD, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 0, 0xA, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                123,
+                Radix::Hex,
+            ),
+            (
+                vec![
+                    0xF, 0, 2, 0, 0, 0, 0, 0, 0xD, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 0, 0xA, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 4 - 123,
+                Radix::Hex,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    7, 0, 2, 0, 0, 0, 0, 0, 0xD, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1,
+                    0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1,
+                    0, 0, 0, 0, 0, 0xA, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 4 - 123,
+                Radix::Hex,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    7, 0, 2, 0, 0, 0, 0, 0, 0xD, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1,
+                    0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1,
+                    0, 0, 0, 0, 0, 0xA, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 4 + 123,
+                Radix::Hex,
+            ),
+            // Dec
+            (
+                vec![
+                    9, 5, 7, 4, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 9, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 9, 1, 1, 7, 0, 0, 0, 0, 1, 1, 1, 5, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 2, 0, 6,
+                ],
+                123,
+                Radix::Dec,
+            ),
+            (
+                vec![
+                    9, 5, 7, 4, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 9, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 9, 1, 1, 7, 0, 0, 0, 0, 1, 1, 1, 5, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 2, 0, 5,
+                ],
+                EXPONENT_MIN / 10 - 123,
+                Radix::Dec,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    9, 5, 7, 4, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 9, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 9, 1, 1, 7, 0, 0, 0, 0, 1, 1, 1, 5, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 2, 0, 7,
+                ],
+                EXPONENT_MIN / 10 - 123,
+                Radix::Dec,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    9, 5, 7, 4, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 9, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 9, 1, 1, 7, 0, 0, 0, 0, 1, 1, 1, 5, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 2, 0, 5,
+                ],
+                EXPONENT_MIN / 10 + 10,
+                Radix::Dec,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    9, 5, 7, 4, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 9, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 9, 1, 1, 7, 0, 0, 0, 0, 1, 1, 1, 5, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 2, 0, 5,
+                ],
+                123,
+                Radix::Dec,
+            ),
+        ] {
+            let g = BigFloatNumber::convert_from_radix(
+                Sign::Pos,
+                &s1,
+                exp,
+                rdx,
+                usize::MAX,
+                RoundingMode::None,
+            )
+            .unwrap();
+
+            let (s, d, e) = g.convert_to_radix(rdx, RoundingMode::None).unwrap();
+
+            // verify no information loss in mantissa becase of length
+            let lead_zeroes_s1 = s1.iter().take_while(|&&x| x == 0).count();
+            let lead_zeroes_d = d.iter().take_while(|&&x| x == 0).count();
+            assert!(*d.iter().last().unwrap() != 0);
+            assert!(*s1.iter().last().unwrap() != 0);
+            assert!(d.len() - lead_zeroes_d >= s1.len() - lead_zeroes_s1);
+
+            let mut n =
+                BigFloatNumber::convert_from_radix(s, &d, e, rdx, usize::MAX, RoundingMode::None)
+                    .unwrap();
+
+            if rdx == Radix::Dec {
+                n.set_precision(g.mantissa_max_bit_len(), RoundingMode::ToEven)
+                    .unwrap();
+
+                assert!(n.cmp(&g) == 0);
+            } else {
+                assert!(n.cmp(&g) == 0);
+            }
+        }
+
+        // unknown p: decimal
     }
 
     fn random_radix() -> Radix {

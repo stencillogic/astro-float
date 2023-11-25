@@ -40,7 +40,7 @@
 //! **Constants**
 //!
 //! Constants such as pi or the Euler number have arbitrary precision and are evaluated lazily and then cached in the constants cache.
-//! Some functions expect constants cache as parameter because the library does not maintain global state.
+//! Some functions expect constants cache as parameter.
 //!
 //! **Correctness**
 //!
