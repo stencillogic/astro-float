@@ -21,7 +21,7 @@ use crate::EXPONENT_MIN;
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
-const TEN_PWR_MAX_TO_DEC: isize = EXPONENT_MAX as isize / 4;
+const TEN_PWR_MAX_TO_DEC: usize = EXPONENT_MAX as usize / 4;
 const TEN_PWR_MAX_FROM_DEC: usize = (EXPONENT_MAX as u64 * 301029995 / 1000000000) as usize;
 
 impl BigFloatNumber {
@@ -351,25 +351,29 @@ impl BigFloatNumber {
 
             let mut err_acc = 0;
 
-            let mut pwr = n_wrk;
-            if pwr.abs() > TEN_PWR_MAX_TO_DEC {
-                let tp = TEN.powsi(TEN_PWR_MAX_TO_DEC * pwr.signum(), p_wrk, RoundingMode::None)?;
+            let mut pwr = n_wrk.unsigned_abs();
+            if pwr > TEN_PWR_MAX_TO_DEC {
+                let tp = TEN.powi(TEN_PWR_MAX_TO_DEC, p_wrk, RoundingMode::None)?;
                 err_acc += 1;
 
-                while pwr.abs() > TEN_PWR_MAX_TO_DEC {
-                    x = x.mul(&tp, p_wrk, RoundingMode::None)?;
-                    err_acc += 2;
-                    if pwr > 0 {
-                        pwr -= TEN_PWR_MAX_TO_DEC;
+                while pwr > TEN_PWR_MAX_TO_DEC {
+                    if n_wrk < 0 {
+                        x = x.div(&tp, p_wrk, RoundingMode::None)?;
                     } else {
-                        pwr += TEN_PWR_MAX_TO_DEC;
+                        x = x.mul(&tp, p_wrk, RoundingMode::None)?;
                     }
+                    err_acc += 2;
+                    pwr -= TEN_PWR_MAX_TO_DEC;
                 }
             }
 
             if pwr != 0 {
-                let tp = TEN.powsi(pwr, p_wrk, RoundingMode::None)?;
-                x = x.mul(&tp, p_wrk, RoundingMode::None)?;
+                let tp = TEN.powi(pwr, p_wrk, RoundingMode::None)?;
+                if n_wrk < 0 {
+                    x = x.div(&tp, p_wrk, RoundingMode::None)?;
+                } else {
+                    x = x.mul(&tp, p_wrk, RoundingMode::None)?;
+                }
                 err_acc += 3;
             }
 
@@ -476,7 +480,6 @@ impl BigFloatNumber {
                 }
 
                 *e += 1;
-                digits[0] = 1;
             }
         }
 
@@ -1351,5 +1354,50 @@ mod tests {
             BigFloatNumber::round_dec(&mut input, 0, RoundingMode::Up, true, &mut check_roundable);
         assert!(!ovf);
         assert_eq!(input, [9, 9, 9, 9, 9, 9]);
+
+        // try round
+        assert!(BigFloatNumber::try_round_dec(
+            &mut [9, 9, 9, 9, 9, 9],
+            3,
+            RoundingMode::Up,
+            Sign::Pos,
+            &mut 0,
+            false
+        )
+        .unwrap());
+        assert!(!BigFloatNumber::try_round_dec(
+            &mut [9, 9, 9, 9, 9, 9],
+            3,
+            RoundingMode::Up,
+            Sign::Pos,
+            &mut 0,
+            true
+        )
+        .unwrap());
+
+        let mut e = 0;
+        assert!(BigFloatNumber::try_round_dec(
+            &mut [9, 9, 9, 9, 9, 0],
+            3,
+            RoundingMode::Up,
+            Sign::Pos,
+            &mut e,
+            true
+        )
+        .unwrap());
+        assert_eq!(e, 1);
+
+        e = EXPONENT_MAX;
+        assert_eq!(
+            BigFloatNumber::try_round_dec(
+                &mut [9, 9, 9, 9, 9, 0],
+                3,
+                RoundingMode::FromZero,
+                Sign::Neg,
+                &mut e,
+                true
+            ),
+            Err(Error::ExponentOverflow(Sign::Neg))
+        );
     }
 }
