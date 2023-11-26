@@ -3,16 +3,13 @@
 //! See main crate [docs](https://docs.rs/astro-float/latest/astro_float/).
 
 #![cfg_attr(not(feature = "std"), no_std)]
-
 #![deny(missing_docs)]
 #![deny(clippy::suspicious)]
-
 #![allow(clippy::comparison_chain)]
 #![allow(clippy::should_implement_trait)]
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::module_inception)]
-
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
