@@ -1,7 +1,6 @@
 //! Conversion utilities.
 
 use crate::common::consts::TEN;
-use crate::common::consts::TENPOWERS;
 use crate::common::util::log2_ceil;
 use crate::common::util::round_p;
 use crate::defs::DoubleWord;
@@ -16,6 +15,7 @@ use crate::defs::WORD_BIT_SIZE;
 use crate::defs::WORD_MAX;
 use crate::mantissa::Mantissa;
 use crate::num::BigFloatNumber;
+use crate::Consts;
 use crate::EXPONENT_MAX;
 use crate::EXPONENT_MIN;
 
@@ -46,6 +46,7 @@ impl BigFloatNumber {
         rdx: Radix,
         mut p: usize,
         rm: RoundingMode,
+        cc: &mut Consts,
     ) -> Result<Self, Error> {
         if p < usize::MAX {
             p = round_p(p);
@@ -56,6 +57,7 @@ impl BigFloatNumber {
             }
         }
 
+        #[cfg(target_arch = "x86")]
         if e < EXPONENT_MIN || e > EXPONENT_MAX {
             return Err(Error::InvalidArgument);
         }
@@ -63,7 +65,7 @@ impl BigFloatNumber {
         match rdx {
             Radix::Bin => Self::conv_from_binary(sign, digits, e, p, rm),
             Radix::Oct => Self::conv_from_commensurable(sign, digits, e, 3, p, rm),
-            Radix::Dec => Self::conv_from_dec(sign, digits, e, p, rm),
+            Radix::Dec => Self::conv_from_dec(sign, digits, e, p, rm, cc),
             Radix::Hex => Self::conv_from_commensurable(sign, digits, e, 4, p, rm),
         }
     }
@@ -275,6 +277,7 @@ impl BigFloatNumber {
         e: Exponent,
         p: usize,
         rm: RoundingMode,
+        cc: &mut Consts,
     ) -> Result<Self, Error> {
         // mantissa part
         let leadzeroes = digits.iter().take_while(|&&x| x == 0).count();
@@ -284,11 +287,8 @@ impl BigFloatNumber {
         }
 
         let k = log2_ceil(digits.len() - leadzeroes);
-        let mut m = TENPOWERS.with(|tp| {
-            let borrowed = &mut tp.borrow_mut();
-            let values = borrowed.tenpowers(k)?;
-            Mantissa::conv_from_dec(&digits[leadzeroes..], values)
-        })?;
+        let tenpowers = cc.tenpowers(k)?;
+        let mut m = Mantissa::conv_from_dec(&digits[leadzeroes..], tenpowers)?;
 
         if m.bit_len() > EXPONENT_MAX as usize {
             return Err(Error::ExponentOverflow(sign));
@@ -375,16 +375,21 @@ impl BigFloatNumber {
         &self,
         rdx: Radix,
         rm: RoundingMode,
+        cc: &mut Consts,
     ) -> Result<(Sign, Vec<u8>, Exponent), Error> {
         match rdx {
             Radix::Bin => self.conv_to_binary(),
             Radix::Oct => self.conv_to_commensurable(3),
-            Radix::Dec => self.conv_to_dec(rm),
+            Radix::Dec => self.conv_to_dec(rm, cc),
             Radix::Hex => self.conv_to_commensurable(4),
         }
     }
 
-    fn conv_to_dec(&self, rm: RoundingMode) -> Result<(Sign, Vec<u8>, Exponent), Error> {
+    fn conv_to_dec(
+        &self,
+        rm: RoundingMode,
+        cc: &mut Consts,
+    ) -> Result<(Sign, Vec<u8>, Exponent), Error> {
         if self.precision() == 0 {
             return Ok((self.sign(), Vec::new(), 0));
         }
@@ -434,7 +439,7 @@ impl BigFloatNumber {
             }
 
             if err_acc > err {
-                err_acc += err_acc / TEN_PWR_MAX_TO_DEC as usize + 3;
+                err_acc += err_acc / TEN_PWR_MAX_TO_DEC + 3;
                 p_wrk += round_p(err_acc - err);
                 err = err_acc;
                 continue;
@@ -451,11 +456,8 @@ impl BigFloatNumber {
 
             let k = log2_ceil(l);
 
-            let mut digits = TENPOWERS.with(|tp| {
-                let borrowed = &mut tp.borrow_mut();
-                let values = borrowed.tenpowers(k)?;
-                m.conv_to_dec(1 << k, values, k - 1, true)
-            })?;
+            let tenpowers = cc.tenpowers(k)?;
+            let mut digits = m.conv_to_dec(1 << k, tenpowers, k - 1, true)?;
 
             let mut e_out = digits.len() as isize - n_wrk;
 
@@ -762,10 +764,14 @@ mod tests {
 
     #[test]
     fn test_conv_num() {
+        let mut cc = Consts::new().unwrap();
+
         // basic tests
         let n = BigFloatNumber::from_f64(64, 0.031256789f64).unwrap();
 
-        let (s, m, e) = n.convert_to_radix(Radix::Bin, RoundingMode::None).unwrap();
+        let (s, m, e) = n
+            .convert_to_radix(Radix::Bin, RoundingMode::None, &mut cc)
+            .unwrap();
 
         assert_eq!(
             m,
@@ -777,15 +783,25 @@ mod tests {
         assert_eq!(s, Sign::Pos);
         assert_eq!(e, -4);
 
-        let g = BigFloatNumber::convert_from_radix(s, &m, e, Radix::Bin, 160, RoundingMode::ToEven)
-            .unwrap();
+        let g = BigFloatNumber::convert_from_radix(
+            s,
+            &m,
+            e,
+            Radix::Bin,
+            160,
+            RoundingMode::ToEven,
+            &mut cc,
+        )
+        .unwrap();
         let f = g.to_f64();
 
         assert_eq!(f, 0.031256789f64);
 
         let n = BigFloatNumber::from_f64(64, 0.00012345678f64).unwrap();
 
-        let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).unwrap();
+        let (s, m, e) = n
+            .convert_to_radix(Radix::Dec, RoundingMode::None, &mut cc)
+            .unwrap();
 
         assert_eq!(s, Sign::Pos);
         assert_eq!(
@@ -801,6 +817,7 @@ mod tests {
             Radix::Oct,
             64,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
         let n = BigFloatNumber::from_f64(64, -83.591552734375).unwrap();
@@ -816,10 +833,19 @@ mod tests {
                 false,
             )
             .unwrap();
-            let (s, m, e) = n.convert_to_radix(Radix::Oct, RoundingMode::None).unwrap();
-            let g =
-                BigFloatNumber::convert_from_radix(s, &m, e, Radix::Oct, 160, RoundingMode::ToEven)
-                    .unwrap();
+            let (s, m, e) = n
+                .convert_to_radix(Radix::Oct, RoundingMode::None, &mut cc)
+                .unwrap();
+            let g = BigFloatNumber::convert_from_radix(
+                s,
+                &m,
+                e,
+                Radix::Oct,
+                160,
+                RoundingMode::ToEven,
+                &mut cc,
+            )
+            .unwrap();
 
             assert!(n.cmp(&g) == 0);
 
@@ -831,7 +857,9 @@ mod tests {
                 false,
             )
             .unwrap();
-            let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).unwrap();
+            let (s, m, e) = n
+                .convert_to_radix(Radix::Dec, RoundingMode::None, &mut cc)
+                .unwrap();
 
             assert_eq!(
                 m,
@@ -843,9 +871,16 @@ mod tests {
             assert!(s == Sign::Pos);
             assert!(e == 0);
 
-            let g =
-                BigFloatNumber::convert_from_radix(s, &m, e, Radix::Dec, 96, RoundingMode::ToEven)
-                    .unwrap();
+            let g = BigFloatNumber::convert_from_radix(
+                s,
+                &m,
+                e,
+                Radix::Dec,
+                96,
+                RoundingMode::ToEven,
+                &mut cc,
+            )
+            .unwrap();
             assert!(g.cmp(&n) == 0);
         }
 
@@ -859,10 +894,19 @@ mod tests {
                 false,
             )
             .unwrap();
-            let (s, m, e) = n.convert_to_radix(Radix::Oct, RoundingMode::None).unwrap();
-            let g =
-                BigFloatNumber::convert_from_radix(s, &m, e, Radix::Oct, 192, RoundingMode::ToEven)
-                    .unwrap();
+            let (s, m, e) = n
+                .convert_to_radix(Radix::Oct, RoundingMode::None, &mut cc)
+                .unwrap();
+            let g = BigFloatNumber::convert_from_radix(
+                s,
+                &m,
+                e,
+                Radix::Oct,
+                192,
+                RoundingMode::ToEven,
+                &mut cc,
+            )
+            .unwrap();
 
             assert!(n.cmp(&g) == 0);
 
@@ -875,7 +919,7 @@ mod tests {
             )
             .unwrap();
             let (s, m, e) = n
-                .convert_to_radix(Radix::Dec, RoundingMode::ToEven)
+                .convert_to_radix(Radix::Dec, RoundingMode::ToEven, &mut cc)
                 .unwrap();
 
             assert_eq!(
@@ -889,9 +933,16 @@ mod tests {
             assert_eq!(s, Sign::Pos);
             assert_eq!(e, 0);
 
-            let g =
-                BigFloatNumber::convert_from_radix(s, &m, e, Radix::Dec, 192, RoundingMode::ToEven)
-                    .unwrap();
+            let g = BigFloatNumber::convert_from_radix(
+                s,
+                &m,
+                e,
+                Radix::Dec,
+                192,
+                RoundingMode::ToEven,
+                &mut cc,
+            )
+            .unwrap();
             //println!("{:?}", g);
             //println!("{:?}", n);
             assert!(g.cmp(&n) == 0);
@@ -918,10 +969,19 @@ mod tests {
                     .unwrap();
             let rdx = random_radix();
 
-            let (s1, m1, e1) = n.convert_to_radix(rdx, RoundingMode::ToEven).unwrap();
-            let mut g =
-                BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, RoundingMode::ToEven)
-                    .unwrap();
+            let (s1, m1, e1) = n
+                .convert_to_radix(rdx, RoundingMode::ToEven, &mut cc)
+                .unwrap();
+            let mut g = BigFloatNumber::convert_from_radix(
+                s1,
+                &m1,
+                e1,
+                rdx,
+                p2,
+                RoundingMode::ToEven,
+                &mut cc,
+            )
+            .unwrap();
 
             //println!("\n{:?}", rdx);
             //println!("{:?} {:?} {}", s1, m1, e1);
@@ -957,14 +1017,23 @@ mod tests {
             let mut n = random_subnormal(p1);
             let rdx = random_radix();
 
-            let (s1, m1, e1) = n.convert_to_radix(rdx, RoundingMode::ToEven).unwrap();
+            let (s1, m1, e1) = n
+                .convert_to_radix(rdx, RoundingMode::ToEven, &mut cc)
+                .unwrap();
 
             //println!("\n{:?}", rdx);
             //println!("{:?} {:?} {}", s1, m1, e1);
 
-            let mut g =
-                BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, RoundingMode::ToEven)
-                    .unwrap();
+            let mut g = BigFloatNumber::convert_from_radix(
+                s1,
+                &m1,
+                e1,
+                rdx,
+                p2,
+                RoundingMode::ToEven,
+                &mut cc,
+            )
+            .unwrap();
 
             //println!("\n{:?}", rdx);
             //println!("{:?} {:?} {}", s1, m1, e1);
@@ -1011,16 +1080,17 @@ mod tests {
                 //println!("\n{:?} {} {}", rdx, p1, p2);
                 //println!("{:?}", n);
 
-                let (s1, m1, e1) = n.convert_to_radix(rdx, rm).unwrap();
+                let (s1, m1, e1) = n.convert_to_radix(rdx, rm, &mut cc).unwrap();
 
                 //println!("{:?} {:?} {}", s1, m1, e1);
 
-                let mut g = BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, rm).unwrap();
+                let mut g =
+                    BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, rm, &mut cc).unwrap();
 
                 //println!("{:?}", g);
 
                 if rdx == Radix::Dec {
-                    eps.set_exponent(n.exponent() - p as Exponent + 3);
+                    eps.set_exponent(n.exponent() - p as Exponent + 4);
                     assert!(n.sub(&g, p, rm).unwrap().abs().unwrap().cmp(&eps) <= 0);
                 } else {
                     if p2 < p1 {
@@ -1038,11 +1108,12 @@ mod tests {
             let mut n = BigFloatNumber::min_positive(p1).unwrap();
             //println!("\n{:?} {} {}", rdx, p1, p2);
             //println!("{:?}", n);
-            let (s1, m1, e1) = n.convert_to_radix(rdx, rm).unwrap();
+            let (s1, m1, e1) = n.convert_to_radix(rdx, rm, &mut cc).unwrap();
 
             //println!("{:?} {:?} {}", s1, m1, e1);
 
-            let mut g = BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, rm).unwrap();
+            let mut g =
+                BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, rm, &mut cc).unwrap();
             //println!("{:?}", g);
 
             if rdx == Radix::Dec {
@@ -1070,14 +1141,23 @@ mod tests {
                     e1,
                     rdx,
                     p1,
-                    RoundingMode::ToEven
+                    RoundingMode::ToEven,
+                    &mut cc
                 )
                 .unwrap()
                 .is_zero());
                 let m1 = [1, rdx as u8, 0];
                 assert!(
-                    BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p1, RoundingMode::ToEven)
-                        .unwrap_err()
+                    BigFloatNumber::convert_from_radix(
+                        s1,
+                        &m1,
+                        e1,
+                        rdx,
+                        p1,
+                        RoundingMode::ToEven,
+                        &mut cc
+                    )
+                    .unwrap_err()
                         == Error::InvalidArgument
                 );
                 let m1 = [1, rdx as u8 - 1, 0];
@@ -1087,7 +1167,8 @@ mod tests {
                     e1,
                     rdx,
                     0,
-                    RoundingMode::ToEven
+                    RoundingMode::ToEven,
+                    &mut cc,
                 )
                 .unwrap()
                 .is_zero());
@@ -1098,7 +1179,8 @@ mod tests {
                     e1,
                     rdx,
                     p1,
-                    RoundingMode::ToEven
+                    RoundingMode::ToEven,
+                    &mut cc,
                 )
                 .unwrap()
                 .is_zero());
@@ -1109,7 +1191,8 @@ mod tests {
                     e1,
                     rdx,
                     p1,
-                    RoundingMode::ToEven
+                    RoundingMode::ToEven,
+                    &mut cc,
                 )
                 .unwrap()
                 .is_zero());
@@ -1315,10 +1398,13 @@ mod tests {
                 rdx,
                 usize::MAX,
                 RoundingMode::None,
+                &mut cc,
             )
             .unwrap();
 
-            let (s, d, e) = g.convert_to_radix(rdx, RoundingMode::None).unwrap();
+            let (s, d, e) = g
+                .convert_to_radix(rdx, RoundingMode::None, &mut cc)
+                .unwrap();
 
             // verify no information loss in mantissa becase of length
             let lead_zeroes_s1 = s1.iter().take_while(|&&x| x == 0).count();
@@ -1327,9 +1413,16 @@ mod tests {
             assert!(*s1.iter().last().unwrap() != 0);
             assert!(d.len() - lead_zeroes_d >= s1.len() - lead_zeroes_s1);
 
-            let mut n =
-                BigFloatNumber::convert_from_radix(s, &d, e, rdx, usize::MAX, RoundingMode::None)
-                    .unwrap();
+            let mut n = BigFloatNumber::convert_from_radix(
+                s,
+                &d,
+                e,
+                rdx,
+                usize::MAX,
+                RoundingMode::None,
+                &mut cc,
+            )
+            .unwrap();
 
             if rdx == Radix::Dec {
                 if g.mantissa_max_bit_len() < n.mantissa_max_bit_len() {

@@ -120,9 +120,9 @@ mod tests {
         //println!("{:?}", n2.format(crate::Radix::Dec, rm).unwrap());
 
         // near zero
-        let n1 = BigFloatNumber::parse("-6.2625AC139402BE3D18693E64BFF93D122A9FB2295D654817665874F984C1D9E32B6C42F068F33020_e-13", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n1 = BigFloatNumber::parse("-6.2625AC139402BE3D18693E64BFF93D122A9FB2295D654817665874F984C1D9E32B6C42F068F33020_e-13", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
         let n2 = n1.asinh(p, rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("-6.2625AC139402BE3D18693E64BFF93D122A9F8B69858A068F649D78ADAF2C51C59A22D727857055D8_e-13", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse("-6.2625AC139402BE3D18693E64BFF93D122A9F8B69858A068F649D78ADAF2C51C59A22D727857055D8_e-13", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
 
         // println!("{:?}", n1.format(crate::Radix::Hex, rm).unwrap());
         // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
@@ -130,9 +130,9 @@ mod tests {
         assert!(n2.cmp(&n3) == 0);
 
         // large exp
-        let n1 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419EBBFC39B4BEC14AF6_e+1000", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n1 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419EBBFC39B4BEC14AF6_e+1000", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
         let n2 = n1.asinh(p, rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("2.C5DAB0AF9025886C3364C7B6D6741EB19D4FB009D3F92CA21B77498D9F0666363C665F2F324EAEC8_e+3", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse("2.C5DAB0AF9025886C3364C7B6D6741EB19D4FB009D3F92CA21B77498D9F0666363C665F2F324EAEC8_e+3", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
 
         // println!("{:?}", n1.format(crate::Radix::Bin, rm).unwrap());
         // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());

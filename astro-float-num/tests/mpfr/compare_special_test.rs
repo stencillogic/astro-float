@@ -5,7 +5,7 @@ use std::ops::Add;
 
 use crate::mpfr::common::{
     assert_float_close, conv_to_mpfr, get_last_zero, get_near_one, get_oned_sides, get_oned_zeroed,
-    get_periodic, get_random_rnd_pair,
+    get_periodic, get_random_rnd_pair, test_astro_op_no_cc,
 };
 use crate::mpfr::common::{get_prec_rng, test_astro_op};
 use astro_float_num::{
@@ -94,7 +94,7 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
         for n in nn.iter() {
             //println!("{:?}", n);
 
-            let f = conv_to_mpfr(p1, n);
+            let f = conv_to_mpfr(p1, n, &mut cc);
 
             let nn1 = [
                 BigFloat::new(p2),
@@ -113,12 +113,12 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
             ];
 
             for n1 in nn1.iter() {
-                let f1 = conv_to_mpfr(p2, n1);
+                let f1 = conv_to_mpfr(p2, n1, &mut cc);
 
                 //println!("rm {:?}", rm);
                 //println!("\n--{:?}\n{:?}", n, n1);
                 //println!("\n--{:?}\n{:?}", f, f1);
-                test_astro_op!(
+                test_astro_op_no_cc!(
                     true,
                     n,
                     n1,
@@ -129,9 +129,10 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
                     p,
                     rm,
                     rnd,
-                    (n, n1, p, rm, "add")
+                    (n, n1, p, rm, "add"),
+                    cc
                 );
-                test_astro_op!(
+                test_astro_op_no_cc!(
                     true,
                     n,
                     n1,
@@ -142,9 +143,10 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
                     p,
                     rm,
                     rnd,
-                    (n, n1, p, rm, "sub")
+                    (n, n1, p, rm, "sub"),
+                    cc
                 );
-                test_astro_op!(
+                test_astro_op_no_cc!(
                     true,
                     n,
                     n1,
@@ -155,9 +157,10 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
                     p,
                     rm,
                     rnd,
-                    (n, n1, p, rm, "mul")
+                    (n, n1, p, rm, "mul"),
+                    cc
                 );
-                test_astro_op!(
+                test_astro_op_no_cc!(
                     true,
                     n,
                     n1,
@@ -168,7 +171,8 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
                     p,
                     rm,
                     rnd,
-                    (n, n1, p, rm, "div")
+                    (n, n1, p, rm, "div"),
+                    cc
                 );
 
                 test_astro_op!(
@@ -205,11 +209,11 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
 
                 //println!("\n{:?}\n{:?}", n3, f3);
 
-                assert_float_close(n3, f3, p, &format!("{:?}", (n, n1, "rem")), true);
+                assert_float_close(n3, f3, p, &format!("{:?}", (n, n1, "rem")), true, &mut cc);
             }
 
-            test_astro_op!(true, n, sqrt, f, sqrt, p, rm, rnd, (n, p, rm, "sqrt"));
-            test_astro_op!(true, n, cbrt, f, cbrt, p, rm, rnd, (n, p, rm, "cbrt"));
+            test_astro_op_no_cc!(true, n, sqrt, f, sqrt, p, rm, rnd, (n, p, rm, "sqrt"), cc);
+            test_astro_op_no_cc!(true, n, cbrt, f, cbrt, p, rm, rnd, (n, p, rm, "cbrt"), cc);
             test_astro_op!(true, n, ln, f, log, p, rm, rnd, (n, p, rm, "ln"), cc);
             test_astro_op!(true, n, log2, f, log2, p, rm, rnd, (n, p, rm, "log2"), cc);
             test_astro_op!(
@@ -241,7 +245,7 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
             let mut n_trig = n.clone();
             let f_trig = if n.exponent().unwrap() > 128 {
                 n_trig.set_exponent(128); // large exponent causes very long computation.
-                conv_to_mpfr(p1, &n_trig)
+                conv_to_mpfr(p1, &n_trig, &mut cc)
             } else {
                 f.clone()
             };
@@ -324,7 +328,14 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
 
                 unsafe { mpfr::pow_ui(f3.as_raw_mut(), f.as_raw(), i as Word, rnd) };
 
-                assert_float_close(n3, f3, p, &format!("{:?}", (n, i, p, rm, "powi")), true);
+                assert_float_close(
+                    n3,
+                    f3,
+                    p,
+                    &format!("{:?}", (n, i, p, rm, "powi")),
+                    true,
+                    &mut cc,
+                );
             }
 
             // reciprocal
@@ -333,7 +344,14 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
             let mut f3 = Float::with_val(p as u32, 1);
             unsafe { mpfr::div(f3.as_raw_mut(), mpfr_one.as_raw(), f.as_raw(), rnd) };
 
-            assert_float_close(n3, f3, p, &format!("{:?}", (n, p, rm, "reciprocal")), true);
+            assert_float_close(
+                n3,
+                f3,
+                p,
+                &format!("{:?}", (n, p, rm, "reciprocal")),
+                true,
+                &mut cc,
+            );
         }
     }
 
@@ -349,7 +367,7 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
         let e = rand::random::<usize>() % (10 + EXPONENT_MAX as usize);
         n.set_exponent((EXPONENT_MIN as isize + e as isize) as Exponent);
 
-        let f = conv_to_mpfr(p1, &n);
+        let f = conv_to_mpfr(p1, &n, &mut cc);
 
         test_astro_op!(true, n, sin, f, sin, p, rm, rnd, (&n, p, rm, "sin"), cc);
 

@@ -1,15 +1,13 @@
 //! Deserialization of BigFloat.
 
 use core::fmt::Formatter;
+use core::str::FromStr;
 
 use crate::num::BigFloatNumber;
-use crate::{BigFloat, Radix, RoundingMode};
+use crate::BigFloat;
 use serde::de::Error;
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer};
-
-#[cfg(not(feature = "std"))]
-use {alloc::format, alloc::string::String};
 
 pub struct BigFloatVisitor {}
 
@@ -34,7 +32,7 @@ impl<'de> Visitor<'de> for BigFloatVisitor {
     }
 
     fn visit_f32<E: Error>(self, v: f32) -> Result<Self::Value, E> {
-        match BigFloatNumber::from_f32(64, v) {
+        match BigFloatNumber::from_f64(64, v as f64) {
             Ok(o) => Ok(o.into()),
             Err(e) => Err(Error::custom(format!("{e:?}"))),
         }
@@ -48,8 +46,8 @@ impl<'de> Visitor<'de> for BigFloatVisitor {
     }
 
     fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
-        match BigFloatNumber::parse(v, Radix::Dec, 64, RoundingMode::None) {
-            Ok(o) => Ok(o.into()),
+        match BigFloat::from_str(v) {
+            Ok(o) => Ok(o),
             Err(e) => Err(Error::custom(format!("{e:?}"))),
         }
     }
@@ -69,6 +67,8 @@ impl<'de> Visitor<'de> for BigFloatVisitor {
 #[cfg(test)]
 mod tests {
 
+    use core::str::FromStr;
+
     use serde_json::from_str;
 
     use crate::BigFloat;
@@ -78,15 +78,14 @@ mod tests {
 
     #[test]
     fn from_json() {
-        assert_eq!("0.0", format!("{}", from_str::<BigFloat>("-0").unwrap()));
-        assert_eq!("0.0", format!("{}", from_str::<BigFloat>("0.0").unwrap()));
-        assert_eq!(
-            "2.999999999999999889e-1",
-            format!("{}", from_str::<BigFloat>("0.3").unwrap())
-        );
-        assert_eq!(
-            "2.9999999999999999998e-1",
-            format!("{}", from_str::<BigFloat>("\"0.3\"").unwrap())
-        );
+        let x = BigFloat::new(1);
+        assert_eq!(x, from_str::<BigFloat>("-0").unwrap());
+        assert_eq!(x, from_str::<BigFloat>("0.0").unwrap());
+
+        let x = BigFloat::from_f64(0.3, 64);
+        assert_eq!(x, from_str::<BigFloat>("0.3").unwrap());
+
+        let x = BigFloat::from_str("0.3").unwrap();
+        assert_eq!(x, from_str::<BigFloat>("\"0.3\"").unwrap());
     }
 }

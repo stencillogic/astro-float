@@ -72,7 +72,14 @@ fn mpfr_compare_const() {
                 mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd);
             }
 
-            assert_float_close(n1, f1, p, &format!("{:?}", (p, rm, "const e")), true);
+            assert_float_close(
+                n1,
+                f1,
+                p,
+                &format!("{:?}", (p, rm, "const e")),
+                true,
+                &mut cc,
+            );
 
             // ln(10)
             let n1 = cc.ln_10(p, rm);
@@ -81,7 +88,14 @@ fn mpfr_compare_const() {
                 mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd);
             }
 
-            assert_float_close(n1, f1, p, &format!("{:?}", (p, rm, "const ln(10)")), true);
+            assert_float_close(
+                n1,
+                f1,
+                p,
+                &format!("{:?}", (p, rm, "const ln(10)")),
+                true,
+                &mut cc,
+            );
         }
     }
 
@@ -130,7 +144,14 @@ fn mpfr_compare_const() {
         mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd);
     }
 
-    assert_float_close(n1, f1, p, &format!("{:?}", (p, rm, "const e")), true);
+    assert_float_close(
+        n1,
+        f1,
+        p,
+        &format!("{:?}", (p, rm, "const e")),
+        true,
+        &mut cc,
+    );
 
     // ln(10)
     let n1 = cc.ln_10(p, rm);
@@ -139,5 +160,12 @@ fn mpfr_compare_const() {
         mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd);
     }
 
-    assert_float_close(n1, f1, p, &format!("{:?}", (p, rm, "const ln(10)")), true);
+    assert_float_close(
+        n1,
+        f1,
+        p,
+        &format!("{:?}", (p, rm, "const ln(10)")),
+        true,
+        &mut cc,
+    );
 }

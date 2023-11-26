@@ -63,9 +63,6 @@ pub const WORD_BIT_SIZE: usize = core::mem::size_of::<Word>() * 8;
 /// Word with the most significant bit set.
 pub const WORD_SIGNIFICANT_BIT: Word = WORD_MAX << (WORD_BIT_SIZE - 1);
 
-/// Default rounding mode.
-pub const DEFAULT_RM: RoundingMode = RoundingMode::ToEven;
-
 /// Default precision.
 pub const DEFAULT_P: usize = 128;
 

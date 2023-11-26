@@ -4,7 +4,7 @@ use crate::defs::Error;
 use crate::defs::Radix;
 use crate::defs::RoundingMode;
 use crate::num::BigFloatNumber;
-use crate::parser;
+use crate::Consts;
 use crate::Exponent;
 use crate::Sign;
 
@@ -28,16 +28,23 @@ impl BigFloatNumber {
     ///  - InvalidArgument: failed to parse input or precision is incorrect.
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
-    pub fn parse(s: &str, rdx: Radix, p: usize, rm: RoundingMode) -> Result<Self, Error> {
+    #[cfg(test)]
+    pub fn parse(
+        s: &str,
+        rdx: Radix,
+        p: usize,
+        rm: RoundingMode,
+        cc: &mut Consts,
+    ) -> Result<Self, Error> {
         Self::p_assertion(p)?;
 
-        let ps = parser::parse(s, rdx)?;
+        let ps = crate::parser::parse(s, rdx)?;
 
         if ps.is_nan() || ps.is_inf() {
             Err(Error::InvalidArgument)
         } else {
             let (m, s, e) = ps.raw_parts();
-            BigFloatNumber::convert_from_radix(s, m, e, rdx, p, rm)
+            BigFloatNumber::convert_from_radix(s, m, e, rdx, p, rm, cc)
         }
     }
 
@@ -50,8 +57,8 @@ impl BigFloatNumber {
     ///
     ///  - MemoryAllocation: failed to allocate memory for mantissa.
     ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
-    pub fn format(&self, rdx: Radix, rm: RoundingMode) -> Result<String, Error> {
-        let (s, m, e) = self.convert_to_radix(rdx, rm)?;
+    pub fn format(&self, rdx: Radix, rm: RoundingMode, cc: &mut Consts) -> Result<String, Error> {
+        let (s, m, e) = self.convert_to_radix(rdx, rm, cc)?;
 
         let mut mstr = String::new();
         let mstr_sz = 8
@@ -131,6 +138,7 @@ mod tests {
     fn test_strop() {
         let mut eps = BigFloatNumber::from_word(1, 192).unwrap();
         let rm = RoundingMode::ToEven;
+        let mut cc = Consts::new().unwrap();
 
         for i in 0..1000 {
             let p1 = (random::<usize>() % 32 + 3) * WORD_BIT_SIZE;
@@ -145,8 +153,8 @@ mod tests {
                     random_subnormal(p1)
                 };
 
-                let s = n.format(rdx, rm).unwrap();
-                let d = BigFloatNumber::parse(&s, rdx, p2, rm).unwrap();
+                let s = n.format(rdx, rm, &mut cc).unwrap();
+                let d = BigFloatNumber::parse(&s, rdx, p2, rm, &mut cc).unwrap();
 
                 if i & 1 == 0 {
                     if rdx == Radix::Dec {
@@ -173,24 +181,24 @@ mod tests {
         let p1 = (random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let p2 = (random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let p = p1.min(p2);
+        let rm = RoundingMode::None; // avoid exponent overflow for dec conversion.
 
         for rdx in [Radix::Bin, Radix::Oct, Radix::Dec, Radix::Hex] {
             // min, max
             // for p2 < p1 rounding will cause overflow, for p2 >= p1 no rounding is needed.
-            let rm = RoundingMode::None;
             for mut n in
                 [BigFloatNumber::max_value(p1).unwrap(), BigFloatNumber::min_value(p1).unwrap()]
             {
                 //println!("\n{:?} {} {}", rdx, p1, p2);
                 //println!("{:?}", n);
 
-                let s = n.format(rdx, rm).unwrap();
-                let mut g = BigFloatNumber::parse(&s, rdx, p2, rm).unwrap();
+                let s = n.format(rdx, rm, &mut cc).unwrap();
+                let mut g = BigFloatNumber::parse(&s, rdx, p2, rm, &mut cc).unwrap();
 
                 //println!("{:?}", g);
 
                 if rdx == Radix::Dec {
-                    eps.set_exponent(n.exponent() - p as Exponent + 3);
+                    eps.set_exponent(n.exponent() - p as Exponent + 4); // 4, since rm is none
                     assert!(n.sub(&g, p, rm).unwrap().abs().unwrap().cmp(&eps) <= 0);
                 } else {
                     if p2 < p1 {
@@ -204,11 +212,9 @@ mod tests {
             }
 
             // min subnormal
-            let rm = RoundingMode::ToEven;
-
             let mut n = BigFloatNumber::min_positive(p1).unwrap();
-            let s = n.format(rdx, rm).unwrap();
-            let mut g = BigFloatNumber::parse(&s, rdx, p2, rm).unwrap();
+            let s = n.format(rdx, rm, &mut cc).unwrap();
+            let mut g = BigFloatNumber::parse(&s, rdx, p2, rm, &mut cc).unwrap();
 
             if rdx == Radix::Dec {
                 let mut eps = BigFloatNumber::min_positive(p).unwrap();

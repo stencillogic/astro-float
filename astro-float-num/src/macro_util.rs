@@ -13,7 +13,7 @@ pub fn compute_added_err_near_one(arg: &BigFloat, p: usize) -> usize {
         let one = BigFloat::from(arg_sign.to_int());
 
         if let Some(0) = arg.exponent() {
-            d = one.sub(&arg, p, RoundingMode::None);
+            d = one.sub(arg, p, RoundingMode::None);
         } else if let Some(1) = arg.exponent() {
             d = arg.sub(&one, p, RoundingMode::None);
         } else {
@@ -27,7 +27,7 @@ pub fn compute_added_err_near_one(arg: &BigFloat, p: usize) -> usize {
         }
     }
 
-    return 0;
+    0
 }
 
 #[cfg(test)]

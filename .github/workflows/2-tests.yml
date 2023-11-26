@@ -10,15 +10,29 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-and-test:
+  build-and-test-x64:
 
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build --workspace --release --verbose
     - name: Run tests
       run: cargo test --workspace --release --verbose
     - name: Run no_std tests
       run: cargo test --workspace --release --verbose --no-default-features --features random,serde
+
+  build-and-test-x32:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install dependencies
+      if: runner.os == 'ubuntu-latest'
+      run: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install -y libc6:i386 libncurses5:i386 libstdc++6:i386
+    - name: Add 32 bit toolchain
+      run: rustup toolchain install stable-i686-unknown-linux-gnu
+    - name: Run tests
+      run: cargo +stable-i686-unknown-linux-gnu test --workspace --release --verbose
+    - name: Run no_std tests
+      run: cargo +stable-i686-unknown-linux-gnu test --workspace --release --verbose --no-default-features --features random,serde

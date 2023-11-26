@@ -1,8 +1,12 @@
 //! Static constants.
 
-use crate::{defs::DEFAULT_P, num::BigFloatNumber, ops::consts::TenPowers};
-use core::cell::RefCell;
+use crate::{defs::DEFAULT_P, num::BigFloatNumber};
 use lazy_static::lazy_static;
+
+#[cfg(feature = "std")]
+use crate::ops::consts::Consts;
+#[cfg(feature = "std")]
+use core::cell::RefCell;
 
 lazy_static! {
 
@@ -46,6 +50,8 @@ lazy_static! {
     pub(crate) static ref C120: BigFloatNumber = BigFloatNumber::from_word(120, DEFAULT_P).expect("Constant C24 initialization.");
 }
 
+// TODO: Consider using in std environment everywhere Consts are needed.
+#[cfg(feature = "std")]
 thread_local! {
-    pub static TENPOWERS: RefCell<TenPowers> = RefCell::new(TenPowers::new());
+    pub static TENPOWERS: RefCell<Consts> = RefCell::new(Consts::new().expect("Failed to initialize thread-local constants cache"));
 }

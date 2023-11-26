@@ -119,12 +119,14 @@ fn macro_run_err_test() {
         Radix::Dec,
         p,
         RoundingMode::None,
+        &mut cc,
     );
     let y = BigFloat::parse(
         "1.57079632679489661923132169163975144209",
         Radix::Dec,
         p,
         RoundingMode::None,
+        &mut cc,
     );
 
     let z = expr!(cos(x) - sin(y), &mut ctx);
@@ -244,11 +246,35 @@ fn macro_run_err_test() {
 
     let s1 = "1.0000000000000000000234";
     let s2 = "1.234567890123456789e+20";
-    let b = BigFloat::parse(s1, astro_float_num::Radix::Dec, p, RoundingMode::None);
-    let n = BigFloat::parse(s2, astro_float_num::Radix::Dec, p, RoundingMode::None);
+    let b = BigFloat::parse(
+        s1,
+        astro_float_num::Radix::Dec,
+        p,
+        RoundingMode::None,
+        &mut cc,
+    );
+    let n = BigFloat::parse(
+        s2,
+        astro_float_num::Radix::Dec,
+        p,
+        RoundingMode::None,
+        &mut cc,
+    );
     let y1 = b.pow(&n, p, rm, &mut cc);
-    let b = BigFloat::parse(s1, astro_float_num::Radix::Dec, p + 128, RoundingMode::None);
-    let n = BigFloat::parse(s2, astro_float_num::Radix::Dec, p + 128, RoundingMode::None);
+    let b = BigFloat::parse(
+        s1,
+        astro_float_num::Radix::Dec,
+        p + 128,
+        RoundingMode::None,
+        &mut cc,
+    );
+    let n = BigFloat::parse(
+        s2,
+        astro_float_num::Radix::Dec,
+        p + 128,
+        RoundingMode::None,
+        &mut cc,
+    );
     let mut y2 = b.pow(&n, p + 128, RoundingMode::None, &mut cc);
     y2.set_precision(p, rm).unwrap();
 
@@ -259,11 +285,35 @@ fn macro_run_err_test() {
 
     let s1 = "0.9999999999999999923456";
     let s2 = "-1.234567890123456789e+25";
-    let b = BigFloat::parse(s1, astro_float_num::Radix::Dec, p, RoundingMode::None);
-    let n = BigFloat::parse(s2, astro_float_num::Radix::Dec, p, RoundingMode::None);
+    let b = BigFloat::parse(
+        s1,
+        astro_float_num::Radix::Dec,
+        p,
+        RoundingMode::None,
+        &mut cc,
+    );
+    let n = BigFloat::parse(
+        s2,
+        astro_float_num::Radix::Dec,
+        p,
+        RoundingMode::None,
+        &mut cc,
+    );
     let y1 = b.pow(&n, p, rm, &mut cc);
-    let b = BigFloat::parse(s1, astro_float_num::Radix::Dec, p + 128, RoundingMode::None);
-    let n = BigFloat::parse(s2, astro_float_num::Radix::Dec, p + 128, RoundingMode::None);
+    let b = BigFloat::parse(
+        s1,
+        astro_float_num::Radix::Dec,
+        p + 128,
+        RoundingMode::None,
+        &mut cc,
+    );
+    let n = BigFloat::parse(
+        s2,
+        astro_float_num::Radix::Dec,
+        p + 128,
+        RoundingMode::None,
+        &mut cc,
+    );
     let mut y2 = b.pow(&n, p + 128, RoundingMode::None, &mut cc);
     y2.set_precision(p, rm).unwrap();
 
@@ -274,9 +324,21 @@ fn macro_run_err_test() {
 
     // sin
     let s1 = "1.234567890123456789e+77";
-    let n = BigFloat::parse(s1, astro_float_num::Radix::Dec, 128, RoundingMode::None);
+    let n = BigFloat::parse(
+        s1,
+        astro_float_num::Radix::Dec,
+        128,
+        RoundingMode::None,
+        &mut cc,
+    );
     let y1 = n.sin(128, rm, &mut cc);
-    let n = BigFloat::parse(s1, astro_float_num::Radix::Dec, 320, RoundingMode::None);
+    let n = BigFloat::parse(
+        s1,
+        astro_float_num::Radix::Dec,
+        320,
+        RoundingMode::None,
+        &mut cc,
+    );
     let mut y2 = n.sin(320, RoundingMode::None, &mut cc);
     y2.set_precision(128, rm).unwrap();
 
@@ -286,9 +348,21 @@ fn macro_run_err_test() {
     assert_eq!(y2, z);
 
     // cos
-    let n = BigFloat::parse(s1, astro_float_num::Radix::Dec, 128, RoundingMode::None);
+    let n = BigFloat::parse(
+        s1,
+        astro_float_num::Radix::Dec,
+        128,
+        RoundingMode::None,
+        &mut cc,
+    );
     let y1 = n.cos(128, rm, &mut cc);
-    let n = BigFloat::parse(s1, astro_float_num::Radix::Dec, 320, RoundingMode::None);
+    let n = BigFloat::parse(
+        s1,
+        astro_float_num::Radix::Dec,
+        320,
+        RoundingMode::None,
+        &mut cc,
+    );
     let mut y2 = n.cos(320, RoundingMode::None, &mut cc);
     y2.set_precision(128, rm).unwrap();
 
@@ -299,7 +373,13 @@ fn macro_run_err_test() {
 
     // tan
     let s1 = "1.1001001000011111101101010100010001000010110100011000010001101001100010011000110011000101000101110000000110111000001110011010001e+0";
-    let n = BigFloat::parse(s1, astro_float_num::Radix::Bin, p, RoundingMode::None);
+    let n = BigFloat::parse(
+        s1,
+        astro_float_num::Radix::Bin,
+        p,
+        RoundingMode::None,
+        &mut cc,
+    );
     let y1 = n.tan(p, rm, &mut cc);
 
     let n = BigFloat::parse(
@@ -307,6 +387,7 @@ fn macro_run_err_test() {
         astro_float_num::Radix::Dec,
         y1.exponent().unwrap() as usize * 2 + p,
         RoundingMode::None,
+        &mut cc,
     );
     let mut y2 = n.tan(
         y1.exponent().unwrap() as usize * 2 + p,
@@ -399,6 +480,7 @@ fn macro_run_err_test() {
         Radix::Hex,
         usize::MAX,
         RoundingMode::None,
+        &mut cc,
     );
     let y1 = x.tanh(p, rm, &mut cc);
 
@@ -413,10 +495,22 @@ fn macro_run_err_test() {
     // asinh
     let s1 = "6.1705892816164049e-1";
 
-    let x = BigFloat::parse(s1, astro_float_num::Radix::Dec, p, RoundingMode::None);
+    let x = BigFloat::parse(
+        s1,
+        astro_float_num::Radix::Dec,
+        p,
+        RoundingMode::None,
+        &mut cc,
+    );
     let y1 = x.asinh(p, rm, &mut cc);
 
-    let x = BigFloat::parse(s1, astro_float_num::Radix::Dec, p + 1, RoundingMode::None);
+    let x = BigFloat::parse(
+        s1,
+        astro_float_num::Radix::Dec,
+        p + 1,
+        RoundingMode::None,
+        &mut cc,
+    );
     let mut y2 = x.asinh(p + 1, RoundingMode::None, &mut cc);
     y2.set_precision(p, rm).unwrap();
 

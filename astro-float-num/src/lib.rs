@@ -2,15 +2,17 @@
 //!
 //! See main crate [docs](https://docs.rs/astro-float/latest/astro_float/).
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
 #![deny(missing_docs)]
 #![deny(clippy::suspicious)]
-#![cfg_attr(not(feature = "std"), no_std)]
+
 #![allow(clippy::comparison_chain)]
 #![allow(clippy::should_implement_trait)]
-#![allow(clippy::too_many_arguments)]
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::module_inception)]
+
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -20,12 +22,14 @@ mod conv;
 pub mod ctx;
 mod defs;
 mod ext;
-mod for_3rd;
 mod mantissa;
 mod num;
 mod ops;
 mod parser;
 mod strop;
+
+#[cfg(feature = "std")]
+mod for_3rd;
 
 #[doc(hidden)]
 pub mod macro_util;
