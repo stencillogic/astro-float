@@ -1,8 +1,8 @@
 //! Static constants.
 
 use crate::{defs::DEFAULT_P, num::BigFloatNumber, ops::consts::TenPowers};
+use core::cell::RefCell;
 use lazy_static::lazy_static;
-use std::cell::RefCell;
 
 lazy_static! {
 

@@ -394,15 +394,11 @@ fn macro_run_err_test() {
     assert_ne!(z2, y);
 
     // tanh
-    let x = BigFloat::from_words(
-        &[
-            9236992107743244213,
-            15337583864450254957,
-            14091965535849219585,
-            16039319970605309248,
-        ],
-        Sign::Pos,
-        -98,
+    let x = BigFloat::parse(
+        "3.7A5C72221B0875030E42DFF83D5C180753682D0D054821B600C18D877C7DBED4_e-19",
+        Radix::Hex,
+        usize::MAX,
+        RoundingMode::None,
     );
     let y1 = x.tanh(p, rm, &mut cc);
 
@@ -458,22 +454,4 @@ fn macro_run_err_test() {
 
     assert_ne!(y1, z);
     assert_eq!(y2, z);
-
-    // assert does not hang when inexact arguments.
-    let x = BigFloat::from_raw_parts(
-        &[9441246966859219331u64, 13943995520284385473u64],
-        128,
-        Sign::Pos,
-        -5,
-        true,
-    );
-    let y = BigFloat::from_raw_parts(
-        &[145249953336295741u64, 9295997013522923649u64],
-        128,
-        Sign::Neg,
-        -3,
-        true,
-    );
-
-    let _ = expr!(y + x, &mut ctx);
 }

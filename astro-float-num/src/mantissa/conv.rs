@@ -6,6 +6,9 @@ use crate::common::util::shift_slice_right;
 use crate::mantissa::Mantissa;
 use crate::{Error, Word, WORD_BIT_SIZE};
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 // Number of decimal digits per word.
 const WORD_TENPOWER_LEN: usize = if WORD_BIT_SIZE < 64 { 8 } else { 16 };
 
@@ -214,6 +217,9 @@ mod tests {
     use crate::{common::util::log2_ceil, Word, WORD_BIT_SIZE, WORD_SIGNIFICANT_BIT};
 
     use super::*;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::vec::Vec;
 
     #[test]
     fn test_compute_tenpowers() {

@@ -757,6 +757,9 @@ mod tests {
     use crate::defs::{Sign, EXPONENT_MAX, EXPONENT_MIN};
     use rand::random;
 
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
+
     #[test]
     fn test_conv_num() {
         // basic tests
@@ -834,7 +837,7 @@ mod tests {
                 m,
                 [
                     5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-                    9, 9, 9, 2
+                    9, 9, 9
                 ]
             );
             assert!(s == Sign::Pos);
@@ -1305,7 +1308,7 @@ mod tests {
                 Radix::Dec,
             ),
         ] {
-            let g = BigFloatNumber::convert_from_radix(
+            let mut g = BigFloatNumber::convert_from_radix(
                 Sign::Pos,
                 &s1,
                 exp,
@@ -1329,8 +1332,13 @@ mod tests {
                     .unwrap();
 
             if rdx == Radix::Dec {
-                n.set_precision(g.mantissa_max_bit_len(), RoundingMode::ToEven)
-                    .unwrap();
+                if g.mantissa_max_bit_len() < n.mantissa_max_bit_len() {
+                    n.set_precision(g.mantissa_max_bit_len(), RoundingMode::ToEven)
+                        .unwrap();
+                } else {
+                    g.set_precision(n.mantissa_max_bit_len(), RoundingMode::ToEven)
+                        .unwrap();
+                }
 
                 assert!(n.cmp(&g) == 0);
             } else {

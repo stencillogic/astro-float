@@ -15,6 +15,9 @@ use crate::BigFloat;
 use crate::Error;
 use crate::RoundingMode;
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 /// Constants cache contains arbitrary-precision mathematical constants.
 #[derive(Debug)]
 pub struct Consts {

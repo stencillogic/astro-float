@@ -145,7 +145,7 @@ fn one_arg_fun_cc(
             let ret = #fun(&arg, p_wrk, astro_float::RoundingMode::None, cc);
 
             if let Some(e) = ret.exponent() {
-                let h = 2 * (e.unsigned_abs() as isize) - p as isize;
+                let h = 2 * (e.unsigned_abs() as isize) + 1;
                 if (errs[#errs_id] as isize) < h {
                     errs[#errs_id] = h as usize;
                     continue;
@@ -495,11 +495,7 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
             let mut ret: astro_float::BigFloat = (#expr).into();
 
-            if ret.inexact() {
-                if ret.try_set_precision(p, rm, p_rnd) {
-                    break ret;
-                }
-            } else {
+            if ret.try_set_precision(p, rm, p_rnd) {
                 break ret;
             }
 
