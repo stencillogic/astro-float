@@ -4,6 +4,7 @@ mod cbrt;
 mod conv;
 mod div;
 mod fft;
+#[allow(clippy::module_inception)]
 mod mantissa;
 mod mul;
 mod sqrt;

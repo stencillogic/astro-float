@@ -72,7 +72,7 @@ pub(crate) fn series_cost_optimize<S: ArgReductionEstimator>(
             polycoeff_gen.iter_cost() as u64 * niter as u64
         } else {
             series_cost(niter, p, polycoeff_gen)
-        } + S::reduction_cost(reduction_times, p) as u64;
+        } + S::reduction_cost(reduction_times, p);
 
         if cost2 < cost1 {
             cost1 = cost2;

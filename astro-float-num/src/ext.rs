@@ -323,6 +323,7 @@ impl BigFloat {
 
     /// Compares `self` to `d2`.
     /// Returns positive if `self` > `d2`, negative if `self` < `d2`, zero if `self` == `d2`, None if `self` or `d2` is NaN.
+    #[allow(clippy::should_implement_trait)]
     pub fn cmp(&self, d2: &BigFloat) -> Option<SignedWord> {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {

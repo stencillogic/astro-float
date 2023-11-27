@@ -445,7 +445,7 @@ impl BigFloatNumber {
                 continue;
             }
 
-            let (mut m, _, e, inexact) = x.to_raw_parts();
+            let (mut m, _, e, inexact) = x.into_raw_parts();
 
             let shift = e as usize - p_wrk;
             if shift > 0 {

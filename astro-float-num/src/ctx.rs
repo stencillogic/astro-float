@@ -80,6 +80,7 @@ impl Context {
     /// # Errors
     ///
     /// - MemoryAllocation: failed to allocate memory for the constants cache.
+    #[allow(clippy::should_implement_trait)]
     pub fn clone(&self) -> Result<Self, Error> {
         let cc = Consts::new()?;
         Ok(Context {

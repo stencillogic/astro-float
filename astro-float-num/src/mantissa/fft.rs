@@ -105,6 +105,7 @@ impl Mantissa {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn fft_forward(
         parts: &mut [SliceWithSign],
         w: usize,

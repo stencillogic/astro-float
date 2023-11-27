@@ -334,7 +334,7 @@ impl BigFloatNumber {
             &mut inexact,
         )?;
 
-        let e = e1 + e2 - e_shift as isize;
+        let e = e1 + e2 - e_shift;
 
         if e > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(s));
@@ -400,7 +400,7 @@ impl BigFloatNumber {
         let (e_shift, m3) =
             m1_normalized.div(m2_normalized, p, rm, s == Sign::Pos, &mut inexact)?;
 
-        let e = e1 - e2 + e_shift as isize;
+        let e = e1 - e2 + e_shift;
 
         if e > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(s));
@@ -554,9 +554,9 @@ impl BigFloatNumber {
             #[cfg(not(target_arch = "x86"))]
             {
                 // checks for the case when usize is larger than exponent
-                debug_assert!((shift as isize) < (isize::MAX as isize / 2 + EXPONENT_MIN as isize));
+                debug_assert!((shift as isize) < (isize::MAX / 2 + EXPONENT_MIN as isize));
 
-                if (self.e as isize) - shift as isize <= isize::MIN as isize / 2 {
+                if (self.e as isize) - shift as isize <= isize::MIN / 2 {
                     return Err(Error::ExponentOverflow(self.s));
                 }
             }
@@ -675,9 +675,9 @@ impl BigFloatNumber {
 
         #[cfg(not(target_arch = "x86"))]
         {
-            debug_assert!(shift <= isize::MAX / 2 && e >= isize::MIN as isize / 2);
+            debug_assert!(shift <= isize::MAX / 2 && e >= isize::MIN / 2);
         }
-        e -= shift as isize;
+        e -= shift;
 
         if e > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(d3.s));
@@ -910,7 +910,7 @@ impl BigFloatNumber {
     /// The function returns mantissa,
     /// sign, exponent, and a bool value which specify whether the number is inexact.
     #[inline]
-    pub fn to_raw_parts(self) -> (Mantissa, Sign, Exponent, bool) {
+    pub fn into_raw_parts(self) -> (Mantissa, Sign, Exponent, bool) {
         (self.m, self.s, self.e, self.inexact)
     }
 
@@ -1174,7 +1174,7 @@ impl BigFloatNumber {
     pub fn set_exponent(&mut self, e: Exponent) {
         if !self.is_zero() {
             if self.is_subnormal() && e > EXPONENT_MIN {
-                let ediff = (e as isize - EXPONENT_MIN as isize) as isize;
+                let ediff = e as isize - EXPONENT_MIN as isize;
 
                 let n = self.mantissa_max_bit_len() - self.precision();
                 if n as isize >= ediff {

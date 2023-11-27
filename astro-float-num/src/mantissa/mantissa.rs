@@ -230,6 +230,7 @@ impl Mantissa {
 
     /// Subtracts m2 from self. m2 is supposed to be shifted right by m2_shift bits.
     /// `inexact` is set to true if the result is not exact.
+    #[allow(clippy::too_many_arguments)]
     pub fn abs_sub(
         &self,
         m2: &Self,
@@ -332,6 +333,7 @@ impl Mantissa {
     }
 
     /// Returns exponent shift, and self + m2.
+    #[allow(clippy::too_many_arguments)]
     pub fn abs_add(
         &self,
         m2: &Self,

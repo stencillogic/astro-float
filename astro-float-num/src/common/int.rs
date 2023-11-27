@@ -38,26 +38,26 @@ impl<'a> SliceWithSign<'a> {
     }
 
     #[inline]
-    pub fn add<'b, 'c>(&self, s2: &SliceWithSign<'b>, dst: &mut SliceWithSign<'c>) {
+    pub fn add(&self, s2: &SliceWithSign<'_>, dst: &mut SliceWithSign<'_>) {
         self.add_sub(s2, dst, 1);
     }
 
     #[inline]
-    pub fn sub<'b, 'c>(&self, s2: &SliceWithSign<'b>, dst: &mut SliceWithSign<'c>) {
+    pub fn sub(&self, s2: &SliceWithSign<'_>, dst: &mut SliceWithSign<'_>) {
         self.add_sub(s2, dst, -1);
     }
 
     #[inline]
-    pub fn add_assign<'c>(&mut self, s2: &SliceWithSign<'c>) {
+    pub fn add_assign(&mut self, s2: &SliceWithSign<'_>) {
         self.add_sub_assign(s2, 1);
     }
 
     #[inline]
-    pub fn sub_assign<'c>(&mut self, s2: &SliceWithSign<'c>) {
+    pub fn sub_assign(&mut self, s2: &SliceWithSign<'_>) {
         self.add_sub_assign(s2, -1);
     }
 
-    fn add_sub<'b, 'c>(&self, s2: &SliceWithSign<'b>, dst: &mut SliceWithSign<'c>, op: i8) {
+    fn add_sub(&self, s2: &SliceWithSign<'_>, dst: &mut SliceWithSign<'_>, op: i8) {
         if (self.sign != s2.sign && op > 0) || (op < 0 && self.sign == s2.sign) {
             // subtract
             let cmp = Self::abs_cmp(self, s2);
@@ -77,7 +77,7 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
-    fn add_sub_assign<'b>(&mut self, s2: &SliceWithSign<'b>, op: i8) {
+    fn add_sub_assign(&mut self, s2: &SliceWithSign<'_>, op: i8) {
         if (self.sign != s2.sign && op > 0) || (op < 0 && self.sign == s2.sign) {
             // subtract
             let cmp = Self::abs_cmp(self, s2);
@@ -166,7 +166,7 @@ impl<'a> SliceWithSign<'a> {
         }
     }
 
-    pub fn copy_from<'c>(&mut self, s2: &SliceWithSign<'c>) {
+    pub fn copy_from(&mut self, s2: &SliceWithSign<'_>) {
         match &mut self.m {
             SliceWithSignType::Mut(m) => {
                 match &s2.m {

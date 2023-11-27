@@ -64,7 +64,7 @@ impl Mantissa {
 
             self.shift_left_resize(*shift)?;
 
-            let (q, mut r) = Self::div_unbalanced(self.digits(), &tenpower)?;
+            let (q, mut r) = Self::div_unbalanced(self.digits(), tenpower)?;
 
             shift_slice_right(&mut r, *shift);
 
@@ -93,7 +93,7 @@ impl Mantissa {
         tenpowers: &mut Vec<(WordBuf, WordBuf, usize)>,
         p: usize,
     ) -> Result<(), Error> {
-        if tenpowers.len() == 0 {
+        if tenpowers.is_empty() {
             let mut wb = WordBuf::new(1)?;
             wb[0] = 10;
             let shift = Self::maximize(&mut wb);
@@ -178,7 +178,7 @@ impl Mantissa {
             for pair in chunks.chunks(2) {
                 if pair.len() == 2 {
                     let mut wb1 = WordBuf::new(pair[1].len() + tenpower.len())?;
-                    Self::mul_unbalanced(&pair[1], &tenpower, &mut wb1)?;
+                    Self::mul_unbalanced(&pair[1], tenpower, &mut wb1)?;
 
                     let mut wb2 = WordBuf::new(wb1.len() + 1)?;
                     wb2[..wb1.len()].copy_from_slice(&wb1);
