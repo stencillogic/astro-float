@@ -70,7 +70,8 @@ impl BigFloat {
         Self::result_to_ext(BigFloatNumber::from_f64(p, f), false, true)
     }
 
-    pub(crate) fn nan(err: Option<Error>) -> Self {
+    /// Constructs not-a-number with an associated error `err`.
+    pub fn nan(err: Option<Error>) -> Self {
         BigFloat {
             inner: Flavor::NaN(err),
         }

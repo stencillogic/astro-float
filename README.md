@@ -18,7 +18,7 @@ Below is an example of using the library.
 For more information please refer to the library documentation: https://docs.rs/astro-float/latest/astro_float/
 
 
-Calculate Pi with 1024 bit precision rounded to even.
+Calculate Pi with 1024 bit precision rounded to the nearest even number.
 
 ``` rust
 use astro_float::Consts;

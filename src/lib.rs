@@ -44,14 +44,13 @@
 //!
 //! **Correctness**
 //!
-//! Results of all arithmetic operations, mathematical functions, and constant values are correctly rounded.
-//!
+//! Results of all arithmetic operations, mathematical functions, and constant values are correctly rounded
+//! (a correctly rounded number is a number that is identical to a number computed to infinite precision and then rounded, reflecting no information loss during rounding).
 //!
 //! ## Examples
 //!
-//! The example below computes value of Pi with precision 1024 rounded to even using `expr!` macro.
-//! Macro simplifies syntax, takes care of the error and rounding of the result.
-//! Although, macro has certain pitfalls to avoid. Check the macro documentation for more details.
+//! The example below computes value of Pi with precision 1024 rounded to the nearest even number using `expr!` macro.
+//! Macro simplifies syntax and takes care of the error.
 //!
 //! ```
 //! use astro_float::Consts;
@@ -78,8 +77,8 @@
 //! // output: 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458699748e+0
 //! ```
 //!
-//! The example below computes value of Pi with precision 1024 rounded to even using `BigFloat` directly.
-//! In this case, we will take care of error, and we will not check wether the result is correctly rounded.
+//! The example below computes value of Pi with precision 1024 rounded to the nearest even number using `BigFloat` directly.
+//! We will take care of the error in this case.
 //!
 //! ``` rust
 //! use astro_float::BigFloat;
@@ -138,7 +137,7 @@
 extern crate alloc;
 
 /// Computes an expression with the specified precision and rounding mode.
-/// Macro takes into account 3 aspects.
+/// Macro takes into account 2 aspects.
 ///
 /// 1. Code simplification. Macro simplifies code and improves its readability by allowing to specify simple and concise expression
 /// and process input arguments transparently.
@@ -146,8 +145,7 @@ extern crate alloc;
 /// 2. Error compensation. Macro compensates error caused by [catastrophic cancellation](https://en.wikipedia.org/wiki/Catastrophic_cancellation)
 /// and some other situations where precision can be lost by automatically increasing the working precision internally.
 ///
-/// 3. Correct rounding. Sometimes it is necessary to increase working precision to have enough information to perform rounding correctly.
-/// Macro does this automatically for rounding modes different from `RoundingMode::None`.
+/// The macro does not take care of correct rounding, because the completion of the rounding algorithm in finite time depends on the macro's input.
 ///
 /// The macro accepts an expression to compute and a context.
 /// The expression can include:
@@ -203,21 +201,8 @@ extern crate alloc;
 /// The context determines the precision, the rounding mode of the result, and also contains the cache of constants.
 /// Tuple `(usize, RoundingMode, &mut Consts)` can also be used as a temporary context (see example below).
 ///
-/// The macro will determine additional precision needed to compensate error and perform correct rounding,
-/// also it will try to eliminate cancellation.
-///
-/// Any input argument in the expression is interpreted as exact,
-/// For example, if an argument of an expression has type BigFloat and it is an inexact result of a previous computation.
-///
-/// **Avoid passing expressions which contain mathematical identity if you expect a correctly rounded result**.
-///
-/// Examples of such expressions:
-///
-///  - `expr!(sin(x) - sin(x), ctx)`
-///  - `expr!(ln(exp(x)), ctx)`,
-///  - `expr!(sin(x) * sin(x) / (1 - cos(x) * cos(x)), ctx)`,
-///
-/// Macro does not analyze the expression for presense of identity and will increase the precision infinitely and will never return.
+/// Any input argument in the expression is interpreted as exact
+/// (i.e. if an argument of an expression has type BigFloat and it is an inexact result of a previous computation).
 ///
 /// ## Examples
 ///

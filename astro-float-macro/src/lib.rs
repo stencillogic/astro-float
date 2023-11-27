@@ -529,8 +529,7 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let rm = ctx.rounding_mode();
         let cc = ctx.consts();
 
-        let mut p_inc = astro_float::WORD_BIT_SIZE;
-        let mut p_rnd = p + p_inc;
+        let mut p_rnd = p + astro_float::WORD_BIT_SIZE;
         let mut errs: [usize; #err_sz] = [#(#err, )*];
 
         loop {
@@ -538,12 +537,11 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
             let mut ret: astro_float::BigFloat = (#expr).into();
 
-            if ret.try_set_precision(p, rm, p_rnd) {
-                break ret;
+            if let Err(err) = ret.set_precision(p, rm) {
+                ret = astro_float::BigFloat::nan(Some(err));
             }
 
-            p_rnd = p_rnd.saturating_add(p_inc);
-            p_inc = (((p_rnd / 5).saturating_add(astro_float::WORD_BIT_SIZE - 1)) / astro_float::WORD_BIT_SIZE) * astro_float::WORD_BIT_SIZE;
+            break ret;
         }
     });
 

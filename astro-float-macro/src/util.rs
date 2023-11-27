@@ -13,13 +13,11 @@ use syn::ExprCall;
 
 pub fn str_to_bigfloat_expr(s: &str, span: Span, cc: &mut Consts) -> Result<TokenStream, Error> {
     let f = BigFloat::parse(s, Radix::Dec, usize::MAX, RoundingMode::ToEven, cc);
-    if f.is_nan() {
-        if let Some(err) = f.err() {
-            return Err(Error::new(
-                span,
-                format!("failed to parse BigFloat from {}: {}", s, err),
-            ));
-        }
+    if let Some(err) = f.err() {
+        return Err(Error::new(
+            span,
+            format!("failed to parse BigFloat from {}: {}", s, err),
+        ));
     }
 
     let q = if f.inexact() {
