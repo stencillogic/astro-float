@@ -1,5 +1,15 @@
 # Release notes
 
+**0.8.0**
+
+ - Scalable conversion to decimal and from decimal base implemented: conversion and formatting functions now require constants cache.
+ - Implementation of traits `FromStr` and `Display` and `serde` feature are now not available in no_std.
+ - Mechanism of correct rounding has been removed from the `expr!` macro to increase its stablility.
+ - Macro `expr!` now supports constants `pi`, `e`, `ln_2`, and `ln_10` in expressions.
+ - New public functions `BigFloat::nan()`, `BigFloat::format()`, new constant `EXPONENT_BIT_SIZE`.
+ - Bug fixes and code refinements.
+ - Improved portability and stability.
+
 **0.7.0**
 
  - Improved integration tests.
