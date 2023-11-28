@@ -60,10 +60,12 @@ mod tests {
     use super::*;
     use crate::common::consts::ONE;
     use crate::{common::util::random_subnormal, defs::WORD_BIT_SIZE, Exponent};
-    use crate::{Sign, EXPONENT_MAX};
+    use crate::{Consts, Sign, EXPONENT_MAX};
 
     #[test]
     fn test_sqrt() {
+        let mut cc = Consts::new().unwrap();
+
         /* let n1 = BigFloatNumber::from_words(
             &[18446744073709551614, 18446744073709551615],
             Sign::Pos, 0).unwrap();
@@ -77,6 +79,7 @@ mod tests {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
         let d2 = d1.sqrt(p, RoundingMode::ToEven).unwrap();
@@ -85,6 +88,7 @@ mod tests {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
 
@@ -97,6 +101,7 @@ mod tests {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
         let d2 = d1.sqrt(p, RoundingMode::ToEven).unwrap();
@@ -105,6 +110,7 @@ mod tests {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
 

@@ -334,7 +334,7 @@ impl BigFloatNumber {
             &mut inexact,
         )?;
 
-        let e = e1 + e2 - e_shift as isize;
+        let e = e1 + e2 - e_shift;
 
         if e > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(s));
@@ -400,7 +400,7 @@ impl BigFloatNumber {
         let (e_shift, m3) =
             m1_normalized.div(m2_normalized, p, rm, s == Sign::Pos, &mut inexact)?;
 
-        let e = e1 - e2 + e_shift as isize;
+        let e = e1 - e2 + e_shift;
 
         if e > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(s));
@@ -499,9 +499,13 @@ impl BigFloatNumber {
         if e1eff > e2eff {
             // (m1 * 2^(e1eff - e2eff)) mod m2 = ((m1 mod m2) * ( 2^(e1eff - e2eff) mod m2 )) mod m2
 
-            let two = Mantissa::from_raw_parts(&[2], 2)?;
-
-            let powm = two.pow_mod((e1eff - e2eff) as usize, m2_normalized)?;
+            let mut two = Mantissa::from_raw_parts(&[2], 2)?;
+            let powm = if (e1eff - e2eff) as usize >= m2_normalized.max_bit_len() {
+                two.pow_mod((e1eff - e2eff) as usize, m2_normalized)?
+            } else {
+                two.pow2((e1eff - e2eff - 1) as usize)?;
+                two // m3 still becomes 0 in rare case when two == m2_normalized
+            };
 
             let m3 = self.m.rem(m2_normalized)?;
 
@@ -550,9 +554,9 @@ impl BigFloatNumber {
             #[cfg(not(target_arch = "x86"))]
             {
                 // checks for the case when usize is larger than exponent
-                debug_assert!((shift as isize) < (isize::MAX as isize / 2 + EXPONENT_MIN as isize));
+                debug_assert!((shift as isize) < (isize::MAX / 2 + EXPONENT_MIN as isize));
 
-                if (self.e as isize) - shift as isize <= isize::MIN as isize / 2 {
+                if (self.e as isize) - shift as isize <= isize::MIN / 2 {
                     return Err(Error::ExponentOverflow(self.s));
                 }
             }
@@ -671,9 +675,9 @@ impl BigFloatNumber {
 
         #[cfg(not(target_arch = "x86"))]
         {
-            debug_assert!(shift <= isize::MAX / 2 && e >= isize::MIN as isize / 2);
+            debug_assert!(shift <= isize::MAX / 2 && e >= isize::MIN / 2);
         }
-        e -= shift as isize;
+        e -= shift;
 
         if e > EXPONENT_MAX as isize {
             return Err(Error::ExponentOverflow(d3.s));
@@ -841,6 +845,9 @@ impl BigFloatNumber {
         ret.m = m;
         ret.e = exponent - 0b1111111111 - shift as Exponent;
 
+        #[cfg(target_arch = "x86")]
+        debug_assert!(ret.e <= EXPONENT_MAX && ret.e >= EXPONENT_MIN);
+
         Ok(ret)
     }
 
@@ -886,27 +893,6 @@ impl BigFloatNumber {
         }
     }
 
-    /// Constructs a number with precision `p` from f32 value.
-    /// Precision is rounded upwards to the word size.
-    ///
-    /// ## Errors
-    ///
-    ///  - InvalidArgument: the precision is incorrect or `f` is NaN.
-    ///  - MemoryAllocation: failed to allocate memory for mantissa.
-    ///  - ExponentOverflow: `f` is Inf.
-    #[inline]
-    pub fn from_f32(p: usize, f: f32) -> Result<Self, Error> {
-        Self::from_f64(p, f as f64)
-    }
-
-    /// Converts a number to f32 value.
-    /// self is converted to f64 first (rounding to zero), and then to f32 (rounding is default for built-in types).
-    #[inline]
-    #[cfg(test)]
-    pub(crate) fn to_f32(&self) -> f32 {
-        self.to_f64() as f32
-    }
-
     /// Returns true if `self` is subnormal. A number is subnormal if the most significant bit of the mantissa is not equal to 1.
     #[inline]
     pub fn is_subnormal(&self) -> bool {
@@ -923,9 +909,17 @@ impl BigFloatNumber {
         (m, n, self.s, self.e, self.inexact)
     }
 
+    /// Consumes `self` and decomposes into raw parts.
+    /// The function returns mantissa,
+    /// sign, exponent, and a bool value which specify whether the number is inexact.
+    #[inline]
+    pub fn into_raw_parts(self) -> (Mantissa, Sign, Exponent, bool) {
+        (self.m, self.s, self.e, self.inexact)
+    }
+
     /// Constructs a number from the raw parts:
     ///
-    ///  - `m` is the mantisaa.
+    ///  - `m` is the mantissa.
     ///  - `n` is the number of significant bits in mantissa.
     ///  - `s` is the sign.
     ///  - `e` is the exponent.
@@ -949,6 +943,7 @@ impl BigFloatNumber {
         let p = m.len() * WORD_BIT_SIZE;
         Self::p_assertion(p)?;
 
+        #[cfg(target_arch = "x86")]
         if e < EXPONENT_MIN || e > EXPONENT_MAX {
             return Err(Error::InvalidArgument);
         }
@@ -994,6 +989,7 @@ impl BigFloatNumber {
         let p = m.len() * WORD_BIT_SIZE;
         Self::p_assertion(p)?;
 
+        #[cfg(target_arch = "x86")]
         if e < EXPONENT_MIN || e > EXPONENT_MAX {
             return Err(Error::InvalidArgument);
         }
@@ -1133,17 +1129,6 @@ impl BigFloatNumber {
         Ok(ret)
     }
 
-    /// Returns integer part as a word.
-    pub(crate) fn int_as_word(&self) -> Word {
-        if self.e > 0 && WORD_BIT_SIZE >= self.e as usize {
-            let d = self.m.most_significant_word();
-            let shift = WORD_BIT_SIZE - self.e as usize;
-            d >> shift
-        } else {
-            0
-        }
-    }
-
     /// Returns true if `self` is odd integer number.
     pub(crate) fn is_odd_int(&self) -> bool {
         if self.e > 0 {
@@ -1190,9 +1175,18 @@ impl BigFloatNumber {
     /// Note that if `self` is subnormal, the exponent may not change, but the mantissa will shift instead.
     /// `e` will be clamped to the range from EXPONENT_MIN to EXPONENT_MAX if it's outside of the range.
     pub fn set_exponent(&mut self, e: Exponent) {
+        #[cfg(target_arch = "x86")]
+        let e = if e < EXPONENT_MIN {
+            EXPONENT_MIN
+        } else if e > EXPONENT_MAX {
+            EXPONENT_MAX
+        } else {
+            e
+        };
+
         if !self.is_zero() {
             if self.is_subnormal() && e > EXPONENT_MIN {
-                let ediff = (e as isize - EXPONENT_MIN as isize) as isize;
+                let ediff = e as isize - EXPONENT_MIN as isize;
 
                 let n = self.mantissa_max_bit_len() - self.precision();
                 if n as isize >= ediff {
@@ -1319,6 +1313,7 @@ impl BigFloatNumber {
     pub fn random_normal(p: usize, exp_from: Exponent, exp_to: Exponent) -> Result<Self, Error> {
         Self::p_assertion(p)?;
 
+        #[cfg(target_arch = "x86")]
         if exp_from < EXPONENT_MIN || exp_to > EXPONENT_MAX {
             return Err(Error::InvalidArgument);
         }
@@ -1378,7 +1373,7 @@ impl BigFloatNumber {
         rm: RoundingMode,
         s: usize,
     ) -> Result<bool, Error> {
-        self.set_precision_internal(p, rm, true, s)
+        self.set_precision_internal(p, rm, self.inexact(), s)
     }
 
     fn set_precision_internal(
@@ -1616,7 +1611,7 @@ impl_int_conv!(i64, u64, from_i64, from_u64);
 #[cfg(test)]
 mod tests {
 
-    use crate::{common::util::random_subnormal, defs::WORD_MAX};
+    use crate::{common::util::random_subnormal, defs::WORD_MAX, Consts};
 
     use super::*;
     use rand::random;
@@ -1633,6 +1628,7 @@ mod tests {
         let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
 
         let rm = RoundingMode::ToEven;
+        let mut cc = Consts::new().unwrap();
 
         let mut d1;
         let mut d2;
@@ -1791,8 +1787,6 @@ mod tests {
             if f.is_finite() {
                 d1 = BigFloatNumber::from_f64(p, f).unwrap();
                 assert!(d1.to_f64() == f);
-                d1 = BigFloatNumber::from_f32(p, f as f32).unwrap();
-                assert!(d1.to_f32() == f as f32);
             }
         }
 
@@ -1811,21 +1805,46 @@ mod tests {
             let n4 = BigFloatNumber::from_i64(i4, p).unwrap();
             let n5 = BigFloatNumber::from_i128(i5, p).unwrap();
 
-            let p1 =
-                BigFloatNumber::parse(&format!("{}", i1), crate::Radix::Dec, p, RoundingMode::None)
-                    .unwrap();
-            let p2 =
-                BigFloatNumber::parse(&format!("{}", i2), crate::Radix::Dec, p, RoundingMode::None)
-                    .unwrap();
-            let p3 =
-                BigFloatNumber::parse(&format!("{}", i3), crate::Radix::Dec, p, RoundingMode::None)
-                    .unwrap();
-            let p4 =
-                BigFloatNumber::parse(&format!("{}", i4), crate::Radix::Dec, p, RoundingMode::None)
-                    .unwrap();
-            let p5 =
-                BigFloatNumber::parse(&format!("{}", i5), crate::Radix::Dec, p, RoundingMode::None)
-                    .unwrap();
+            let p1 = BigFloatNumber::parse(
+                &format!("{}", i1),
+                crate::Radix::Dec,
+                p,
+                RoundingMode::None,
+                &mut cc,
+            )
+            .unwrap();
+            let p2 = BigFloatNumber::parse(
+                &format!("{}", i2),
+                crate::Radix::Dec,
+                p,
+                RoundingMode::None,
+                &mut cc,
+            )
+            .unwrap();
+            let p3 = BigFloatNumber::parse(
+                &format!("{}", i3),
+                crate::Radix::Dec,
+                p,
+                RoundingMode::None,
+                &mut cc,
+            )
+            .unwrap();
+            let p4 = BigFloatNumber::parse(
+                &format!("{}", i4),
+                crate::Radix::Dec,
+                p,
+                RoundingMode::None,
+                &mut cc,
+            )
+            .unwrap();
+            let p5 = BigFloatNumber::parse(
+                &format!("{}", i5),
+                crate::Radix::Dec,
+                p,
+                RoundingMode::None,
+                &mut cc,
+            )
+            .unwrap();
 
             assert!(p1.cmp(&n1) == 0);
             assert!(p2.cmp(&n2) == 0);
@@ -2351,11 +2370,12 @@ mod tests {
             crate::Radix::Hex,
             320,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
 
         d2 = d1.reciprocal(320, RoundingMode::ToEven).unwrap();
-        d3 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000000D237A0818813B7A_e+0", crate::Radix::Hex, 320, RoundingMode::None).unwrap();
+        d3 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000000D237A0818813B7A_e+0", crate::Radix::Hex, 320, RoundingMode::None, &mut cc).unwrap();
 
         //println!("{:?}", d2.format(crate::Radix::Hex, rm).unwrap());
 
@@ -2622,10 +2642,22 @@ mod tests {
                     ("0.000000007", "0.000000004"),
                     ("0.00000000000000009", "0.000000000000000004"),
                 ] {
-                    d1 = BigFloatNumber::parse(s1, crate::Radix::Dec, prec1, RoundingMode::None)
-                        .unwrap();
-                    d2 = BigFloatNumber::parse(s2, crate::Radix::Dec, prec2, RoundingMode::None)
-                        .unwrap();
+                    d1 = BigFloatNumber::parse(
+                        s1,
+                        crate::Radix::Dec,
+                        prec1,
+                        RoundingMode::None,
+                        &mut cc,
+                    )
+                    .unwrap();
+                    d2 = BigFloatNumber::parse(
+                        s2,
+                        crate::Radix::Dec,
+                        prec2,
+                        RoundingMode::None,
+                        &mut cc,
+                    )
+                    .unwrap();
 
                     let p = prec1.max(prec2);
 
@@ -2663,6 +2695,7 @@ mod tests {
             let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
             let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
             let p = p1.max(p2);
+            let e_rng = (p_rng * WORD_BIT_SIZE) as Exponent;
 
             d1 = BigFloatNumber::random_normal(
                 p1,
@@ -2672,7 +2705,7 @@ mod tests {
             .unwrap()
             .abs()
             .unwrap();
-            d2 = BigFloatNumber::random_normal(p2, d1.exponent() - 10, d1.exponent() + 10)
+            d2 = BigFloatNumber::random_normal(p2, d1.exponent() - e_rng, d1.exponent() + e_rng)
                 .unwrap()
                 .abs()
                 .unwrap();
@@ -2681,21 +2714,21 @@ mod tests {
 
             d3 = d1
                 .sub(
-                    &d1.div(&d2, p + 1, RoundingMode::ToEven)
+                    &d1.div(&d2, p + p_rng * WORD_BIT_SIZE, RoundingMode::None)
                         .unwrap()
                         .floor()
                         .unwrap()
-                        .mul(&d2, p + 1, RoundingMode::ToEven)
+                        .mul(&d2, p + p_rng * WORD_BIT_SIZE, RoundingMode::None)
                         .unwrap(),
-                    p + 1,
+                    ret.mantissa_max_bit_len(),
                     RoundingMode::ToEven,
                 )
                 .unwrap();
 
-            // println!("\n{:?}", d1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
-            // println!("{:?}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-            // println!("{:?}", ret.format(crate::Radix::Bin, RoundingMode::None).unwrap());
-            // println!("{:?}", d3.format(crate::Radix::Bin, RoundingMode::None).unwrap());
+            //println!("\n{:?}", d1.format(crate::Radix::Dec, RoundingMode::None).unwrap());
+            //println!("{:?}", d2.format(crate::Radix::Dec, RoundingMode::None).unwrap());
+            //println!("{:?}", ret.format(crate::Radix::Dec, RoundingMode::None).unwrap());
+            //println!("{:?}", d3.format(crate::Radix::Dec, RoundingMode::None).unwrap());
 
             assert!(ret.sub(&d3, p, RoundingMode::ToEven).unwrap().is_zero());
 
@@ -2732,20 +2765,51 @@ mod tests {
             );
         }
 
-        let d1 = BigFloatNumber::parse("3.0", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
-        assert!(d1.is_odd_int());
-        let d1 = BigFloatNumber::parse("3.01", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
-        assert!(!d1.is_odd_int());
-        let d1 = BigFloatNumber::parse("32.0", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
-        assert!(!d1.is_odd_int());
+        // special case rem
+        let d1 = BigFloatNumber::from_words(&[WORD_SIGNIFICANT_BIT], Sign::Pos, 2).unwrap();
+        let d2 = BigFloatNumber::from_words(&[WORD_SIGNIFICANT_BIT], Sign::Pos, 65).unwrap();
+
+        let d3 = d2.rem(&d1).unwrap();
+        assert!(d3.is_zero());
+
+        // is_odd_int
         let d1 =
-            BigFloatNumber::parse("32.01", crate::Radix::Dec, 128, RoundingMode::None).unwrap();
+            BigFloatNumber::parse("3.0", crate::Radix::Dec, 128, RoundingMode::ToEven, &mut cc)
+                .unwrap();
+        assert!(d1.is_odd_int());
+        let d1 = BigFloatNumber::parse(
+            "3.01",
+            crate::Radix::Dec,
+            128,
+            RoundingMode::ToEven,
+            &mut cc,
+        )
+        .unwrap();
+        assert!(!d1.is_odd_int());
+        let d1 = BigFloatNumber::parse(
+            "32.0",
+            crate::Radix::Dec,
+            128,
+            RoundingMode::ToEven,
+            &mut cc,
+        )
+        .unwrap();
+        assert!(!d1.is_odd_int());
+        let d1 = BigFloatNumber::parse(
+            "32.01",
+            crate::Radix::Dec,
+            128,
+            RoundingMode::ToEven,
+            &mut cc,
+        )
+        .unwrap();
         assert!(!d1.is_odd_int());
         let d1 = BigFloatNumber::parse(
             "0.00000000000000000000001",
             crate::Radix::Dec,
             256,
-            RoundingMode::None,
+            RoundingMode::ToEven,
+            &mut cc,
         )
         .unwrap();
         assert!(!d1.is_odd_int());
@@ -2753,7 +2817,8 @@ mod tests {
             "5.00000000000000000000001",
             crate::Radix::Dec,
             256,
-            RoundingMode::None,
+            RoundingMode::ToEven,
+            &mut cc,
         )
         .unwrap();
         assert!(!d1.is_odd_int());
@@ -2761,7 +2826,8 @@ mod tests {
             "10000000000000000000001.0",
             crate::Radix::Dec,
             256,
-            RoundingMode::None,
+            RoundingMode::ToEven,
+            &mut cc,
         )
         .unwrap();
         assert!(d1.is_odd_int());
@@ -2769,7 +2835,8 @@ mod tests {
             "10000000000000000000001.0000000000000000001",
             crate::Radix::Dec,
             256,
-            RoundingMode::None,
+            RoundingMode::ToEven,
+            &mut cc,
         )
         .unwrap();
         assert!(!d1.is_odd_int());
@@ -3599,6 +3666,50 @@ mod tests {
             }
             let time = start_time.elapsed();
             println!("div {}", time.as_millis());
+        }
+    }
+
+    #[ignore]
+    #[test]
+    #[cfg(feature = "std")]
+    fn rem_perf() {
+        for _ in 0..5 {
+            let mut d1 = vec![];
+            let mut d2 = vec![];
+            let p_rng = 10;
+            let p_min = 100;
+            for _ in 0..1000 {
+                let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+                let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+
+                let d = BigFloatNumber::random_normal(
+                    p1,
+                    EXPONENT_MIN / 2 - p1 as Exponent,
+                    EXPONENT_MAX / 2,
+                )
+                .unwrap()
+                .abs()
+                .unwrap();
+                let de = d.exponent();
+                d1.push(d);
+                d2.push(
+                    BigFloatNumber::random_normal(
+                        p2,
+                        de - (WORD_BIT_SIZE * p_rng) as Exponent,
+                        de + (WORD_BIT_SIZE * p_rng) as Exponent,
+                    )
+                    .unwrap()
+                    .abs()
+                    .unwrap(),
+                );
+            }
+
+            let start_time = std::time::Instant::now();
+            for (d1, d2) in d1.iter().zip(d2.iter()) {
+                let _ = d1.rem(d2);
+            }
+            let time = start_time.elapsed();
+            println!("rem {}", time.as_millis());
         }
     }
 }

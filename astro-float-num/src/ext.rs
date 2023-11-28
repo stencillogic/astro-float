@@ -2,7 +2,6 @@
 
 use crate::defs::SignedWord;
 use crate::defs::DEFAULT_P;
-use crate::defs::DEFAULT_RM;
 use crate::num::BigFloatNumber;
 use crate::Consts;
 use crate::Error;
@@ -11,12 +10,14 @@ use crate::Radix;
 use crate::RoundingMode;
 use crate::Sign;
 use crate::Word;
-use core::fmt::Write;
 use core::num::FpCategory;
 use lazy_static::lazy_static;
 
+#[cfg(feature = "std")]
+use core::fmt::Write;
+
 #[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 /// Not a number.
 pub const NAN: BigFloat = BigFloat {
@@ -69,7 +70,8 @@ impl BigFloat {
         Self::result_to_ext(BigFloatNumber::from_f64(p, f), false, true)
     }
 
-    pub(crate) fn nan(err: Option<Error>) -> Self {
+    /// Constructs not-a-number with an associated error `err`.
+    pub fn nan(err: Option<Error>) -> Self {
         BigFloat {
             inner: Flavor::NaN(err),
         }
@@ -322,6 +324,7 @@ impl BigFloat {
 
     /// Compares `self` to `d2`.
     /// Returns positive if `self` > `d2`, negative if `self` < `d2`, zero if `self` == `d2`, None if `self` or `d2` is NaN.
+    #[allow(clippy::should_implement_trait)]
     pub fn cmp(&self, d2: &BigFloat) -> Option<SignedWord> {
         match &self.inner {
             Flavor::Value(v1) => match &d2.inner {
@@ -597,6 +600,7 @@ impl BigFloat {
 
     /// Parses a number from the string `s`.
     /// The function expects `s` to be a number in scientific format in base 10, or +-Inf, or NaN.
+    /// if `p` equals to usize::MAX then the precision of the resulting number is determined automatically from the input.
     ///
     /// ## Examples
     ///
@@ -604,19 +608,22 @@ impl BigFloat {
     /// # use astro_float_num::BigFloat;
     /// # use astro_float_num::Radix;
     /// # use astro_float_num::RoundingMode;
-    /// let n = BigFloat::parse("0.0", Radix::Bin, 64, RoundingMode::ToEven);
+    /// # use astro_float_num::Consts;
+    /// let mut cc = Consts::new().expect("Constants cache initialized.");
+    ///
+    /// let n = BigFloat::parse("0.0", Radix::Bin, 64, RoundingMode::ToEven, &mut cc);
     /// assert!(n.is_zero());
     ///
-    /// let n = BigFloat::parse("1.124e-24", Radix::Dec, 128, RoundingMode::ToEven);
+    /// let n = BigFloat::parse("1.124e-24", Radix::Dec, 128, RoundingMode::ToEven, &mut cc);
     /// assert!(n.sub(&BigFloat::from_f64(1.124e-24, 128), 128, RoundingMode::ToEven).exponent() <= Some(-52 - 24));
     ///
-    /// let n = BigFloat::parse("-Inf", Radix::Hex, 1, RoundingMode::None);
+    /// let n = BigFloat::parse("-Inf", Radix::Hex, 1, RoundingMode::None, &mut cc);
     /// assert!(n.is_inf_neg());
     ///
-    /// let n = BigFloat::parse("NaN", Radix::Oct, 2, RoundingMode::None);
+    /// let n = BigFloat::parse("NaN", Radix::Oct, 2, RoundingMode::None, &mut cc);
     /// assert!(n.is_nan());
     /// ```
-    pub fn parse(s: &str, rdx: Radix, p: usize, rm: RoundingMode) -> Self {
+    pub fn parse(s: &str, rdx: Radix, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
         match crate::parser::parse(s, rdx) {
             Ok(ps) => {
                 if ps.is_inf() {
@@ -630,7 +637,7 @@ impl BigFloat {
                 } else {
                     let (m, s, e) = ps.raw_parts();
                     Self::result_to_ext(
-                        BigFloatNumber::convert_from_radix(s, m, e, rdx, p, rm),
+                        BigFloatNumber::convert_from_radix(s, m, e, rdx, p, rm, cc),
                         false,
                         true,
                     )
@@ -640,14 +647,16 @@ impl BigFloat {
         }
     }
 
+    #[cfg(feature = "std")]
     pub(crate) fn write_str<T: Write>(
         &self,
         w: &mut T,
         rdx: Radix,
         rm: RoundingMode,
+        cc: &mut Consts,
     ) -> Result<(), core::fmt::Error> {
         match &self.inner {
-            Flavor::Value(v) => match v.format(rdx, rm) {
+            Flavor::Value(v) => match v.format(rdx, rm, cc) {
                 Ok(s) => w.write_str(&s),
                 Err(e) => match e {
                     Error::ExponentOverflow(s) => {
@@ -666,6 +675,47 @@ impl BigFloat {
             }
             crate::ext::Flavor::NaN(_) => w.write_str("NaN"),
         }
+    }
+
+    /// Formats the number using radix `rdx` and rounding mode `rm`.
+    /// Note, since hexadecimal digits include the character "e", the exponent part is separated
+    /// from the mantissa by "_".
+    /// For example, a number with mantissa `123abcdef` and exponent `123` would be formatted as `123abcdef_e+123`.
+    ///
+    /// ## Errors
+    ///
+    ///  - MemoryAllocation: failed to allocate memory for mantissa.
+    ///  - ExponentOverflow: the resulting exponent becomes greater than the maximum allowed value for the exponent.
+    pub fn format(&self, rdx: Radix, rm: RoundingMode, cc: &mut Consts) -> Result<String, Error> {
+        let s = match &self.inner {
+            Flavor::Value(v) => match v.format(rdx, rm, cc) {
+                Ok(s) => return Ok(s),
+                Err(e) => match e {
+                    Error::ExponentOverflow(s) => {
+                        if s.is_positive() {
+                            "Inf"
+                        } else {
+                            "-Inf"
+                        }
+                    }
+                    _ => "Err",
+                },
+            },
+            Flavor::Inf(sign) => {
+                if sign.is_negative() {
+                    "-Inf"
+                } else {
+                    "Inf"
+                }
+            }
+            crate::ext::Flavor::NaN(_) => "NaN",
+        };
+
+        let mut ret = String::new();
+        ret.try_reserve_exact(s.len())?;
+        ret.push_str(s);
+
+        Ok(ret)
     }
 
     /// Returns a random normalized (not subnormal) BigFloat number with exponent in the range
@@ -981,20 +1031,24 @@ impl BigFloat {
     /// The first element in `digits` is the most significant digit.
     /// `e` is the exponent part of the number, such that the number can be represented as `digits` * `rdx` ^ `e`.
     /// Precision is rounded upwards to the word size.
+    /// if `p` equals usize::MAX then the precision of the resulting number is determined automatically from the input.
     ///
     /// ## Examples
     ///
     /// Code below converts `-0.1234567₈ × 10₈^3₈` given in radix 8 to BigFloat.
     ///
     /// ``` rust
-    /// # use astro_float_num::{BigFloat, Sign, RoundingMode, Radix};
+    /// # use astro_float_num::{BigFloat, Sign, RoundingMode, Radix, Consts};
+    /// let mut cc = Consts::new().expect("Constants cache initialized.");
+    ///
     /// let g = BigFloat::convert_from_radix(
     ///     Sign::Neg,
     ///     &[1, 2, 3, 4, 5, 6, 7, 0],
     ///     3,
     ///     Radix::Oct,
     ///     64,
-    ///     RoundingMode::None);
+    ///     RoundingMode::None,
+    ///     &mut cc);
     ///
     /// let n = BigFloat::from_f64(-83.591552734375, 64);
     ///
@@ -1016,9 +1070,10 @@ impl BigFloat {
         rdx: Radix,
         p: usize,
         rm: RoundingMode,
+        cc: &mut Consts,
     ) -> Self {
         Self::result_to_ext(
-            BigFloatNumber::convert_from_radix(sign, digits, e, rdx, p, rm),
+            BigFloatNumber::convert_from_radix(sign, digits, e, rdx, p, rm, cc),
             false,
             true,
         )
@@ -1032,13 +1087,15 @@ impl BigFloat {
     /// ## Examples
     ///
     /// ``` rust
-    /// # use astro_float_num::{BigFloat, Sign, RoundingMode, Radix};
+    /// # use astro_float_num::{BigFloat, Sign, RoundingMode, Radix, Consts};
     /// let n = BigFloat::from_f64(0.00012345678f64, 64);
     ///
-    /// let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).expect("Conversion failed");
+    /// let mut cc = Consts::new().expect("Constants cache initialized.");
+    ///
+    /// let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None, &mut cc).expect("Conversion failed");
     ///
     /// assert_eq!(s, Sign::Pos);
-    /// assert_eq!(m, [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4, 2]);
+    /// assert_eq!(m, [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4]);
     /// assert_eq!(e, -3);
     /// ```
     ///
@@ -1051,9 +1108,10 @@ impl BigFloat {
         &self,
         rdx: Radix,
         rm: RoundingMode,
+        cc: &mut Consts,
     ) -> Result<(Sign, Vec<u8>, Exponent), Error> {
         match &self.inner {
-            Flavor::Value(v) => v.convert_to_radix(rdx, rm),
+            Flavor::Value(v) => v.convert_to_radix(rdx, rm, cc),
             Flavor::NaN(_) => Err(Error::InvalidArgument),
             Flavor::Inf(_) => Err(Error::InvalidArgument),
         }
@@ -1079,7 +1137,7 @@ impl BigFloat {
     /// Try to round and then set the precision to `p`, given `self` has `s` correct digits in mantissa.
     /// The function returns true if rounding succeeded, or if `self` is Inf or NaN.
     /// If the fuction returns `false`, `self` is still modified, and should be discarded.
-    /// In case of an error, `self` will be set to NaN with associated error.
+    /// In case of an error, `self` will be set to NaN with an associated error.
     /// If the precision `p` is incorrect `self` will be set to NaN.
     pub fn try_set_precision(&mut self, p: usize, rm: RoundingMode, s: usize) -> bool {
         if let Flavor::Value(v) = &mut self.inner {
@@ -1432,13 +1490,13 @@ impl From<BigFloatNumber> for BigFloat {
     }
 }
 
-use core::fmt::Binary;
-use core::fmt::Octal;
-use core::fmt::UpperHex;
+#[cfg(feature = "std")]
 use core::{
-    cmp::Eq, cmp::Ordering, cmp::PartialEq, cmp::PartialOrd, fmt::Display, fmt::Formatter,
-    ops::Neg, str::FromStr,
+    fmt::{Binary, Display, Formatter, Octal, UpperHex},
+    str::FromStr,
 };
+
+use core::{cmp::Eq, cmp::Ordering, cmp::PartialEq, cmp::PartialOrd, ops::Neg};
 
 impl Neg for BigFloat {
     type Output = BigFloat;
@@ -1519,12 +1577,25 @@ impl Default for BigFloat {
     }
 }
 
+#[cfg(feature = "std")]
 impl FromStr for BigFloat {
-    type Err = ();
+    type Err = Error;
 
     /// Returns parsed number or NAN in case of error.
+    /// The implementation is not available in no_std environment.
     fn from_str(src: &str) -> Result<BigFloat, Self::Err> {
-        Ok(BigFloat::parse(src, Radix::Dec, DEFAULT_P, DEFAULT_RM))
+        let bf = crate::common::consts::TENPOWERS.with(|tp| {
+            let cc = &mut tp.borrow_mut();
+            BigFloat::parse(src, Radix::Dec, usize::MAX, RoundingMode::ToEven, cc)
+        });
+
+        if bf.is_nan() {
+            if let Some(err) = bf.err() {
+                return Err(err);
+            }
+        }
+
+        Ok(bf)
     }
 }
 
@@ -1551,32 +1622,42 @@ impl_from!(u32, from_u32);
 impl_from!(u64, from_u64);
 impl_from!(u128, from_u128);
 
+#[cfg(feature = "std")]
 macro_rules! impl_format_rdx {
     ($trait:ty, $rdx:path) => {
         impl $trait for BigFloat {
+            /// Formats the number.
+            /// The implementation is not available in no_std environment.
             fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-                self.write_str(f, $rdx, DEFAULT_RM)
+                crate::common::consts::TENPOWERS.with(|tp| {
+                    let cc = &mut tp.borrow_mut();
+                    self.write_str(f, $rdx, RoundingMode::ToEven, cc)
+                })
             }
         }
     };
 }
 
+#[cfg(feature = "std")]
 impl_format_rdx!(Binary, Radix::Bin);
+#[cfg(feature = "std")]
 impl_format_rdx!(Octal, Radix::Oct);
+#[cfg(feature = "std")]
 impl_format_rdx!(Display, Radix::Dec);
+#[cfg(feature = "std")]
 impl_format_rdx!(UpperHex, Radix::Hex);
 
 /// A trait for conversion with additional arguments.
 pub trait FromExt<T> {
     /// Converts `v` to BigFloat with precision `p` using rounding mode `rm`.
-    fn from_ext(v: T, p: usize, rm: RoundingMode) -> Self;
+    fn from_ext(v: T, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self;
 }
 
 impl<T> FromExt<T> for BigFloat
 where
     BigFloat: From<T>,
 {
-    fn from_ext(v: T, p: usize, rm: RoundingMode) -> Self {
+    fn from_ext(v: T, p: usize, rm: RoundingMode, _cc: &mut Consts) -> Self {
         let mut ret = BigFloat::from(v);
         if let Err(err) = ret.set_precision(p, rm) {
             BigFloat::nan(Some(err))
@@ -1587,8 +1668,8 @@ where
 }
 
 impl FromExt<&str> for BigFloat {
-    fn from_ext(v: &str, p: usize, rm: RoundingMode) -> Self {
-        BigFloat::parse(v, crate::Radix::Dec, p, rm)
+    fn from_ext(v: &str, p: usize, rm: RoundingMode, cc: &mut Consts) -> Self {
+        BigFloat::parse(v, crate::Radix::Dec, p, rm, cc)
     }
 }
 
@@ -1615,14 +1696,12 @@ mod tests {
     use std::str::FromStr;
 
     #[cfg(not(feature = "std"))]
-    use core::str::FromStr;
-
-    #[cfg(not(feature = "std"))]
     use alloc::format;
 
     #[test]
     fn test_ext() {
         let rm = RoundingMode::ToOdd;
+        let mut cc = Consts::new().unwrap();
 
         // Inf & NaN
         let d1 = BigFloat::from_u8(1, rand_p());
@@ -1656,22 +1735,22 @@ mod tests {
         for _ in 0..1000 {
             let i = rand::random::<i64>();
             let d1 = BigFloat::from_i64(i, rand_p());
-            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm);
+            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm, &mut cc);
             assert!(d1.cmp(&n1) == Some(0));
 
             let i = rand::random::<u64>();
             let d1 = BigFloat::from_u64(i, rand_p());
-            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm);
+            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm, &mut cc);
             assert!(d1.cmp(&n1) == Some(0));
 
             let i = rand::random::<i128>();
             let d1 = BigFloat::from_i128(i, rand_p());
-            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm);
+            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm, &mut cc);
             assert!(d1.cmp(&n1) == Some(0));
 
             let i = rand::random::<u128>();
             let d1 = BigFloat::from_u128(i, rand_p());
-            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm);
+            let n1 = BigFloat::parse(&format!("{}", i), Radix::Dec, rand_p(), rm, &mut cc);
             assert!(d1.cmp(&n1) == Some(0));
         }
 
@@ -1872,8 +1951,6 @@ mod tests {
         assert!(!INF_NEG.is_positive());
         assert!(!NAN.is_positive());
         assert!(!NAN.is_negative());
-
-        let mut cc = Consts::new().unwrap();
 
         assert!(ONE.pow(&ONE, rand_p(), rm, &mut cc).cmp(&ONE) == Some(0));
         assert!(BigFloat::new(DEFAULT_P)
@@ -2198,46 +2275,58 @@ mod tests {
             &[],
             0,
             Radix::Dec,
-            usize::MAX,
+            usize::MAX - 1,
             RoundingMode::None,
+            &mut cc,
         );
         assert!(n1.is_nan());
         assert!(n1.err() == Some(Error::InvalidArgument));
 
-        assert!(n1.convert_to_radix(Radix::Dec, RoundingMode::None) == Err(Error::InvalidArgument));
         assert!(
-            INF_POS.convert_to_radix(Radix::Dec, RoundingMode::None) == Err(Error::InvalidArgument)
+            n1.convert_to_radix(Radix::Dec, RoundingMode::None, &mut cc)
+                == Err(Error::InvalidArgument)
         );
         assert!(
-            INF_NEG.convert_to_radix(Radix::Dec, RoundingMode::None) == Err(Error::InvalidArgument)
+            INF_POS.convert_to_radix(Radix::Dec, RoundingMode::None, &mut cc)
+                == Err(Error::InvalidArgument)
+        );
+        assert!(
+            INF_NEG.convert_to_radix(Radix::Dec, RoundingMode::None, &mut cc)
+                == Err(Error::InvalidArgument)
         );
     }
 
+    #[cfg(feature = "std")]
     #[test]
-    pub fn test_ops() {
-        let d1 = -&(TWO.clone());
-        assert!(d1.is_negative());
+    fn test_ops_std() {
+        let mut cc = Consts::new().unwrap();
 
         let d1 = BigFloat::parse(
             "0.0123456789012345678901234567890123456789",
             Radix::Dec,
             DEFAULT_P,
             RoundingMode::None,
+            &mut cc,
         );
 
         let d1str = format!("{}", d1);
-        assert_eq!(&d1str, "1.234567890123456789012345678901234567888e-2");
-        assert!(BigFloat::from_str(&d1str).unwrap() == d1);
+        assert_eq!(&d1str, "1.23456789012345678901234567890123456789e-2");
+        let mut d2 = BigFloat::from_str(&d1str).unwrap();
+        d2.set_precision(DEFAULT_P, RoundingMode::ToEven).unwrap();
+        assert_eq!(d2, d1);
 
         let d1 = BigFloat::parse(
             "-123.456789012345678901234567890123456789",
             Radix::Dec,
             DEFAULT_P,
             RoundingMode::None,
+            &mut cc,
         );
         let d1str = format!("{}", d1);
-        assert_eq!(&d1str, "-1.23456789012345678901234567890123456788917e+2");
-        assert_eq!(BigFloat::from_str(&d1str).unwrap(), d1);
+        assert_eq!(&d1str, "-1.23456789012345678901234567890123456789e+2");
+        let mut d2 = BigFloat::from_str(&d1str).unwrap();
+        d2.set_precision(DEFAULT_P, RoundingMode::ToEven).unwrap();
+        assert_eq!(d2, d1);
 
         let d1str = format!("{}", INF_POS);
         assert_eq!(d1str, "Inf");
@@ -2250,27 +2339,46 @@ mod tests {
 
         assert!(BigFloat::from_str("abc").is_ok());
         assert!(BigFloat::from_str("abc").unwrap().is_nan());
+    }
+
+    #[test]
+    pub fn test_ops() {
+        let mut cc = Consts::new().unwrap();
+
+        let d1 = -&(TWO.clone());
+        assert!(d1.is_negative());
 
         let p = DEFAULT_P;
         let rm = RoundingMode::ToEven;
-        assert!(BigFloat::from_i8(-123, p) == BigFloat::parse("-1.23e+2", Radix::Dec, p, rm));
-        assert!(BigFloat::from_u8(123, p) == BigFloat::parse("1.23e+2", Radix::Dec, p, rm));
-        assert!(BigFloat::from_i16(-12312, p) == BigFloat::parse("-1.2312e+4", Radix::Dec, p, rm));
-        assert!(BigFloat::from_u16(12312, p) == BigFloat::parse("1.2312e+4", Radix::Dec, p, rm));
         assert!(
-            BigFloat::from_i32(-123456789, p)
-                == BigFloat::parse("-1.23456789e+8", Radix::Dec, p, rm)
+            BigFloat::from_i8(-123, p) == BigFloat::parse("-1.23e+2", Radix::Dec, p, rm, &mut cc)
         );
         assert!(
-            BigFloat::from_u32(123456789, p) == BigFloat::parse("1.23456789e+8", Radix::Dec, p, rm)
+            BigFloat::from_u8(123, p) == BigFloat::parse("1.23e+2", Radix::Dec, p, rm, &mut cc)
+        );
+        assert!(
+            BigFloat::from_i16(-12312, p)
+                == BigFloat::parse("-1.2312e+4", Radix::Dec, p, rm, &mut cc)
+        );
+        assert!(
+            BigFloat::from_u16(12312, p)
+                == BigFloat::parse("1.2312e+4", Radix::Dec, p, rm, &mut cc)
+        );
+        assert!(
+            BigFloat::from_i32(-123456789, p)
+                == BigFloat::parse("-1.23456789e+8", Radix::Dec, p, rm, &mut cc)
+        );
+        assert!(
+            BigFloat::from_u32(123456789, p)
+                == BigFloat::parse("1.23456789e+8", Radix::Dec, p, rm, &mut cc)
         );
         assert!(
             BigFloat::from_i64(-1234567890123456789, p)
-                == BigFloat::parse("-1.234567890123456789e+18", Radix::Dec, p, rm)
+                == BigFloat::parse("-1.234567890123456789e+18", Radix::Dec, p, rm, &mut cc)
         );
         assert!(
             BigFloat::from_u64(1234567890123456789, p)
-                == BigFloat::parse("1.234567890123456789e+18", Radix::Dec, p, rm)
+                == BigFloat::parse("1.234567890123456789e+18", Radix::Dec, p, rm, &mut cc)
         );
         assert!(
             BigFloat::from_i128(-123456789012345678901234567890123456789, p)
@@ -2278,7 +2386,8 @@ mod tests {
                     "-1.23456789012345678901234567890123456789e+38",
                     Radix::Dec,
                     p,
-                    rm
+                    rm,
+                    &mut cc
                 )
         );
         assert!(
@@ -2287,7 +2396,8 @@ mod tests {
                     "1.23456789012345678901234567890123456789e+38",
                     Radix::Dec,
                     p,
-                    rm
+                    rm,
+                    &mut cc
                 )
         );
 

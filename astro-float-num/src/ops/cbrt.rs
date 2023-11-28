@@ -67,7 +67,7 @@ mod tests {
     use crate::{
         common::{consts::ONE, util::random_subnormal},
         defs::{EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE},
-        Exponent,
+        Consts, Exponent,
     };
 
     #[cfg(feature = "std")]
@@ -84,6 +84,7 @@ mod tests {
         println!("{:?}", n2.format(crate::Radix::Bin, RoundingMode::None));
         return; */
 
+        let mut cc = Consts::new().unwrap();
         let mut eps = ONE.clone().unwrap();
 
         for _ in 0..1000 {
@@ -174,6 +175,7 @@ mod tests {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
         let d2 = d1.cbrt(p, RoundingMode::ToEven).unwrap();
@@ -182,6 +184,7 @@ mod tests {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
 
@@ -194,6 +197,7 @@ mod tests {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
         let d2 = d1.cbrt(p, RoundingMode::ToEven).unwrap();
@@ -202,6 +206,7 @@ mod tests {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
 

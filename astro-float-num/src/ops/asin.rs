@@ -54,6 +54,7 @@ impl BigFloatNumber {
         let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
         let mut x = self.clone()?;
+        x.set_inexact(false);
 
         loop {
             let p_x = p_wrk + additional_prec;
@@ -68,6 +69,7 @@ impl BigFloatNumber {
             let mut ret = d.atan(p_x, rm, cc)?;
 
             if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact());
                 break Ok(ret);
             }
 
@@ -103,17 +105,18 @@ mod tests {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
         let n2 = n1.asin(p, rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419EBBFC39B4BEC14AF6_e+0", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419EBBFC39B4BEC14AF6_e+0", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
 
         assert!(n2.cmp(&n3) == 0);
 
         // near zero
-        let n1 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419EBBFC39B4BEC14AF6_e-10", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n1 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419EBBFC39B4BEC14AF6_e-10", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
         let n2 = n1.asin(p, rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A2A55DE7312DF295F5AB0362F0A77F89C5756A9380CF056D90_e-10", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A2A55DE7312DF295F5AB0362F0A77F89C5756A9380CF056D90_e-10", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
 
         //println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 

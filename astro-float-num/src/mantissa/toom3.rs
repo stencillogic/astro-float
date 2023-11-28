@@ -24,9 +24,9 @@ impl Mantissa {
         )
     }
 
-    fn toom3_factors<'a, 'b>(
+    fn toom3_factors<'a>(
         params: (SliceWithSign<'a>, SliceWithSign<'a>, SliceWithSign<'a>),
-        x1: &mut SliceWithSign<'b>,
+        x1: &mut SliceWithSign<'_>,
         buf1: &'a mut [Word],
         buf2: &'a mut [Word],
         buf3: &'a mut [Word],

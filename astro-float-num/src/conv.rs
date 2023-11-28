@@ -1,10 +1,7 @@
 //! Conversion utilities.
 
-use crate::common::consts::EIGHT;
-use crate::common::consts::SIXTEEN;
 use crate::common::consts::TEN;
-use crate::common::consts::TEN_POW_9;
-use crate::common::consts::TWO;
+use crate::common::util::log2_ceil;
 use crate::common::util::round_p;
 use crate::defs::DoubleWord;
 use crate::defs::Error;
@@ -13,15 +10,20 @@ use crate::defs::Radix;
 use crate::defs::RoundingMode;
 use crate::defs::Sign;
 use crate::defs::Word;
+use crate::defs::DEFAULT_P;
 use crate::defs::WORD_BIT_SIZE;
 use crate::defs::WORD_MAX;
 use crate::mantissa::Mantissa;
 use crate::num::BigFloatNumber;
+use crate::Consts;
 use crate::EXPONENT_MAX;
 use crate::EXPONENT_MIN;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+
+const TEN_PWR_MAX_TO_DEC: usize = EXPONENT_MAX as usize / 4;
+const TEN_PWR_MAX_FROM_DEC: usize = (EXPONENT_MAX as u64 * 301029995 / 1000000000) as usize;
 
 impl BigFloatNumber {
     /// Converts an array of digits in radix `rdx` to BigFloatNumber with precision `p`.
@@ -29,6 +31,7 @@ impl BigFloatNumber {
     /// The first element in `digits` is the most significant digit.
     /// `e` is the exponent part of the number, such that the number can be represented as `digits` * `rdx` ^ `e`.
     /// Precision is rounded upwards to the word size.
+    /// if `p` equals usize::MAX then the precision of the resulting number is determined automatically from the input.
     ///
     /// ## Errors
     ///
@@ -41,16 +44,20 @@ impl BigFloatNumber {
         digits: &[u8],
         e: Exponent,
         rdx: Radix,
-        p: usize,
+        mut p: usize,
         rm: RoundingMode,
+        cc: &mut Consts,
     ) -> Result<Self, Error> {
-        let p = round_p(p);
-        Self::p_assertion(p)?;
+        if p < usize::MAX {
+            p = round_p(p);
+            Self::p_assertion(p)?;
 
-        if p == 0 {
-            return Self::new(0);
+            if p == 0 {
+                return Self::new(0);
+            }
         }
 
+        #[cfg(target_arch = "x86")]
         if e < EXPONENT_MIN || e > EXPONENT_MAX {
             return Err(Error::InvalidArgument);
         }
@@ -58,7 +65,7 @@ impl BigFloatNumber {
         match rdx {
             Radix::Bin => Self::conv_from_binary(sign, digits, e, p, rm),
             Radix::Oct => Self::conv_from_commensurable(sign, digits, e, 3, p, rm),
-            Radix::Dec => Self::conv_from_num_dec(sign, digits, e, p, rm),
+            Radix::Dec => Self::conv_from_dec(sign, digits, e, p, rm, cc),
             Radix::Hex => Self::conv_from_commensurable(sign, digits, e, 4, p, rm),
         }
     }
@@ -66,13 +73,15 @@ impl BigFloatNumber {
     fn conv_from_binary(
         sign: Sign,
         digits: &[u8],
-        e: Exponent,
+        mut e: Exponent,
         p: usize,
         rm: RoundingMode,
     ) -> Result<Self, Error> {
         if digits.is_empty() {
-            return Self::new(p);
+            return Self::new(if p < usize::MAX { p } else { DEFAULT_P });
         }
+
+        Self::p_assertion(round_p(digits.len()))?;
 
         let mut mantissa = Mantissa::new(digits.len())?;
         let mut d = 0;
@@ -104,11 +113,32 @@ impl BigFloatNumber {
 
         mantissa.update_bit_len();
 
-        let mut ret = BigFloatNumber::from_raw_unchecked(mantissa, sign, e, false);
+        if p < usize::MAX {
+            let mut ret = BigFloatNumber::from_raw_unchecked(mantissa, sign, e, false);
 
-        ret.set_precision(p, rm)?;
+            ret.set_precision(p, rm)?;
 
-        Ok(ret)
+            Ok(ret)
+        } else {
+            let shift = mantissa.max_bit_len() - mantissa.bit_len();
+
+            if shift > 0 {
+                if e > EXPONENT_MIN {
+                    let e_shift = (e - EXPONENT_MIN) as usize;
+
+                    if e_shift >= shift {
+                        mantissa.normilize2();
+                        e -= shift as Exponent;
+                    } else {
+                        mantissa.shift_left(e_shift);
+                        mantissa.set_bit_len(mantissa.bit_len() + e_shift);
+                        e = EXPONENT_MIN;
+                    }
+                }
+            }
+
+            Ok(BigFloatNumber::from_raw_unchecked(mantissa, sign, e, false))
+        }
     }
 
     // radix is power of 2.
@@ -149,11 +179,15 @@ impl BigFloatNumber {
 
         if zeroes == digits.len() {
             // mantissa is zero
-            let m = Mantissa::new(p)?;
+            let m = Mantissa::new(if p < usize::MAX { p } else { DEFAULT_P })?;
 
             Ok(BigFloatNumber::from_raw_unchecked(m, sign, 0, false))
         } else {
-            let mut m = Mantissa::new((digits.len() - zeroes) * shift + WORD_BIT_SIZE)?;
+            let msz = round_p((digits.len() - zeroes) * shift + WORD_BIT_SIZE);
+
+            Self::p_assertion(msz)?;
+
+            let mut m = Mantissa::new(msz)?;
 
             // exponent
             let e = e as isize * shift as isize + e_shift;
@@ -198,117 +232,134 @@ impl BigFloatNumber {
             m.set_bit_len(m.max_bit_len());
 
             let mut ret = if e < EXPONENT_MIN as isize {
-                let mut num = BigFloatNumber::from_raw_unchecked(m, sign, EXPONENT_MIN, false);
+                if p < usize::MAX {
+                    let mut num = BigFloatNumber::from_raw_unchecked(m, sign, EXPONENT_MIN, false);
 
-                if p + WORD_BIT_SIZE > num.mantissa_max_bit_len() {
-                    num.set_precision(p + WORD_BIT_SIZE, RoundingMode::None)?;
+                    if p + WORD_BIT_SIZE > num.mantissa_max_bit_len() {
+                        num.set_precision(p + WORD_BIT_SIZE, RoundingMode::None)?;
+                    }
+
+                    num.subnormalize(e, RoundingMode::None);
+
+                    if num.inexact() {
+                        num.mantissa_mut().digits_mut()[0] |= 1; // sticky for correct rounding when calling set_precision()
+                    }
+
+                    num
+                } else {
+                    let e_shift = (EXPONENT_MIN as isize - e) as usize;
+                    let newbitlen = m.bit_len().saturating_add(e_shift);
+
+                    Self::p_assertion(round_p(newbitlen))?;
+
+                    m.extend_subnormal(e_shift)?;
+
+                    let leftshift = m.max_bit_len() - newbitlen;
+                    m.shift_left(leftshift);
+
+                    BigFloatNumber::from_raw_unchecked(m, sign, EXPONENT_MIN, false)
                 }
-
-                num.subnormalize(e, RoundingMode::None);
-
-                if num.inexact() {
-                    num.mantissa_mut().digits_mut()[0] |= 1; // sticky for correct rounding when calling set_precision()
-                }
-
-                num
             } else {
                 BigFloatNumber::from_raw_unchecked(m, sign, e as Exponent, false)
             };
 
-            ret.set_precision(p, rm)?;
+            if p < usize::MAX {
+                ret.set_precision(p, rm)?;
+            }
 
             Ok(ret)
         }
     }
 
-    fn conv_from_num_dec(
+    fn conv_from_dec(
         sign: Sign,
         digits: &[u8],
         e: Exponent,
         p: usize,
         rm: RoundingMode,
+        cc: &mut Consts,
     ) -> Result<Self, Error> {
         // mantissa part
         let leadzeroes = digits.iter().take_while(|&&x| x == 0).count();
 
-        let pf = round_p(
-            (((digits.len() - leadzeroes) as u64 * 3321928095 / 1000000000) as usize).max(p)
-                + WORD_BIT_SIZE,
-        );
-
-        let mut f = Self::new(pf)?;
-
-        // TODO: divide and conquer can be used to build the mantissa.
-        let mut word: Word = 0;
-        let mut i = 0;
-        for &d in digits.iter().skip(leadzeroes) {
-            if d > 9 {
-                return Err(Error::InvalidArgument);
-            }
-
-            word *= 10;
-            word += d as Word;
-
-            i += 1;
-            if i == 9 {
-                i = 0;
-
-                let d2 = Self::from_word(word, 1)?;
-                f = f.mul(&TEN_POW_9, pf, RoundingMode::None)?;
-                f = f.add(&d2, pf, RoundingMode::None)?;
-
-                word = 0;
-            }
+        if digits.len() - leadzeroes == 0 {
+            return Self::new(if p < usize::MAX { p } else { DEFAULT_P });
         }
 
-        if i > 0 {
-            let mut ten_pow = 10;
-            i -= 1;
-            while i > 0 {
-                ten_pow *= 10;
-                i -= 1;
-            }
-            let ten_pow = Self::from_word(ten_pow, 1)?;
-            let d2 = Self::from_word(word, 1)?;
-            f = f.mul(&ten_pow, pf, RoundingMode::None)?;
-            f = f.add(&d2, pf, RoundingMode::None)?;
+        let k = log2_ceil(digits.len() - leadzeroes);
+        let tenpowers = cc.tenpowers(k)?;
+        let mut m = Mantissa::conv_from_dec(&digits[leadzeroes..], tenpowers)?;
+
+        if m.bit_len() > EXPONENT_MAX as usize {
+            return Err(Error::ExponentOverflow(sign));
         }
+
+        let me = m.bit_len() as Exponent;
+        let _ = m.normilize2();
+
+        let x = BigFloatNumber::from_raw_unchecked(m, sign, me, false);
 
         // exponent part
         let n = e as isize - digits.len() as isize;
 
-        let nmax = (EXPONENT_MAX as u64 * 301029995 / 1000000000) as usize;
-
-        let ten = Self::from_word(10, 4)?;
-
-        let mut nabs = n.unsigned_abs();
-        if nabs > nmax {
-            let fpnmax = ten.powi(nmax, pf, RoundingMode::None)?;
-
-            while nabs > nmax {
-                f = if n < 0 {
-                    f.div(&fpnmax, pf, RoundingMode::None)
-                } else {
-                    f.mul(&fpnmax, pf, RoundingMode::None)
-                }?;
-                nabs -= nmax;
-            }
+        let p = if p < usize::MAX {
+            p
+        } else {
+            // determine from the input
+            let p = round_p((digits.len() as u64 * 3321928095 / 1000000000) as usize + 1);
+            Self::p_assertion(p)?;
+            p
         };
 
-        if nabs > 0 {
-            let fpn = ten.powi(nabs, pf.max(p) + WORD_BIT_SIZE, RoundingMode::None)?;
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p + p_inc;
 
-            f = if n < 0 {
-                f.div(&fpn, pf, RoundingMode::None)
-            } else {
-                f.mul(&fpn, pf, RoundingMode::None)
-            }?;
+        // error estimation
+        let mut err = 0;
+        let npowmax = n.unsigned_abs() / TEN_PWR_MAX_FROM_DEC;
+        let tenpowrem = n.unsigned_abs() % TEN_PWR_MAX_FROM_DEC;
+        if npowmax != 0 {
+            err += 3 * npowmax;
+        }
+        if tenpowrem != 0 {
+            err += 3;
         }
 
-        f.set_sign(sign);
-        f.set_precision(p, rm)?;
+        loop {
+            let p_f = p_wrk + err;
 
-        Ok(f)
+            let mut f = x.clone()?;
+
+            if npowmax != 0 {
+                let fpnmax = TEN.powi(TEN_PWR_MAX_FROM_DEC, p_f, RoundingMode::None)?;
+
+                for _ in 0..npowmax {
+                    if n < 0 {
+                        f = f.div(&fpnmax, p_f, RoundingMode::None)?
+                    } else {
+                        f = f.mul(&fpnmax, p_f, RoundingMode::None)?
+                    }
+                }
+            };
+
+            if tenpowrem != 0 {
+                let fpn = TEN.powi(tenpowrem, p_f, RoundingMode::None)?;
+                if n < 0 {
+                    f = f.div(&fpn, p_f, RoundingMode::None)?
+                } else {
+                    f = f.mul(&fpn, p_f, RoundingMode::None)?
+                }
+            }
+
+            f.set_sign(sign);
+
+            if f.try_set_precision(p, rm, p_wrk)? {
+                return Ok(f);
+            }
+
+            p_wrk += p_inc;
+            p_inc = round_p(p_wrk / 5);
+        }
     }
 
     /// Converts `self` to radix `rdx` using rounding mode `rm`.
@@ -324,59 +375,292 @@ impl BigFloatNumber {
         &self,
         rdx: Radix,
         rm: RoundingMode,
+        cc: &mut Consts,
     ) -> Result<(Sign, Vec<u8>, Exponent), Error> {
         match rdx {
             Radix::Bin => self.conv_to_binary(),
             Radix::Oct => self.conv_to_commensurable(3),
-            Radix::Dec => self.conv_to_dec(rm),
+            Radix::Dec => self.conv_to_dec(rm, cc),
             Radix::Hex => self.conv_to_commensurable(4),
         }
     }
 
-    fn conv_to_dec(&self, rm: RoundingMode) -> Result<(Sign, Vec<u8>, Exponent), Error> {
-        // input: rdx = 10, self = m*2^e, 0.5 <= m < 1,
-        // let self = m*2^e * rdx^n / rdx^n, where n = floor(e * log_rdx(2))
-        // let f = m / rdx^n,
-        // then resulting number is F = f * rdx^n
+    fn conv_to_dec(
+        &self,
+        rm: RoundingMode,
+        cc: &mut Consts,
+    ) -> Result<(Sign, Vec<u8>, Exponent), Error> {
+        if self.precision() == 0 {
+            return Ok((self.sign(), Vec::new(), 0));
+        }
 
-        let n = (self.exponent().unsigned_abs() as u64 * 301029996 / 1000000000) as usize;
-        let l = (self.mantissa_max_bit_len() as u64 * 301029996 / 1000000000 + 1) as usize;
+        let p = self.mantissa_max_bit_len();
+        let subn_e = p - self.precision();
+        let n = (p as u64 * 301029996 / 1000000000) as usize + 1;
 
-        let (digits, e_shift) = if n == 0 {
-            self.conv_mantissa(l, Radix::Dec, rm)
-        } else {
-            let p_w = self.mantissa_max_bit_len() + WORD_BIT_SIZE;
+        let mut err = WORD_BIT_SIZE; // speculative
+        let mut p_wrk = round_p((n as u64 * 3321928095 / 1000000000) as usize + 1 + err);
+        let mut p_inc = WORD_BIT_SIZE;
 
-            let rdx = Self::number_for_radix(Radix::Dec)?;
+        loop {
+            let mut x = self.clone()?;
+            x.set_inexact(false);
 
-            let f = if n >= 646456993 {
-                // avoid powi overflow
+            let n_wrk = ((p_wrk as i64 - self.exponent() as i64 + subn_e as i64) * 301029996
+                / 1000000000) as isize
+                + 1;
 
-                let d = rdx.powi(n - 1, p_w, RoundingMode::None)?;
+            let mut err_acc = 0;
 
-                if self.exponent() < 0 {
-                    self.mul(&d, self.mantissa_max_bit_len(), RoundingMode::None)?
-                        .mul(rdx, self.mantissa_max_bit_len(), RoundingMode::None)
-                } else {
-                    self.div(&d, self.mantissa_max_bit_len(), RoundingMode::None)?
-                        .div(rdx, self.mantissa_max_bit_len(), RoundingMode::None)
+            let mut pwr = n_wrk.unsigned_abs();
+            if pwr > TEN_PWR_MAX_TO_DEC {
+                let tp = TEN.powi(TEN_PWR_MAX_TO_DEC, p_wrk, RoundingMode::None)?;
+                err_acc += 1;
+
+                while pwr > TEN_PWR_MAX_TO_DEC {
+                    if n_wrk < 0 {
+                        x = x.div(&tp, p_wrk, RoundingMode::None)?;
+                    } else {
+                        x = x.mul(&tp, p_wrk, RoundingMode::None)?;
+                    }
+                    err_acc += 2;
+                    pwr -= TEN_PWR_MAX_TO_DEC;
                 }
+            }
+
+            if pwr != 0 {
+                let tp = TEN.powi(pwr, p_wrk, RoundingMode::None)?;
+                if n_wrk < 0 {
+                    x = x.div(&tp, p_wrk, RoundingMode::None)?;
+                } else {
+                    x = x.mul(&tp, p_wrk, RoundingMode::None)?;
+                }
+                err_acc += 3;
+            }
+
+            if err_acc > err {
+                err_acc += err_acc / TEN_PWR_MAX_TO_DEC + 3;
+                p_wrk += round_p(err_acc - err);
+                err = err_acc;
+                continue;
+            }
+
+            let (mut m, _, e, inexact) = x.into_raw_parts();
+
+            let shift = e as usize - p_wrk;
+            if shift > 0 {
+                m.shift_left_resize(shift)?;
+            }
+
+            let l = (m.bit_len() as u64 * 301029996 / 1000000000) as usize + 1;
+
+            let k = log2_ceil(l);
+
+            let tenpowers = cc.tenpowers(k)?;
+            let mut digits = m.conv_to_dec(1 << k, tenpowers, k - 1, true)?;
+
+            let mut e_out = digits.len() as isize - n_wrk;
+
+            let mut e_subn = 0;
+            if e_out < EXPONENT_MIN as isize {
+                e_subn = (EXPONENT_MIN as isize - e_out) as usize;
+                e_out = EXPONENT_MIN as isize;
+            }
+
+            let mut e_out = e_out as Exponent;
+
+            // try round
+            let valid =
+                digits.len() - ((shift + err_acc) as i64 * 301029996 / 1000000000) as usize - 1; // cut off digits with error
+
+            debug_assert!(digits.len() > n);
+            debug_assert!(valid > n);
+
+            if Self::try_round_dec(
+                &mut digits[..valid],
+                n,
+                rm,
+                self.sign(),
+                &mut e_out,
+                inexact,
+            )? {
+                if e_subn > 0 {
+                    if e_out > EXPONENT_MIN {
+                        e_subn -= 1;
+                        e_out = EXPONENT_MIN;
+                    }
+
+                    let rsz = if digits.len() > n { n } else { digits.len() };
+
+                    digits.resize(rsz + e_subn, 0);
+                    digits[rsz..].fill(0);
+                    digits.rotate_right(e_subn);
+                } else {
+                    if digits.len() > n {
+                        digits.resize(n, 0);
+                    }
+                }
+
+                // remove trailing zeroes
+                let nzr = digits.iter().rev().take_while(|&&x| x == 0).count();
+
+                digits.resize(digits.len() - nzr, 0);
+
+                return Ok((self.sign(), digits, e_out));
+            }
+
+            p_wrk += p_inc;
+            p_inc = round_p(p_wrk / 5);
+        }
+    }
+
+    // Try to round a decimal mantissa.
+    fn try_round_dec(
+        digits: &mut [u8],
+        n: usize,
+        rm: RoundingMode,
+        s: Sign,
+        e: &mut Exponent,
+        inexact: bool,
+    ) -> Result<bool, Error> {
+        let mut check_roundable = inexact;
+
+        if n > 0 {
+            let ovf = Self::round_dec(digits, n, rm, s.is_positive(), &mut check_roundable);
+
+            if check_roundable {
+                return Ok(false);
+            }
+
+            if ovf {
+                if *e == EXPONENT_MAX {
+                    return Err(Error::ExponentOverflow(s));
+                }
+
+                *e += 1;
+            }
+        }
+
+        Ok(true)
+    }
+
+    // Round decimal mantissa.
+    // The function is similar to Mantissa::round_mantissa.
+    fn round_dec(
+        digits: &mut [u8],
+        n: usize,
+        rm: RoundingMode,
+        is_positive: bool,
+        check_roundable: &mut bool,
+    ) -> bool {
+        if rm == RoundingMode::None {
+            *check_roundable = false;
+            return false;
+        }
+
+        #[inline]
+        fn get_rem(arr: &[u8]) -> (bool, bool) {
+            let mut rem9 = true;
+            let mut rem0 = true;
+
+            for &d in arr.iter() {
+                if d != 9 {
+                    rem9 = false;
+                }
+                if d != 0 {
+                    rem0 = false;
+                }
+            }
+            (rem0, rem9)
+        }
+
+        if n > 0 && n < digits.len() {
+            let mut c = false;
+
+            if rm == RoundingMode::ToEven || rm == RoundingMode::ToOdd {
+                let is_even = digits[n - 1] % 2 == 0;
+                let dn = digits[n];
+
+                let (rem0, rem9) = get_rem(&digits[n + 1..]);
+
+                if *check_roundable && (rem0 || rem9) {
+                    return false;
+                }
+
+                // need adding 1?
+                match rm {
+                    RoundingMode::ToEven => {
+                        if dn == 5 {
+                            if !is_even || !rem0 {
+                                c = true;
+                            }
+                        } else if dn > 5 {
+                            c = true;
+                        }
+                    }
+                    RoundingMode::ToOdd => {
+                        if dn == 5 {
+                            if is_even || !rem0 {
+                                c = true;
+                            }
+                        } else if dn > 5 {
+                            c = true;
+                        }
+                    }
+                    _ => unreachable!(),
+                };
             } else {
-                let d = rdx.powi(n, p_w, RoundingMode::None)?;
+                let (rem0, rem9) = get_rem(&digits[n..]);
 
-                if self.exponent() < 0 {
-                    self.mul(&d, self.mantissa_max_bit_len(), RoundingMode::None)
-                } else {
-                    self.div(&d, self.mantissa_max_bit_len(), RoundingMode::None)
+                if *check_roundable && (rem0 || rem9) {
+                    return false;
                 }
-            }?;
 
-            f.conv_mantissa(l, Radix::Dec, rm)
-        }?;
+                // rounding
+                match rm {
+                    RoundingMode::ToZero => {}
+                    RoundingMode::FromZero => {
+                        if !rem0 {
+                            // add 1
+                            c = true;
+                        }
+                    }
+                    RoundingMode::Up => {
+                        if !rem0 && is_positive {
+                            // add 1
+                            c = true;
+                        }
+                    }
+                    RoundingMode::Down => {
+                        if !rem0 && !is_positive {
+                            // add 1
+                            c = true;
+                        }
+                    }
+                    _ => unreachable!(),
+                };
+            }
 
-        let e = (n as Exponent) * self.exponent().signum() + e_shift;
+            *check_roundable = false; // can round
 
-        Ok((self.sign(), digits, e))
+            digits[n..].fill(0);
+
+            if c {
+                for v in digits[..n].iter_mut().rev() {
+                    if *v < 9 {
+                        *v += 1;
+                        return false;
+                    } else {
+                        *v = 0;
+                    }
+                }
+
+                digits[0] = 1;
+
+                return true;
+            }
+        }
+        false
     }
 
     /// Conversion for radixes of power of 2.
@@ -390,15 +674,23 @@ impl BigFloatNumber {
         }
 
         let mut ret = Vec::new();
+        ret.try_reserve_exact(self.mantissa_max_bit_len() / shift)?;
 
         let mask = (WORD_MAX >> (WORD_BIT_SIZE - shift)) as DoubleWord;
         let mut iter = self.mantissa().digits().iter().rev();
 
         let mut done = WORD_BIT_SIZE - shift + e_shift;
         let mut d = *iter.next().unwrap() as DoubleWord; // iter is never empty.
+        let mut cnt = 0;
 
         loop {
             let digit = ((d >> done) & mask) as u8;
+
+            if digit == 0 {
+                cnt += 1;
+            } else {
+                cnt = 0;
+            }
 
             ret.push(digit);
 
@@ -423,118 +715,38 @@ impl BigFloatNumber {
             }
 
             let digit = ((d >> done) & mask) as u8;
-            ret.push(digit);
+            if digit > 0 {
+                cnt = 0;
+                ret.push(digit);
+            }
         }
+
+        ret.resize(ret.len() - cnt, 0);
 
         Ok((self.sign(), ret, e))
     }
 
     fn conv_to_binary(&self) -> Result<(Sign, Vec<u8>, Exponent), Error> {
         let mut ret = Vec::new();
+        ret.try_reserve_exact(self.mantissa_max_bit_len())?;
+        let mut cnt = 0;
 
         for v in self.mantissa().digits().iter().rev() {
             for i in (0..WORD_BIT_SIZE).rev() {
-                ret.push(((v >> i) & 1) as u8);
+                let val = ((v >> i) & 1) as u8;
+                if val == 1 {
+                    cnt = 0;
+                } else {
+                    cnt += 1;
+                }
+                ret.push(val);
             }
         }
+
+        // cut off trailing zeroes
+        ret.resize(ret.len() - cnt, 0);
 
         Ok((self.sign(), ret, self.exponent()))
-    }
-
-    fn conv_mantissa(
-        &self,
-        l: usize,
-        rdx: Radix,
-        rm: RoundingMode,
-    ) -> Result<(Vec<u8>, Exponent), Error> {
-        let mut ret = Vec::new();
-        let mut e_shift = 0;
-
-        if self.is_zero() {
-            ret.try_reserve_exact(1)?;
-            ret.push(0);
-        } else {
-            ret.try_reserve_exact(3 + l)?;
-
-            let mut r = self.clone()?;
-            r.set_sign(Sign::Pos);
-            r.set_precision(r.mantissa_max_bit_len() + 4, RoundingMode::None)?;
-
-            let rdx_num = Self::number_for_radix(rdx)?;
-            let rdx_word = Self::word_for_radix(rdx);
-
-            let mut word;
-
-            let d = r.mul(rdx_num, r.mantissa_max_bit_len(), RoundingMode::None)?;
-            r = d.fract()?;
-            word = d.int_as_word();
-            if word == 0 {
-                e_shift = -1;
-                let d = r.mul(rdx_num, r.mantissa_max_bit_len(), RoundingMode::None)?;
-                r = d.fract()?;
-                word = d.int_as_word();
-            } else if word >= rdx_word {
-                e_shift = 1;
-
-                ret.push((word / rdx_word) as u8);
-                ret.push((word % rdx_word) as u8);
-
-                let d = r.mul(rdx_num, r.mantissa_max_bit_len(), RoundingMode::None)?;
-                r = d.fract()?;
-                word = d.int_as_word();
-            }
-
-            for _ in 0..l {
-                ret.push(word as u8);
-
-                let d = r.mul(rdx_num, r.mantissa_max_bit_len(), RoundingMode::None)?;
-                r = d.fract()?;
-                word = d.int_as_word();
-            }
-
-            if !r.round(0, rm)?.is_zero() {
-                word += 1;
-
-                if word == rdx_word {
-                    ret.push(0);
-
-                    let mut i = ret.len() - 2;
-                    while i > 0 && ret[i] + 1 == rdx_word as u8 {
-                        ret[i] = 0;
-                        i -= 1;
-                    }
-                    ret[i] += 1;
-                } else {
-                    ret.push(word as u8);
-                }
-            } else {
-                ret.push(word as u8);
-            }
-        }
-
-        // strip zeroes
-        let nzeroes = ret.iter().rev().take_while(|x| **x == 0).count();
-        ret.truncate(ret.len() - nzeroes);
-
-        Ok((ret, e_shift))
-    }
-
-    fn word_for_radix(rdx: Radix) -> Word {
-        match rdx {
-            Radix::Bin => 2,
-            Radix::Oct => 8,
-            Radix::Dec => 10,
-            Radix::Hex => 16,
-        }
-    }
-
-    fn number_for_radix(rdx: Radix) -> Result<&'static Self, Error> {
-        Ok(match rdx {
-            Radix::Bin => &TWO,
-            Radix::Oct => &EIGHT,
-            Radix::Dec => &TEN,
-            Radix::Hex => &SIXTEEN,
-        })
     }
 }
 
@@ -547,38 +759,54 @@ mod tests {
     use crate::defs::{Sign, EXPONENT_MAX, EXPONENT_MIN};
     use rand::random;
 
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
+
     #[test]
-    fn test_conv() {
+    fn test_conv_num() {
+        let mut cc = Consts::new().unwrap();
+
         // basic tests
         let n = BigFloatNumber::from_f64(64, 0.031256789f64).unwrap();
 
-        let (s, m, e) = n.convert_to_radix(Radix::Bin, RoundingMode::None).unwrap();
+        let (s, m, e) = n
+            .convert_to_radix(Radix::Bin, RoundingMode::None, &mut cc)
+            .unwrap();
 
         assert_eq!(
             m,
             [
                 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0,
-                1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0
+                1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1
             ]
         );
         assert_eq!(s, Sign::Pos);
         assert_eq!(e, -4);
 
-        let g = BigFloatNumber::convert_from_radix(s, &m, e, Radix::Bin, 160, RoundingMode::ToEven)
-            .unwrap();
+        let g = BigFloatNumber::convert_from_radix(
+            s,
+            &m,
+            e,
+            Radix::Bin,
+            160,
+            RoundingMode::ToEven,
+            &mut cc,
+        )
+        .unwrap();
         let f = g.to_f64();
 
         assert_eq!(f, 0.031256789f64);
 
         let n = BigFloatNumber::from_f64(64, 0.00012345678f64).unwrap();
 
-        let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).unwrap();
+        let (s, m, e) = n
+            .convert_to_radix(Radix::Dec, RoundingMode::None, &mut cc)
+            .unwrap();
 
         assert_eq!(s, Sign::Pos);
         assert_eq!(
             m,
-            [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4, 2]
+            [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 4]
         );
         assert_eq!(e, -3);
 
@@ -589,6 +817,7 @@ mod tests {
             Radix::Oct,
             64,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
         let n = BigFloatNumber::from_f64(64, -83.591552734375).unwrap();
@@ -604,10 +833,19 @@ mod tests {
                 false,
             )
             .unwrap();
-            let (s, m, e) = n.convert_to_radix(Radix::Oct, RoundingMode::None).unwrap();
-            let g =
-                BigFloatNumber::convert_from_radix(s, &m, e, Radix::Oct, 160, RoundingMode::ToEven)
-                    .unwrap();
+            let (s, m, e) = n
+                .convert_to_radix(Radix::Oct, RoundingMode::None, &mut cc)
+                .unwrap();
+            let g = BigFloatNumber::convert_from_radix(
+                s,
+                &m,
+                e,
+                Radix::Oct,
+                160,
+                RoundingMode::ToEven,
+                &mut cc,
+            )
+            .unwrap();
 
             assert!(n.cmp(&g) == 0);
 
@@ -619,21 +857,30 @@ mod tests {
                 false,
             )
             .unwrap();
-            let (s, m, e) = n.convert_to_radix(Radix::Dec, RoundingMode::None).unwrap();
+            let (s, m, e) = n
+                .convert_to_radix(Radix::Dec, RoundingMode::None, &mut cc)
+                .unwrap();
 
             assert_eq!(
                 m,
                 [
                     5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-                    9, 9, 9, 2
+                    9, 9, 9
                 ]
             );
             assert!(s == Sign::Pos);
             assert!(e == 0);
 
-            let g =
-                BigFloatNumber::convert_from_radix(s, &m, e, Radix::Dec, 96, RoundingMode::ToEven)
-                    .unwrap();
+            let g = BigFloatNumber::convert_from_radix(
+                s,
+                &m,
+                e,
+                Radix::Dec,
+                96,
+                RoundingMode::ToEven,
+                &mut cc,
+            )
+            .unwrap();
             assert!(g.cmp(&n) == 0);
         }
 
@@ -647,10 +894,19 @@ mod tests {
                 false,
             )
             .unwrap();
-            let (s, m, e) = n.convert_to_radix(Radix::Oct, RoundingMode::None).unwrap();
-            let g =
-                BigFloatNumber::convert_from_radix(s, &m, e, Radix::Oct, 192, RoundingMode::ToEven)
-                    .unwrap();
+            let (s, m, e) = n
+                .convert_to_radix(Radix::Oct, RoundingMode::None, &mut cc)
+                .unwrap();
+            let g = BigFloatNumber::convert_from_radix(
+                s,
+                &m,
+                e,
+                Radix::Oct,
+                192,
+                RoundingMode::ToEven,
+                &mut cc,
+            )
+            .unwrap();
 
             assert!(n.cmp(&g) == 0);
 
@@ -663,7 +919,7 @@ mod tests {
             )
             .unwrap();
             let (s, m, e) = n
-                .convert_to_radix(Radix::Dec, RoundingMode::ToEven)
+                .convert_to_radix(Radix::Dec, RoundingMode::ToEven, &mut cc)
                 .unwrap();
 
             assert_eq!(
@@ -677,9 +933,16 @@ mod tests {
             assert_eq!(s, Sign::Pos);
             assert_eq!(e, 0);
 
-            let g =
-                BigFloatNumber::convert_from_radix(s, &m, e, Radix::Dec, 192, RoundingMode::ToEven)
-                    .unwrap();
+            let g = BigFloatNumber::convert_from_radix(
+                s,
+                &m,
+                e,
+                Radix::Dec,
+                192,
+                RoundingMode::ToEven,
+                &mut cc,
+            )
+            .unwrap();
             //println!("{:?}", g);
             //println!("{:?}", n);
             assert!(g.cmp(&n) == 0);
@@ -706,10 +969,19 @@ mod tests {
                     .unwrap();
             let rdx = random_radix();
 
-            let (s1, m1, e1) = n.convert_to_radix(rdx, RoundingMode::ToEven).unwrap();
-            let mut g =
-                BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, RoundingMode::ToEven)
-                    .unwrap();
+            let (s1, m1, e1) = n
+                .convert_to_radix(rdx, RoundingMode::ToEven, &mut cc)
+                .unwrap();
+            let mut g = BigFloatNumber::convert_from_radix(
+                s1,
+                &m1,
+                e1,
+                rdx,
+                p2,
+                RoundingMode::ToEven,
+                &mut cc,
+            )
+            .unwrap();
 
             //println!("\n{:?}", rdx);
             //println!("{:?} {:?} {}", s1, m1, e1);
@@ -745,14 +1017,23 @@ mod tests {
             let mut n = random_subnormal(p1);
             let rdx = random_radix();
 
-            let (s1, m1, e1) = n.convert_to_radix(rdx, RoundingMode::ToEven).unwrap();
+            let (s1, m1, e1) = n
+                .convert_to_radix(rdx, RoundingMode::ToEven, &mut cc)
+                .unwrap();
 
             //println!("\n{:?}", rdx);
             //println!("{:?} {:?} {}", s1, m1, e1);
 
-            let mut g =
-                BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, RoundingMode::ToEven)
-                    .unwrap();
+            let mut g = BigFloatNumber::convert_from_radix(
+                s1,
+                &m1,
+                e1,
+                rdx,
+                p2,
+                RoundingMode::ToEven,
+                &mut cc,
+            )
+            .unwrap();
 
             //println!("\n{:?}", rdx);
             //println!("{:?} {:?} {}", s1, m1, e1);
@@ -799,16 +1080,17 @@ mod tests {
                 //println!("\n{:?} {} {}", rdx, p1, p2);
                 //println!("{:?}", n);
 
-                let (s1, m1, e1) = n.convert_to_radix(rdx, rm).unwrap();
+                let (s1, m1, e1) = n.convert_to_radix(rdx, rm, &mut cc).unwrap();
 
                 //println!("{:?} {:?} {}", s1, m1, e1);
 
-                let mut g = BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, rm).unwrap();
+                let mut g =
+                    BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, rm, &mut cc).unwrap();
 
                 //println!("{:?}", g);
 
                 if rdx == Radix::Dec {
-                    eps.set_exponent(n.exponent() - p as Exponent + 3);
+                    eps.set_exponent(n.exponent() - p as Exponent + 4);
                     assert!(n.sub(&g, p, rm).unwrap().abs().unwrap().cmp(&eps) <= 0);
                 } else {
                     if p2 < p1 {
@@ -826,11 +1108,12 @@ mod tests {
             let mut n = BigFloatNumber::min_positive(p1).unwrap();
             //println!("\n{:?} {} {}", rdx, p1, p2);
             //println!("{:?}", n);
-            let (s1, m1, e1) = n.convert_to_radix(rdx, rm).unwrap();
+            let (s1, m1, e1) = n.convert_to_radix(rdx, rm, &mut cc).unwrap();
 
             //println!("{:?} {:?} {}", s1, m1, e1);
 
-            let mut g = BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, rm).unwrap();
+            let mut g =
+                BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p2, rm, &mut cc).unwrap();
             //println!("{:?}", g);
 
             if rdx == Radix::Dec {
@@ -858,14 +1141,23 @@ mod tests {
                     e1,
                     rdx,
                     p1,
-                    RoundingMode::ToEven
+                    RoundingMode::ToEven,
+                    &mut cc
                 )
                 .unwrap()
                 .is_zero());
                 let m1 = [1, rdx as u8, 0];
                 assert!(
-                    BigFloatNumber::convert_from_radix(s1, &m1, e1, rdx, p1, RoundingMode::ToEven)
-                        .unwrap_err()
+                    BigFloatNumber::convert_from_radix(
+                        s1,
+                        &m1,
+                        e1,
+                        rdx,
+                        p1,
+                        RoundingMode::ToEven,
+                        &mut cc
+                    )
+                    .unwrap_err()
                         == Error::InvalidArgument
                 );
                 let m1 = [1, rdx as u8 - 1, 0];
@@ -875,7 +1167,8 @@ mod tests {
                     e1,
                     rdx,
                     0,
-                    RoundingMode::ToEven
+                    RoundingMode::ToEven,
+                    &mut cc,
                 )
                 .unwrap()
                 .is_zero());
@@ -886,7 +1179,8 @@ mod tests {
                     e1,
                     rdx,
                     p1,
-                    RoundingMode::ToEven
+                    RoundingMode::ToEven,
+                    &mut cc,
                 )
                 .unwrap()
                 .is_zero());
@@ -897,12 +1191,255 @@ mod tests {
                     e1,
                     rdx,
                     p1,
-                    RoundingMode::ToEven
+                    RoundingMode::ToEven,
+                    &mut cc,
                 )
                 .unwrap()
                 .is_zero());
             }
         }
+
+        // unkonwn p: binary, octal, hexadecimal
+        for (s1, exp, rdx) in [
+            // Bin
+            (
+                vec![
+                    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1,
+                ],
+                123,
+                Radix::Bin,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0,
+                    0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1,
+                ],
+                EXPONENT_MIN + 3,
+                Radix::Bin,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0,
+                    0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1,
+                ],
+                EXPONENT_MIN,
+                Radix::Bin,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0,
+                    0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1,
+                ],
+                EXPONENT_MIN + 256,
+                Radix::Bin,
+            ),
+            // Oct
+            (
+                vec![
+                    7, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                123,
+                Radix::Oct,
+            ),
+            (
+                vec![
+                    7, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 3 - 123,
+                Radix::Oct,
+            ),
+            (
+                vec![
+                    3, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 3 + 123,
+                Radix::Oct,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 3, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1,
+                    1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0,
+                    0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 3 - 123,
+                Radix::Oct,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 3, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1,
+                    1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0,
+                    0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 3 + 123,
+                Radix::Oct,
+            ),
+            // Hex
+            (
+                vec![
+                    0xF, 0, 2, 0, 0, 0, 0, 0, 0xD, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 0, 0xA, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                123,
+                Radix::Hex,
+            ),
+            (
+                vec![
+                    0xF, 0, 2, 0, 0, 0, 0, 0, 0xD, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 0, 0xA, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 4 - 123,
+                Radix::Hex,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    7, 0, 2, 0, 0, 0, 0, 0, 0xD, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1,
+                    0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1,
+                    0, 0, 0, 0, 0, 0xA, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 4 - 123,
+                Radix::Hex,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    7, 0, 2, 0, 0, 0, 0, 0, 0xD, 0, 0, 0, 4, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1,
+                    0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 5, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1,
+                    0, 0, 0, 0, 0, 0xA, 0, 0, 0, 0, 0, 3, 0, 6,
+                ],
+                EXPONENT_MIN / 4 + 123,
+                Radix::Hex,
+            ),
+            // Dec
+            (
+                vec![
+                    9, 5, 7, 4, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 9, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 9, 1, 1, 7, 0, 0, 0, 0, 1, 1, 1, 5, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 2, 0, 6,
+                ],
+                123,
+                Radix::Dec,
+            ),
+            (
+                vec![
+                    9, 5, 7, 4, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 9, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 9, 1, 1, 7, 0, 0, 0, 0, 1, 1, 1, 5, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 2, 0, 5,
+                ],
+                EXPONENT_MIN / 10 - 123,
+                Radix::Dec,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    9, 5, 7, 4, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 9, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 9, 1, 1, 7, 0, 0, 0, 0, 1, 1, 1, 5, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 2, 0, 7,
+                ],
+                EXPONENT_MIN / 10 - 123,
+                Radix::Dec,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    9, 5, 7, 4, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 9, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 9, 1, 1, 7, 0, 0, 0, 0, 1, 1, 1, 5, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 2, 0, 5,
+                ],
+                EXPONENT_MIN / 10 + 10,
+                Radix::Dec,
+            ),
+            (
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    9, 5, 7, 4, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 9, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1,
+                    1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 9, 1, 1, 7, 0, 0, 0, 0, 1, 1, 1, 5, 0, 0, 1, 1,
+                    1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 2, 0, 5,
+                ],
+                123,
+                Radix::Dec,
+            ),
+        ] {
+            let mut g = BigFloatNumber::convert_from_radix(
+                Sign::Pos,
+                &s1,
+                exp,
+                rdx,
+                usize::MAX,
+                RoundingMode::None,
+                &mut cc,
+            )
+            .unwrap();
+
+            let (s, d, e) = g
+                .convert_to_radix(rdx, RoundingMode::None, &mut cc)
+                .unwrap();
+
+            // verify no information loss in mantissa becase of length
+            let lead_zeroes_s1 = s1.iter().take_while(|&&x| x == 0).count();
+            let lead_zeroes_d = d.iter().take_while(|&&x| x == 0).count();
+            assert!(*d.iter().last().unwrap() != 0);
+            assert!(*s1.iter().last().unwrap() != 0);
+            assert!(d.len() - lead_zeroes_d >= s1.len() - lead_zeroes_s1);
+
+            let mut n = BigFloatNumber::convert_from_radix(
+                s,
+                &d,
+                e,
+                rdx,
+                usize::MAX,
+                RoundingMode::None,
+                &mut cc,
+            )
+            .unwrap();
+
+            if rdx == Radix::Dec {
+                if g.mantissa_max_bit_len() < n.mantissa_max_bit_len() {
+                    n.set_precision(g.mantissa_max_bit_len(), RoundingMode::ToEven)
+                        .unwrap();
+                } else {
+                    g.set_precision(n.mantissa_max_bit_len(), RoundingMode::ToEven)
+                        .unwrap();
+                }
+
+                assert!(n.cmp(&g) == 0);
+            } else {
+                assert!(n.cmp(&g) == 0);
+            }
+        }
+
+        // unknown p: decimal
     }
 
     fn random_radix() -> Radix {
@@ -913,5 +1450,361 @@ mod tests {
             3 => Radix::Hex,
             _ => unreachable!(),
         }
+    }
+
+    #[test]
+    fn test_round_dec() {
+        let mut testset = [
+            (
+                RoundingMode::ToEven,
+                vec![
+                    (
+                        ([1, 2, 3, 5, 0, 0], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 5, 0, 0], false, true),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 5, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 5, 0, 1], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),  // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 4, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 6, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 4, 9, 9], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 4, 9, 9], false, true),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 4, 5, 0, 0], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 5, 0, 0], false, true),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 4, 5, 0, 1], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 5, 0, 0, 0], false, false),  // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 4, 4, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 4, 6, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 5, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 4, 4, 9, 9], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                ],
+            ),
+            (
+                RoundingMode::ToOdd,
+                vec![
+                    (
+                        ([1, 2, 3, 5, 0, 0], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 5, 0, 0], false, true),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 5, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 5, 0, 1], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),  // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 4, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 6, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 4, 9, 9], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 4, 5, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 5, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 4, 5, 0, 1], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 5, 0, 0, 0], false, false),  // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 4, 4, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 4, 6, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 5, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 4, 4, 9, 9], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 4, 9, 9], false, true),   // output, overflow, check_roundable
+                    ),
+                ],
+            ),
+            (
+                RoundingMode::FromZero,
+                vec![
+                    (
+                        ([1, 2, 3, 0, 0, 0], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, true),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 0, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 0, 0, 1], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),  // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 9, 9, 9], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 9, 9, 9], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 9, 9, 9], false, true),   // output, overflow, check_roundable
+                    ),
+                ],
+            ),
+            (
+                RoundingMode::ToZero,
+                vec![
+                    (
+                        ([1, 2, 3, 0, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 9, 9, 9], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 9, 9, 9], false, true),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 9, 9, 9], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 1, 1, 1], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),  // output, overflow, check_roundable
+                    ),
+                ],
+            ),
+            (
+                RoundingMode::None,
+                vec![
+                    (
+                        ([1, 2, 3, 1, 2, 3], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 1, 2, 3], false, false),  // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 1, 2, 3], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 1, 2, 3], false, false),   // output, overflow, check_roundable
+                    ),
+                ],
+            ),
+            (
+                RoundingMode::Up,
+                vec![
+                    (
+                        ([1, 2, 3, 0, 0, 0], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, true),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 0, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 0, 0, 1], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),  // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 9, 9, 9], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 0, 0, 0], 3, false, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),    // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 9, 9, 9], 3, false, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 9, 9, 9], false, true),    // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 9, 9, 9], 3, false, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),    // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 1, 1, 1], 3, false, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                ],
+            ),
+            (
+                RoundingMode::Down,
+                vec![
+                    (
+                        ([1, 2, 3, 0, 0, 0], 3, false, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, true),    // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 0, 0, 0], 3, false, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),    // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 0, 0, 1], 3, false, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 9, 9, 9], 3, false, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 4, 0, 0, 0], false, false),    // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 0, 0, 0], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 9, 9, 9], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 9, 9, 9], false, true),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 9, 9, 9], 3, true, false), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),   // output, overflow, check_roundable
+                    ),
+                    (
+                        ([1, 2, 3, 1, 1, 1], 3, true, true), // input, n, is_positive, check_roundable
+                        ([1, 2, 3, 0, 0, 0], false, false),  // output, overflow, check_roundable
+                    ),
+                ],
+            ),
+        ];
+
+        for (rm, sets) in testset.iter_mut() {
+            for (
+                (input, n, is_positive, check_roundable),
+                (output, overflow, check_roundable_ret),
+            ) in sets.iter_mut()
+            {
+                match rm {
+                    RoundingMode::ToEven
+                    | RoundingMode::ToOdd
+                    | RoundingMode::FromZero
+                    | RoundingMode::ToZero
+                    | RoundingMode::None => {
+                        // indifferent of sign
+                        for is_positive in [true, false] {
+                            let ovf = BigFloatNumber::round_dec(
+                                input,
+                                *n,
+                                *rm,
+                                is_positive,
+                                check_roundable,
+                            );
+                            assert_eq!(*check_roundable, *check_roundable_ret);
+                            assert_eq!(*overflow, ovf);
+                            assert_eq!(*input, *output);
+                        }
+                    }
+                    RoundingMode::Down | RoundingMode::Up => {
+                        let ovf = BigFloatNumber::round_dec(
+                            input,
+                            *n,
+                            *rm,
+                            *is_positive,
+                            check_roundable,
+                        );
+                        assert_eq!(*check_roundable, *check_roundable_ret);
+                        assert_eq!(*overflow, ovf);
+                        assert_eq!(*input, *output);
+                    }
+                }
+            }
+        }
+
+        // overflow
+        let mut input = [9, 9, 9, 9, 9, 9];
+        let mut check_roundable = false;
+        let ovf =
+            BigFloatNumber::round_dec(&mut input, 3, RoundingMode::Up, true, &mut check_roundable);
+        assert!(ovf);
+        assert_eq!(input, [1, 0, 0, 0, 0, 0]);
+
+        // n = input.len()
+        let mut input = [9, 9, 9, 9, 9, 9];
+        let mut check_roundable = false;
+        let ovf =
+            BigFloatNumber::round_dec(&mut input, 6, RoundingMode::Up, true, &mut check_roundable);
+        assert!(!ovf);
+        assert_eq!(input, [9, 9, 9, 9, 9, 9]);
+
+        // n > input.len()
+        let mut input = [9, 9, 9, 9, 9, 9];
+        let mut check_roundable = false;
+        let ovf =
+            BigFloatNumber::round_dec(&mut input, 7, RoundingMode::Up, true, &mut check_roundable);
+        assert!(!ovf);
+        assert_eq!(input, [9, 9, 9, 9, 9, 9]);
+
+        // n = 0
+        let mut input = [9, 9, 9, 9, 9, 9];
+        let mut check_roundable = false;
+        let ovf =
+            BigFloatNumber::round_dec(&mut input, 0, RoundingMode::Up, true, &mut check_roundable);
+        assert!(!ovf);
+        assert_eq!(input, [9, 9, 9, 9, 9, 9]);
+
+        // try round
+        assert!(BigFloatNumber::try_round_dec(
+            &mut [9, 9, 9, 9, 9, 9],
+            3,
+            RoundingMode::Up,
+            Sign::Pos,
+            &mut 0,
+            false
+        )
+        .unwrap());
+        assert!(!BigFloatNumber::try_round_dec(
+            &mut [9, 9, 9, 9, 9, 9],
+            3,
+            RoundingMode::Up,
+            Sign::Pos,
+            &mut 0,
+            true
+        )
+        .unwrap());
+
+        let mut e = 0;
+        assert!(BigFloatNumber::try_round_dec(
+            &mut [9, 9, 9, 9, 9, 0],
+            3,
+            RoundingMode::Up,
+            Sign::Pos,
+            &mut e,
+            true
+        )
+        .unwrap());
+        assert_eq!(e, 1);
+
+        e = EXPONENT_MAX;
+        assert_eq!(
+            BigFloatNumber::try_round_dec(
+                &mut [9, 9, 9, 9, 9, 0],
+                3,
+                RoundingMode::FromZero,
+                Sign::Neg,
+                &mut e,
+                true
+            ),
+            Err(Error::ExponentOverflow(Sign::Neg))
+        );
     }
 }

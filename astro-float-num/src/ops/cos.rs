@@ -125,6 +125,7 @@ impl BigFloatNumber {
         let mut add_p = (1 - COS_EXP_THRES) as usize;
         loop {
             let mut x = self.clone()?;
+            x.set_inexact(false);
 
             let p_x = p_wrk + add_p;
             x.set_precision(p_x, RoundingMode::None)?;
@@ -138,6 +139,7 @@ impl BigFloatNumber {
                 add_p = t;
             } else {
                 if ret.try_set_precision(p, rm, p_wrk)? {
+                    ret.set_inexact(ret.inexact() | self.inexact());
                     break Ok(ret);
                 }
 
@@ -241,7 +243,7 @@ mod tests {
         half_pi.set_precision(p, RoundingMode::None).unwrap();
 
         let n2 = half_pi.cos(p, rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("5.2049C1114CF98E804177D4C76273644A29410F31C6809BBDF2A33679A7486365EEEE1A43A7D13E58_e-21", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse("5.2049C1114CF98E804177D4C76273644A29410F31C6809BBDF2A33679A7486365EEEE1A43A7D13E58_e-21", crate::Radix::Hex, 640, RoundingMode::None, &mut cc).unwrap();
 
         //println!("{:?}", n2.format(crate::Radix::Bin, rm).unwrap());
 
@@ -250,7 +252,7 @@ mod tests {
         // large exponent
         half_pi.set_exponent(256);
         let n2 = half_pi.cos(p, rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("3.2F00069261A9FFC022D09F662F2E2DDBEFD1AF138813F2A71D7601C58E793299EA052E4EBC59107C_e-1", crate::Radix::Hex, 640, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse("3.2F00069261A9FFC022D09F662F2E2DDBEFD1AF138813F2A71D7601C58E793299EA052E4EBC59107C_e-1", crate::Radix::Hex, 640, RoundingMode::None, &mut cc).unwrap();
 
         //println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
@@ -258,9 +260,9 @@ mod tests {
 
         // small exponent
         let p = 384;
-        let n1 = BigFloatNumber::parse("1.992EF09686C3DC782C05BFD7863A715ECBDAED45DBAEE3ADFEF1AB8F74DB393D8CD6EAF9CA8443A6C28CF59D35B7FF56_e-20", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n1 = BigFloatNumber::parse("1.992EF09686C3DC782C05BFD7863A715ECBDAED45DBAEE3ADFEF1AB8F74DB393D8CD6EAF9CA8443A6C28CF59D35B7FF56_e-20", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
         let n2 = n1.cos(p, RoundingMode::ToEven, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEB8FC7D51D69792F9AB263F754D161F6A_e-1", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse("F.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEB8FC7D51D69792F9AB263F754D161F6A_e-1", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
 
         // println!("{:?}", n1.format(crate::Radix::Hex, rm).unwrap());
 

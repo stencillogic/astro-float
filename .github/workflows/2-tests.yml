@@ -10,14 +10,30 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-and-test:
+  build-and-test-x64:
 
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build --workspace --release --verbose
+    - name: Run tests
+      run: cargo test --workspace --release --verbose
+    - name: Run no_std tests
+      run: cargo test --workspace --release --verbose --no-default-features --features random,serde
+
+  build-and-test-x32:
+
+    runs-on: ubuntu-latest
+
+    env:
+      DEP_GMP_LIMB_BITS: 32
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install -y gcc-multilib g++-multilib
+    - name: Add 32 bit toolchain
+      run: rustup toolchain install stable-i686-unknown-linux-gnu && rustup default stable-i686-unknown-linux-gnu
     - name: Run tests
       run: cargo test --workspace --release --verbose
     - name: Run no_std tests

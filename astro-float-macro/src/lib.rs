@@ -7,7 +7,7 @@
 
 mod util;
 
-use astro_float_num::Exponent;
+use astro_float_num::{Consts, EXPONENT_BIT_SIZE};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
@@ -16,10 +16,9 @@ use syn::{
 };
 use util::{check_arg_num, str_to_bigfloat_expr};
 
-// Size of exponent in bits.
-const EXPONENT_BIT_SIZE: usize = core::mem::size_of::<Exponent>() * 8;
-
 // Speculative error estimation.
+// This error is added upfront, before actual error is known.
+// It helps to avoid additional recalculations due to changing error estimation.
 const SPEC_ADD_ERR: usize = 32;
 
 struct MacroInput {
@@ -50,31 +49,69 @@ enum ErrAlgo {
     AsinAcos,
 }
 
-fn traverse_binary(expr: &ExprBinary, err: &mut Vec<usize>) -> Result<TokenStream, Error> {
-    let left_expr = traverse_expr(&expr.left, err)?;
-    let right_expr = traverse_expr(&expr.right, err)?;
+fn traverse_binary(
+    expr: &ExprBinary,
+    err: &mut Vec<usize>,
+    cc: &mut Consts,
+) -> Result<TokenStream, Error> {
+    let left_expr = traverse_expr(&expr.left, err, cc)?;
+    let right_expr = traverse_expr(&expr.right, err, cc)?;
+
+    let errs_id = err.len();
 
     let ts = match expr.op {
         BinOp::Add(_) => {
-            quote!(astro_float::BigFloat::add(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
+            err.push(1);
+            quote!({
+                let arg1 = #left_expr;
+                let arg2 = #right_expr;
+                let ret = astro_float::BigFloat::add(&arg1, &arg2, p_wrk, astro_float::RoundingMode::None);
+                if let (Some(e1), Some(e2), Some(e3)) = (arg1.exponent(), arg2.exponent(), ret.exponent()) {
+                    if (e1 as isize - e2 as isize).abs() <= 1 && arg1.sign() != arg2.sign() {
+                        let newerr = (e1.max(e2) as isize - e3 as isize).unsigned_abs() + 1;
+                        if errs[#errs_id] < newerr {
+                            errs[#errs_id] = newerr;
+                            continue;
+                        }
+                    }
+                }
+                ret
+            })
         }
         BinOp::Sub(_) => {
-            quote!(astro_float::BigFloat::sub(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
+            err.push(1);
+            quote!({
+                let arg1 = #left_expr;
+                let arg2 = #right_expr;
+                let ret = astro_float::BigFloat::sub(&arg1, &arg2, p_wrk, astro_float::RoundingMode::None);
+                if let (Some(e1), Some(e2), Some(e3)) = (arg1.exponent(), arg2.exponent(), ret.exponent()) {
+                    if (e1 as isize - e2 as isize).abs() <= 1 && arg1.sign() == arg2.sign() {
+                        let newerr = (e1.max(e2) as isize - e3 as isize).unsigned_abs() + 1;
+                        if errs[#errs_id] < newerr {
+                            errs[#errs_id] = newerr;
+                            continue;
+                        }
+                    }
+                }
+                ret
+            })
         }
         BinOp::Mul(_) => {
+            err.push(3);
             quote!(astro_float::BigFloat::mul(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
         }
         BinOp::Div(_) => {
+            err.push(3);
             quote!(astro_float::BigFloat::div(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
         }
-        BinOp::Rem(_) => quote!(astro_float::BigFloat::rem(&(#left_expr), &(#right_expr))),
+        BinOp::Rem(_) => {
+            quote!(astro_float::BigFloat::rem(&(#left_expr), &(#right_expr)))
+        }
         _ => return Err(Error::new(
             expr.span(),
             "unexpected binary operator. Only \"+\", \"-\", \"*\", \"/\", and \"%\" are allowed.",
         )),
     };
-
-    err.push(1);
 
     Ok(ts)
 }
@@ -84,9 +121,10 @@ fn one_arg_fun(
     expr: &ExprCall,
     added_err: usize,
     err: &mut Vec<usize>,
+    cc: &mut Consts,
 ) -> Result<TokenStream, Error> {
     check_arg_num(1, expr)?;
-    let arg = traverse_expr(&expr.args[0], err)?;
+    let arg = traverse_expr(&expr.args[0], err, cc)?;
     err.push(added_err);
     Ok(quote!(#fun(&(#arg), p_wrk, astro_float::RoundingMode::None)))
 }
@@ -97,10 +135,11 @@ fn one_arg_fun_cc(
     added_err: usize,
     err: &mut Vec<usize>,
     algo: ErrAlgo,
+    cc: &mut Consts,
 ) -> Result<TokenStream, Error> {
     check_arg_num(1, expr)?;
 
-    let arg = traverse_expr(&expr.args[0], err)?;
+    let arg = traverse_expr(&expr.args[0], err, cc)?;
 
     let errs_id = err.len();
 
@@ -112,7 +151,7 @@ fn one_arg_fun_cc(
             let ret = #fun(&arg, p_wrk, astro_float::RoundingMode::None, cc);
 
             if let Some(e) = ret.exponent() {
-                let h = 2 * (e.unsigned_abs() as isize) - p as isize;
+                let h = 2 * (e.unsigned_abs() as isize) + 1;
                 if (errs[#errs_id] as isize) < h {
                     errs[#errs_id] = h as usize;
                     continue;
@@ -129,7 +168,7 @@ fn one_arg_fun_cc(
         let errcheck = match algo {
             ErrAlgo::None => quote!(), // the error is constant
             ErrAlgo::Log => quote!({
-                let newerr = compute_added_err_near_one(&arg, p_wrk) + 2;
+                let newerr = astro_float::macro_util::compute_added_err_near_one(&arg, p_wrk) + 2;
                 if errs[#errs_id] < newerr {
                     errs[#errs_id] = newerr;
                     continue;
@@ -144,7 +183,7 @@ fn one_arg_fun_cc(
                 }
             }),
             ErrAlgo::AsinAcos => quote!({
-                let newerr = compute_added_err_near_one(&arg, p_wrk) / 2;
+                let newerr = astro_float::macro_util::compute_added_err_near_one(&arg, p_wrk) / 2;
                 if errs[#errs_id] < newerr {
                     errs[#errs_id] = newerr;
                     continue;
@@ -171,17 +210,18 @@ fn two_arg_fun_cc(
     added_err: usize,
     err: &mut Vec<usize>,
     algo: ErrAlgo,
+    cc: &mut Consts,
 ) -> Result<TokenStream, Error> {
     check_arg_num(2, expr)?;
 
-    let arg1 = traverse_expr(&expr.args[0], err)?;
-    let arg2 = traverse_expr(&expr.args[1], err)?;
+    let arg1 = traverse_expr(&expr.args[0], err, cc)?;
+    let arg2 = traverse_expr(&expr.args[1], err, cc)?;
 
     let errs_id = err.len();
     let errcheck = match algo {
         ErrAlgo::Log2 => quote!({
-            let newerr1 = compute_added_err_near_one(&arg1, p_wrk);
-            let newerr2 = compute_added_err_near_one(&arg2, p_wrk);
+            let newerr1 = astro_float::macro_util::compute_added_err_near_one(&arg1, p_wrk);
+            let newerr2 = astro_float::macro_util::compute_added_err_near_one(&arg2, p_wrk);
             let newerr = newerr1 + newerr2 + 2;
             if errs[#errs_id] < newerr {
                 errs[#errs_id] = newerr;
@@ -189,12 +229,12 @@ fn two_arg_fun_cc(
             }
         }),
         ErrAlgo::Pow => quote!({
-            let mut newerr = EXPONENT_BIT_SIZE + 2;
+            let mut newerr = astro_float::EXPONENT_BIT_SIZE + 2;
             if let Some(en) = arg2.exponent() {
                 if let Some(1 | 0) = arg1.exponent() {
                     if en > 0 {
-                        let c = compute_added_err_near_one(&arg1, p_wrk);
-                        if en as usize <= c + EXPONENT_BIT_SIZE {
+                        let c = astro_float::macro_util::compute_added_err_near_one(&arg1, p_wrk);
+                        if en as usize <= c + astro_float::EXPONENT_BIT_SIZE {
                             newerr += en as usize;
                         } // result is zero or inf otherwise
                     }
@@ -220,21 +260,26 @@ fn two_arg_fun_cc(
     }))
 }
 
-fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, Error> {
+fn traverse_call(
+    expr: &ExprCall,
+    err: &mut Vec<usize>,
+    cc: &mut Consts,
+) -> Result<TokenStream, Error> {
     let errmes = "unexpected function name. Only \"recip\", \"sqrt\", \"cbrt\", \"ln\", \"log2\", \"log10\", \"log\", \"exp\", \"pow\", \"sin\", \"cos\", \"tan\", \"asin\", \"acos\", \"atan\", \"sinh\", \"cosh\", \"tanh\", \"asinh\", \"acosh\", \"atanh\" are allowed.";
 
     if let Expr::Path(fun) = expr.func.as_ref() {
         if let Some(fname) = fun.path.get_ident() {
             let ts = match fname.to_string().as_str() {
-                "recip" => one_arg_fun(quote!(astro_float::BigFloat::reciprocal), expr, 2, err),
-                "sqrt" => one_arg_fun(quote!(astro_float::BigFloat::sqrt), expr, 1, err),
-                "cbrt" => one_arg_fun(quote!(astro_float::BigFloat::cbrt), expr, 1, err),
+                "recip" => one_arg_fun(quote!(astro_float::BigFloat::reciprocal), expr, 2, err, cc),
+                "sqrt" => one_arg_fun(quote!(astro_float::BigFloat::sqrt), expr, 1, err, cc),
+                "cbrt" => one_arg_fun(quote!(astro_float::BigFloat::cbrt), expr, 1, err, cc),
                 "ln" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::ln),
                     expr,
                     SPEC_ADD_ERR,
                     err,
                     ErrAlgo::Log,
+                    cc,
                 ),
                 "log2" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::log2),
@@ -242,6 +287,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     SPEC_ADD_ERR,
                     err,
                     ErrAlgo::Log,
+                    cc,
                 ),
                 "log10" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::log10),
@@ -249,6 +295,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     SPEC_ADD_ERR,
                     err,
                     ErrAlgo::Log,
+                    cc,
                 ),
                 "log" => two_arg_fun_cc(
                     quote!(astro_float::BigFloat::log),
@@ -256,6 +303,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     SPEC_ADD_ERR * 2,
                     err,
                     ErrAlgo::Log2,
+                    cc,
                 ),
                 "exp" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::exp),
@@ -263,6 +311,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     EXPONENT_BIT_SIZE,
                     err,
                     ErrAlgo::None,
+                    cc,
                 ),
                 "pow" => two_arg_fun_cc(
                     quote!(astro_float::BigFloat::pow),
@@ -270,6 +319,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     EXPONENT_BIT_SIZE + SPEC_ADD_ERR,
                     err,
                     ErrAlgo::Pow,
+                    cc,
                 ),
                 "sin" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::sin),
@@ -277,6 +327,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     SPEC_ADD_ERR,
                     err,
                     ErrAlgo::SinCos,
+                    cc,
                 ),
                 "cos" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::cos),
@@ -284,6 +335,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     SPEC_ADD_ERR,
                     err,
                     ErrAlgo::SinCos,
+                    cc,
                 ),
                 "tan" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::tan),
@@ -291,6 +343,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     2 * SPEC_ADD_ERR,
                     err,
                     ErrAlgo::Tan,
+                    cc,
                 ),
                 "asin" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::asin),
@@ -298,6 +351,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     SPEC_ADD_ERR / 2,
                     err,
                     ErrAlgo::AsinAcos,
+                    cc,
                 ),
                 "acos" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::acos),
@@ -305,6 +359,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     SPEC_ADD_ERR / 2,
                     err,
                     ErrAlgo::AsinAcos,
+                    cc,
                 ),
                 "atan" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::atan),
@@ -312,6 +367,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     1,
                     err,
                     ErrAlgo::None,
+                    cc,
                 ),
                 "sinh" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::sinh),
@@ -319,6 +375,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     EXPONENT_BIT_SIZE,
                     err,
                     ErrAlgo::None,
+                    cc,
                 ),
                 "cosh" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::cosh),
@@ -326,6 +383,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     EXPONENT_BIT_SIZE,
                     err,
                     ErrAlgo::None,
+                    cc,
                 ),
                 "tanh" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::tanh),
@@ -333,6 +391,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     1,
                     err,
                     ErrAlgo::None,
+                    cc,
                 ),
                 "asinh" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::asinh),
@@ -340,6 +399,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     2,
                     err,
                     ErrAlgo::None,
+                    cc,
                 ),
                 "acosh" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::acosh),
@@ -347,6 +407,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     SPEC_ADD_ERR,
                     err,
                     ErrAlgo::Log,
+                    cc,
                 ),
                 "atanh" => one_arg_fun_cc(
                     quote!(astro_float::BigFloat::atanh),
@@ -354,6 +415,7 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
                     SPEC_ADD_ERR,
                     err,
                     ErrAlgo::Log,
+                    cc,
                 ),
                 _ => return Err(Error::new(expr.span(), errmes)),
             }?;
@@ -364,17 +426,21 @@ fn traverse_call(expr: &ExprCall, err: &mut Vec<usize>) -> Result<TokenStream, E
     Err(Error::new(expr.span(), errmes))
 }
 
-fn traverse_group(expr: &ExprGroup, err: &mut Vec<usize>) -> Result<TokenStream, Error> {
-    traverse_expr(&expr.expr, err)
+fn traverse_group(
+    expr: &ExprGroup,
+    err: &mut Vec<usize>,
+    cc: &mut Consts,
+) -> Result<TokenStream, Error> {
+    traverse_expr(&expr.expr, err, cc)
 }
 
-fn traverse_lit(expr: &ExprLit) -> Result<TokenStream, Error> {
+fn traverse_lit(expr: &ExprLit, cc: &mut Consts) -> Result<TokenStream, Error> {
     let span = expr.span();
 
     match &expr.lit {
-        Lit::Str(v) => str_to_bigfloat_expr(&v.value(), span),
-        Lit::Int(v) => str_to_bigfloat_expr(v.base10_digits(), span),
-        Lit::Float(v) => str_to_bigfloat_expr(v.base10_digits(), span),
+        Lit::Str(v) => str_to_bigfloat_expr(&v.value(), span, cc),
+        Lit::Int(v) => str_to_bigfloat_expr(v.base10_digits(), span, cc),
+        Lit::Float(v) => str_to_bigfloat_expr(v.base10_digits(), span, cc),
         _ => Err(Error::new(
             expr.span(),
             "unexpected literal. Only string, integer, or floating point literals are supported.",
@@ -382,18 +448,38 @@ fn traverse_lit(expr: &ExprLit) -> Result<TokenStream, Error> {
     }
 }
 
-fn traverse_paren(expr: &ExprParen, err: &mut Vec<usize>) -> Result<TokenStream, Error> {
-    traverse_expr(&expr.expr, err)
+fn traverse_paren(
+    expr: &ExprParen,
+    err: &mut Vec<usize>,
+    cc: &mut Consts,
+) -> Result<TokenStream, Error> {
+    traverse_expr(&expr.expr, err, cc)
 }
 
 fn traverse_path(expr: &ExprPath) -> Result<TokenStream, Error> {
-    Ok(
-        quote!(astro_float::BigFloat::from_ext((#expr).clone(), p_wrk, astro_float::RoundingMode::None)),
-    )
+    Ok(if expr.path.is_ident("pi") {
+        quote!({ cc.pi(p_wrk, astro_float::RoundingMode::None) })
+    } else if expr.path.is_ident("e") {
+        quote!({ cc.e(p_wrk, astro_float::RoundingMode::None) })
+    } else if expr.path.is_ident("ln_2") {
+        quote!({ cc.ln_2(p_wrk, astro_float::RoundingMode::None) })
+    } else if expr.path.is_ident("ln_10") {
+        quote!({ cc.ln_10(p_wrk, astro_float::RoundingMode::None) })
+    } else {
+        quote!({
+            let mut arg = astro_float::BigFloat::from_ext((#expr).clone(), p_wrk, astro_float::RoundingMode::ToEven, cc);
+            arg.set_inexact(false);
+            arg
+        })
+    })
 }
 
-fn traverse_unary(expr: &ExprUnary, err: &mut Vec<usize>) -> Result<TokenStream, Error> {
-    let op_expr = traverse_expr(&expr.expr, err)?;
+fn traverse_unary(
+    expr: &ExprUnary,
+    err: &mut Vec<usize>,
+    cc: &mut Consts,
+) -> Result<TokenStream, Error> {
+    let op_expr = traverse_expr(&expr.expr, err, cc)?;
 
     match expr.op {
         UnOp::Neg(_) => Ok(quote!(astro_float::BigFloat::neg(&(#op_expr)))),
@@ -404,15 +490,15 @@ fn traverse_unary(expr: &ExprUnary, err: &mut Vec<usize>) -> Result<TokenStream,
     }
 }
 
-fn traverse_expr(expr: &Expr, err: &mut Vec<usize>) -> Result<TokenStream, Error> {
+fn traverse_expr(expr: &Expr, err: &mut Vec<usize>, cc: &mut Consts) -> Result<TokenStream, Error> {
     match expr {
-        Expr::Binary(e) => traverse_binary(e, err),
-        Expr::Call(e) => traverse_call(e, err),
-        Expr::Group(e) => traverse_group(e, err),
-        Expr::Lit(e) => traverse_lit(e),
-        Expr::Paren(e) => traverse_paren(e, err),
+        Expr::Binary(e) => traverse_binary(e, err,cc),
+        Expr::Call(e) => traverse_call(e, err,cc),
+        Expr::Group(e) => traverse_group(e, err,cc),
+        Expr::Lit(e) => traverse_lit(e, cc),
+        Expr::Paren(e) => traverse_paren(e, err, cc),
         Expr::Path(e) => traverse_path(e),
-        Expr::Unary(e) => traverse_unary(e, err),
+        Expr::Unary(e) => traverse_unary(e, err, cc),
         _ => Err(Error::new(expr.span(), "unexpected expression. Only operators \"+\", \"-\", \"*\", \"/\", \"%\", functions \"recip\", \"sqrt\", \"cbrt\", \"ln\", \"log2\", \"log10\", \"log\", \"exp\", \"pow\", \"sin\", \"cos\", \"tan\", \"asin\", \"acos\", \"atan\", \"sinh\", \"cosh\", \"tanh\", \"asinh\", \"acosh\", \"atanh\", literals and variables, and grouping with parentheses are supported.")),
     }
 }
@@ -428,7 +514,9 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let mut err = Vec::new();
 
-    let expr = traverse_expr(&expr, &mut err).unwrap_or_else(|e| e.to_compile_error());
+    let mut cc = Consts::new().expect("Failed to initialize constant cache.");
+
+    let expr = traverse_expr(&expr, &mut err, &mut cc).unwrap_or_else(|e| e.to_compile_error());
 
     let err_sz = err.len();
 
@@ -436,59 +524,24 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         use astro_float::FromExt;
         use astro_float::ctx::Contextable;
 
-        const EXPONENT_BIT_SIZE: usize = core::mem::size_of::<astro_float::Exponent>() * 8;
-
         let mut ctx = &mut (#ctx);
         let p: usize = ctx.precision();
         let rm = ctx.rounding_mode();
         let cc = ctx.consts();
 
-        let mut p_inc = astro_float::WORD_BIT_SIZE;
-        let mut p_rnd = p + p_inc;
+        let mut p_rnd = p + astro_float::WORD_BIT_SIZE;
         let mut errs: [usize; #err_sz] = [#(#err, )*];
-
-        fn compute_added_err_near_one(arg: &astro_float::BigFloat, p: usize) -> usize {
-            let d: astro_float::BigFloat;
-            if arg.is_zero() {
-                return 0;
-            }
-
-            if let Some(arg_sign) = arg.sign() {
-                let one = astro_float::BigFloat::from(arg_sign.to_int());
-
-                if let Some(0) = arg.exponent() {
-                    d = one.sub(&arg, p, astro_float::RoundingMode::None);
-                } else if let Some(1) = arg.exponent() {
-                    d = arg.sub(&one, p, astro_float::RoundingMode::None);
-                } else {
-                    return 0;
-                }
-
-                if d.is_zero() && d.inexact() {
-                    return p;
-                } else if let Some(e) = d.exponent() {
-                    return (-e) as usize;
-                }
-            }
-
-            return 0;
-        }
 
         loop {
             let p_wrk = p_rnd.saturating_add(errs.iter().sum());
 
             let mut ret: astro_float::BigFloat = (#expr).into();
 
-            if ret.inexact() {
-                if ret.try_set_precision(p, rm, p_rnd) {
-                    break ret;
-                }
-            } else {
-                break ret;
+            if let Err(err) = ret.set_precision(p, rm) {
+                ret = astro_float::BigFloat::nan(Some(err));
             }
 
-            p_rnd = p_rnd.saturating_add(p_inc);
-            p_inc = (((p_rnd / 5).saturating_add(astro_float::WORD_BIT_SIZE - 1)) / astro_float::WORD_BIT_SIZE) * astro_float::WORD_BIT_SIZE;
+            break ret;
         }
     });
 

@@ -113,8 +113,8 @@ impl BigFloatNumber {
                 let x = match self.exp_positive_arg(p_x, cc) {
                     Ok(v) => Ok(v),
                     Err(e) => match e {
-                        Error::ExponentOverflow(_) => {
-                            return Self::new(p);
+                        Error::ExponentOverflow(sign) => {
+                            return Self::new2(p, sign, self.inexact());
                         }
                         Error::DivisionByZero => Err(Error::DivisionByZero),
                         Error::InvalidArgument => Err(Error::InvalidArgument),
@@ -128,6 +128,7 @@ impl BigFloatNumber {
             }?;
 
             if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact());
                 return Ok(ret);
             }
 
@@ -164,6 +165,7 @@ impl BigFloatNumber {
 
         let mut fract = self.fract()?;
         let e_fract = if !fract.is_zero() {
+            fract.set_inexact(false);
             fract.set_precision(p_work, RoundingMode::None)?;
             fract.set_sign(Sign::Pos);
             fract.expf()
@@ -185,7 +187,7 @@ impl BigFloatNumber {
     ///  - DivisionByZero: `self` is zero and `n` is negative.
     pub fn powsi(&self, n: isize, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         if n >= 0 {
-            self.powi(n as usize, p, rm)
+            self.powi_internal(n as usize, p, rm, true)
         } else {
             let p = round_p(p);
 
@@ -203,7 +205,7 @@ impl BigFloatNumber {
             loop {
                 let p_x = p_wrk + 2;
 
-                let x = self.powi(n.unsigned_abs(), p_x, RoundingMode::None)?;
+                let x = self.powi_internal(n.unsigned_abs(), p_x, RoundingMode::None, false)?;
 
                 if x.inexact() {
                     let mut ret = ONE.div(&x, p_x, RoundingMode::None)?;
@@ -230,6 +232,16 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: the precision is incorrect.
     pub fn powi(&self, n: usize, p: usize, rm: RoundingMode) -> Result<Self, Error> {
+        self.powi_internal(n, p, rm, true)
+    }
+
+    fn powi_internal(
+        &self,
+        n: usize,
+        p: usize,
+        rm: RoundingMode,
+        update_inexact: bool,
+    ) -> Result<Self, Error> {
         let p = round_p(p);
 
         let mut i = n;
@@ -269,6 +281,15 @@ impl BigFloatNumber {
                 let mut x = self.clone()?;
                 x.set_inexact(false);
 
+                let mut c;
+                let arg = if self.inexact() {
+                    c = self.clone()?;
+                    c.set_inexact(false);
+                    &c
+                } else {
+                    self
+                };
+
                 x.set_precision(p_x, RoundingMode::FromZero)?;
 
                 // TODO: consider windowing and precomputed values.
@@ -280,7 +301,7 @@ impl BigFloatNumber {
                     x = x.mul(&x, p_x, RoundingMode::FromZero)?;
 
                     if j & WORD_SIGNIFICANT_BIT as usize != 0 {
-                        x = x.mul(self, p_x, RoundingMode::FromZero)?;
+                        x = x.mul(arg, p_x, RoundingMode::FromZero)?;
                     }
 
                     j <<= 1;
@@ -301,17 +322,17 @@ impl BigFloatNumber {
             })?;
 
             if ret.exponent() == EXPONENT_MIN && ret.precision() == 1 {
+                if update_inexact {
+                    ret.set_inexact(ret.inexact() | self.inexact());
+                }
                 ret.set_precision(p, rm)?;
                 return Ok(ret);
             }
 
-            if ret.inexact() {
-                if ret.try_set_precision(p, rm, p_wrk)? {
-                    return Ok(ret);
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                if update_inexact {
+                    ret.set_inexact(ret.inexact() | self.inexact());
                 }
-            } else {
-                ret.set_inexact(self.inexact());
-                ret.set_precision(p, rm)?;
                 return Ok(ret);
             }
 
@@ -421,7 +442,13 @@ impl BigFloatNumber {
     ) -> Result<Self, Error> {
         if n.is_zero() {
             let mut ret = Self::from_word(1, p)?;
-            ret.set_inexact(n.inexact());
+            if n.inexact() {
+                if self.exponent() == 1 && self.abs_cmp(&ONE) == 0 {
+                    ret.set_inexact(self.inexact());
+                } else {
+                    ret.set_inexact(true);
+                }
+            }
             return Ok(ret);
         } else if self.is_zero() {
             return if n.is_negative() {
@@ -488,9 +515,12 @@ impl BigFloatNumber {
         let p = round_p(p);
 
         let mut x = self.clone()?;
+        let mut y = n.clone()?;
+        x.set_inexact(false);
+        y.set_inexact(false);
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.mantissa_max_bit_len().max(n.mantissa_max_bit_len())) + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len().max(y.mantissa_max_bit_len())) + p_inc;
 
         loop {
             let p_ext = p_wrk + 2;
@@ -498,7 +528,7 @@ impl BigFloatNumber {
 
             let ln = x.ln(p_ext, RoundingMode::None, cc)?;
 
-            let m = match n.mul(&ln, p_ext, RoundingMode::None) {
+            let mut m = match y.mul(&ln, p_ext, RoundingMode::None) {
                 Ok(v) => Ok(v),
                 Err(e) => match e {
                     Error::ExponentOverflow(Sign::Neg) => {
@@ -513,14 +543,28 @@ impl BigFloatNumber {
 
             compute_small_exp!(ONE, m.exponent() as isize, m.is_negative(), p, rm);
 
-            let mut ret = m.exp(p_ext, RoundingMode::None, cc)?;
+            let mut ret = if m.is_negative() {
+                m.set_sign(Sign::Pos);
 
-            if ret.inexact() {
-                if ret.try_set_precision(p, rm, p_wrk)? {
-                    return Ok(ret);
-                }
+                let u = match m.exp(p_ext, RoundingMode::None, cc) {
+                    Ok(v) => Ok(v),
+                    Err(e) => match e {
+                        Error::ExponentOverflow(sign) => {
+                            return Self::new2(p, sign, self.inexact());
+                        }
+                        Error::DivisionByZero => Err(Error::DivisionByZero),
+                        Error::InvalidArgument => Err(Error::InvalidArgument),
+                        Error::MemoryAllocation => Err(Error::MemoryAllocation),
+                    },
+                }?;
+
+                ONE.div(&u, p_ext, RoundingMode::FromZero)
             } else {
-                ret.set_precision(p, rm)?;
+                m.exp(p_ext, RoundingMode::None, cc)
+            }?;
+
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact() | n.inexact());
                 return Ok(ret);
             }
 
@@ -554,6 +598,7 @@ mod test {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
         let d2 = d1.exp(p, RoundingMode::ToEven, &mut cc).unwrap();
@@ -562,6 +607,7 @@ mod test {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
 
@@ -575,6 +621,7 @@ mod test {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
         let d2 = d1.exp(p, RoundingMode::ToEven, &mut cc).unwrap();
@@ -583,6 +630,7 @@ mod test {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
 
@@ -597,40 +645,40 @@ mod test {
 
         // pow(small, small)
         let p = 256;
-        let mut d1 = BigFloatNumber::parse("1.10010100010011110010001011101010010101111000010101010100010010111001000100011101010111011010110011011111110000010010101000110001001000000101000010101111001100110111100011101000110001001000000101000010101111001100110111100011101010011101101", crate::Radix::Bin, p, RoundingMode::None).unwrap();
+        let mut d1 = BigFloatNumber::parse("1.10010100010011110010001011101010010101111000010101010100010010111001000100011101010111011010110011011111110000010010101000110001001000000101000010101111001100110111100011101000110001001000000101000010101111001100110111100011101010011101101", crate::Radix::Bin, p, RoundingMode::None, &mut cc).unwrap();
         d1.set_exponent(-123456);
-        let mut d2 = BigFloatNumber::parse("1.00110001001000010100001010111100110011011110001110101001110110100000101000010010101111000010110010100010011110010001011101010101010001001011100110111111100100010001110101011101101011000001001010100101111001100110111100011101000110001001000", crate::Radix::Bin, p, RoundingMode::None).unwrap();
+        let mut d2 = BigFloatNumber::parse("1.00110001001000010100001010111100110011011110001110101001110110100000101000010010101111000010110010100010011110010001011101010101010001001011100110111111100100010001110101011101101011000001001010100101111001100110111100011101000110001001000", crate::Radix::Bin, p, RoundingMode::None, &mut cc).unwrap();
         d2.set_exponent(-123);
         let d3 = d1.pow(&d2, p, RoundingMode::ToEven, &mut cc).unwrap();
-        let d4 = BigFloatNumber::parse("1.111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111100111000110010011110111100111111100111010011001110010010110010100100110010110111110110100011010000110110011010111101110000011100011010100110100000001e-1", crate::Radix::Bin, p, RoundingMode::None).unwrap();
+        let d4 = BigFloatNumber::parse("1.111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111100111000110010011110111100111111100111010011001110010010110010100100110010110111110110100011010000110110011010111101110000011100011010100110100000001e-1", crate::Radix::Bin, p, RoundingMode::None, &mut cc).unwrap();
 
         assert!(d4.cmp(&d3) == 0);
 
         // pow(large, small)
-        let mut d1 = BigFloatNumber::parse("1.10010100010011110010001011101010010101111000010101010100010010111001000100011101010111011010110011011111110000010010101000110001001000000101000010101111001100110111100011101000110001001000000101000010101111001100110111100011101010011101101", crate::Radix::Bin, p, RoundingMode::None).unwrap();
+        let mut d1 = BigFloatNumber::parse("1.10010100010011110010001011101010010101111000010101010100010010111001000100011101010111011010110011011111110000010010101000110001001000000101000010101111001100110111100011101000110001001000000101000010101111001100110111100011101010011101101", crate::Radix::Bin, p, RoundingMode::None, &mut cc).unwrap();
         d1.set_exponent(123456);
-        let mut d2 = BigFloatNumber::parse("1.00110001001000010100001010111100110011011110001110101001110110100000101000010010101111000010110010100010011110010001011101010101010001001011100110111111100100010001110101011101101011000001001010100101111001100110111100011101000110001001000", crate::Radix::Bin, p, RoundingMode::None).unwrap();
+        let mut d2 = BigFloatNumber::parse("1.00110001001000010100001010111100110011011110001110101001110110100000101000010010101111000010110010100010011110010001011101010101010001001011100110111111100100010001110101011101101011000001001010100101111001100110111100011101000110001001000", crate::Radix::Bin, p, RoundingMode::None, &mut cc).unwrap();
         d2.set_exponent(-123);
         let d3 = d1.pow(&d2, p, RoundingMode::ToEven, &mut cc).unwrap();
-        let d4 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000110001110011010111001000101100100101011011111001101101011011010100101111001001000010000010100110110011000001011011111000000000010111010000010110111", crate::Radix::Bin, p, RoundingMode::None).unwrap();
+        let d4 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000110001110011010111001000101100100101011011111001101101011011010100101111001001000010000010100110110011000001011011111000000000010111010000010110111", crate::Radix::Bin, p, RoundingMode::None, &mut cc).unwrap();
 
         assert!(d4.cmp(&d3) == 0);
 
         // pow(>~1, large)
-        let d1 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000110001110011010111001000101100100101011011111001101101011011010100101111001001000010000010100110110011000001011011111000000000010111010000010110111", crate::Radix::Bin, p, RoundingMode::None).unwrap();
-        let mut d2 = BigFloatNumber::parse("1.00110001001000010100001010111100110011011110001110101001110110100000101000010010101111000010110010100010011110010001011101010101010001001011100110111111100100010001110101011101101011000001001010100101111001100110111100011101000110001001000", crate::Radix::Bin, p, RoundingMode::None).unwrap();
+        let d1 = BigFloatNumber::parse("1.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000110001110011010111001000101100100101011011111001101101011011010100101111001001000010000010100110110011000001011011111000000000010111010000010110111", crate::Radix::Bin, p, RoundingMode::None, &mut cc).unwrap();
+        let mut d2 = BigFloatNumber::parse("1.00110001001000010100001010111100110011011110001110101001110110100000101000010010101111000010110010100010011110010001011101010101010001001011100110111111100100010001110101011101101011000001001010100101111001100110111100011101000110001001000", crate::Radix::Bin, p, RoundingMode::None, &mut cc).unwrap();
         d2.set_exponent(123);
         let d3 = d1.pow(&d2, p, RoundingMode::ToEven, &mut cc).unwrap();
-        let d4 = BigFloatNumber::parse("1.000011101011111010010100111000101101011001100110110100101011001110100110011011100100100101011100010100011101011111010011100011010000110001100111001011000001111110001110000110000000101101011001010001000011011001000010001110000100110000110011111100000001e+1010101101000111", crate::Radix::Bin, p, RoundingMode::None).unwrap();
+        let d4 = BigFloatNumber::parse("1.000011101011111010010100111000101101011001100110110100101011001110100110011011100100100101011100010100011101011111010011100011010000110001100111001011000001111110001110000110000000101101011001010001000011011001000010001110000100110000110011111100000001e+1010101101000111", crate::Radix::Bin, p, RoundingMode::None, &mut cc).unwrap();
 
         assert!(d4.cmp(&d3) == 0);
 
         // pow(<~1, large)
-        let d1 = BigFloatNumber::parse("0.1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111110001110011010111001000101100100101011011111001101101011011010100101111001001000010000010100110110011000001011011111000000000010111010000010110111", crate::Radix::Bin, p, RoundingMode::None).unwrap();
-        let mut d2 = BigFloatNumber::parse("1.00110001001000010100001010111100110011011110001110101001110110100000101000010010101111000010110010100010011110010001011101010101010001001011100110111111100100010001110101011101101011000001001010100101111001100110111100011101000110001001000", crate::Radix::Bin, p, RoundingMode::None).unwrap();
+        let d1 = BigFloatNumber::parse("0.1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111110001110011010111001000101100100101011011111001101101011011010100101111001001000010000010100110110011000001011011111000000000010111010000010110111", crate::Radix::Bin, p, RoundingMode::None, &mut cc).unwrap();
+        let mut d2 = BigFloatNumber::parse("1.00110001001000010100001010111100110011011110001110101001110110100000101000010010101111000010110010100010011110010001011101010101010001001011100110111111100100010001110101011101101011000001001010100101111001100110111100011101000110001001000", crate::Radix::Bin, p, RoundingMode::None, &mut cc).unwrap();
         d2.set_exponent(123);
         let d3 = d1.pow(&d2, p, RoundingMode::ToEven, &mut cc).unwrap();
-        let d4 = BigFloatNumber::parse("1.010011011001100100100000101011101001110011001100011001011011010010101111101100111101011010101101101111100111001001001101000111110001010010111101110010011100001011011111001111001001001100100111010100100010010111011011110010110101110000100111001100100000011e-110000110100111100", crate::Radix::Bin, p, RoundingMode::None).unwrap();
+        let d4 = BigFloatNumber::parse("1.010011011001100100100000101011101001110011001100011001011011010010101111101100111101011010101101101111100111001001001101000111110001010010111101110010011100001011011111001111001001001100100111010100100010010111011011110010110101110000100111001100100000011e-110000110100111100", crate::Radix::Bin, p, RoundingMode::None, &mut cc).unwrap();
 
         // println!("{:?}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("{:?}", d2.format(crate::Radix::Bin, RoundingMode::None).unwrap());

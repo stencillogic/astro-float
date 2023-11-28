@@ -1,15 +1,16 @@
 //! Components used in MPFR integration tests
 
 use astro_float_num::{
-    BigFloat, Exponent, Radix, RoundingMode, Sign, Word, WORD_BIT_SIZE, WORD_SIGNIFICANT_BIT,
+    BigFloat, Consts, Exponent, Radix, RoundingMode, Sign, Word, WORD_BIT_SIZE,
+    WORD_SIGNIFICANT_BIT,
 };
 use gmp_mpfr_sys::mpfr::{self, rnd_t};
 use rand::random;
 use rug::Float;
 
 macro_rules! test_astro_op {
-    ($eq:literal, $n1:ident, $n2:ident, $astro_op:ident, $f1:ident, $f2:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_info:expr $(, $cc:ident)?) => {
-        let n3 = BigFloat::$astro_op(&($n1), &($n2), $p, $rm$(, &mut $cc)?);
+    ($eq:literal, $n1:ident, $n2:ident, $astro_op:ident, $f1:ident, $f2:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_info:expr, $cc:ident) => {
+        let n3 = BigFloat::$astro_op(&($n1), &($n2), $p, $rm, &mut $cc);
 
         let mut f3 = Float::with_val($p as u32, 1);
 
@@ -19,19 +20,7 @@ macro_rules! test_astro_op {
         //println!("\n{:b}\n{}", $n1, $f1.to_string_radix(2, None));
         //println!("\n{:b}\n{}", n3, f3.to_string_radix(2, None));
 
-        assert_float_close(n3, f3, $p, &format!("{:?}", $op_info), $eq);
-    };
-    ($eq:literal, $n1:ident, $astro_op:ident, $f1:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_info:expr) => {
-        let n3 = BigFloat::$astro_op(&($n1), $p, $rm);
-
-        let mut f3 = Float::with_val($p as u32, 1);
-
-        unsafe { mpfr::$mpfr_op(f3.as_raw_mut(), ($f1).as_raw(), $rnd) };
-
-        // println!("\n{:b}\n{}", $n1, $f1.to_string_radix(2, None));
-        // println!("\n{:b}\n{}", n3, f3.to_string_radix(2, None));
-
-        assert_float_close(n3, f3, $p, &format!("{:?}", $op_info), $eq);
+        assert_float_close(n3, f3, $p, &format!("{:?}", $op_info), $eq, &mut $cc);
     };
     ($eq:literal, $n1:ident, $astro_op:ident, $f1:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_info:expr, $cc:ident) => {
         let n3 = BigFloat::$astro_op(&($n1), $p, $rm, &mut $cc);
@@ -43,7 +32,47 @@ macro_rules! test_astro_op {
         // println!("\n{:b}\n{}", $n1, $f1.to_string_radix(2, None));
         // println!("\n{:b}\n{}", n3, f3.to_string_radix(2, None));
 
-        assert_float_close(n3, f3, $p, &format!("{:?}", $op_info), $eq);
+        assert_float_close(n3, f3, $p, &format!("{:?}", $op_info), $eq, &mut $cc);
+    };
+    ($eq:literal, $n1:ident, $astro_op:ident, $f1:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_info:expr, $cc:ident) => {
+        let n3 = BigFloat::$astro_op(&($n1), $p, $rm, &mut $cc);
+
+        let mut f3 = Float::with_val($p as u32, 1);
+
+        unsafe { mpfr::$mpfr_op(f3.as_raw_mut(), ($f1).as_raw(), $rnd) };
+
+        // println!("\n{:b}\n{}", $n1, $f1.to_string_radix(2, None));
+        // println!("\n{:b}\n{}", n3, f3.to_string_radix(2, None));
+
+        assert_float_close(n3, f3, $p, &format!("{:?}", $op_info), $eq, &mut $cc);
+    };
+}
+
+macro_rules! test_astro_op_no_cc {
+    ($eq:literal, $n1:ident, $n2:ident, $astro_op:ident, $f1:ident, $f2:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_info:expr, $cc:ident) => {
+        let n3 = BigFloat::$astro_op(&($n1), &($n2), $p, $rm);
+
+        let mut f3 = Float::with_val($p as u32, 1);
+
+        unsafe { mpfr::$mpfr_op(f3.as_raw_mut(), ($f1).as_raw(), ($f2).as_raw(), $rnd) };
+
+        //println!("\n{:b}\n{:b}", $n1, $n2);
+        //println!("\n{:b}\n{}", $n1, $f1.to_string_radix(2, None));
+        //println!("\n{:b}\n{}", n3, f3.to_string_radix(2, None));
+
+        assert_float_close(n3, f3, $p, &format!("{:?}", $op_info), $eq, &mut $cc);
+    };
+    ($eq:literal, $n1:ident, $astro_op:ident, $f1:ident, $mpfr_op:ident, $p:ident, $rm:ident, $rnd:ident, $op_info:expr, $cc:ident) => {
+        let n3 = BigFloat::$astro_op(&($n1), $p, $rm);
+
+        let mut f3 = Float::with_val($p as u32, 1);
+
+        unsafe { mpfr::$mpfr_op(f3.as_raw_mut(), ($f1).as_raw(), $rnd) };
+
+        // println!("\n{:b}\n{}", $n1, $f1.to_string_radix(2, None));
+        // println!("\n{:b}\n{}", n3, f3.to_string_radix(2, None));
+
+        assert_float_close(n3, f3, $p, &format!("{:?}", $op_info), $eq, &mut $cc);
     };
 }
 
@@ -58,12 +87,13 @@ macro_rules! test_astro_const {
             mpfr::$mpfr_const(f1.as_raw_mut(), $rnd);
         }
 
-        assert_float_close(n1, f1, $p, &format!("{:?}", $op_info), true);
+        assert_float_close(n1, f1, $p, &format!("{:?}", $op_info), true, &mut $cc);
     };
 }
 
 pub(crate) use test_astro_const;
 pub(crate) use test_astro_op;
+pub(crate) use test_astro_op_no_cc;
 
 pub const fn get_prec_rng() -> usize {
     #[cfg(not(debug_assertions))]
@@ -77,23 +107,31 @@ pub const fn get_prec_rng() -> usize {
     }
 }
 
-pub fn get_float_pair(p: usize, emin: Exponent, emax: Exponent) -> (BigFloat, Float) {
+pub fn get_float_pair(
+    p: usize,
+    emin: Exponent,
+    emax: Exponent,
+    cc: &mut Consts,
+) -> (BigFloat, Float) {
     let n = BigFloat::random_normal(p, emin, emax);
-    let f = conv_to_mpfr(p, &n);
+    let f = conv_to_mpfr(p, &n, cc);
     (n, f)
 }
 
-pub fn conv_to_mpfr(p: usize, n: &BigFloat) -> Float {
-    let s1 = conv_str_to_mpfr_compat(format!("{:b}", n));
+pub fn conv_to_mpfr(p: usize, n: &BigFloat, cc: &mut Consts) -> Float {
+    let s1 = conv_str_to_mpfr_compat(n.format(Radix::Bin, RoundingMode::ToEven, cc).unwrap());
     let f = Float::with_val(p as u32, Float::parse_radix(s1, 2).unwrap());
     let s2 = conv_str_from_mpfr_compat(f.to_string_radix(2, None));
     //println!("\n{}\n{}", s1, s2);
-    assert_eq!(*n, BigFloat::parse(&s2, Radix::Bin, p, RoundingMode::None));
+    assert_eq!(
+        *n,
+        BigFloat::parse(&s2, Radix::Bin, p, RoundingMode::None, cc)
+    );
     f
 }
 
 // assert float values are equal or differ not more than 1 ulp.
-pub fn assert_float_close(n: BigFloat, f: Float, p: usize, op: &str, eq: bool) {
+pub fn assert_float_close(n: BigFloat, f: Float, p: usize, op: &str, eq: bool, cc: &mut Consts) {
     if n.is_inf() {
         // inf
         let ovf = unsafe { mpfr::overflow_p() };
@@ -116,13 +154,13 @@ pub fn assert_float_close(n: BigFloat, f: Float, p: usize, op: &str, eq: bool) {
         // n == f
         let s1 = f.to_string_radix(2, None);
         let s2 = conv_str_from_mpfr_compat(s1);
-        let n2 = BigFloat::parse(&s2, Radix::Bin, p, RoundingMode::None);
+        let n2 = BigFloat::parse(&s2, Radix::Bin, p, RoundingMode::None, cc);
         assert_eq!(n, n2, "{}", op);
     } else {
         // at most 1 ulp difference
         let s1 = f.to_string_radix(2, None);
         let s2 = conv_str_from_mpfr_compat(s1);
-        let n2 = BigFloat::parse(&s2, Radix::Bin, p, RoundingMode::None);
+        let n2 = BigFloat::parse(&s2, Radix::Bin, p, RoundingMode::None, cc);
         assert_eq!(
             n.mantissa_max_bit_len(),
             n2.mantissa_max_bit_len(),
@@ -150,7 +188,11 @@ pub fn assert_float_close(n: BigFloat, f: Float, p: usize, op: &str, eq: bool) {
 }
 
 pub fn conv_str_to_mpfr_compat(s: String) -> String {
-    let (sig, exp) = s.split_at(s.find('e').unwrap() + 1);
+    let (sig, exp) = if let Some(pos) = s.find('e') {
+        s.split_at(pos + 1)
+    } else {
+        (s.as_str(), "0")
+    };
     let expn = i64::from_str_radix(exp, 2).unwrap();
     sig.to_owned() + &expn.to_string()
 }

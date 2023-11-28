@@ -120,6 +120,7 @@ impl BigFloatNumber {
 
         loop {
             let mut x = self.clone()?;
+            x.set_inexact(false);
 
             let p_x = p_wrk + 3;
             x.set_precision(p_x, RoundingMode::None)?;
@@ -129,6 +130,7 @@ impl BigFloatNumber {
             let mut ret = x.sin_series(RoundingMode::None)?;
 
             if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact());
                 break Ok(ret);
             }
 
@@ -237,6 +239,7 @@ mod tests {
             crate::Radix::Hex,
             640,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
 
@@ -250,6 +253,7 @@ mod tests {
             crate::Radix::Hex,
             640,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
 
@@ -259,9 +263,9 @@ mod tests {
 
         // small exponent
         let p = 384;
-        let d1 = BigFloatNumber::parse("-4.6C7B4339E519CAFC9C58869B348D66FD510B4E74F0A6476126B55FD73F5533C7B84C5733C34BB312677AE7C015A666D0_e-17", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let d1 = BigFloatNumber::parse("-4.6C7B4339E519CAFC9C58869B348D66FD510B4E74F0A6476126B55FD73F5533C7B84C5733C34BB312677AE7C015A666D0_e-17", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
         let d2 = d1.sin(p, RoundingMode::ToEven, &mut cc).unwrap();
-        let d3 = BigFloatNumber::parse("-4.6C7B4339E519CAFC9C58869B348D66FD510B4E74F0A638F3725423CE43E0D375A6FEE810D77915E6EA2D8EE32EBCF618_e-17", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let d3 = BigFloatNumber::parse("-4.6C7B4339E519CAFC9C58869B348D66FD510B4E74F0A638F3725423CE43E0D375A6FEE810D77915E6EA2D8EE32EBCF618_e-17", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
 
         // println!("{:?}", d1.format(crate::Radix::Bin, RoundingMode::None).unwrap());
         // println!("{:?}", d2.format(crate::Radix::Hex, RoundingMode::None).unwrap());

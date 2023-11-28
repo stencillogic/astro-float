@@ -83,6 +83,7 @@ impl BigFloatNumber {
 
         loop {
             let mut x = self.clone()?;
+            x.set_inexact(false);
 
             let p_x = p_wrk + 3;
             x.set_precision(p_x, RoundingMode::None)?;
@@ -92,6 +93,7 @@ impl BigFloatNumber {
             let mut ret = x.tan_series(RoundingMode::None)?;
 
             if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact());
                 break Ok(ret);
             }
 
@@ -250,7 +252,7 @@ mod tests {
             "3.1F0B46DCBD63D29899ECF829DA54DE0EE0852B2569B572B793E50817CEF4C77D959712B45E2B7E4C_e+20",
             crate::Radix::Hex,
             p,
-            RoundingMode::None,
+            RoundingMode::None, &mut cc,
         )
         .unwrap();
 
@@ -259,7 +261,7 @@ mod tests {
         // large exponent
         half_pi.set_exponent(256);
         let n2 = half_pi.tan(p, rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("4.ECDEC5EF3A1EA5339A46BC0C490F52A86A033C56BCDD413E36C657EB7757F073500B013B9A7B43C0_e+0", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse("4.ECDEC5EF3A1EA5339A46BC0C490F52A86A033C56BCDD413E36C657EB7757F073500B013B9A7B43C0_e+0", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
 
         assert!(n2.cmp(&n3) == 0);
 

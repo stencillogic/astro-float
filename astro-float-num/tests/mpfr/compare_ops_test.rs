@@ -5,6 +5,7 @@ use std::ops::Add;
 
 use crate::mpfr::common::get_prec_rng;
 use crate::mpfr::common::test_astro_op;
+use crate::mpfr::common::test_astro_op_no_cc;
 use crate::mpfr::common::{assert_float_close, get_float_pair, get_random_rnd_pair};
 use astro_float_num::Word;
 use astro_float_num::{BigFloat, Consts, Exponent, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
@@ -70,7 +71,7 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
 
         let (rm, rnd) = get_random_rnd_pair();
 
-        let (n1, mut f1) = get_float_pair(p1, 0, 0);
+        let (n1, mut f1) = get_float_pair(p1, 0, 0, &mut cc);
 
         let n2 = n1.round(p, rm);
 
@@ -78,7 +79,14 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
             mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd);
         }
 
-        assert_float_close(n2, f1, p, &format!("{:?}", (n1, p, rm, "prec round")), true);
+        assert_float_close(
+            n2,
+            f1,
+            p,
+            &format!("{:?}", (n1, p, rm, "prec round")),
+            true,
+            &mut cc,
+        );
     }
 
     // add, sub
@@ -89,19 +97,20 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
 
         let (rm, rnd) = get_random_rnd_pair();
 
-        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, EXPONENT_MAX);
+        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, EXPONENT_MAX, &mut cc);
         let n1e = n1.exponent().unwrap();
         let (n2, f2) = get_float_pair(
             p2,
             n1e.saturating_sub(2 * (p2 + p1) as Exponent),
             n1e.saturating_add(2 * (p2 + p1) as Exponent),
+            &mut cc,
         );
 
         // println!("\n{:?}", rm);
         // println!("{:b}\n{}", n1, f1.to_string_radix(2, None));
         // println!("\n{:b}\n{}", n2, f2.to_string_radix(2, None));
 
-        test_astro_op!(
+        test_astro_op_no_cc!(
             true,
             n1,
             n2,
@@ -112,9 +121,10 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
             p,
             rm,
             rnd,
-            (&n1, &n2, p, rm, "add")
+            (&n1, &n2, p, rm, "add"),
+            cc
         );
-        test_astro_op!(
+        test_astro_op_no_cc!(
             true,
             n1,
             n2,
@@ -125,7 +135,8 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
             p,
             rm,
             rnd,
-            (&n1, &n2, p, rm, "sub")
+            (&n1, &n2, p, rm, "sub"),
+            cc
         );
     }
 
@@ -139,14 +150,14 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
 
         let (rm, rnd) = get_random_rnd_pair();
 
-        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, EXPONENT_MAX);
-        let (n2, f2) = get_float_pair(p2, EXPONENT_MIN, EXPONENT_MAX);
+        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, EXPONENT_MAX, &mut cc);
+        let (n2, f2) = get_float_pair(p2, EXPONENT_MIN, EXPONENT_MAX, &mut cc);
 
         // println!("\n{:?}", rm);
         // println!("{:b}\n{}", n1, f1.to_string_radix(2, None));
         // println!("\n{:b}\n{}", n2, f2.to_string_radix(2, None));
 
-        test_astro_op!(
+        test_astro_op_no_cc!(
             true,
             n1,
             n2,
@@ -157,9 +168,10 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
             p,
             rm,
             rnd,
-            (&n1, &n2, p, rm, "mul")
+            (&n1, &n2, p, rm, "mul"),
+            cc
         );
-        test_astro_op!(
+        test_astro_op_no_cc!(
             true,
             n1,
             n2,
@@ -170,7 +182,8 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
             p,
             rm,
             rnd,
-            (&n1, &n2, p, rm, "div")
+            (&n1, &n2, p, rm, "div"),
+            cc
         );
 
         let n3 = BigFloat::reciprocal(&n1, p, rm);
@@ -184,6 +197,7 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
             p,
             &format!("{:?}", (&n1, &n2, p, rm, "reciprocal")),
             true,
+            &mut cc,
         );
     }
 
@@ -195,8 +209,18 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
 
         let (_rm, rnd) = get_random_rnd_pair();
 
-        let (n1, mut f1) = get_float_pair(p1, EXPONENT_MIN / 2 - p1 as Exponent, EXPONENT_MAX / 2);
-        let (n2, mut f2) = get_float_pair(p2, EXPONENT_MIN / 2 - p2 as Exponent, EXPONENT_MAX / 2);
+        let (n1, mut f1) = get_float_pair(
+            p1,
+            EXPONENT_MIN / 2 - p1 as Exponent,
+            EXPONENT_MAX / 2,
+            &mut cc,
+        );
+        let (n2, mut f2) = get_float_pair(
+            p2,
+            EXPONENT_MIN / 2 - p2 as Exponent,
+            EXPONENT_MAX / 2,
+            &mut cc,
+        );
         f1 = f1.abs();
         f2 = f2.abs();
 
@@ -217,7 +241,7 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
 
         // println!("\nn3 f3\n{:b}\n{}", n3, f3.to_string_radix(2, None));
 
-        assert_float_close(n3, f3, p, &format!("{:?}", (n1, n2, "rem")), true);
+        assert_float_close(n3, f3, p, &format!("{:?}", (n1, n2, "rem")), true, &mut cc);
     }
 
     // powi
@@ -233,6 +257,7 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
             p1,
             EXPONENT_MIN / i as Exponent,
             EXPONENT_MAX / i as Exponent,
+            &mut cc,
         );
 
         let n3 = BigFloat::powi(&n1, i, p, rm);
@@ -244,7 +269,14 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
         // println!("\n{}", i);
         // println!("{:b}\n{}", n1, f1.to_string_radix(2, None));
 
-        assert_float_close(n3, f3, p, &format!("{:?}", (n1, i, p, rm, "powi")), true);
+        assert_float_close(
+            n3,
+            f3,
+            p,
+            &format!("{:?}", (n1, i, p, rm, "powi")),
+            true,
+            &mut cc,
+        );
     }
 
     // pow
@@ -256,7 +288,7 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
         let (rm, rnd) = get_random_rnd_pair();
         // println!("{:?}", rm);
 
-        let (mut b, mut c) = get_float_pair(p2, EXPONENT_MIN, EXPONENT_MAX);
+        let (mut b, mut c) = get_float_pair(p2, EXPONENT_MIN, EXPONENT_MAX, &mut cc);
 
         b = b.abs();
         c = c.abs();
@@ -265,7 +297,7 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
         let emax = EXPONENT_MAX / if n == 0 { 1 } else { n } as Exponent;
         let emin = -emax;
 
-        let (n1, f1) = get_float_pair(p1, emin, emax);
+        let (n1, f1) = get_float_pair(p1, emin, emax, &mut cc);
 
         // println!("{:?}", b);
         // println!("{:?}", n1);
@@ -295,7 +327,7 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
         let (rm, rnd) = get_random_rnd_pair();
         //println!("{:?}", rm);
 
-        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, 256);
+        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, 256, &mut cc);
 
         //println!("{:?}", n1);
 
@@ -313,7 +345,7 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
         let (rm, rnd) = get_random_rnd_pair();
         //println!("{:?}", rm);
 
-        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, 32);
+        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, 32, &mut cc);
 
         //println!("{:?}", n1);
 
@@ -364,7 +396,7 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
         let (rm, rnd) = get_random_rnd_pair();
         //println!("{:?}", rm);
 
-        let (n1, f1) = get_float_pair(p1, 1, EXPONENT_MAX);
+        let (n1, f1) = get_float_pair(p1, 1, EXPONENT_MAX, &mut cc);
 
         //println!("{:?}", n1);
 
@@ -390,7 +422,7 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
         let (rm, rnd) = get_random_rnd_pair();
         // println!("{:?}", rm);
 
-        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, 0);
+        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, 0, &mut cc);
 
         //println!("{:?}\n{:?}", n1, f1.to_string_radix(2, None));
 
@@ -440,13 +472,35 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
         let (rm, rnd) = get_random_rnd_pair();
         //println!("{:?}", rm);
 
-        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, EXPONENT_MAX);
+        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, EXPONENT_MAX, &mut cc);
 
         // println!("{:b}", n1);
         // println!("{}", f1.to_string_radix(2, None));
 
-        test_astro_op!(true, n1, sqrt, f1, sqrt, p, rm, rnd, (&n1, p, rm, "sqrt"));
-        test_astro_op!(true, n1, cbrt, f1, cbrt, p, rm, rnd, (&n1, p, rm, "cbrt"));
+        test_astro_op_no_cc!(
+            true,
+            n1,
+            sqrt,
+            f1,
+            sqrt,
+            p,
+            rm,
+            rnd,
+            (&n1, p, rm, "sqrt"),
+            cc
+        );
+        test_astro_op_no_cc!(
+            true,
+            n1,
+            cbrt,
+            f1,
+            cbrt,
+            p,
+            rm,
+            rnd,
+            (&n1, p, rm, "cbrt"),
+            cc
+        );
         test_astro_op!(true, n1, ln, f1, log, p, rm, rnd, (&n1, p, rm, "ln"), cc);
         test_astro_op!(
             true,

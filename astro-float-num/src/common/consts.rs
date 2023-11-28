@@ -3,6 +3,11 @@
 use crate::{defs::DEFAULT_P, num::BigFloatNumber};
 use lazy_static::lazy_static;
 
+#[cfg(feature = "std")]
+use crate::ops::consts::Consts;
+#[cfg(feature = "std")]
+use core::cell::RefCell;
+
 lazy_static! {
 
     /// 1
@@ -43,7 +48,10 @@ lazy_static! {
 
     /// 120
     pub(crate) static ref C120: BigFloatNumber = BigFloatNumber::from_word(120, DEFAULT_P).expect("Constant C24 initialization.");
+}
 
-    /// 10^9
-    pub(crate) static ref TEN_POW_9: BigFloatNumber = BigFloatNumber::from_word(1000000000, DEFAULT_P).expect("Constant TEN_POW_9 initialization.");
+// TODO: Consider using in std environment everywhere Consts are needed.
+#[cfg(feature = "std")]
+thread_local! {
+    pub static TENPOWERS: RefCell<Consts> = RefCell::new(Consts::new().expect("Failed to initialize thread-local constants cache"));
 }

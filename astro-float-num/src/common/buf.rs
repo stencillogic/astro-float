@@ -57,7 +57,7 @@ impl WordBuf {
         self.inner.truncate(n);
     }
 
-    /// Try to exted the size to fit the precision p. Fill new elements with 0. Data is shifted to the left.
+    /// Try to exted the size to fit the precision p. Data is shifted to the left.
     pub fn try_extend(&mut self, p: usize) -> Result<(), Error> {
         let n = (p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
         let l = self.inner.len();
@@ -79,6 +79,20 @@ impl WordBuf {
         if n > self.inner.len() {
             self.inner.resize(n, 0);
         }
+        Ok(())
+    }
+
+    /// Try to extend the size to fit the precision p. Data is shifted to the left by d bits.
+    pub fn try_extend_3(&mut self, p: usize, d: usize) -> Result<(), Error> {
+        let n = (p + WORD_BIT_SIZE - 1) / WORD_BIT_SIZE;
+        let l = self.inner.len();
+        self.inner.try_reserve(n - l)?;
+        unsafe {
+            // values of the newely allocated words stay unitialized for performance reasons
+            self.inner.set_len(n);
+        }
+        self.inner[l] = 0;
+        shift_slice_left(&mut self.inner, d);
         Ok(())
     }
 

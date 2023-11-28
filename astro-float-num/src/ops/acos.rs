@@ -37,6 +37,7 @@ impl BigFloatNumber {
         let mut add_p = (1 - ACOS_EXP_THRES) as usize;
 
         let mut x = self.clone()?;
+        x.set_inexact(false);
 
         loop {
             let p_x = p_wrk + add_p;
@@ -59,6 +60,7 @@ impl BigFloatNumber {
                 add_p = t;
             } else {
                 if ret.try_set_precision(p, rm, p_wrk)? {
+                    ret.set_inexact(ret.inexact() | self.inexact());
                     return Ok(ret);
                 }
 
@@ -95,19 +97,20 @@ mod tests {
             crate::Radix::Hex,
             p,
             RoundingMode::None,
+            &mut cc,
         )
         .unwrap();
         let n2 = n1.acos(p, rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("5.2049C1114CF98E7B6DB49CCF999F4A5E697D73E5DA6BEC6578098357460BAFFB0C25779F1C63E8D8_e-21", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse("5.2049C1114CF98E7B6DB49CCF999F4A5E697D73E5DA6BEC6578098357460BAFFB0C25779F1C63E8D8_e-21", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
 
         // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
 
         // near zero
-        let n1 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419EBBFC39B4BEC14AF6_e-10", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n1 = BigFloatNumber::parse("1.921FB54442D18469898CC51701B839A200000000000000004D3C337F7C8D419EBBFC39B4BEC14AF6_e-10", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
         let n2 = n1.acos(p, rm, &mut cc).unwrap();
-        let n3 = BigFloatNumber::parse("1.921FB54442D18467F76D0FD2BEE6B538C877D6FA13175F455EB9961B4834A04EF790AE0274E87FF6_e+0", crate::Radix::Hex, p, RoundingMode::None).unwrap();
+        let n3 = BigFloatNumber::parse("1.921FB54442D18467F76D0FD2BEE6B538C877D6FA13175F455EB9961B4834A04EF790AE0274E87FF6_e+0", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
 
         // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
 
