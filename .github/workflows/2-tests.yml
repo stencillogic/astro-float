@@ -28,7 +28,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Install dependencies
-      run: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install -y g++-multilib libc6:i386 libncurses5:i386 libstdc++6:i386 libgmp-dev:i386
+      run: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install -y gcc-multilib g++-multilib libc6:i386 libncurses5:i386 libstdc++6:i386 libgmp-dev:i386
     - name: Add 32 bit toolchain
       run: rustup toolchain install stable-i686-unknown-linux-gnu && rustup default stable-i686-unknown-linux-gnu
     - name: Run tests
