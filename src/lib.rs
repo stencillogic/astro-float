@@ -120,7 +120,7 @@
 //! ```
 //!
 //! ## Performance recommendations
-//! 
+//!
 //! When small error is acceptable because of rounding it is recommended to do all computations with `RoundingMode::None`, and use `BigFloat::set_precision` or `BigFloat::round` with a specific rounding mode just once for the final result.
 //!
 //! ## no_std
