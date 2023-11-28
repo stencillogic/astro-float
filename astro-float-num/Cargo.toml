@@ -1,6 +1,6 @@
 [package]
 name = "astro-float-num"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["stencillogic <stencillogic@gmail.com>"]
 license = "MIT"
@@ -13,8 +13,10 @@ repository = "https://github.com/stencillogic/astro-float"
 [dev-dependencies]
 rand = "0.8.5"
 serde_json = "1.0.89"
-rug = { version = "1.17.0", features = ["float", "rand"] }
-gmp-mpfr-sys = { version = "1.4.12", features = [] }
+
+[target.'cfg(target_arch = "x86_64")'.dev-dependencies]
+rug = { version = "~1.20.0", features = ["float", "rand"] }
+gmp-mpfr-sys = { version = "~1.6.0", features = [] }
 
 [dependencies]
 serde = { version = "1.0.147", optional = true }
