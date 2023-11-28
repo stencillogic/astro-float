@@ -32,6 +32,6 @@ jobs:
     - name: Add 32 bit toolchain
       run: rustup toolchain install stable-i686-unknown-linux-gnu && rustup default stable-i686-unknown-linux-gnu
     - name: Run tests
-      run: cargo test --workspace --release --verbose
+      run: cargo test --target i686-unknown-linux-gnu --workspace --release --verbose
     - name: Run no_std tests
-      run: cargo test --workspace --release --verbose --no-default-features --features random,serde
+      run: cargo test --target i686-unknown-linux-gnu --workspace --release --verbose --no-default-features --features random,serde
