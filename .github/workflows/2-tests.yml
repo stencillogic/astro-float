@@ -28,8 +28,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Install dependencies
-      run: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install -y g++-multilib libc6:i386 libncurses5:i386 libstdc++6:i386
+      run: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install -y g++-multilib libc6:i386 libncurses5:i386 libstdc++6:i386 libgmp-dev:i386
     - name: Add 32 bit toolchain
       run: rustup target add i686-unknown-linux-gnu
     - name: Run tests
-      run: cargo build --target i686-unknown-linux-gnu --workspace --release --verbose
+      run: cargo test --target i686-unknown-linux-gnu --workspace --release --verbose
