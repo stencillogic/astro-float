@@ -4,15 +4,15 @@ version = "0.8.0"
 edition = "2021"
 authors = ["stencillogic <stencillogic@gmail.com>"]
 license = "MIT"
-description = "Multiple precision floating point numbers implemented purely in Rust."
-categories = ["algorithms", "data-structures", "science"]
+description = "Multiple precision floating-point numbers library."
+categories = ["algorithms", "data-structures", "science", "no-std"]
 keywords = ["bigfloat", "numeric", "mathematics", "bignum"]
 readme = "README.md"
 repository = "https://github.com/stencillogic/astro-float"
 
 [dependencies]
-astro-float-num = "0.2.1"
-astro-float-macro = "0.3.1"
+astro-float-num = "0.2.2"
+astro-float-macro = "0.3.2"
 
 [features]
 default = ["std", "random", "serde"]
