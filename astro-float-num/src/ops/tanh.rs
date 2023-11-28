@@ -8,6 +8,7 @@ use crate::defs::EXPONENT_MAX;
 use crate::num::BigFloatNumber;
 use crate::ops::util::compute_small_exp;
 use crate::Consts;
+use crate::Sign;
 use crate::WORD_BIT_SIZE;
 
 impl BigFloatNumber {
@@ -48,6 +49,8 @@ impl BigFloatNumber {
         let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
         let mut x = self.clone()?;
+        x.set_inexact(false);
+        x.set_sign(Sign::Pos);
 
         loop {
             let p_x = p_wrk + additional_prec;
@@ -59,13 +62,19 @@ impl BigFloatNumber {
                 Ok(v) => Ok(v),
                 Err(e) => match e {
                     Error::ExponentOverflow(_) => {
-                        let mut ret = if rm as u32 & 0b1100 != 0 {
-                            // rounding down or to zero
+                        let rm_mask = if self.is_positive() {
+                            0b1100 // rounding down or to zero
+                        } else {
+                            0b1010 // rounding up or to zero
+                        };
+
+                        let mut ret = if rm as u32 & rm_mask != 0 {
                             let mut ret = BigFloatNumber::max_value(p)?;
+                            ret.set_sign(self.sign());
                             ret.set_exponent(0);
                             ret
                         } else {
-                            Self::from_i8(1, p)?
+                            Self::from_i8(self.sign().to_int(), p)?
                         };
 
                         ret.set_inexact(true);
@@ -78,27 +87,15 @@ impl BigFloatNumber {
                 },
             }?;
 
-            if xexp.is_zero() {
-                let mut ret = if rm as u32 & 0b1010 != 0 {
-                    // rounding up or to zero
-                    let mut ret = BigFloatNumber::min_value(p)?;
-                    ret.set_exponent(0);
-                    ret
-                } else {
-                    Self::from_i8(-1, p)?
-                };
-
-                ret.set_inexact(true);
-
-                return Ok(ret);
-            }
-
             let d1 = xexp.sub(&ONE, p_x, RoundingMode::Down)?;
             let d2 = xexp.add(&ONE, p_x, RoundingMode::Up)?;
 
             let mut ret = d1.div(&d2, p_x, RoundingMode::None)?;
 
+            ret.set_sign(self.sign());
+
             if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact());
                 break Ok(ret);
             }
 
@@ -139,8 +136,8 @@ mod tests {
         let n2 = n1.tanh(p, rm, &mut cc).unwrap();
         let n3 = BigFloatNumber::parse("-4.029AC2B966FC8CD896222A09593F0751477AC23B7FED67E140D1714FFCEC504D75DF70C388B621AF2FBC77C90C98C50F852D65BEDA273128_e-13", crate::Radix::Hex, p, RoundingMode::None, &mut cc).unwrap();
 
-        // println!("{:?}", n1.format(crate::Radix::Hex, rm).unwrap());
-        // println!("{:?}", n2.format(crate::Radix::Hex, rm).unwrap());
+        //println!("{:?}", n1.format(crate::Radix::Hex, rm, &mut cc).unwrap());
+        //println!("{:?}", n2.format(crate::Radix::Hex, rm, &mut cc).unwrap());
 
         assert!(n2.cmp(&n3) == 0);
 

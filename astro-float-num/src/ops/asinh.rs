@@ -46,6 +46,8 @@ impl BigFloatNumber {
                     let mut p_inc = WORD_BIT_SIZE;
                     let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
+                    x.set_inexact(false);
+
                     loop {
                         let p_x = p_wrk + 2;
 
@@ -56,6 +58,7 @@ impl BigFloatNumber {
                         let mut ret = ln2.add(&lnx, p_x, RoundingMode::None)?;
 
                         if ret.try_set_precision(p, rm, p_wrk)? {
+                            ret.set_inexact(ret.inexact() | self.inexact());
                             break Ok(ret);
                         }
 
@@ -73,6 +76,8 @@ impl BigFloatNumber {
                 let mut p_inc = WORD_BIT_SIZE;
                 let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
+                x.set_inexact(false);
+
                 loop {
                     let p_x = p_wrk + self.exponent().unsigned_abs() as usize + 5;
                     x.set_precision(p_x, RoundingMode::None)?;
@@ -88,6 +93,7 @@ impl BigFloatNumber {
                     let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
 
                     if ret.try_set_precision(p, rm, p_wrk)? {
+                        ret.set_inexact(ret.inexact() | self.inexact());
                         break Ok(ret);
                     }
 

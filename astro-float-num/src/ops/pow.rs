@@ -113,8 +113,8 @@ impl BigFloatNumber {
                 let x = match self.exp_positive_arg(p_x, cc) {
                     Ok(v) => Ok(v),
                     Err(e) => match e {
-                        Error::ExponentOverflow(_) => {
-                            return Self::new(p);
+                        Error::ExponentOverflow(sign) => {
+                            return Self::new2(p, sign, self.inexact());
                         }
                         Error::DivisionByZero => Err(Error::DivisionByZero),
                         Error::InvalidArgument => Err(Error::InvalidArgument),
@@ -128,6 +128,7 @@ impl BigFloatNumber {
             }?;
 
             if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact());
                 return Ok(ret);
             }
 
@@ -164,6 +165,7 @@ impl BigFloatNumber {
 
         let mut fract = self.fract()?;
         let e_fract = if !fract.is_zero() {
+            fract.set_inexact(false);
             fract.set_precision(p_work, RoundingMode::None)?;
             fract.set_sign(Sign::Pos);
             fract.expf()
@@ -185,7 +187,7 @@ impl BigFloatNumber {
     ///  - DivisionByZero: `self` is zero and `n` is negative.
     pub fn powsi(&self, n: isize, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         if n >= 0 {
-            self.powi(n as usize, p, rm)
+            self.powi_internal(n as usize, p, rm, true)
         } else {
             let p = round_p(p);
 
@@ -203,7 +205,7 @@ impl BigFloatNumber {
             loop {
                 let p_x = p_wrk + 2;
 
-                let x = self.powi(n.unsigned_abs(), p_x, RoundingMode::None)?;
+                let x = self.powi_internal(n.unsigned_abs(), p_x, RoundingMode::None, false)?;
 
                 if x.inexact() {
                     let mut ret = ONE.div(&x, p_x, RoundingMode::None)?;
@@ -230,6 +232,16 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: the precision is incorrect.
     pub fn powi(&self, n: usize, p: usize, rm: RoundingMode) -> Result<Self, Error> {
+        self.powi_internal(n, p, rm, true)
+    }
+
+    fn powi_internal(
+        &self,
+        n: usize,
+        p: usize,
+        rm: RoundingMode,
+        update_inexact: bool,
+    ) -> Result<Self, Error> {
         let p = round_p(p);
 
         let mut i = n;
@@ -270,7 +282,7 @@ impl BigFloatNumber {
                 x.set_inexact(false);
 
                 let mut c;
-                let arg = if rm != RoundingMode::None && self.inexact() {
+                let arg = if self.inexact() {
                     c = self.clone()?;
                     c.set_inexact(false);
                     &c
@@ -310,17 +322,17 @@ impl BigFloatNumber {
             })?;
 
             if ret.exponent() == EXPONENT_MIN && ret.precision() == 1 {
+                if update_inexact {
+                    ret.set_inexact(ret.inexact() | self.inexact());
+                }
                 ret.set_precision(p, rm)?;
                 return Ok(ret);
             }
 
-            if ret.inexact() {
-                if ret.try_set_precision(p, rm, p_wrk)? {
-                    return Ok(ret);
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                if update_inexact {
+                    ret.set_inexact(ret.inexact() | self.inexact());
                 }
-            } else {
-                ret.set_inexact(self.inexact());
-                ret.set_precision(p, rm)?;
                 return Ok(ret);
             }
 
@@ -430,7 +442,13 @@ impl BigFloatNumber {
     ) -> Result<Self, Error> {
         if n.is_zero() {
             let mut ret = Self::from_word(1, p)?;
-            ret.set_inexact(n.inexact());
+            if n.inexact() {
+                if self.exponent() == 1 && self.abs_cmp(&ONE) == 0 {
+                    ret.set_inexact(self.inexact());
+                } else {
+                    ret.set_inexact(true);
+                }
+            }
             return Ok(ret);
         } else if self.is_zero() {
             return if n.is_negative() {
@@ -497,9 +515,12 @@ impl BigFloatNumber {
         let p = round_p(p);
 
         let mut x = self.clone()?;
+        let mut y = n.clone()?;
+        x.set_inexact(false);
+        y.set_inexact(false);
 
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.mantissa_max_bit_len().max(n.mantissa_max_bit_len())) + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len().max(y.mantissa_max_bit_len())) + p_inc;
 
         loop {
             let p_ext = p_wrk + 2;
@@ -507,7 +528,7 @@ impl BigFloatNumber {
 
             let ln = x.ln(p_ext, RoundingMode::None, cc)?;
 
-            let m = match n.mul(&ln, p_ext, RoundingMode::None) {
+            let mut m = match y.mul(&ln, p_ext, RoundingMode::None) {
                 Ok(v) => Ok(v),
                 Err(e) => match e {
                     Error::ExponentOverflow(Sign::Neg) => {
@@ -522,14 +543,28 @@ impl BigFloatNumber {
 
             compute_small_exp!(ONE, m.exponent() as isize, m.is_negative(), p, rm);
 
-            let mut ret = m.exp(p_ext, RoundingMode::None, cc)?;
+            let mut ret = if m.is_negative() {
+                m.set_sign(Sign::Pos);
 
-            if ret.inexact() {
-                if ret.try_set_precision(p, rm, p_wrk)? {
-                    return Ok(ret);
-                }
+                let u = match m.exp(p_ext, RoundingMode::None, cc) {
+                    Ok(v) => Ok(v),
+                    Err(e) => match e {
+                        Error::ExponentOverflow(sign) => {
+                            return Self::new2(p, sign, self.inexact());
+                        }
+                        Error::DivisionByZero => Err(Error::DivisionByZero),
+                        Error::InvalidArgument => Err(Error::InvalidArgument),
+                        Error::MemoryAllocation => Err(Error::MemoryAllocation),
+                    },
+                }?;
+
+                ONE.div(&u, p_ext, RoundingMode::FromZero)
             } else {
-                ret.set_precision(p, rm)?;
+                m.exp(p_ext, RoundingMode::None, cc)
+            }?;
+
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact() | n.inexact());
                 return Ok(ret);
             }
 

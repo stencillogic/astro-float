@@ -128,6 +128,7 @@ impl BigFloatNumber {
 
         loop {
             let mut x = m.clone()?;
+            x.set_inexact(false);
 
             let p_x = p_wrk + additional_prec;
             x.set_precision(p_x, RoundingMode::None)?;
@@ -149,6 +150,7 @@ impl BigFloatNumber {
             };
 
             if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact());
                 return Ok(ret);
             }
 
@@ -261,6 +263,7 @@ impl BigFloatNumber {
 
         loop {
             let mut x = m.clone()?;
+            x.set_inexact(false);
 
             let p_x = p_wrk + additional_prec;
             x.set_precision(p_x, RoundingMode::None)?;
@@ -279,6 +282,7 @@ impl BigFloatNumber {
             let mut ret = p3.add(&n, p_x, RoundingMode::None)?;
 
             if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact());
                 return Ok(ret);
             }
 
@@ -304,6 +308,7 @@ impl BigFloatNumber {
         let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
         let mut x = self.clone()?;
+        x.set_inexact(false);
 
         loop {
             let p_x = p_wrk + 5; // avoid error being accounted by try_set_precision
@@ -328,6 +333,7 @@ impl BigFloatNumber {
             }
 
             if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact());
                 return Ok(ret);
             }
 
@@ -364,25 +370,28 @@ impl BigFloatNumber {
         let mut p_wrk = p.max(self.mantissa_max_bit_len().max(n.mantissa_max_bit_len())) + p_inc;
 
         let mut x = self.clone()?;
-        let mut n = n.clone()?;
+        let mut y = n.clone()?;
+        x.set_inexact(false);
+        y.set_inexact(false);
 
         loop {
             let p_x = p_wrk + 5;
             x.set_precision(p_x, RoundingMode::None)?;
-            n.set_precision(p_x, RoundingMode::None)?;
+            y.set_precision(p_x, RoundingMode::None)?;
 
             let p1 = x.ln(p_x, RoundingMode::None, cc)?;
 
-            let p2 = n.ln(p_x, RoundingMode::None, cc)?;
+            let p2 = y.ln(p_x, RoundingMode::None, cc)?;
 
             let mut ret = p1.div(&p2, p_x, RoundingMode::None)?;
 
             let mut ret2 = ret.clone()?; // clone, becuase try_set_precision modifies ret
             if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact() | n.inexact());
                 return Ok(ret);
             } else {
                 // check if the result is exact
-                let pwr = n.pow(
+                let pwr = y.pow(
                     &ret2,
                     p_x.max(self.mantissa_max_bit_len()),
                     RoundingMode::None,
@@ -390,6 +399,7 @@ impl BigFloatNumber {
                 )?;
 
                 if pwr.cmp(self) == 0 {
+                    ret2.set_inexact(ret2.inexact() | self.inexact() | n.inexact());
                     ret2.set_precision(p, rm)?;
                     return Ok(ret2);
                 }

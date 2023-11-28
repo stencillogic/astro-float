@@ -1137,7 +1137,7 @@ impl BigFloat {
     /// Try to round and then set the precision to `p`, given `self` has `s` correct digits in mantissa.
     /// The function returns true if rounding succeeded, or if `self` is Inf or NaN.
     /// If the fuction returns `false`, `self` is still modified, and should be discarded.
-    /// In case of an error, `self` will be set to NaN with associated error.
+    /// In case of an error, `self` will be set to NaN with an associated error.
     /// If the precision `p` is incorrect `self` will be set to NaN.
     pub fn try_set_precision(&mut self, p: usize, rm: RoundingMode, s: usize) -> bool {
         if let Flavor::Value(v) = &mut self.inner {

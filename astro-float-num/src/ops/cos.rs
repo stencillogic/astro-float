@@ -125,6 +125,7 @@ impl BigFloatNumber {
         let mut add_p = (1 - COS_EXP_THRES) as usize;
         loop {
             let mut x = self.clone()?;
+            x.set_inexact(false);
 
             let p_x = p_wrk + add_p;
             x.set_precision(p_x, RoundingMode::None)?;
@@ -138,6 +139,7 @@ impl BigFloatNumber {
                 add_p = t;
             } else {
                 if ret.try_set_precision(p, rm, p_wrk)? {
+                    ret.set_inexact(ret.inexact() | self.inexact());
                     break Ok(ret);
                 }
 

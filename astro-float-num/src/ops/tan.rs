@@ -83,6 +83,7 @@ impl BigFloatNumber {
 
         loop {
             let mut x = self.clone()?;
+            x.set_inexact(false);
 
             let p_x = p_wrk + 3;
             x.set_precision(p_x, RoundingMode::None)?;
@@ -92,6 +93,7 @@ impl BigFloatNumber {
             let mut ret = x.tan_series(RoundingMode::None)?;
 
             if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact());
                 break Ok(ret);
             }
 

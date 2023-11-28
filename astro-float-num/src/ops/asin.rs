@@ -54,6 +54,7 @@ impl BigFloatNumber {
         let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
 
         let mut x = self.clone()?;
+        x.set_inexact(false);
 
         loop {
             let p_x = p_wrk + additional_prec;
@@ -68,6 +69,7 @@ impl BigFloatNumber {
             let mut ret = d.atan(p_x, rm, cc)?;
 
             if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact());
                 break Ok(ret);
             }
 

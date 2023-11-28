@@ -37,6 +37,7 @@ impl BigFloatNumber {
         let mut add_p = (1 - ACOS_EXP_THRES) as usize;
 
         let mut x = self.clone()?;
+        x.set_inexact(false);
 
         loop {
             let p_x = p_wrk + add_p;
@@ -59,6 +60,7 @@ impl BigFloatNumber {
                 add_p = t;
             } else {
                 if ret.try_set_precision(p, rm, p_wrk)? {
+                    ret.set_inexact(ret.inexact() | self.inexact());
                     return Ok(ret);
                 }
 
