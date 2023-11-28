@@ -44,7 +44,7 @@
 //!
 //! **Correctness**
 //!
-//! Results of all arithmetic operations, mathematical functions, and constant values are correctly rounded
+//! Results of all arithmetic operations, mathematical functions, radix conversion, and constant values are correctly rounded
 //! (a correctly rounded number is a number that is identical to a number computed to infinite precision and then rounded, reflecting no information loss during rounding).
 //!
 //! ## Examples
