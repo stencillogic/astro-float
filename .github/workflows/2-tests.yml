@@ -25,6 +25,9 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    env:
+      TARGET: i686-unknown-linux-gnu
+
     steps:
     - uses: actions/checkout@v3
     - name: Install dependencies
