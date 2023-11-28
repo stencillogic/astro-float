@@ -845,6 +845,9 @@ impl BigFloatNumber {
         ret.m = m;
         ret.e = exponent - 0b1111111111 - shift as Exponent;
 
+        #[cfg(target_arch = "x86")]
+        debug_assert!(ret.e <= EXPONENT_MAX && ret.e >= EXPONENT_MIN);
+
         Ok(ret)
     }
 
@@ -1172,6 +1175,15 @@ impl BigFloatNumber {
     /// Note that if `self` is subnormal, the exponent may not change, but the mantissa will shift instead.
     /// `e` will be clamped to the range from EXPONENT_MIN to EXPONENT_MAX if it's outside of the range.
     pub fn set_exponent(&mut self, e: Exponent) {
+        #[cfg(target_arch = "x86")]
+        let e = if e < EXPONENT_MIN {
+            EXPONENT_MIN
+        } else if e > EXPONENT_MAX {
+            EXPONENT_MAX
+        } else {
+            e
+        };
+
         if !self.is_zero() {
             if self.is_subnormal() && e > EXPONENT_MIN {
                 let ediff = e as isize - EXPONENT_MIN as isize;
