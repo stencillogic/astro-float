@@ -88,8 +88,9 @@
 //! // Precision with some space for error.
 //! let p = 1024 + 8;
 //!
-//! // Rounding of all operations
-//! let rm = RoundingMode::ToEven;
+//! // The results of computations will not be rounded.
+//! // That will be more performant, even though it may give an incorrectly rounded result.
+//! let rm = RoundingMode::None;
 //!
 //! // Initialize mathematical constants cache
 //! let mut cc = Consts::new().expect("An error occured when initializing constants");
@@ -103,11 +104,11 @@
 //! let n = n.atan(p, rm, &mut cc);
 //! let mut pi = six.mul(&n, p, rm);
 //!
-//! // Reduce precision to 1024
-//! pi.set_precision(1024, rm).expect("Precision updated");
+//! // Reduce precision to 1024 and round to the nearest even number.
+//! pi.set_precision(1024, RoundingMode::ToEven).expect("Precision updated");
 //!
 //! // Use library's constant for verifying the result
-//! let pi_lib = cc.pi(1024, rm);
+//! let pi_lib = cc.pi(1024, RoundingMode::ToEven);
 //!
 //! // Compare computed constant with library's constant
 //! assert_eq!(pi.cmp(&pi_lib), Some(0));
@@ -117,6 +118,10 @@
 //!
 //! // output: 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458699748e+0
 //! ```
+//!
+//! ## Performance recommendations
+//! 
+//! When small error is acceptable because of rounding it is recommended to do all computations with `RoundingMode::None`, and use `BigFloat::set_precision` or `BigFloat::round` with a specific rounding mode just once for the final result.
 //!
 //! ## no_std
 //!
