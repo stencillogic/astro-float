@@ -1696,9 +1696,6 @@ mod tests {
     use std::str::FromStr;
 
     #[cfg(not(feature = "std"))]
-    use core::str::FromStr;
-
-    #[cfg(not(feature = "std"))]
     use alloc::format;
 
     #[test]
