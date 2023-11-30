@@ -398,47 +398,31 @@ mod tests {
         assert!(!ps.is_nan());
         assert!(ps.sign().is_negative());
 
-        let numstr;
-        #[cfg(not(target_arch = "x86"))]
-        {
-            numstr = "0.0000abc_e+7FFFFFFF";
-        }
-        #[cfg(target_arch = "x86")]
-        {
-            numstr = "0.0000abc_e+1FFFFFFF";
-        }
-        let ps = parse(numstr, Radix::Hex).unwrap();
+        let numstr = format!("0.0000abc_e+{:X}", EXPONENT_MAX);
+        let ps = parse(&numstr, Radix::Hex).unwrap();
         assert!(!ps.is_inf());
         assert!(!ps.is_nan());
         let (m, _s, e) = ps.raw_parts();
         assert_eq!(m, [0, 0, 0, 0, 0xa, 0xb, 0xc]);
-        #[cfg(not(target_arch = "x86"))]
-        {
-            assert_eq!(e, 0x7FFFFFFF);
-        }
-        #[cfg(target_arch = "x86")]
-        {
-            assert_eq!(e, 0x1FFFFFFF);
-        }
+        assert_eq!(e, EXPONENT_MAX);
 
         // small exp
-        let ps = parse("abc.def09123e_e-80000004", Radix::Hex).unwrap();
+        let numstr = format!(
+            "abc.def09123e_e-{:x}",
+            (EXPONENT_MIN as i64 - 4).unsigned_abs()
+        );
+        let ps = parse(&numstr, Radix::Hex).unwrap();
         assert!(!ps.is_inf());
         assert!(!ps.is_nan());
         let (m, _s, e) = ps.raw_parts();
         assert_eq!(m.iter().filter(|&&x| x != 0).count(), 0);
         assert!(e == 0);
 
-        let numstr;
-        #[cfg(not(target_arch = "x86"))]
-        {
-            numstr = "0.0000abcdef09123e_e-80000000";
-        }
-        #[cfg(target_arch = "x86")]
-        {
-            numstr = "0.0000abcdef09123e_e-20000000";
-        }
-        let ps = parse(numstr, Radix::Hex).unwrap();
+        let numstr = format!(
+            "0.0000abcdef09123e_e-{:X}",
+            (EXPONENT_MIN as i64).unsigned_abs()
+        );
+        let ps = parse(&numstr, Radix::Hex).unwrap();
         assert!(!ps.is_inf());
         assert!(!ps.is_nan());
         let (m, _s, e) = ps.raw_parts();
@@ -446,14 +430,7 @@ mod tests {
             m,
             [0, 0, 0, 0, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x0, 0x9, 0x1, 0x2, 0x3, 0xe]
         );
-        #[cfg(not(target_arch = "x86"))]
-        {
-            assert_eq!(e, -0x80000000);
-        }
-        #[cfg(target_arch = "x86")]
-        {
-            assert_eq!(e, -0x20000000);
-        }
+        assert_eq!(e, EXPONENT_MIN);
 
         let ps = parse(
             "abc.def09123e_e-ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
