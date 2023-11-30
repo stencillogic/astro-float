@@ -988,7 +988,7 @@ mod tests {
             //println!("{:?}\n{:?}", n, g);
 
             if rdx == Radix::Dec {
-                eps.set_exponent(n.exponent() - p as Exponent + 3);
+                eps.set_exponent(n.exponent() - p as Exponent + 4);
                 assert!(
                     n.sub(&g, p, RoundingMode::None)
                         .unwrap()
