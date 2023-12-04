@@ -36,8 +36,6 @@ impl BigFloatNumber {
         rm: RoundingMode,
         cc: &mut Consts,
     ) -> Result<Self, Error> {
-        Self::p_assertion(p)?;
-
         let ps = crate::parser::parse(s, rdx)?;
 
         if ps.is_nan() || ps.is_inf() {

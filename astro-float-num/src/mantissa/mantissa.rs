@@ -1213,7 +1213,7 @@ impl Mantissa {
     }
 
     // Add 1 ulp to mantissa, return true if carry occures
-    fn add_ulp(&mut self) -> bool {
+    pub(crate) fn add_ulp(&mut self) -> bool {
         let mut c = 1;
         for v in self.m.iter_mut() {
             c = add_carry(*v, 0, c, v);

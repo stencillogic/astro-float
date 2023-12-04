@@ -469,44 +469,44 @@ impl BigFloatNumber {
 
             let mut e_out = e_out as Exponent;
 
-            // try round
+            // cut off digits with error
             let valid =
-                digits.len() - ((shift + err_acc) as i64 * 301029996 / 1000000000) as usize - 1; // cut off digits with error
+                digits.len() as i64 - ((shift + err_acc) as i64 * 301029996 / 1000000000) - 1;
 
-            debug_assert!(digits.len() > n);
-            debug_assert!(valid > n);
+            if digits.len() > n && valid > n as i64 {
+                // try round
+                if Self::try_round_dec(
+                    &mut digits[..valid as usize],
+                    n,
+                    rm,
+                    self.sign(),
+                    &mut e_out,
+                    inexact,
+                )? {
+                    if e_subn > 0 {
+                        if e_out > EXPONENT_MIN {
+                            e_subn -= 1;
+                            e_out = EXPONENT_MIN;
+                        }
 
-            if Self::try_round_dec(
-                &mut digits[..valid],
-                n,
-                rm,
-                self.sign(),
-                &mut e_out,
-                inexact,
-            )? {
-                if e_subn > 0 {
-                    if e_out > EXPONENT_MIN {
-                        e_subn -= 1;
-                        e_out = EXPONENT_MIN;
+                        let rsz = if digits.len() > n { n } else { digits.len() };
+
+                        digits.resize(rsz + e_subn, 0);
+                        digits[rsz..].fill(0);
+                        digits.rotate_right(e_subn);
+                    } else {
+                        if digits.len() > n {
+                            digits.resize(n, 0);
+                        }
                     }
 
-                    let rsz = if digits.len() > n { n } else { digits.len() };
+                    // remove trailing zeroes
+                    let nzr = digits.iter().rev().take_while(|&&x| x == 0).count();
 
-                    digits.resize(rsz + e_subn, 0);
-                    digits[rsz..].fill(0);
-                    digits.rotate_right(e_subn);
-                } else {
-                    if digits.len() > n {
-                        digits.resize(n, 0);
-                    }
+                    digits.resize(digits.len() - nzr, 0);
+
+                    return Ok((self.sign(), digits, e_out));
                 }
-
-                // remove trailing zeroes
-                let nzr = digits.iter().rev().take_while(|&&x| x == 0).count();
-
-                digits.resize(digits.len() - nzr, 0);
-
-                return Ok((self.sign(), digits, e_out));
             }
 
             p_wrk += p_inc;
@@ -1198,6 +1198,28 @@ mod tests {
                 .is_zero());
             }
         }
+
+        // dec, short digits
+        let n = BigFloatNumber::from_words(
+            &[1052139549, 0, 0, 0, 0, 0, 0, 0, 14488038915593732096],
+            Sign::Pos,
+            1,
+        )
+        .unwrap();
+        let (s, d, e) = n
+            .convert_to_radix(Radix::Dec, RoundingMode::ToEven, &mut cc)
+            .unwrap();
+        let g = BigFloatNumber::convert_from_radix(
+            s,
+            &d,
+            e,
+            Radix::Dec,
+            n.mantissa_max_bit_len(),
+            RoundingMode::None,
+            &mut cc,
+        )
+        .unwrap();
+        assert!(g.cmp(&n) == 0);
 
         // unkonwn p: binary, octal, hexadecimal
         for (s1, exp, rdx) in [
