@@ -32,7 +32,8 @@ pub enum ErrAlgo<'a> {
     Log2(&'a BigFloat, &'a BigFloat),
     Pow(&'a BigFloat, &'a BigFloat),
     Trig(&'a BigFloat, usize, TrigFun, &'a mut Consts),
-    AsinAcosAcosh(&'a BigFloat, usize),
+    Asin(&'a BigFloat, usize),
+    AcosAcosh(&'a BigFloat, usize),
 }
 
 /// Computes the precision increment of an arguments to cover the error for a given algorithm.
@@ -43,7 +44,7 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
             let y = compute_added_err_near_one(base, 0);
             let x = compute_added_err_near_one(arg, 0);
             5 + x.max(y)
-        }
+        },
         ErrAlgo::Pow(base, arg) => {
             if let Some(earg) = arg.exponent() {
                 let n = compute_added_err_near_one(base, 0);
@@ -56,7 +57,7 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
             } else {
                 0
             }
-        }
+        },
         ErrAlgo::Trig(arg, p, fun, cc) => {
             if let Some(e) = arg.exponent() {
                 let err = if e < 1 {
@@ -125,10 +126,18 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
             } else {
                 0
             }
-        }
-        ErrAlgo::AsinAcosAcosh(arg, c) => {
+        },
+        ErrAlgo::Asin(arg, c) => {
             let n = compute_added_err_near_one(arg, 0);
             c + (n + 1) / 2
+        },
+        ErrAlgo::AcosAcosh(arg, c) => {
+            let n = compute_added_err_near_one(arg, 0);
+            c + if arg.is_positive() {
+                n
+            } else {
+                n / 2
+            }
         }
     }
 }
@@ -502,6 +511,40 @@ mod tests {
                             assert!(err <= err_estimate);
                         }
                     }
+                }
+            }
+
+            // asin, acos
+            for e in [0, -1, -2, -(EXPONENT_BIT_SIZE as Exponent + ernd), -(1000 + ernd)] {
+
+                let near1set = if e == 0 { vec![0, -1] } else { vec![0] };
+
+                for near1 in near1set {
+                    let p = (rand::random::<usize>() % 10 + 1) * WORD_BIT_SIZE;
+
+                    let (n1, n2) = gen_num_pair(p, e, near1);
+
+                    // asin
+                    let d1 = BigFloat::asin(&n1, p, RoundingMode::None, &mut cc);
+                    let d2 = BigFloat::asin(&n2, p, RoundingMode::None, &mut cc);
+    
+                    let err_estimate =
+                        compute_added_err(ErrAlgo::Asin(&n1, 2));
+                    let err = calc_err(d1, d2, p);
+    
+                    //println!("asin {:?} {:?}", err, err_estimate);
+                    assert!(err <= err_estimate);
+
+                    // acos
+                    let d1 = BigFloat::acos(&n1, p, RoundingMode::None, &mut cc);
+                    let d2 = BigFloat::acos(&n2, p, RoundingMode::None, &mut cc);
+
+                    let err_estimate =
+                        compute_added_err(ErrAlgo::AcosAcosh(&n1, 2));
+                    let err = calc_err(d1, d2, p);
+    
+                    //println!("acos {:?} {:?}", err, err_estimate);
+                    assert!(err <= err_estimate);
                 }
             }
         }
