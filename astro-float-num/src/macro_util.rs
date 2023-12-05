@@ -32,8 +32,10 @@ pub enum ErrAlgo<'a> {
     Log2(&'a BigFloat, &'a BigFloat),
     Pow(&'a BigFloat, &'a BigFloat),
     Trig(&'a BigFloat, usize, TrigFun, &'a mut Consts),
-    Asin(&'a BigFloat, usize),
-    AcosAcosh(&'a BigFloat, usize),
+    Asin(&'a BigFloat),
+    Acos(&'a BigFloat),
+    Acosh(&'a BigFloat),
+    Atanh(&'a BigFloat),
 }
 
 /// Computes the precision increment of an arguments to cover the error for a given algorithm.
@@ -127,16 +129,30 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
                 0
             }
         },
-        ErrAlgo::Asin(arg, c) => {
+        ErrAlgo::Asin(arg) => {
             let n = compute_added_err_near_one(arg, 0);
-            c + (n + 1) / 2
+            2 + (n + 1) / 2
         },
-        ErrAlgo::AcosAcosh(arg, c) => {
+        ErrAlgo::Acos(arg) => {
             let n = compute_added_err_near_one(arg, 0);
-            c + if arg.is_positive() {
+            2 + if arg.is_positive() {
                 n
             } else {
                 n / 2
+            }
+        },
+        ErrAlgo::Acosh(arg) => {
+            if arg.is_positive() && arg.exponent().unwrap_or(0) >= 1 {
+                2 + compute_added_err_near_one(arg, 0)
+            } else {
+                0
+            }
+        },
+        ErrAlgo::Atanh(arg) => {
+            if arg.exponent().unwrap_or(0) < 1 {
+                2 + compute_added_err_near_one(arg, 0)
+            } else {
+                0
             }
         }
     }
@@ -394,8 +410,7 @@ mod tests {
                         assert!(err <= err_estimate);
 
                         // log base b, pow
-                        for e2 in ([] as [Exponent; 0]) {
-                            // [0, 1, 2, EXPONENT_BIT_SIZE as Exponent + ernd, 1000 + ernd, 1000000 + ernd] {
+                        for e2 in [0, 1, 2, EXPONENT_BIT_SIZE as Exponent + ernd, 1000 + ernd, 1000000 + ernd] {
                             for esign2 in [1, -1] {
                                 let near1set2 = if e2 <= 2 { vec![0, -1, 1] } else { vec![0] };
 
@@ -463,6 +478,73 @@ mod tests {
 
                         //println!("exp {:?}", err);
                         assert!(err <= EXPONENT_BIT_SIZE + 1);
+
+                        // sinh
+                        let d1 = BigFloat::sinh(&n1, p, RoundingMode::None, &mut cc);
+                        let d2 = BigFloat::sinh(&n2, p, RoundingMode::None, &mut cc);
+
+                        let err = calc_err(d1, d2, p);
+
+                        //println!("sinh {:?}", err);
+                        assert!(err <= EXPONENT_BIT_SIZE + 1);
+
+                        // cosh
+                        let d1 = BigFloat::cosh(&n1, p, RoundingMode::None, &mut cc);
+                        let d2 = BigFloat::cosh(&n2, p, RoundingMode::None, &mut cc);
+
+                        let err = calc_err(d1, d2, p);
+
+                        //println!("cosh {:?}", err);
+                        assert!(err <= EXPONENT_BIT_SIZE + 1);
+
+                        // tanh
+                        let d1 = BigFloat::tanh(&n1, p, RoundingMode::None, &mut cc);
+                        let d2 = BigFloat::tanh(&n2, p, RoundingMode::None, &mut cc);
+
+                        let err = calc_err(d1, d2, p);
+
+                        //println!("tanh {:?}", err);
+                        assert!(err <= 2);
+
+                        // asinh
+                        let d1 = BigFloat::asinh(&n1, p, RoundingMode::None, &mut cc);
+                        let d2 = BigFloat::asinh(&n2, p, RoundingMode::None, &mut cc);
+
+                        let err = calc_err(d1, d2, p);
+
+                        //println!("asinh {:?}", err);
+                        assert!(err <= 2);
+
+                        // acosh
+                        let d1 = BigFloat::acosh(&n1, p, RoundingMode::None, &mut cc);
+                        let d2 = BigFloat::acosh(&n2, p, RoundingMode::None, &mut cc);
+
+                        let err_estimate =
+                        compute_added_err(ErrAlgo::Acosh(&n1));
+                        let err = calc_err(d1, d2, p);
+
+                        //println!("acosh {:?} {:?}", err, err_estimate);
+                        assert!(err <= err_estimate);
+
+                        // atanh
+                        let d1 = BigFloat::atanh(&n1, p, RoundingMode::None, &mut cc);
+                        let d2 = BigFloat::atanh(&n2, p, RoundingMode::None, &mut cc);
+
+                        let err_estimate =
+                        compute_added_err(ErrAlgo::Atanh(&n1));
+                        let err = calc_err(d1, d2, p);
+
+                        //println!("atanh {:?} {:?}", err, err_estimate);
+                        assert!(err <= err_estimate);
+
+                        // atan
+                        let d1 = BigFloat::atan(&n1, p, RoundingMode::None, &mut cc);
+                        let d2 = BigFloat::atan(&n2, p, RoundingMode::None, &mut cc);
+
+                        let err = calc_err(d1, d2, p);
+
+                        //println!("atan {:?}", err);
+                        assert!(err <= 2);
                     }
                 }
             }
@@ -529,7 +611,7 @@ mod tests {
                     let d2 = BigFloat::asin(&n2, p, RoundingMode::None, &mut cc);
     
                     let err_estimate =
-                        compute_added_err(ErrAlgo::Asin(&n1, 2));
+                        compute_added_err(ErrAlgo::Asin(&n1));
                     let err = calc_err(d1, d2, p);
     
                     //println!("asin {:?} {:?}", err, err_estimate);
@@ -540,7 +622,7 @@ mod tests {
                     let d2 = BigFloat::acos(&n2, p, RoundingMode::None, &mut cc);
 
                     let err_estimate =
-                        compute_added_err(ErrAlgo::AcosAcosh(&n1, 2));
+                        compute_added_err(ErrAlgo::Acos(&n1));
                     let err = calc_err(d1, d2, p);
     
                     //println!("acos {:?} {:?}", err, err_estimate);
