@@ -52,7 +52,7 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
         ErrAlgo::Log2(base, arg) => {
             if (arg.inexact() || base.inexact()) && arg.is_positive() && base.is_positive() {
                 let y = if base.inexact() { compute_added_err_near_one(base, 0) } else { 0 };
-                let x = if arg.inexact() { compute_added_err_near_one(arg, 0) } else {0};
+                let x = if arg.inexact() { compute_added_err_near_one(arg, 0) } else { 0 };
                 5 + x.max(y)
             } else {
                 0
@@ -142,10 +142,10 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
                                 }
                             }
                         };
-    
+
                         err + e.unsigned_abs() as usize
                     };
-    
+
                     err + 2
                 } else {
                     0
@@ -452,8 +452,8 @@ mod tests {
                                     let (b1, b2) = gen_num_pair(p, e2, near12);
                                     let mut bc = [b1, b2];
 
-                                    for (i1, i2) in [(0,0),(0,1),(1,0),(1,1),] {
-                                        for (j1, j2) in [(0,0),(0,1),(1,0),(1,1),] {
+                                    for (i1, i2) in [(0, 0), (0, 1), (1, 0), (1, 1)] {
+                                        for (j1, j2) in [(0, 0), (0, 1), (1, 0), (1, 1)] {
                                             if i1 == i2 && j1 == j2 {
                                                 continue;
                                             }
@@ -480,13 +480,8 @@ mod tests {
                                             let b = &bc[j1];
                                             let bb = &bc[j2];
 
-                                            let d1 = BigFloat::log(
-                                                n,
-                                                b,
-                                                p,
-                                                RoundingMode::None,
-                                                &mut cc,
-                                            );
+                                            let d1 =
+                                                BigFloat::log(n, b, p, RoundingMode::None, &mut cc);
                                             let d2 = BigFloat::log(
                                                 nn,
                                                 bb,
@@ -498,19 +493,14 @@ mod tests {
                                             let err_estimate =
                                                 compute_added_err(ErrAlgo::Log2(b, n));
                                             let err = calc_err(d1, d2, p);
-        
+
                                             let err_estimate = 1.max(err_estimate);
 
                                             //println!("log {:?} {:?}", err, err_estimate);
                                             assert!(err <= err_estimate);
-        
-                                            let d1 = BigFloat::pow(
-                                                b,
-                                                n,
-                                                p,
-                                                RoundingMode::None,
-                                                &mut cc,
-                                            );
+
+                                            let d1 =
+                                                BigFloat::pow(b, n, p, RoundingMode::None, &mut cc);
                                             let d2 = BigFloat::pow(
                                                 bb,
                                                 nn,
@@ -522,8 +512,9 @@ mod tests {
                                             let err_estimate =
                                                 compute_added_err(ErrAlgo::Pow(b, n));
                                             let err = calc_err(d1, d2, p);
-        
-                                            if !(b.abs().cmp(&ONE) == Some(0) || bb.abs().cmp(&ONE) == Some(0))
+
+                                            if !(b.abs().cmp(&ONE) == Some(0)
+                                                || bb.abs().cmp(&ONE) == Some(0))
                                             {
                                                 let err_estimate = 1.max(err_estimate);
                                                 //println!("pow {:?} {:?}", err, err_estimate);
