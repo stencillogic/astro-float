@@ -37,18 +37,6 @@ impl Parse for MacroInput {
     }
 }
 
-// Algorithm of error computation.
-#[derive(Copy, Clone, Debug, PartialEq)]
-enum ErrAlgo {
-    None,
-    Log,
-    Log2,
-    Pow,
-    SinCos,
-    Tan,
-    AsinAcos,
-}
-
 fn traverse_binary(
     expr: &ExprBinary,
     err: &mut Vec<usize>,
@@ -66,12 +54,14 @@ fn traverse_binary(
                 let arg1 = #left_expr;
                 let arg2 = #right_expr;
                 let ret = astro_float::BigFloat::add(&arg1, &arg2, p_wrk, astro_float::RoundingMode::None);
-                if let (Some(e1), Some(e2), Some(e3)) = (arg1.exponent(), arg2.exponent(), ret.exponent()) {
-                    if (e1 as isize - e2 as isize).abs() <= 1 && arg1.sign() != arg2.sign() {
-                        let newerr = (e1.max(e2) as isize - e3 as isize).unsigned_abs() + 1;
-                        if errs[#errs_id] < newerr {
-                            errs[#errs_id] = newerr;
-                            continue;
+                if arg1.inexact() || arg2.inexact() {
+                    if let (Some(e1), Some(e2), Some(e3)) = (arg1.exponent(), arg2.exponent(), ret.exponent()) {
+                        if (e1 as isize - e2 as isize).abs() <= 1 && arg1.sign() != arg2.sign() {
+                            let newerr = (e1.max(e2) as isize - e3 as isize).unsigned_abs() + 1;
+                            if errs[#errs_id] < newerr {
+                                errs[#errs_id] = newerr;
+                                continue;
+                            }
                         }
                     }
                 }
@@ -84,12 +74,14 @@ fn traverse_binary(
                 let arg1 = #left_expr;
                 let arg2 = #right_expr;
                 let ret = astro_float::BigFloat::sub(&arg1, &arg2, p_wrk, astro_float::RoundingMode::None);
-                if let (Some(e1), Some(e2), Some(e3)) = (arg1.exponent(), arg2.exponent(), ret.exponent()) {
-                    if (e1 as isize - e2 as isize).abs() <= 1 && arg1.sign() == arg2.sign() {
-                        let newerr = (e1.max(e2) as isize - e3 as isize).unsigned_abs() + 1;
-                        if errs[#errs_id] < newerr {
-                            errs[#errs_id] = newerr;
-                            continue;
+                if arg1.inexact() || arg2.inexact() {
+                    if let (Some(e1), Some(e2), Some(e3)) = (arg1.exponent(), arg2.exponent(), ret.exponent()) {
+                        if (e1 as isize - e2 as isize).abs() <= 1 && arg1.sign() == arg2.sign() {
+                            let newerr = (e1.max(e2) as isize - e3 as isize).unsigned_abs() + 1;
+                            if errs[#errs_id] < newerr {
+                                errs[#errs_id] = newerr;
+                                continue;
+                            }
                         }
                     }
                 }
@@ -98,7 +90,8 @@ fn traverse_binary(
         }
         BinOp::Mul(_) => {
             err.push(3);
-            quote!(astro_float::BigFloat::mul(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
+            quote!(
+                astro_float::BigFloat::mul(&(#left_expr), &(#right_expr), p_wrk, astro_float::RoundingMode::None))
         }
         BinOp::Div(_) => {
             err.push(3);
@@ -119,97 +112,85 @@ fn traverse_binary(
 fn one_arg_fun(
     fun: TokenStream,
     expr: &ExprCall,
-    added_err: usize,
+    initial_err: usize,
     err: &mut Vec<usize>,
     cc: &mut Consts,
-) -> Result<TokenStream, Error> {
-    check_arg_num(1, expr)?;
-    let arg = traverse_expr(&expr.args[0], err, cc)?;
-    err.push(added_err);
-    Ok(quote!(#fun(&(#arg), p_wrk, astro_float::RoundingMode::None)))
-}
-
-fn one_arg_fun_cc(
-    fun: TokenStream,
-    expr: &ExprCall,
-    added_err: usize,
-    err: &mut Vec<usize>,
-    algo: ErrAlgo,
-    cc: &mut Consts,
+    use_cc: bool,
 ) -> Result<TokenStream, Error> {
     check_arg_num(1, expr)?;
 
     let arg = traverse_expr(&expr.args[0], err, cc)?;
+    err.push(initial_err);
 
-    let errs_id = err.len();
-
-    if algo == ErrAlgo::Tan {
-        // for tan check the returned value
-        let ts = quote!({
-            let arg = #arg;
-
-            let ret = #fun(&arg, p_wrk, astro_float::RoundingMode::None, cc);
-
-            if let Some(e) = ret.exponent() {
-                let h = 2 * (e.unsigned_abs() as isize) + 1;
-                if (errs[#errs_id] as isize) < h {
-                    errs[#errs_id] = h as usize;
-                    continue;
-                }
-            }
-
-            ret
-        });
-
-        err.push(added_err);
-
-        Ok(ts)
+    let ret = if use_cc {
+        quote!(#fun(&(#arg), p_wrk, astro_float::RoundingMode::None, cc))
     } else {
-        let errcheck = match algo {
-            ErrAlgo::None => quote!(), // the error is constant
-            ErrAlgo::Log => quote!({
-                let newerr = astro_float::macro_util::compute_added_err_near_one(&arg, p_wrk) + 2;
-                if errs[#errs_id] < newerr {
-                    errs[#errs_id] = newerr;
-                    continue;
-                }
-            }),
-            ErrAlgo::SinCos => quote!({
-                if let Some(e) = arg.exponent() {
-                    if (errs[#errs_id] as isize) < (e as isize) {
-                        errs[#errs_id] = e as usize;
-                        continue;
-                    }
-                }
-            }),
-            ErrAlgo::AsinAcos => quote!({
-                let newerr = astro_float::macro_util::compute_added_err_near_one(&arg, p_wrk) / 2;
-                if errs[#errs_id] < newerr {
-                    errs[#errs_id] = newerr;
-                    continue;
-                }
-            }),
-            _ => return Err(Error::new(expr.span(), "unexpected error in macro logic.")),
-        };
+        quote!(#fun(&(#arg), p_wrk, astro_float::RoundingMode::None))
+    };
 
-        err.push(added_err);
-
-        Ok(quote!({
-            let arg = #arg;
-
-            #errcheck
-
-            #fun(&arg, p_wrk, astro_float::RoundingMode::None, cc)
-        }))
-    }
+    Ok(ret)
 }
 
-fn two_arg_fun_cc(
+fn one_arg_fun_errcheck(
     fun: TokenStream,
     expr: &ExprCall,
-    added_err: usize,
+    initial_err: usize,
     err: &mut Vec<usize>,
-    algo: ErrAlgo,
+    errcheck: TokenStream,
+    cc: &mut Consts,
+) -> Result<TokenStream, Error> {
+    check_arg_num(1, expr)?;
+
+    let arg = traverse_expr(&expr.args[0], err, cc)?;
+    let errs_id = err.len();
+    err.push(initial_err);
+
+    Ok(quote!({
+        let arg = #arg;
+
+        let newerr = astro_float::macro_util::compute_added_err(#errcheck);
+        if errs[#errs_id] < newerr {
+            errs[#errs_id] = newerr;
+            continue;
+        }
+
+        #fun(&arg, p_wrk, astro_float::RoundingMode::None, cc)
+    }))
+}
+
+fn trig_fun(
+    fun: TokenStream,
+    expr: &ExprCall,
+    initial_err: usize,
+    err: &mut Vec<usize>,
+    errfun: TokenStream,
+    cc: &mut Consts,
+) -> Result<TokenStream, Error> {
+    check_arg_num(1, expr)?;
+
+    let arg = traverse_expr(&expr.args[0], err, cc)?;
+    let errs_id = err.len();
+    err.push(initial_err);
+
+    Ok(quote!({
+        let arg = astro_float::macro_util::check_exponent_range(#arg, emin, emax);
+
+        let newerr = astro_float::macro_util::compute_added_err(astro_float::macro_util::ErrAlgo::Trig(&arg, p_wrk, #errfun, cc));
+        if errs[#errs_id] < newerr {
+            errs[#errs_id] = newerr;
+            continue;
+        }
+
+        #fun(&arg, p_wrk, astro_float::RoundingMode::None, cc)
+    }))
+}
+
+fn two_arg_fun_errcheck(
+    fun: TokenStream,
+    expr: &ExprCall,
+    initial_err: usize,
+    err: &mut Vec<usize>,
+    errcheck: TokenStream,
     cc: &mut Consts,
 ) -> Result<TokenStream, Error> {
     check_arg_num(2, expr)?;
@@ -218,43 +199,18 @@ fn two_arg_fun_cc(
     let arg2 = traverse_expr(&expr.args[1], err, cc)?;
 
     let errs_id = err.len();
-    let errcheck = match algo {
-        ErrAlgo::Log2 => quote!({
-            let newerr1 = astro_float::macro_util::compute_added_err_near_one(&arg1, p_wrk);
-            let newerr2 = astro_float::macro_util::compute_added_err_near_one(&arg2, p_wrk);
-            let newerr = newerr1 + newerr2 + 2;
-            if errs[#errs_id] < newerr {
-                errs[#errs_id] = newerr;
-                continue;
-            }
-        }),
-        ErrAlgo::Pow => quote!({
-            let mut newerr = astro_float::EXPONENT_BIT_SIZE + 2;
-            if let Some(en) = arg2.exponent() {
-                if let Some(1 | 0) = arg1.exponent() {
-                    if en > 0 {
-                        let c = astro_float::macro_util::compute_added_err_near_one(&arg1, p_wrk);
-                        if en as usize <= c + astro_float::EXPONENT_BIT_SIZE {
-                            newerr += en as usize;
-                        } // result is zero or inf otherwise
-                    }
-                }
-            }
-            if errs[#errs_id] < newerr {
-                errs[#errs_id] = newerr;
-                continue;
-            }
-        }),
-        _ => return Err(Error::new(expr.span(), "unexpected error in macro logic.")),
-    };
 
-    err.push(added_err);
+    err.push(initial_err);
 
     Ok(quote!({
         let arg1 = #arg1;
         let arg2 = #arg2;
 
-        #errcheck
+        let newerr = astro_float::macro_util::compute_added_err(#errcheck);
+        if errs[#errs_id] < newerr {
+            errs[#errs_id] = newerr;
+            continue;
+        }
 
         #fun(&arg1, &arg2, p_wrk, astro_float::RoundingMode::None, cc)
     }))
@@ -270,151 +226,139 @@ fn traverse_call(
     if let Expr::Path(fun) = expr.func.as_ref() {
         if let Some(fname) = fun.path.get_ident() {
             let ts = match fname.to_string().as_str() {
-                "recip" => one_arg_fun(quote!(astro_float::BigFloat::reciprocal), expr, 2, err, cc),
-                "sqrt" => one_arg_fun(quote!(astro_float::BigFloat::sqrt), expr, 1, err, cc),
-                "cbrt" => one_arg_fun(quote!(astro_float::BigFloat::cbrt), expr, 1, err, cc),
-                "ln" => one_arg_fun_cc(
+                "recip" => one_arg_fun(
+                    quote!(astro_float::BigFloat::reciprocal),
+                    expr,
+                    2,
+                    err,
+                    cc,
+                    false,
+                ),
+                "sqrt" => one_arg_fun(quote!(astro_float::BigFloat::sqrt), expr, 1, err, cc, false),
+                "cbrt" => one_arg_fun(quote!(astro_float::BigFloat::cbrt), expr, 1, err, cc, false),
+                "ln" => one_arg_fun_errcheck(
                     quote!(astro_float::BigFloat::ln),
                     expr,
                     SPEC_ADD_ERR,
                     err,
-                    ErrAlgo::Log,
+                    quote!(astro_float::macro_util::ErrAlgo::Log(&arg, 2)),
                     cc,
                 ),
-                "log2" => one_arg_fun_cc(
+                "log2" => one_arg_fun_errcheck(
                     quote!(astro_float::BigFloat::log2),
                     expr,
                     SPEC_ADD_ERR,
                     err,
-                    ErrAlgo::Log,
+                    quote!(astro_float::macro_util::ErrAlgo::Log(&arg, 3)),
                     cc,
                 ),
-                "log10" => one_arg_fun_cc(
+                "log10" => one_arg_fun_errcheck(
                     quote!(astro_float::BigFloat::log10),
                     expr,
                     SPEC_ADD_ERR,
                     err,
-                    ErrAlgo::Log,
+                    quote!(astro_float::macro_util::ErrAlgo::Log(&arg, 6)),
                     cc,
                 ),
-                "log" => two_arg_fun_cc(
+                "log" => two_arg_fun_errcheck(
                     quote!(astro_float::BigFloat::log),
                     expr,
-                    SPEC_ADD_ERR * 2,
+                    SPEC_ADD_ERR,
                     err,
-                    ErrAlgo::Log2,
+                    quote!(astro_float::macro_util::ErrAlgo::Log2(&arg2, &arg1)),
                     cc,
                 ),
-                "exp" => one_arg_fun_cc(
+                "exp" => one_arg_fun(
                     quote!(astro_float::BigFloat::exp),
                     expr,
-                    EXPONENT_BIT_SIZE,
+                    EXPONENT_BIT_SIZE + 1,
                     err,
-                    ErrAlgo::None,
                     cc,
+                    true,
                 ),
-                "pow" => two_arg_fun_cc(
+                "pow" => two_arg_fun_errcheck(
                     quote!(astro_float::BigFloat::pow),
                     expr,
                     EXPONENT_BIT_SIZE + SPEC_ADD_ERR,
                     err,
-                    ErrAlgo::Pow,
+                    quote!(astro_float::macro_util::ErrAlgo::Pow(&arg1, &arg2)),
                     cc,
                 ),
-                "sin" => one_arg_fun_cc(
+                "sin" => trig_fun(
                     quote!(astro_float::BigFloat::sin),
                     expr,
                     SPEC_ADD_ERR,
                     err,
-                    ErrAlgo::SinCos,
+                    quote!(astro_float::macro_util::TrigFun::Sin),
                     cc,
                 ),
-                "cos" => one_arg_fun_cc(
+                "cos" => trig_fun(
                     quote!(astro_float::BigFloat::cos),
                     expr,
                     SPEC_ADD_ERR,
                     err,
-                    ErrAlgo::SinCos,
+                    quote!(astro_float::macro_util::TrigFun::Cos),
                     cc,
                 ),
-                "tan" => one_arg_fun_cc(
+                "tan" => trig_fun(
                     quote!(astro_float::BigFloat::tan),
                     expr,
-                    2 * SPEC_ADD_ERR,
+                    SPEC_ADD_ERR,
                     err,
-                    ErrAlgo::Tan,
+                    quote!(astro_float::macro_util::TrigFun::Tan),
                     cc,
                 ),
-                "asin" => one_arg_fun_cc(
+                "asin" => one_arg_fun_errcheck(
                     quote!(astro_float::BigFloat::asin),
                     expr,
                     SPEC_ADD_ERR / 2,
                     err,
-                    ErrAlgo::AsinAcos,
+                    quote!(astro_float::macro_util::ErrAlgo::Asin(&arg)),
                     cc,
                 ),
-                "acos" => one_arg_fun_cc(
+                "acos" => one_arg_fun_errcheck(
                     quote!(astro_float::BigFloat::acos),
                     expr,
                     SPEC_ADD_ERR / 2,
                     err,
-                    ErrAlgo::AsinAcos,
+                    quote!(astro_float::macro_util::ErrAlgo::Acos(&arg)),
                     cc,
                 ),
-                "atan" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::atan),
-                    expr,
-                    1,
-                    err,
-                    ErrAlgo::None,
-                    cc,
-                ),
-                "sinh" => one_arg_fun_cc(
+                "atan" => one_arg_fun(quote!(astro_float::BigFloat::atan), expr, 2, err, cc, true),
+                "sinh" => one_arg_fun(
                     quote!(astro_float::BigFloat::sinh),
                     expr,
-                    EXPONENT_BIT_SIZE,
+                    EXPONENT_BIT_SIZE + 1,
                     err,
-                    ErrAlgo::None,
                     cc,
+                    true,
                 ),
-                "cosh" => one_arg_fun_cc(
+                "cosh" => one_arg_fun(
                     quote!(astro_float::BigFloat::cosh),
                     expr,
-                    EXPONENT_BIT_SIZE,
+                    EXPONENT_BIT_SIZE + 1,
                     err,
-                    ErrAlgo::None,
                     cc,
+                    true,
                 ),
-                "tanh" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::tanh),
-                    expr,
-                    1,
-                    err,
-                    ErrAlgo::None,
-                    cc,
-                ),
-                "asinh" => one_arg_fun_cc(
-                    quote!(astro_float::BigFloat::asinh),
-                    expr,
-                    2,
-                    err,
-                    ErrAlgo::None,
-                    cc,
-                ),
-                "acosh" => one_arg_fun_cc(
+                "tanh" => one_arg_fun(quote!(astro_float::BigFloat::tanh), expr, 2, err, cc, true),
+                "asinh" => {
+                    one_arg_fun(quote!(astro_float::BigFloat::asinh), expr, 2, err, cc, true)
+                }
+                "acosh" => one_arg_fun_errcheck(
                     quote!(astro_float::BigFloat::acosh),
                     expr,
                     SPEC_ADD_ERR,
                     err,
-                    ErrAlgo::Log,
+                    quote!(astro_float::macro_util::ErrAlgo::Acosh(&arg)),
                     cc,
                 ),
-                "atanh" => one_arg_fun_cc(
+                "atanh" => one_arg_fun_errcheck(
                     quote!(astro_float::BigFloat::atanh),
                     expr,
                     SPEC_ADD_ERR,
                     err,
-                    ErrAlgo::Log,
+                    quote!(astro_float::macro_util::ErrAlgo::Atanh(&arg)),
                     cc,
                 ),
                 _ => return Err(Error::new(expr.span(), errmes)),
@@ -527,6 +471,8 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let mut ctx = &mut (#ctx);
         let p: usize = ctx.precision();
         let rm = ctx.rounding_mode();
+        let emin = ctx.emin();
+        let emax = ctx.emax();
         let cc = ctx.consts();
 
         let mut p_rnd = p + astro_float::WORD_BIT_SIZE;

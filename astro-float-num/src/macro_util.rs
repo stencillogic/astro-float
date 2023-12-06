@@ -2,11 +2,12 @@
 
 use crate::{
     common::util::{count_leading_ones, count_leading_zeroes_skip_first},
-    BigFloat, Consts, RoundingMode, Sign, EXPONENT_BIT_SIZE,
+    defs::DEFAULT_P,
+    BigFloat, Consts, Exponent, RoundingMode, Sign, EXPONENT_BIT_SIZE, INF_NEG, INF_POS,
 };
 
 /// Computes error for BigFloat values near 1. This function is for internal use by macro `expr`.
-pub fn compute_added_err_near_one(arg: &BigFloat, _p: usize) -> usize {
+pub fn compute_added_err_near_one(arg: &BigFloat) -> usize {
     if arg.is_zero() {
         return 0;
     }
@@ -44,15 +45,15 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
     match algo {
         ErrAlgo::Log(arg, c) => {
             if arg.inexact() && arg.is_positive() {
-                c + compute_added_err_near_one(arg, 0)
+                c + compute_added_err_near_one(arg)
             } else {
                 0
             }
         }
         ErrAlgo::Log2(base, arg) => {
             if (arg.inexact() || base.inexact()) && arg.is_positive() && base.is_positive() {
-                let y = if base.inexact() { compute_added_err_near_one(base, 0) } else { 0 };
-                let x = if arg.inexact() { compute_added_err_near_one(arg, 0) } else { 0 };
+                let y = if base.inexact() { compute_added_err_near_one(base) } else { 0 };
+                let x = if arg.inexact() { compute_added_err_near_one(arg) } else { 0 };
                 5 + x.max(y)
             } else {
                 0
@@ -64,11 +65,11 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
                     let v = if !base.inexact() || earg <= 0 {
                         0
                     } else {
-                        let n = compute_added_err_near_one(base, 0);
+                        let n = compute_added_err_near_one(base);
                         if earg as usize > n + EXPONENT_BIT_SIZE {
                             0
                         } else {
-                            n.min(earg.unsigned_abs() as usize)
+                            n.min(earg as usize)
                         }
                     };
                     5 + v + EXPONENT_BIT_SIZE
@@ -156,7 +157,7 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
         }
         ErrAlgo::Asin(arg) => {
             if arg.inexact() && arg.exponent().unwrap_or(1) < 1 {
-                let n = compute_added_err_near_one(arg, 0);
+                let n = compute_added_err_near_one(arg);
                 2 + (n + 1) / 2
             } else {
                 0
@@ -164,7 +165,7 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
         }
         ErrAlgo::Acos(arg) => {
             if arg.inexact() && arg.exponent().unwrap_or(1) < 1 {
-                let n = compute_added_err_near_one(arg, 0);
+                let n = compute_added_err_near_one(arg);
                 2 + if arg.is_positive() { n } else { n / 2 }
             } else {
                 0
@@ -172,18 +173,42 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
         }
         ErrAlgo::Acosh(arg) => {
             if arg.inexact() && arg.is_positive() && arg.exponent().unwrap_or(0) >= 1 {
-                2 + compute_added_err_near_one(arg, 0)
+                2 + compute_added_err_near_one(arg)
             } else {
                 0
             }
         }
         ErrAlgo::Atanh(arg) => {
             if arg.inexact() && arg.exponent().unwrap_or(1) < 1 {
-                2 + compute_added_err_near_one(arg, 0)
+                2 + compute_added_err_near_one(arg)
             } else {
                 0
             }
         }
+    }
+}
+
+/// Checks if the number's exponent is in the given exponent range.
+/// Returns Inf if the exponent of `n` is larger than `emax`.
+/// The sign of the infinity is determined by the sign of `n`.
+/// Returns 0 if the exponent of `n` is smaller than `emin`.
+/// Return `n` itself otherwise.
+#[inline]
+pub fn check_exponent_range(n: BigFloat, emin: Exponent, emax: Exponent) -> BigFloat {
+    if let Some(e) = n.exponent() {
+        if e > emax {
+            if n.is_positive() {
+                INF_POS
+            } else {
+                INF_NEG
+            }
+        } else if e < emin {
+            BigFloat::new(n.mantissa_max_bit_len().unwrap_or(DEFAULT_P))
+        } else {
+            n
+        }
+    } else {
+        n
     }
 }
 
@@ -197,10 +222,10 @@ mod tests {
 
     use super::*;
 
-    fn assert(expected: usize, words: &[Word], s: Sign, e: Exponent, p: usize) {
+    fn assert(expected: usize, words: &[Word], s: Sign, e: Exponent) {
         let d = BigFloat::from_words(words, s, e);
         assert_eq!(
-            compute_added_err_near_one(&d, p),
+            compute_added_err_near_one(&d),
             expected,
             "Expected error {} for d = {:?}",
             expected,
@@ -211,37 +236,35 @@ mod tests {
     #[test]
     fn test_compute_err_near_one() {
         for s in [Sign::Pos, Sign::Neg] {
-            for p in [128, 192, 256] {
-                // 0
-                assert(0, &[0, 0, 0], s, 0, p);
+            // 0
+            assert(0, &[0, 0, 0], s, 0);
 
-                // 1 and 0.5
-                assert(1, &[0, 0, WORD_SIGNIFICANT_BIT], s, 0, p);
-                assert(WORD_BIT_SIZE * 3, &[0, 0, WORD_SIGNIFICANT_BIT], s, 1, p);
+            // 1 and 0.5
+            assert(1, &[0, 0, WORD_SIGNIFICANT_BIT], s, 0);
+            assert(WORD_BIT_SIZE * 3, &[0, 0, WORD_SIGNIFICANT_BIT], s, 1);
 
-                // close to 1
-                assert(WORD_BIT_SIZE, &[0, 0, WORD_MAX], s, 0, p);
-                assert(WORD_BIT_SIZE, &[0, WORD_MAX, WORD_SIGNIFICANT_BIT], s, 1, p);
+            // close to 1
+            assert(WORD_BIT_SIZE, &[0, 0, WORD_MAX], s, 0);
+            assert(WORD_BIT_SIZE, &[0, WORD_MAX, WORD_SIGNIFICANT_BIT], s, 1);
 
-                // exponent is neither 0 nor 1
-                assert(0, &[0, 123, WORD_MAX], s, -1, p);
-                assert(0, &[0, 123, WORD_SIGNIFICANT_BIT], s, 2, p);
-            }
+            // exponent is neither 0 nor 1
+            assert(0, &[0, 123, WORD_MAX], s, -1);
+            assert(0, &[0, 123, WORD_SIGNIFICANT_BIT], s, 2);
         }
 
         // inf and nan
         assert_eq!(
-            compute_added_err_near_one(&INF_POS, 128),
+            compute_added_err_near_one(&INF_POS),
             0,
             "Expected error 0 for INF_POS"
         );
         assert_eq!(
-            compute_added_err_near_one(&INF_NEG, 128),
+            compute_added_err_near_one(&INF_NEG),
             0,
             "Expected error 0 for INF_NEG"
         );
         assert_eq!(
-            compute_added_err_near_one(&NAN, 128),
+            compute_added_err_near_one(&NAN),
             0,
             "Expected error 0 for NAN"
         );
