@@ -39,117 +39,146 @@ pub enum ErrAlgo<'a> {
 }
 
 /// Computes the precision increment of an arguments to cover the error for a given algorithm.
+#[inline]
 pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
     match algo {
-        ErrAlgo::Log(arg, c) => c + compute_added_err_near_one(arg, 0),
-        ErrAlgo::Log2(base, arg) => {
-            let y = compute_added_err_near_one(base, 0);
-            let x = compute_added_err_near_one(arg, 0);
-            5 + x.max(y)
-        },
-        ErrAlgo::Pow(base, arg) => {
-            if let Some(earg) = arg.exponent() {
-                let n = compute_added_err_near_one(base, 0);
-                let v = if earg <= 0 || earg as usize > n + EXPONENT_BIT_SIZE {
-                    0
-                } else {
-                    n.min(earg.unsigned_abs() as usize)
-                };
-                5 + v + EXPONENT_BIT_SIZE
+        ErrAlgo::Log(arg, c) => {
+            if arg.inexact() && arg.is_positive() {
+                c + compute_added_err_near_one(arg, 0)
             } else {
                 0
             }
-        },
-        ErrAlgo::Trig(arg, p, fun, cc) => {
-            if let Some(e) = arg.exponent() {
-                let err = if e < 1 {
-                    0
-                } else {
-                    let err = match fun {
-                        TrigFun::Sin => {
-                            let pi = cc.pi(p, RoundingMode::None);
-                            let mut argrem = arg.rem(&pi);
-                            argrem.set_sign(Sign::Pos);
-                            if argrem.exponent().unwrap_or(0) > 1 {
-                                argrem = argrem.sub(&pi, p, RoundingMode::None);
-                            }
-                            if argrem.is_zero() {
-                                p
-                            } else {
-                                argrem.exponent().map_or(0, |e| {
-                                    if e < 0 {
-                                        e.unsigned_abs() as usize
-                                    } else {
-                                        0
-                                    }
-                                })
-                            }
-                        }
-                        TrigFun::Cos => {
-                            let mut pi = cc.pi(p, RoundingMode::None);
-                            let mut argrem = arg.rem(&pi);
-                            argrem.set_sign(Sign::Pos);
-                            pi.set_exponent(1);
-                            if argrem.exponent().unwrap_or(0) > 0 {
-                                argrem = argrem.sub(&pi, p, RoundingMode::None);
-                            }
-                            if argrem.is_zero() {
-                                p
-                            } else {
-                                argrem.exponent().map_or(0, |e| {
-                                    if e < 0 {
-                                        e.unsigned_abs() as usize
-                                    } else {
-                                        0
-                                    }
-                                })
-                            }
-                        }
-                        TrigFun::Tan => {
-                            let mut pi = cc.pi(p, RoundingMode::None);
-                            pi.set_exponent(1);
-                            let mut argrem = arg.rem(&pi);
-                            argrem.set_sign(Sign::Pos);
-                            if argrem.exponent().unwrap_or(0) > 0 {
-                                argrem = argrem.sub(&pi, p, RoundingMode::None);
-                            }
-                            if argrem.is_zero() {
-                                p
-                            } else {
-                                argrem.exponent().map_or(0, |e| e.unsigned_abs() as usize)
-                            }
+        }
+        ErrAlgo::Log2(base, arg) => {
+            if (arg.inexact() || base.inexact()) && arg.is_positive() && base.is_positive() {
+                let y = if base.inexact() { compute_added_err_near_one(base, 0) } else { 0 };
+                let x = if arg.inexact() { compute_added_err_near_one(arg, 0) } else {0};
+                5 + x.max(y)
+            } else {
+                0
+            }
+        }
+        ErrAlgo::Pow(base, arg) => {
+            if arg.inexact() || base.inexact() {
+                if let Some(earg) = arg.exponent() {
+                    let v = if !base.inexact() || earg <= 0 {
+                        0
+                    } else {
+                        let n = compute_added_err_near_one(base, 0);
+                        if earg as usize > n + EXPONENT_BIT_SIZE {
+                            0
+                        } else {
+                            n.min(earg.unsigned_abs() as usize)
                         }
                     };
-
-                    err + e.unsigned_abs() as usize
-                };
-
-                err + 2
+                    5 + v + EXPONENT_BIT_SIZE
+                } else {
+                    0
+                }
             } else {
                 0
             }
-        },
-        ErrAlgo::Asin(arg) => {
-            let n = compute_added_err_near_one(arg, 0);
-            2 + (n + 1) / 2
-        },
-        ErrAlgo::Acos(arg) => {
-            let n = compute_added_err_near_one(arg, 0);
-            2 + if arg.is_positive() {
-                n
+        }
+        ErrAlgo::Trig(arg, p, fun, cc) => {
+            if arg.inexact() {
+                if let Some(e) = arg.exponent() {
+                    let err = if e < 1 {
+                        0
+                    } else {
+                        let err = match fun {
+                            TrigFun::Sin => {
+                                let pi = cc.pi(p, RoundingMode::None);
+                                let mut argrem = arg.rem(&pi);
+                                argrem.set_sign(Sign::Pos);
+                                if argrem.exponent().unwrap_or(0) > 1 {
+                                    argrem = argrem.sub(&pi, p, RoundingMode::None);
+                                }
+                                if argrem.is_zero() {
+                                    p
+                                } else {
+                                    argrem.exponent().map_or(0, |e| {
+                                        if e < 0 {
+                                            e.unsigned_abs() as usize
+                                        } else {
+                                            0
+                                        }
+                                    })
+                                }
+                            }
+                            TrigFun::Cos => {
+                                let mut pi = cc.pi(p, RoundingMode::None);
+                                let mut argrem = arg.rem(&pi);
+                                if argrem.exponent().unwrap_or(0) == 1 {
+                                    argrem.set_sign(Sign::Pos);
+                                    pi.set_exponent(1);
+                                    argrem = argrem.sub(&pi, p, RoundingMode::None);
+                                    if argrem.is_zero() {
+                                        p
+                                    } else {
+                                        argrem.exponent().map_or(0, |e| {
+                                            if e < 0 {
+                                                e.unsigned_abs() as usize
+                                            } else {
+                                                0
+                                            }
+                                        })
+                                    }
+                                } else {
+                                    0
+                                }
+                            }
+                            TrigFun::Tan => {
+                                let mut pi = cc.pi(p, RoundingMode::None);
+                                pi.set_exponent(1);
+                                let mut argrem = arg.rem(&pi);
+                                argrem.set_sign(Sign::Pos);
+                                if argrem.exponent().unwrap_or(0) > 0 {
+                                    argrem = argrem.sub(&pi, p, RoundingMode::None);
+                                }
+                                if argrem.is_zero() {
+                                    p
+                                } else {
+                                    argrem.exponent().map_or(0, |e| e.unsigned_abs() as usize)
+                                }
+                            }
+                        };
+    
+                        err + e.unsigned_abs() as usize
+                    };
+    
+                    err + 2
+                } else {
+                    0
+                }
             } else {
-                n / 2
+                0
             }
-        },
+        }
+        ErrAlgo::Asin(arg) => {
+            if arg.inexact() && arg.exponent().unwrap_or(1) < 1 {
+                let n = compute_added_err_near_one(arg, 0);
+                2 + (n + 1) / 2
+            } else {
+                0
+            }
+        }
+        ErrAlgo::Acos(arg) => {
+            if arg.inexact() && arg.exponent().unwrap_or(1) < 1 {
+                let n = compute_added_err_near_one(arg, 0);
+                2 + if arg.is_positive() { n } else { n / 2 }
+            } else {
+                0
+            }
+        }
         ErrAlgo::Acosh(arg) => {
-            if arg.is_positive() && arg.exponent().unwrap_or(0) >= 1 {
+            if arg.inexact() && arg.is_positive() && arg.exponent().unwrap_or(0) >= 1 {
                 2 + compute_added_err_near_one(arg, 0)
             } else {
                 0
             }
-        },
+        }
         ErrAlgo::Atanh(arg) => {
-            if arg.exponent().unwrap_or(0) < 1 {
+            if arg.inexact() && arg.exponent().unwrap_or(1) < 1 {
                 2 + compute_added_err_near_one(arg, 0)
             } else {
                 0
@@ -223,7 +252,7 @@ mod tests {
 
         let mut m2 = m1.clone().unwrap();
 
-        let n1 = BigFloatNumber::from_raw_unchecked(m1, s, e, false);
+        let n1 = BigFloatNumber::from_raw_unchecked(m1, s, e, true);
 
         if m2.add_ulp() {
             assert!(e < EXPONENT_MAX);
@@ -231,7 +260,7 @@ mod tests {
             e += 1;
         }
 
-        let n2 = BigFloatNumber::from_raw_unchecked(m2, s, e, false);
+        let n2 = BigFloatNumber::from_raw_unchecked(m2, s, e, true);
 
         (n1.into(), n2.into())
     }
@@ -293,20 +322,16 @@ mod tests {
                 m1.digits_mut()[l - pi_digits.len()] |= pi_digits[0];
             }
 
-            let (mut n1, mut n2) = gen_pair(m1, e);
-
             if add_half_pi {
+                let n = BigFloatNumber::from_raw_unchecked(m1, Sign::Pos, e, true);
                 pi.set_exponent(1);
-                pi.set_sign(n1.sign().unwrap());
-
-                n1 = n1.add(&pi, p, pirm);
-                n2 = n2.add(&pi, p, pirm);
+                let n = pi.add(&n.into(), p, RoundingMode::ToZero);
+                let w = n.as_raw_parts().unwrap().0;
+                m1 = Mantissa::from_words(w.len() * WORD_BIT_SIZE, w).unwrap();
             }
-
-            (n1, n2)
-        } else {
-            gen_pair(m1, e)
         }
+
+        gen_pair(m1, e)
     }
 
     fn calc_err(mut d1: BigFloat, mut d2: BigFloat, p: usize) -> usize {
@@ -343,14 +368,13 @@ mod tests {
 
             for e in [0, 1, 2, EXPONENT_BIT_SIZE as Exponent + ernd, 1000 + ernd, 1000000 + ernd] {
                 for esign in [1, -1] {
-                    let near1set = if e <= 2 { vec![0, -1, 1] } else { vec![0] };
+                    let near1set = if e <= 1 { vec![0, -1, 1] } else { vec![0] };
 
                     for near1 in near1set {
                         let e = e * esign;
                         let p = (rand::random::<usize>() % 10 + 1) * WORD_BIT_SIZE;
 
                         let (n1, n2) = gen_num_pair(p, e, near1);
-                        let (n1_abs, n2_abs) = (n1.abs(), n2.abs());
 
                         //println!("n1 {:?}", n1);
                         //println!("n2 {:?}", n2);
@@ -364,8 +388,8 @@ mod tests {
                         assert!(err <= 2);
 
                         // sqrt
-                        let d1 = BigFloat::sqrt(&n1_abs, p, RoundingMode::None);
-                        let d2 = BigFloat::sqrt(&n2_abs, p, RoundingMode::None);
+                        let d1 = BigFloat::sqrt(&n1, p, RoundingMode::None);
+                        let d2 = BigFloat::sqrt(&n2, p, RoundingMode::None);
                         let err = calc_err(d1, d2, p);
 
                         //println!("sqrt {:?}", err);
@@ -380,8 +404,8 @@ mod tests {
                         assert!(err <= 1);
 
                         // ln
-                        let d1 = BigFloat::ln(&n1_abs, p, RoundingMode::None, &mut cc);
-                        let d2 = BigFloat::ln(&n2_abs, p, RoundingMode::None, &mut cc);
+                        let d1 = BigFloat::ln(&n1, p, RoundingMode::None, &mut cc);
+                        let d2 = BigFloat::ln(&n2, p, RoundingMode::None, &mut cc);
 
                         let err_estimate = compute_added_err(ErrAlgo::Log(&n1, 2));
                         let err = calc_err(d1, d2, p);
@@ -390,8 +414,8 @@ mod tests {
                         assert!(err <= err_estimate);
 
                         // log base 2
-                        let d1 = BigFloat::log2(&n1_abs, p, RoundingMode::None, &mut cc);
-                        let d2 = BigFloat::log2(&n2_abs, p, RoundingMode::None, &mut cc);
+                        let d1 = BigFloat::log2(&n1, p, RoundingMode::None, &mut cc);
+                        let d2 = BigFloat::log2(&n2, p, RoundingMode::None, &mut cc);
 
                         let err_estimate = compute_added_err(ErrAlgo::Log(&n1, 3));
                         let err = calc_err(d1, d2, p);
@@ -400,8 +424,8 @@ mod tests {
                         assert!(err <= err_estimate);
 
                         // log base 10
-                        let d1 = BigFloat::log10(&n1_abs, p, RoundingMode::None, &mut cc);
-                        let d2 = BigFloat::log10(&n2_abs, p, RoundingMode::None, &mut cc);
+                        let d1 = BigFloat::log10(&n1, p, RoundingMode::None, &mut cc);
+                        let d2 = BigFloat::log10(&n2, p, RoundingMode::None, &mut cc);
 
                         let err_estimate = compute_added_err(ErrAlgo::Log(&n1, 6));
                         let err = calc_err(d1, d2, p);
@@ -410,61 +434,102 @@ mod tests {
                         assert!(err <= err_estimate);
 
                         // log base b, pow
-                        for e2 in [0, 1, 2, EXPONENT_BIT_SIZE as Exponent + ernd, 1000 + ernd, 1000000 + ernd] {
+                        let mut nc = [n1.clone(), n2.clone()];
+
+                        for e2 in [
+                            0,
+                            1,
+                            2,
+                            EXPONENT_BIT_SIZE as Exponent + ernd,
+                            1000 + ernd,
+                            1000000 + ernd,
+                        ] {
                             for esign2 in [1, -1] {
-                                let near1set2 = if e2 <= 2 { vec![0, -1, 1] } else { vec![0] };
+                                let near1set2 = if e2 <= 1 { vec![0, -1, 1] } else { vec![0] };
 
                                 for near12 in near1set2 {
                                     let e2 = e2 * esign2;
                                     let (b1, b2) = gen_num_pair(p, e2, near12);
-                                    let (b1_abs, b2_abs) = (b1.abs(), b2.abs());
+                                    let mut bc = [b1, b2];
 
-                                    let d1 = BigFloat::log(
-                                        &n1_abs,
-                                        &b1_abs,
-                                        p,
-                                        RoundingMode::None,
-                                        &mut cc,
-                                    );
-                                    let d2 = BigFloat::log(
-                                        &n2_abs,
-                                        &b2_abs,
-                                        p,
-                                        RoundingMode::None,
-                                        &mut cc,
-                                    );
+                                    for (i1, i2) in [(0,0),(0,1),(1,0),(1,1),] {
+                                        for (j1, j2) in [(0,0),(0,1),(1,0),(1,1),] {
+                                            if i1 == i2 && j1 == j2 {
+                                                continue;
+                                            }
 
-                                    let err_estimate =
-                                        compute_added_err(ErrAlgo::Log2(&b1_abs, &n1_abs));
-                                    let err = calc_err(d1, d2, p);
+                                            if i1 == i2 {
+                                                nc[0].set_inexact(false);
+                                                nc[1].set_inexact(false);
+                                            } else {
+                                                nc[0].set_inexact(true);
+                                                nc[1].set_inexact(true);
+                                            }
 
-                                    //println!("log {:?} {:?}", err, err_estimate);
-                                    assert!(err <= err_estimate);
+                                            if j1 == j2 {
+                                                bc[0].set_inexact(false);
+                                                bc[1].set_inexact(false);
+                                            } else {
+                                                bc[0].set_inexact(true);
+                                                bc[1].set_inexact(true);
+                                            }
 
-                                    //println!("\nb1 {:?}", b1_abs);
-                                    //println!("n1 {:?}", n1_abs);
-                                    let d1 = BigFloat::pow(
-                                        &b1_abs,
-                                        &n1_abs,
-                                        p,
-                                        RoundingMode::None,
-                                        &mut cc,
-                                    );
-                                    let d2 = BigFloat::pow(
-                                        &b2_abs,
-                                        &n2_abs,
-                                        p,
-                                        RoundingMode::None,
-                                        &mut cc,
-                                    );
+                                            let n = &nc[i1];
+                                            let nn = &nc[i2];
 
-                                    let err_estimate =
-                                        compute_added_err(ErrAlgo::Pow(&b1_abs, &n1_abs));
-                                    let err = calc_err(d1, d2, p);
+                                            let b = &bc[j1];
+                                            let bb = &bc[j2];
 
-                                    if !(b1_abs.cmp(&ONE) == Some(0) || b2_abs.cmp(&ONE) == Some(0))
-                                    {
-                                        assert!(err <= err_estimate);
+                                            let d1 = BigFloat::log(
+                                                n,
+                                                b,
+                                                p,
+                                                RoundingMode::None,
+                                                &mut cc,
+                                            );
+                                            let d2 = BigFloat::log(
+                                                nn,
+                                                bb,
+                                                p,
+                                                RoundingMode::None,
+                                                &mut cc,
+                                            );
+
+                                            let err_estimate =
+                                                compute_added_err(ErrAlgo::Log2(b, n));
+                                            let err = calc_err(d1, d2, p);
+        
+                                            let err_estimate = 1.max(err_estimate);
+
+                                            //println!("log {:?} {:?}", err, err_estimate);
+                                            assert!(err <= err_estimate);
+        
+                                            let d1 = BigFloat::pow(
+                                                b,
+                                                n,
+                                                p,
+                                                RoundingMode::None,
+                                                &mut cc,
+                                            );
+                                            let d2 = BigFloat::pow(
+                                                bb,
+                                                nn,
+                                                p,
+                                                RoundingMode::None,
+                                                &mut cc,
+                                            );
+
+                                            let err_estimate =
+                                                compute_added_err(ErrAlgo::Pow(b, n));
+                                            let err = calc_err(d1, d2, p);
+        
+                                            if !(b.abs().cmp(&ONE) == Some(0) || bb.abs().cmp(&ONE) == Some(0))
+                                            {
+                                                let err_estimate = 1.max(err_estimate);
+                                                //println!("pow {:?} {:?}", err, err_estimate);
+                                                assert!(err <= err_estimate);
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -519,8 +584,7 @@ mod tests {
                         let d1 = BigFloat::acosh(&n1, p, RoundingMode::None, &mut cc);
                         let d2 = BigFloat::acosh(&n2, p, RoundingMode::None, &mut cc);
 
-                        let err_estimate =
-                        compute_added_err(ErrAlgo::Acosh(&n1));
+                        let err_estimate = compute_added_err(ErrAlgo::Acosh(&n1));
                         let err = calc_err(d1, d2, p);
 
                         //println!("acosh {:?} {:?}", err, err_estimate);
@@ -530,8 +594,7 @@ mod tests {
                         let d1 = BigFloat::atanh(&n1, p, RoundingMode::None, &mut cc);
                         let d2 = BigFloat::atanh(&n2, p, RoundingMode::None, &mut cc);
 
-                        let err_estimate =
-                        compute_added_err(ErrAlgo::Atanh(&n1));
+                        let err_estimate = compute_added_err(ErrAlgo::Atanh(&n1));
                         let err = calc_err(d1, d2, p);
 
                         //println!("atanh {:?} {:?}", err, err_estimate);
@@ -562,7 +625,6 @@ mod tests {
                             // sin
                             let d1 = BigFloat::sin(&n1, p, RoundingMode::None, &mut cc);
                             let d2 = BigFloat::sin(&n2, p, RoundingMode::None, &mut cc);
-
                             let err_estimate =
                                 compute_added_err(ErrAlgo::Trig(&n1, p, TrigFun::Sin, &mut cc));
                             let err = calc_err(d1, d2, p);
@@ -573,7 +635,6 @@ mod tests {
                             // cos
                             let d1 = BigFloat::cos(&n1, p, RoundingMode::None, &mut cc);
                             let d2 = BigFloat::cos(&n2, p, RoundingMode::None, &mut cc);
-
                             let err_estimate =
                                 compute_added_err(ErrAlgo::Trig(&n1, p, TrigFun::Cos, &mut cc));
                             let err = calc_err(d1, d2, p);
@@ -598,7 +659,6 @@ mod tests {
 
             // asin, acos
             for e in [0, -1, -2, -(EXPONENT_BIT_SIZE as Exponent + ernd), -(1000 + ernd)] {
-
                 let near1set = if e == 0 { vec![0, -1] } else { vec![0] };
 
                 for near1 in near1set {
@@ -609,11 +669,10 @@ mod tests {
                     // asin
                     let d1 = BigFloat::asin(&n1, p, RoundingMode::None, &mut cc);
                     let d2 = BigFloat::asin(&n2, p, RoundingMode::None, &mut cc);
-    
-                    let err_estimate =
-                        compute_added_err(ErrAlgo::Asin(&n1));
+
+                    let err_estimate = compute_added_err(ErrAlgo::Asin(&n1));
                     let err = calc_err(d1, d2, p);
-    
+
                     //println!("asin {:?} {:?}", err, err_estimate);
                     assert!(err <= err_estimate);
 
@@ -621,10 +680,9 @@ mod tests {
                     let d1 = BigFloat::acos(&n1, p, RoundingMode::None, &mut cc);
                     let d2 = BigFloat::acos(&n2, p, RoundingMode::None, &mut cc);
 
-                    let err_estimate =
-                        compute_added_err(ErrAlgo::Acos(&n1));
+                    let err_estimate = compute_added_err(ErrAlgo::Acos(&n1));
                     let err = calc_err(d1, d2, p);
-    
+
                     //println!("acos {:?} {:?}", err, err_estimate);
                     assert!(err <= err_estimate);
                 }
