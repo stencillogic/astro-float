@@ -7,15 +7,21 @@ use crate::{
 };
 
 /// Computes error for BigFloat values near 1. This function is for internal use by macro `expr`.
-pub fn compute_added_err_near_one(arg: &BigFloat) -> usize {
+pub fn compute_added_err_near_one(arg: &BigFloat, emin: Exponent) -> usize {
     if arg.is_zero() {
         return 0;
     }
 
-    match arg.exponent() {
+    let n = match arg.exponent() {
         Some(1) => count_leading_zeroes_skip_first(arg.mantissa_digits().unwrap_or(&[])),
         Some(0) => count_leading_ones(arg.mantissa_digits().unwrap_or(&[])),
         _ => 0,
+    };
+
+    if n > emin.unsigned_abs() as usize {
+        0
+    } else {
+        n
     }
 }
 
@@ -29,43 +35,43 @@ pub enum TrigFun {
 /// Algorithm of error computation.
 #[derive(Debug)]
 pub enum ErrAlgo<'a> {
-    Log(&'a BigFloat, usize),
-    Log2(&'a BigFloat, &'a BigFloat),
-    Pow(&'a BigFloat, &'a BigFloat),
-    Trig(&'a BigFloat, usize, TrigFun, &'a mut Consts),
-    Asin(&'a BigFloat),
-    Acos(&'a BigFloat),
-    Acosh(&'a BigFloat),
-    Atanh(&'a BigFloat),
+    Log(&'a BigFloat, usize, Exponent),
+    Log2(&'a BigFloat, &'a BigFloat, Exponent),
+    Pow(&'a BigFloat, &'a BigFloat, Exponent),
+    Trig(&'a BigFloat, usize, TrigFun, &'a mut Consts, Exponent),
+    Asin(&'a BigFloat, Exponent),
+    Acos(&'a BigFloat, Exponent),
+    Acosh(&'a BigFloat, Exponent),
+    Atanh(&'a BigFloat, Exponent),
 }
 
 /// Computes the precision increment of an arguments to cover the error for a given algorithm.
 #[inline]
 pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
     match algo {
-        ErrAlgo::Log(arg, c) => {
+        ErrAlgo::Log(arg, c, emin) => {
             if arg.inexact() && arg.is_positive() {
-                c + compute_added_err_near_one(arg)
+                c + compute_added_err_near_one(arg, emin)
             } else {
                 0
             }
         }
-        ErrAlgo::Log2(base, arg) => {
+        ErrAlgo::Log2(base, arg, emin) => {
             if (arg.inexact() || base.inexact()) && arg.is_positive() && base.is_positive() {
-                let y = if base.inexact() { compute_added_err_near_one(base) } else { 0 };
-                let x = if arg.inexact() { compute_added_err_near_one(arg) } else { 0 };
+                let y = if base.inexact() { compute_added_err_near_one(base, emin) } else { 0 };
+                let x = if arg.inexact() { compute_added_err_near_one(arg, emin) } else { 0 };
                 5 + x.max(y)
             } else {
                 0
             }
         }
-        ErrAlgo::Pow(base, arg) => {
+        ErrAlgo::Pow(base, arg, emin) => {
             if arg.inexact() || base.inexact() {
                 if let Some(earg) = arg.exponent() {
                     let v = if !base.inexact() || earg <= 0 {
                         0
                     } else {
-                        let n = compute_added_err_near_one(base);
+                        let n = compute_added_err_near_one(base, emin);
                         if earg as usize > n + EXPONENT_BIT_SIZE {
                             0
                         } else {
@@ -80,7 +86,7 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
                 0
             }
         }
-        ErrAlgo::Trig(arg, p, fun, cc) => {
+        ErrAlgo::Trig(arg, p, fun, cc, emin) => {
             if arg.inexact() {
                 if let Some(e) = arg.exponent() {
                     let err = if e < 1 {
@@ -95,10 +101,14 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
                                     argrem = argrem.sub(&pi, p, RoundingMode::None);
                                 }
                                 if argrem.is_zero() {
-                                    p
+                                    if p > emin.unsigned_abs() as usize {
+                                        0
+                                    } else {
+                                        p
+                                    }
                                 } else {
                                     argrem.exponent().map_or(0, |e| {
-                                        if e < 0 {
+                                        if e < 0 && e >= emin {
                                             e.unsigned_abs() as usize
                                         } else {
                                             0
@@ -114,10 +124,14 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
                                     pi.set_exponent(1);
                                     argrem = argrem.sub(&pi, p, RoundingMode::None);
                                     if argrem.is_zero() {
-                                        p
+                                        if p > emin.unsigned_abs() as usize {
+                                            0
+                                        } else {
+                                            p
+                                        }
                                     } else {
                                         argrem.exponent().map_or(0, |e| {
-                                            if e < 0 {
+                                            if e < 0 && e >= emin {
                                                 e.unsigned_abs() as usize
                                             } else {
                                                 0
@@ -137,9 +151,19 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
                                     argrem = argrem.sub(&pi, p, RoundingMode::None);
                                 }
                                 if argrem.is_zero() {
-                                    p
+                                    if p > emin.unsigned_abs() as usize {
+                                        0
+                                    } else {
+                                        p
+                                    }
                                 } else {
-                                    argrem.exponent().map_or(0, |e| e.unsigned_abs() as usize)
+                                    argrem.exponent().map_or(0, |e| {
+                                        if e < emin {
+                                            0
+                                        } else {
+                                            e.unsigned_abs() as usize
+                                        }
+                                    })
                                 }
                             }
                         };
@@ -155,32 +179,32 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
                 0
             }
         }
-        ErrAlgo::Asin(arg) => {
+        ErrAlgo::Asin(arg, emin) => {
             if arg.inexact() && arg.exponent().unwrap_or(1) < 1 {
-                let n = compute_added_err_near_one(arg);
+                let n = compute_added_err_near_one(arg, emin);
                 2 + (n + 1) / 2
             } else {
                 0
             }
         }
-        ErrAlgo::Acos(arg) => {
+        ErrAlgo::Acos(arg, emin) => {
             if arg.inexact() && arg.exponent().unwrap_or(1) < 1 {
-                let n = compute_added_err_near_one(arg);
+                let n = compute_added_err_near_one(arg, emin);
                 2 + if arg.is_positive() { n } else { n / 2 }
             } else {
                 0
             }
         }
-        ErrAlgo::Acosh(arg) => {
+        ErrAlgo::Acosh(arg, emin) => {
             if arg.inexact() && arg.is_positive() && arg.exponent().unwrap_or(0) >= 1 {
-                2 + compute_added_err_near_one(arg)
+                2 + compute_added_err_near_one(arg, emin)
             } else {
                 0
             }
         }
-        ErrAlgo::Atanh(arg) => {
+        ErrAlgo::Atanh(arg, emin) => {
             if arg.inexact() && arg.exponent().unwrap_or(1) < 1 {
-                2 + compute_added_err_near_one(arg)
+                2 + compute_added_err_near_one(arg, emin)
             } else {
                 0
             }
@@ -217,7 +241,8 @@ mod tests {
 
     use crate::{
         ext::ONE, mantissa::Mantissa, num::BigFloatNumber, Consts, Exponent, RoundingMode, Sign,
-        Word, EXPONENT_MAX, INF_NEG, INF_POS, NAN, WORD_BIT_SIZE, WORD_MAX, WORD_SIGNIFICANT_BIT,
+        Word, EXPONENT_MAX, EXPONENT_MIN, INF_NEG, INF_POS, NAN, WORD_BIT_SIZE, WORD_MAX,
+        WORD_SIGNIFICANT_BIT,
     };
 
     use super::*;
@@ -225,7 +250,7 @@ mod tests {
     fn assert(expected: usize, words: &[Word], s: Sign, e: Exponent) {
         let d = BigFloat::from_words(words, s, e);
         assert_eq!(
-            compute_added_err_near_one(&d),
+            compute_added_err_near_one(&d, EXPONENT_MIN),
             expected,
             "Expected error {} for d = {:?}",
             expected,
@@ -254,17 +279,17 @@ mod tests {
 
         // inf and nan
         assert_eq!(
-            compute_added_err_near_one(&INF_POS),
+            compute_added_err_near_one(&INF_POS, EXPONENT_MIN),
             0,
             "Expected error 0 for INF_POS"
         );
         assert_eq!(
-            compute_added_err_near_one(&INF_NEG),
+            compute_added_err_near_one(&INF_NEG, EXPONENT_MIN),
             0,
             "Expected error 0 for INF_NEG"
         );
         assert_eq!(
-            compute_added_err_near_one(&NAN),
+            compute_added_err_near_one(&NAN, EXPONENT_MIN),
             0,
             "Expected error 0 for NAN"
         );
@@ -380,6 +405,7 @@ mod tests {
     #[test]
     fn test_compute_added_err() {
         let mut cc = Consts::new().unwrap();
+        let emin = EXPONENT_MIN;
 
         /* let n = BigFloat::from_words(&[16302899892790296137], Sign::Pos, -2);
         let r = n.reciprocal(64, RoundingMode::None);
@@ -430,7 +456,7 @@ mod tests {
                         let d1 = BigFloat::ln(&n1, p, RoundingMode::None, &mut cc);
                         let d2 = BigFloat::ln(&n2, p, RoundingMode::None, &mut cc);
 
-                        let err_estimate = compute_added_err(ErrAlgo::Log(&n1, 2));
+                        let err_estimate = compute_added_err(ErrAlgo::Log(&n1, 2, emin));
                         let err = calc_err(d1, d2, p);
 
                         //println!("ln {:?} {:?}", err, err_estimate);
@@ -440,7 +466,7 @@ mod tests {
                         let d1 = BigFloat::log2(&n1, p, RoundingMode::None, &mut cc);
                         let d2 = BigFloat::log2(&n2, p, RoundingMode::None, &mut cc);
 
-                        let err_estimate = compute_added_err(ErrAlgo::Log(&n1, 3));
+                        let err_estimate = compute_added_err(ErrAlgo::Log(&n1, 3, emin));
                         let err = calc_err(d1, d2, p);
 
                         //println!("log2 {:?} {:?}", err, err_estimate);
@@ -450,7 +476,7 @@ mod tests {
                         let d1 = BigFloat::log10(&n1, p, RoundingMode::None, &mut cc);
                         let d2 = BigFloat::log10(&n2, p, RoundingMode::None, &mut cc);
 
-                        let err_estimate = compute_added_err(ErrAlgo::Log(&n1, 6));
+                        let err_estimate = compute_added_err(ErrAlgo::Log(&n1, 6, emin));
                         let err = calc_err(d1, d2, p);
 
                         //println!("log10 {:?} {:?}", err, err_estimate);
@@ -514,7 +540,7 @@ mod tests {
                                             );
 
                                             let err_estimate =
-                                                compute_added_err(ErrAlgo::Log2(b, n));
+                                                compute_added_err(ErrAlgo::Log2(b, n, emin));
                                             let err = calc_err(d1, d2, p);
 
                                             let err_estimate = 1.max(err_estimate);
@@ -533,7 +559,7 @@ mod tests {
                                             );
 
                                             let err_estimate =
-                                                compute_added_err(ErrAlgo::Pow(b, n));
+                                                compute_added_err(ErrAlgo::Pow(b, n, emin));
                                             let err = calc_err(d1, d2, p);
 
                                             if !(b.abs().cmp(&ONE) == Some(0)
@@ -598,7 +624,7 @@ mod tests {
                         let d1 = BigFloat::acosh(&n1, p, RoundingMode::None, &mut cc);
                         let d2 = BigFloat::acosh(&n2, p, RoundingMode::None, &mut cc);
 
-                        let err_estimate = compute_added_err(ErrAlgo::Acosh(&n1));
+                        let err_estimate = compute_added_err(ErrAlgo::Acosh(&n1, emin));
                         let err = calc_err(d1, d2, p);
 
                         //println!("acosh {:?} {:?}", err, err_estimate);
@@ -608,7 +634,7 @@ mod tests {
                         let d1 = BigFloat::atanh(&n1, p, RoundingMode::None, &mut cc);
                         let d2 = BigFloat::atanh(&n2, p, RoundingMode::None, &mut cc);
 
-                        let err_estimate = compute_added_err(ErrAlgo::Atanh(&n1));
+                        let err_estimate = compute_added_err(ErrAlgo::Atanh(&n1, emin));
                         let err = calc_err(d1, d2, p);
 
                         //println!("atanh {:?} {:?}", err, err_estimate);
@@ -639,8 +665,13 @@ mod tests {
                             // sin
                             let d1 = BigFloat::sin(&n1, p, RoundingMode::None, &mut cc);
                             let d2 = BigFloat::sin(&n2, p, RoundingMode::None, &mut cc);
-                            let err_estimate =
-                                compute_added_err(ErrAlgo::Trig(&n1, p, TrigFun::Sin, &mut cc));
+                            let err_estimate = compute_added_err(ErrAlgo::Trig(
+                                &n1,
+                                p,
+                                TrigFun::Sin,
+                                &mut cc,
+                                emin,
+                            ));
                             let err = calc_err(d1, d2, p);
 
                             //println!("sin {:?} {:?}", err, err_estimate);
@@ -649,8 +680,13 @@ mod tests {
                             // cos
                             let d1 = BigFloat::cos(&n1, p, RoundingMode::None, &mut cc);
                             let d2 = BigFloat::cos(&n2, p, RoundingMode::None, &mut cc);
-                            let err_estimate =
-                                compute_added_err(ErrAlgo::Trig(&n1, p, TrigFun::Cos, &mut cc));
+                            let err_estimate = compute_added_err(ErrAlgo::Trig(
+                                &n1,
+                                p,
+                                TrigFun::Cos,
+                                &mut cc,
+                                emin,
+                            ));
                             let err = calc_err(d1, d2, p);
 
                             //println!("cos {:?} {:?}", err, err_estimate);
@@ -660,8 +696,13 @@ mod tests {
                             let d1 = BigFloat::tan(&n1, p, RoundingMode::None, &mut cc);
                             let d2 = BigFloat::tan(&n2, p, RoundingMode::None, &mut cc);
 
-                            let err_estimate =
-                                compute_added_err(ErrAlgo::Trig(&n1, p, TrigFun::Tan, &mut cc));
+                            let err_estimate = compute_added_err(ErrAlgo::Trig(
+                                &n1,
+                                p,
+                                TrigFun::Tan,
+                                &mut cc,
+                                emin,
+                            ));
                             let err = calc_err(d1, d2, p);
 
                             //println!("tan {:?} {:?}", err, err_estimate);
@@ -684,7 +725,7 @@ mod tests {
                     let d1 = BigFloat::asin(&n1, p, RoundingMode::None, &mut cc);
                     let d2 = BigFloat::asin(&n2, p, RoundingMode::None, &mut cc);
 
-                    let err_estimate = compute_added_err(ErrAlgo::Asin(&n1));
+                    let err_estimate = compute_added_err(ErrAlgo::Asin(&n1, emin));
                     let err = calc_err(d1, d2, p);
 
                     //println!("asin {:?} {:?}", err, err_estimate);
@@ -694,7 +735,7 @@ mod tests {
                     let d1 = BigFloat::acos(&n1, p, RoundingMode::None, &mut cc);
                     let d2 = BigFloat::acos(&n2, p, RoundingMode::None, &mut cc);
 
-                    let err_estimate = compute_added_err(ErrAlgo::Acos(&n1));
+                    let err_estimate = compute_added_err(ErrAlgo::Acos(&n1, emin));
                     let err = calc_err(d1, d2, p);
 
                     //println!("acos {:?} {:?}", err, err_estimate);

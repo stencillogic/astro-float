@@ -2,8 +2,8 @@
 
 use astro_float_macro::expr;
 use astro_float_num::{
-    ctx::Context, BigFloat, Consts, Radix, RoundingMode, Sign, WORD_BIT_SIZE, WORD_MAX,
-    WORD_SIGNIFICANT_BIT,
+    ctx::Context, BigFloat, Consts, Radix, RoundingMode, Sign, EXPONENT_MAX, EXPONENT_MIN,
+    WORD_BIT_SIZE, WORD_MAX, WORD_SIGNIFICANT_BIT,
 };
 
 #[test]
@@ -18,7 +18,7 @@ fn macro_run_basic_tests() {
     let rm = RoundingMode::None;
     let mut cc = Consts::new().unwrap();
 
-    let mut ctx = Context::new(p, rm, Consts::new().unwrap());
+    let mut ctx = Context::new(p, rm, Consts::new().unwrap(), -1000000, 1000000);
 
     let x = BigFloat::from(1.23);
     let y = BigFloat::from(4.56);
@@ -108,7 +108,7 @@ fn macro_run_err_test() {
     let rm = RoundingMode::ToEven;
     let mut cc = Consts::new().unwrap();
 
-    let mut ctx = Context::new(p, rm, Consts::new().unwrap());
+    let mut ctx = Context::new(p, rm, Consts::new().unwrap(), EXPONENT_MIN, EXPONENT_MAX);
 
     let two = BigFloat::from(2);
     let ten = BigFloat::from(10);

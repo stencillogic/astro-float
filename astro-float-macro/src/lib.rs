@@ -49,7 +49,7 @@ fn traverse_binary(
 
     let ts = match expr.op {
         BinOp::Add(_) => {
-            err.push(1);
+            err.push(2);
             quote!({
                 let arg1 = #left_expr;
                 let arg2 = #right_expr;
@@ -69,7 +69,7 @@ fn traverse_binary(
             })
         }
         BinOp::Sub(_) => {
-            err.push(1);
+            err.push(2);
             quote!({
                 let arg1 = #left_expr;
                 let arg2 = #right_expr;
@@ -175,7 +175,7 @@ fn trig_fun(
     Ok(quote!({
         let arg = astro_float::macro_util::check_exponent_range(#arg, emin, emax);
 
-        let newerr = astro_float::macro_util::compute_added_err(astro_float::macro_util::ErrAlgo::Trig(&arg, p_wrk, #errfun, cc));
+        let newerr = astro_float::macro_util::compute_added_err(astro_float::macro_util::ErrAlgo::Trig(&arg, p_wrk, #errfun, cc, emin));
         if errs[#errs_id] < newerr {
             errs[#errs_id] = newerr;
             continue;
@@ -241,7 +241,7 @@ fn traverse_call(
                     expr,
                     SPEC_ADD_ERR,
                     err,
-                    quote!(astro_float::macro_util::ErrAlgo::Log(&arg, 2)),
+                    quote!(astro_float::macro_util::ErrAlgo::Log(&arg, 2, emin)),
                     cc,
                 ),
                 "log2" => one_arg_fun_errcheck(
@@ -249,7 +249,7 @@ fn traverse_call(
                     expr,
                     SPEC_ADD_ERR,
                     err,
-                    quote!(astro_float::macro_util::ErrAlgo::Log(&arg, 3)),
+                    quote!(astro_float::macro_util::ErrAlgo::Log(&arg, 3, emin)),
                     cc,
                 ),
                 "log10" => one_arg_fun_errcheck(
@@ -257,7 +257,7 @@ fn traverse_call(
                     expr,
                     SPEC_ADD_ERR,
                     err,
-                    quote!(astro_float::macro_util::ErrAlgo::Log(&arg, 6)),
+                    quote!(astro_float::macro_util::ErrAlgo::Log(&arg, 6, emin)),
                     cc,
                 ),
                 "log" => two_arg_fun_errcheck(
@@ -265,7 +265,7 @@ fn traverse_call(
                     expr,
                     SPEC_ADD_ERR,
                     err,
-                    quote!(astro_float::macro_util::ErrAlgo::Log2(&arg2, &arg1)),
+                    quote!(astro_float::macro_util::ErrAlgo::Log2(&arg2, &arg1, emin)),
                     cc,
                 ),
                 "exp" => one_arg_fun(
@@ -281,7 +281,7 @@ fn traverse_call(
                     expr,
                     EXPONENT_BIT_SIZE + SPEC_ADD_ERR,
                     err,
-                    quote!(astro_float::macro_util::ErrAlgo::Pow(&arg1, &arg2)),
+                    quote!(astro_float::macro_util::ErrAlgo::Pow(&arg1, &arg2, emin)),
                     cc,
                 ),
                 "sin" => trig_fun(
@@ -313,7 +313,7 @@ fn traverse_call(
                     expr,
                     SPEC_ADD_ERR / 2,
                     err,
-                    quote!(astro_float::macro_util::ErrAlgo::Asin(&arg)),
+                    quote!(astro_float::macro_util::ErrAlgo::Asin(&arg, emin)),
                     cc,
                 ),
                 "acos" => one_arg_fun_errcheck(
@@ -321,7 +321,7 @@ fn traverse_call(
                     expr,
                     SPEC_ADD_ERR / 2,
                     err,
-                    quote!(astro_float::macro_util::ErrAlgo::Acos(&arg)),
+                    quote!(astro_float::macro_util::ErrAlgo::Acos(&arg, emin)),
                     cc,
                 ),
                 "atan" => one_arg_fun(quote!(astro_float::BigFloat::atan), expr, 2, err, cc, true),
@@ -350,7 +350,7 @@ fn traverse_call(
                     expr,
                     SPEC_ADD_ERR,
                     err,
-                    quote!(astro_float::macro_util::ErrAlgo::Acosh(&arg)),
+                    quote!(astro_float::macro_util::ErrAlgo::Acosh(&arg, emin)),
                     cc,
                 ),
                 "atanh" => one_arg_fun_errcheck(
@@ -358,7 +358,7 @@ fn traverse_call(
                     expr,
                     SPEC_ADD_ERR,
                     err,
-                    quote!(astro_float::macro_util::ErrAlgo::Atanh(&arg)),
+                    quote!(astro_float::macro_util::ErrAlgo::Atanh(&arg, emin)),
                     cc,
                 ),
                 _ => return Err(Error::new(expr.span(), errmes)),
@@ -413,6 +413,7 @@ fn traverse_path(expr: &ExprPath) -> Result<TokenStream, Error> {
         quote!({
             let mut arg = astro_float::BigFloat::from_ext((#expr).clone(), p_wrk, astro_float::RoundingMode::ToEven, cc);
             arg.set_inexact(false);
+            arg = astro_float::macro_util::check_exponent_range(arg, emin, emax);
             arg
         })
     })
@@ -487,7 +488,7 @@ pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 ret = astro_float::BigFloat::nan(Some(err));
             }
 
-            break ret;
+            break astro_float::macro_util::check_exponent_range(ret, emin, emax);
         }
     });
 

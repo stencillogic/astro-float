@@ -58,9 +58,11 @@
 //! use astro_float::ctx::Context;
 //! use astro_float::expr;
 //!
-//! // Create a context with precision 1024, and rounding to even.
+//! // Create a context with precision 1024, rounding to the nearest even,
+//! // and exponent range from -100000 to 100000.
 //! let mut ctx = Context::new(1024, RoundingMode::ToEven,
-//!     Consts::new().expect("Constants cache initialized"));
+//!     Consts::new().expect("Constants cache initialized"),
+//!     -100000, 100000);
 //!
 //! // Compute pi: pi = 6*arctan(1/sqrt(3))
 //! let pi = expr!(6 * atan(1 / sqrt(3)), &mut ctx);
@@ -204,7 +206,8 @@ extern crate alloc;
 ///  - `ln_10`: natural logarithm of 10.
 ///
 /// The context determines the precision, the rounding mode of the result, and also contains the cache of constants.
-/// Tuple `(usize, RoundingMode, &mut Consts)` can also be used as a temporary context (see example below).
+/// Also, macro uses minimum and maximum exponent values from the context to limit possible exponent range of the result and to set the limit of precision required for error compensation.
+/// A tuple `(usize, RoundingMode, &mut Consts)`, or `(usize, RoundingMode, &mut Consts, Exponent, Exponent)` can also be used as a temporary context (see examples below).
 ///
 /// Any input argument in the expression is interpreted as exact
 /// (i.e. if an argument of an expression has type BigFloat and it is an inexact result of a previous computation).
@@ -217,13 +220,15 @@ extern crate alloc;
 /// # use astro_float::Consts;
 /// # use astro_float::BigFloat;
 /// # use astro_float::ctx::Context;
-/// // Precision, rounding mode, and constants cache.
+/// // Precision, rounding mode, constants cache, and exponent range.
 /// let p = 128;
 /// let rm = RoundingMode::Up;
 /// let mut cc = Consts::new().expect("Failed to allocate constants cache");
+/// let emin = -10000;
+/// let emax = 10000;
 ///
 /// // Create a context.
-/// let mut ctx = Context::new(p, rm, cc);
+/// let mut ctx = Context::new(p, rm, cc, emin, emax);
 ///
 /// let x = 123;
 /// let y = "2345";
@@ -235,10 +240,10 @@ extern crate alloc;
 /// assert_eq!(ret, BigFloat::from(124));
 ///
 /// // Destructure context.
-/// let (p, rm, mut cc) = ctx.to_raw_parts();
+/// let (p, rm, mut cc, emin, emax) = ctx.to_raw_parts();
 ///
-/// // Compute an expression using temporary context.
-/// let ret = expr!(x + y / z, (p, rm, &mut cc));
+/// // Compute an expression using a temporary context.
+/// let ret = expr!(x + y / z, (p, rm, &mut cc, emin, emax));
 ///
 /// assert_eq!(ret, BigFloat::from(124));
 /// ```

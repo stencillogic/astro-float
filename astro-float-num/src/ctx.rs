@@ -20,13 +20,15 @@ pub struct Context {
 
 impl Context {
     /// Create a new context.
-    pub fn new(p: usize, rm: RoundingMode, cc: Consts) -> Self {
+    /// The value of `emin` will be clamped to a range between EXPONENT_MIN and 0.
+    /// The value of `emax` will be clamped to a range between 0 and EXPONENT_MAX.
+    pub fn new(p: usize, rm: RoundingMode, cc: Consts, emin: Exponent, emax: Exponent) -> Self {
         Context {
             cc,
             p,
             rm,
-            emin: EXPONENT_MIN,
-            emax: EXPONENT_MAX,
+            emin: emin.clamp(EXPONENT_MIN, 0),
+            emax: emax.clamp(0, EXPONENT_MAX),
         }
     }
 
@@ -59,15 +61,15 @@ impl Context {
     }
 
     /// Sets the minimum exponent.
-    /// If the argument is smaller than `EXPONENT_MIN` the value will be set to `EXPONENT_MIN`.
+    /// The value of `emin` will be clamped to a range between EXPONENT_MIN and 0.
     pub fn set_emin(&mut self, emin: Exponent) {
-        self.emin = emin;
+        self.emin = emin.clamp(EXPONENT_MIN, 0);
     }
 
     /// Sets the maximum exponent.
-    /// If the argument is larger than `EXPONENT_MAX` the value will be set to `EXPONENT_MAX`.
+    /// The value of `emax` will be clamped to a range between 0 and EXPONENT_MAX.
     pub fn set_emax(&mut self, emax: Exponent) {
-        self.emax = emax;
+        self.emax = emax.clamp(0, EXPONENT_MAX);
     }
 
     /// Returns the precision of the context.
@@ -258,11 +260,11 @@ impl Contextable for (usize, RoundingMode, &mut Consts, Exponent, Exponent) {
     }
 
     fn emin(&self) -> Exponent {
-        self.3
+        self.3.clamp(EXPONENT_MIN, 0)
     }
 
     fn emax(&self) -> Exponent {
-        self.4
+        self.4.clamp(0, EXPONENT_MAX)
     }
 }
 

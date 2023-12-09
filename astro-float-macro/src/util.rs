@@ -21,14 +21,14 @@ pub fn str_to_bigfloat_expr(s: &str, span: Span, cc: &mut Consts) -> Result<Toke
     }
 
     let q = if f.inexact() {
-        quote!(astro_float::BigFloat::parse(#s, astro_float::Radix::Dec, p_wrk, astro_float::RoundingMode::ToEven, cc))
+        quote!(astro_float::macro_util::check_exponent_range(astro_float::BigFloat::parse(#s, astro_float::Radix::Dec, p_wrk, astro_float::RoundingMode::ToEven, cc), emin, emax))
     } else if let Some((m, n, s, e, inexact)) = f.as_raw_parts() {
         let stoken = if s.is_positive() {
             quote!(astro_float::Sign::Pos)
         } else {
             quote!(astro_float::Sign::Neg)
         };
-        quote!(astro_float::BigFloat::from_raw_parts(&[#(#m),*], #n, #stoken, #e, #inexact))
+        quote!(astro_float::macro_util::check_exponent_range(astro_float::BigFloat::from_raw_parts(&[#(#m),*], #n, #stoken, #e, #inexact), emin, emax))
     } else {
         quote!(astro_float::BigFloat::nan())
     };
