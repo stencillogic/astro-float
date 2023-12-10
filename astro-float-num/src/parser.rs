@@ -263,7 +263,7 @@ mod tests {
     use super::*;
 
     #[cfg(not(feature = "std"))]
-    use {alloc::string::String, alloc::vec};
+    use {alloc::string::String, alloc::vec, alloc::format};
 
     #[test]
     pub fn test_parser() {

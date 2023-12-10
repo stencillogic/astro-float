@@ -247,6 +247,9 @@ mod tests {
 
     use super::*;
 
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
+
     fn assert(expected: usize, words: &[Word], s: Sign, e: Exponent) {
         let d = BigFloat::from_words(words, s, e);
         assert_eq!(
