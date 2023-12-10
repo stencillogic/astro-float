@@ -72,7 +72,7 @@ pub fn compute_added_err(algo: ErrAlgo<'_>) -> usize {
                         0
                     } else {
                         let n = compute_added_err_near_one(base, emin);
-                        if earg as usize > n + EXPONENT_BIT_SIZE {
+                        if earg as usize > emin.unsigned_abs() as usize + EXPONENT_BIT_SIZE {
                             0
                         } else {
                             n.min(earg as usize)

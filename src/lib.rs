@@ -206,8 +206,11 @@ extern crate alloc;
 ///  - `ln_10`: natural logarithm of 10.
 ///
 /// The context determines the precision, the rounding mode of the result, and also contains the cache of constants.
-/// Also, macro uses minimum and maximum exponent values from the context to limit possible exponent range of the result and to set the limit of precision required for error compensation.
-/// A tuple `(usize, RoundingMode, &mut Consts)`, or `(usize, RoundingMode, &mut Consts, Exponent, Exponent)` can also be used as a temporary context (see examples below).
+/// 
+/// Also, the macro uses minimum and maximum exponent values from the context to limit possible exponent range of the result and to set the limit of precision required for error compensation.
+/// It is recommended to set the smallest values for the exponent range to increase the performance of computations (the internal precision may be as large as the exponent of a number).
+/// 
+/// A tuple `(usize, RoundingMode, &mut Consts)`, or `(usize, RoundingMode, &mut Consts, Exponent, Exponent)` can be used as a temporary context (see examples below).
 ///
 /// Any input argument in the expression is interpreted as exact
 /// (i.e. if an argument of an expression has type BigFloat and it is an inexact result of a previous computation).

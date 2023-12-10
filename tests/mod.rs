@@ -549,3 +549,161 @@ fn macro_run_err_test() {
     assert_ne!(y1, z);
     assert_eq!(y2, z);
 }
+
+// test precision range for error compensation
+#[test]
+fn macro_run_misc_test() {
+    let p = 256;
+    let rm = RoundingMode::None;
+    let mut cc = Consts::new().unwrap();
+    let pi1 = cc.pi(p, RoundingMode::None);
+    let mut pi2 = pi1.clone();
+    pi2.set_exponent(1);
+    let mut ctx = Context::new(p, rm, cc, -1000, 1000);
+    let one = BigFloat::from_u32(1, p);
+
+    // literals: float
+    let z = expr!(2e-301, &mut ctx);
+    assert!(!z.is_zero());
+
+    let z = expr!(2e-302, &mut ctx);
+    assert!(z.is_zero());
+
+    // literals: strings
+    let z = expr!("2e-301", &mut ctx);
+    assert!(!z.is_zero());
+
+    let z = expr!("2e-302", &mut ctx);
+    assert!(z.is_zero());
+
+    // exceed output exponent
+    let z = expr!(2e+151 / 2e-151, &mut ctx);
+    assert!(z.is_inf_pos());
+
+    let z = expr!(2e-151 / 2e+151, &mut ctx);
+    assert!(z.is_zero());
+
+    // ln, log2, lg
+    let z = expr!(1 + 2e-301, &mut ctx);
+    assert!(z == one);
+
+    let z = expr!(ln(1 + 2e-301), &mut ctx);
+    assert!(!z.is_zero());
+
+    let z = expr!(ln(1 + 2e-302), &mut ctx);
+    assert!(z.is_zero());
+
+    let z = expr!(log10(1 + 2e-301), &mut ctx);
+    assert!(!z.is_zero());
+
+    let z = expr!(log10(1 + 2e-302), &mut ctx);
+    assert!(z.is_zero());
+
+    let z = expr!(log2(1 + 2e-301), &mut ctx);
+    assert!(!z.is_zero());
+
+    let z = expr!(log2(1 + 2e-302), &mut ctx);
+    assert!(z.is_zero());
+
+    // log
+    let z = expr!(log(1 + 2e-301, 1 + 2e-301), &mut ctx);
+    assert!(z == one);
+
+    let z = expr!(log(2e+300, 2e+300), &mut ctx);
+    assert!(z == one);
+
+    let z = expr!(log(2e+300, 1 + 2e-301), &mut ctx);
+    assert!(z.is_inf());
+
+    let z = expr!(log(1 + 2e-301, 2e+300), &mut ctx);
+    assert!(z.is_zero());
+
+    let z = expr!(log(1 + 2e-301, 1 + 2e-302), &mut ctx);
+    assert!(z.is_inf());
+
+    let z = expr!(log(1 + 2e-302, 1 + 2e-301), &mut ctx);
+    assert!(z.is_zero());
+
+    let z = expr!(log(1 + 2e-302, 1 + 2e-302), &mut ctx);
+    assert!(z.is_nan());
+
+    // pow
+    let z = expr!(pow(1 + 2e-301, 2e+300), &mut ctx);
+    assert!(!z.is_inf());
+    assert!(z > one);
+
+    let z = expr!(pow(1 + 2e-280, 2e+300), &mut ctx);
+    assert!(z.is_inf());
+
+    let z = expr!(pow(1 + 2e-300, 2e+300 / 2e-2), &mut ctx);
+    assert!(!z.is_inf());
+    assert!(z > one);
+
+    // sin, cos, tan
+    let z = expr!(sin(pi1 + 2e-300), &mut ctx);
+    assert!(z.is_zero() || z.exponent().unwrap() < 0);
+
+    let z = expr!(cos(pi2 + 2e-300), &mut ctx);
+    assert!(z.is_zero() || z.exponent().unwrap() < 0);
+
+    let z = expr!(tan(pi1 + 2e-300), &mut ctx);
+    assert!(z.is_zero() || z.exponent().unwrap() < 0);
+
+    let z = expr!(tan(pi2 + 2e-300), &mut ctx);
+    assert!(z.is_zero() || z.exponent().unwrap() > 1);
+
+    // asin
+    let x = expr!(asin(1), &mut ctx);
+    let z = expr!(asin(1 - 2e-301), &mut ctx);
+    assert!(z == x);
+    let z = expr!(asin(1 - 2e-256), &mut ctx);
+    assert!(z == x);
+    let z = expr!(asin(1 - 2e-150), &mut ctx);
+    assert!(z != x);
+
+    // acos
+    let x = expr!(acos(1), &mut ctx);
+    let z = expr!(acos(1 - 2e-302), &mut ctx);
+    assert!(z == x);
+
+    let z = expr!(acos(1 - 2e-301), &mut ctx);
+    assert!(z.exponent().unwrap() < 0);
+
+    // acos
+    let x = expr!(acos(-1), &mut ctx);
+    let z = expr!(acos(-1 + 2e-302), &mut ctx);
+    assert!(z == x);
+
+    let z = expr!(acos(-1 + 2e-151), &mut ctx);
+    assert!(z != x);
+
+    // acosh
+    let x = expr!(acosh(1), &mut ctx);
+    let z = expr!(acosh(1 + 2e-302), &mut ctx);
+    assert!(z == x);
+
+    let z = expr!(acosh(1 + 2e-301), &mut ctx);
+    assert!(z != x);
+
+    // atanh
+    let x = expr!(atanh(1), &mut ctx);
+    let z = expr!(atanh(1 - 2e-302), &mut ctx);
+    assert!(z == x);
+
+    let z = expr!(atanh(1 - 2e-301), &mut ctx);
+    assert!(z != x);
+
+    let x = expr!(atanh(-1), &mut ctx);
+    let z = expr!(atanh(-1 + 2e-302), &mut ctx);
+    assert!(z == x);
+
+    let z = expr!(atanh(-1 + 2e-301), &mut ctx);
+    assert!(z != x);
+
+    // infinitely close to 1: 0.99999999(9)
+    let z = expr!(5 * (1 / 5), &mut ctx);
+    assert!(z < one);
+
+    let z = expr!(ln(5 * (1 / 5)), &mut ctx);
+    assert!(z.is_zero());
+}
