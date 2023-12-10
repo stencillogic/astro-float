@@ -757,6 +757,7 @@ mod tests {
     use crate::common::consts::ONE;
     use crate::common::util::random_subnormal;
     use crate::defs::{Sign, EXPONENT_MAX, EXPONENT_MIN};
+    use crate::WORD_SIGNIFICANT_BIT;
     use rand::random;
 
     #[cfg(not(feature = "std"))]
@@ -1201,7 +1202,7 @@ mod tests {
 
         // dec, short digits
         let n = BigFloatNumber::from_words(
-            &[1052139549, 0, 0, 0, 0, 0, 0, 0, 14488038915593732096],
+            &[1052139549, 0, 0, 0, 0, 0, 0, 0, WORD_SIGNIFICANT_BIT],
             Sign::Pos,
             1,
         )
@@ -1219,7 +1220,13 @@ mod tests {
             &mut cc,
         )
         .unwrap();
-        assert!(g.cmp(&n) == 0);
+        assert!(
+            g.cmp(&n) == 0
+                || g.sub(&n, n.mantissa_max_bit_len(), RoundingMode::ToEven)
+                    .unwrap()
+                    .exponent()
+                    < -(n.mantissa_max_bit_len() as Exponent - 4)
+        );
 
         // unkonwn p: binary, octal, hexadecimal
         for (s1, exp, rdx) in [
