@@ -1,5 +1,11 @@
 # Release notes
 
+**0.9.0**
+
+ - Error compensation in the `expr` macro has been reworked.
+ - Exponent range is introduced in the context.
+ - Stability improvements.
+
 **0.8.0**
 
  - Scalable conversion to decimal and from decimal base implemented: conversion and formatting functions now require constants cache.

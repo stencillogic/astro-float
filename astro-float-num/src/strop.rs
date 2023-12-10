@@ -36,8 +36,6 @@ impl BigFloatNumber {
         rm: RoundingMode,
         cc: &mut Consts,
     ) -> Result<Self, Error> {
-        Self::p_assertion(p)?;
-
         let ps = crate::parser::parse(s, rdx)?;
 
         if ps.is_nan() || ps.is_inf() {
@@ -137,7 +135,6 @@ mod tests {
     #[test]
     fn test_strop() {
         let mut eps = BigFloatNumber::from_word(1, 192).unwrap();
-        let rm = RoundingMode::ToEven;
         let mut cc = Consts::new().unwrap();
 
         for i in 0..1000 {
@@ -145,35 +142,62 @@ mod tests {
             let p2 = (random::<usize>() % 32 + 3) * WORD_BIT_SIZE;
             let p = p1.min(p2);
 
-            for rdx in [Radix::Bin, Radix::Oct, Radix::Hex, Radix::Dec] {
-                let n = if i & 1 == 0 {
-                    BigFloatNumber::random_normal(p1, EXPONENT_MIN + p as Exponent, EXPONENT_MAX)
-                        .unwrap()
-                } else {
-                    random_subnormal(p1)
+            let n = if i & 1 == 0 {
+                BigFloatNumber::random_normal(p1, EXPONENT_MIN + p as Exponent, EXPONENT_MAX)
+                    .unwrap()
+            } else {
+                random_subnormal(p1)
+            };
+
+            for rdx in [Radix::Bin, Radix::Oct, Radix::Hex] {
+                let rm = match random::<u8>() % 7 {
+                    0 => RoundingMode::ToEven,
+                    1 => RoundingMode::Up,
+                    2 => RoundingMode::Down,
+                    3 => RoundingMode::FromZero,
+                    4 => RoundingMode::ToZero,
+                    5 => RoundingMode::ToOdd,
+                    6 => RoundingMode::None,
+                    _ => unreachable!(),
                 };
 
                 let s = n.format(rdx, rm, &mut cc).unwrap();
                 let d = BigFloatNumber::parse(&s, rdx, p2, rm, &mut cc).unwrap();
 
-                if i & 1 == 0 {
-                    if rdx == Radix::Dec {
-                        eps.set_exponent(n.exponent() - p as Exponent + 3);
-                    } else {
-                        //println!("\n{:?}\n{:?}\n{:?}", s, n, d);
-                        eps.set_exponent(n.exponent() - p as Exponent);
-                    }
-
-                    assert!(d.sub(&n, p, rm).unwrap().abs().unwrap().cmp(&eps) < 0);
+                if p2 < p1 {
+                    let mut x = n.clone().unwrap();
+                    x.set_precision(p, rm).unwrap();
+                    assert!(x.cmp(&d) == 0);
                 } else {
-                    let mut eps2 = BigFloatNumber::min_positive(p).unwrap();
-
-                    if rdx == Radix::Dec {
-                        eps2.set_exponent(eps2.exponent() + 2);
-                    }
-
-                    assert!(d.sub(&n, p, rm).unwrap().abs().unwrap().cmp(&eps2) < 0);
+                    assert!(n.cmp(&d) == 0);
                 }
+            }
+
+            let s = n.format(Radix::Dec, RoundingMode::ToEven, &mut cc).unwrap();
+            let d =
+                BigFloatNumber::parse(&s, Radix::Dec, p2, RoundingMode::ToEven, &mut cc).unwrap();
+
+            if i & 1 == 0 {
+                eps.set_exponent(n.exponent() - p as Exponent + 4);
+                assert!(
+                    d.sub(&n, p, RoundingMode::None)
+                        .unwrap()
+                        .abs()
+                        .unwrap()
+                        .cmp(&eps)
+                        < 0
+                );
+            } else {
+                let mut eps2 = BigFloatNumber::min_positive(p).unwrap();
+                eps2.set_exponent(eps2.exponent() + 2);
+                assert!(
+                    d.sub(&n, p, RoundingMode::None)
+                        .unwrap()
+                        .abs()
+                        .unwrap()
+                        .cmp(&eps2)
+                        < 0
+                );
             }
         }
 
@@ -181,7 +205,7 @@ mod tests {
         let p1 = (random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let p2 = (random::<usize>() % 32 + 1) * WORD_BIT_SIZE;
         let p = p1.min(p2);
-        let rm = RoundingMode::None; // avoid exponent overflow for dec conversion.
+        let rm = RoundingMode::None;
 
         for rdx in [Radix::Bin, Radix::Oct, Radix::Dec, Radix::Hex] {
             // min, max

@@ -3,7 +3,10 @@
 use crate::BigFloat;
 use crate::Consts;
 use crate::Error;
+use crate::Exponent;
 use crate::RoundingMode;
+use crate::EXPONENT_MAX;
+use crate::EXPONENT_MIN;
 
 /// Context contains parameters, like rounding mode and precision, as well as constant values, and is used with `expr!` macro.
 #[derive(Debug)]
@@ -11,18 +14,35 @@ pub struct Context {
     cc: Consts,
     p: usize,
     rm: RoundingMode,
+    emin: Exponent,
+    emax: Exponent,
 }
 
 impl Context {
     /// Create a new context.
-    pub fn new(p: usize, rm: RoundingMode, cc: Consts) -> Self {
-        Context { cc, p, rm }
+    /// The value of `emin` will be clamped to a range between EXPONENT_MIN and 0.
+    /// The value of `emax` will be clamped to a range between 0 and EXPONENT_MAX.
+    pub fn new(p: usize, rm: RoundingMode, cc: Consts, emin: Exponent, emax: Exponent) -> Self {
+        Context {
+            cc,
+            p,
+            rm,
+            emin: emin.clamp(EXPONENT_MIN, 0),
+            emax: emax.clamp(0, EXPONENT_MAX),
+        }
     }
 
-    /// Destructures the context and returns its parts.
-    pub fn to_raw_parts(self) -> (usize, RoundingMode, Consts) {
-        let Context { p, rm, cc } = self;
-        (p, rm, cc)
+    /// Destructures the context and returns its parts: target precision, rounding mode,
+    /// constant cache, minimum exponent, maximum exponent.
+    pub fn to_raw_parts(self) -> (usize, RoundingMode, Consts, Exponent, Exponent) {
+        let Context {
+            p,
+            rm,
+            cc,
+            emin,
+            emax,
+        } = self;
+        (p, rm, cc, emin, emax)
     }
 
     /// Sets the precision of the context.
@@ -38,6 +58,18 @@ impl Context {
     /// Sets the constant cache of the context.
     pub fn set_consts(&mut self, cc: Consts) {
         self.cc = cc;
+    }
+
+    /// Sets the minimum exponent.
+    /// The value of `emin` will be clamped to a range between EXPONENT_MIN and 0.
+    pub fn set_emin(&mut self, emin: Exponent) {
+        self.emin = emin.clamp(EXPONENT_MIN, 0);
+    }
+
+    /// Sets the maximum exponent.
+    /// The value of `emax` will be clamped to a range between 0 and EXPONENT_MAX.
+    pub fn set_emax(&mut self, emax: Exponent) {
+        self.emax = emax.clamp(0, EXPONENT_MAX);
     }
 
     /// Returns the precision of the context.
@@ -75,6 +107,16 @@ impl Context {
         self.cc.ln_10(self.p, self.rm)
     }
 
+    /// Returns the minimum exponent.
+    pub fn emin(&self) -> Exponent {
+        self.emin
+    }
+
+    /// Returns the maximum exponent.
+    pub fn emax(&self) -> Exponent {
+        self.emax
+    }
+
     /// Clones `self` and returns the cloned context.
     ///
     /// # Errors
@@ -87,6 +129,8 @@ impl Context {
             p: self.p,
             rm: self.rm,
             cc,
+            emin: self.emin,
+            emax: self.emax,
         })
     }
 }
@@ -132,6 +176,12 @@ pub trait Contextable {
 
     /// Returns the value of the natural logarithm of 10.
     fn const_ln10(&mut self) -> BigFloat;
+
+    /// Returns the minimum exponent.
+    fn emin(&self) -> Exponent;
+
+    /// Returns the maximum exponent.
+    fn emax(&self) -> Exponent;
 }
 
 impl Contextable for (usize, RoundingMode, &mut Consts) {
@@ -166,6 +216,56 @@ impl Contextable for (usize, RoundingMode, &mut Consts) {
         let (p, rm) = (self.0, self.1);
         self.consts().ln_10(p, rm)
     }
+
+    fn emin(&self) -> Exponent {
+        EXPONENT_MIN
+    }
+
+    fn emax(&self) -> Exponent {
+        EXPONENT_MAX
+    }
+}
+
+impl Contextable for (usize, RoundingMode, &mut Consts, Exponent, Exponent) {
+    fn precision(&self) -> usize {
+        self.0
+    }
+
+    fn rounding_mode(&self) -> RoundingMode {
+        self.1
+    }
+
+    fn consts(&mut self) -> &mut Consts {
+        self.2
+    }
+
+    fn const_pi(&mut self) -> BigFloat {
+        let (p, rm) = (self.0, self.1);
+        self.consts().pi(p, rm)
+    }
+
+    fn const_e(&mut self) -> BigFloat {
+        let (p, rm) = (self.0, self.1);
+        self.consts().e(p, rm)
+    }
+
+    fn const_ln2(&mut self) -> BigFloat {
+        let (p, rm) = (self.0, self.1);
+        self.consts().ln_2(p, rm)
+    }
+
+    fn const_ln10(&mut self) -> BigFloat {
+        let (p, rm) = (self.0, self.1);
+        self.consts().ln_10(p, rm)
+    }
+
+    fn emin(&self) -> Exponent {
+        self.3.clamp(EXPONENT_MIN, 0)
+    }
+
+    fn emax(&self) -> Exponent {
+        self.4.clamp(0, EXPONENT_MAX)
+    }
 }
 
 impl Contextable for Context {
@@ -195,5 +295,13 @@ impl Contextable for Context {
 
     fn const_ln10(&mut self) -> BigFloat {
         Context::const_ln10(self)
+    }
+
+    fn emin(&self) -> Exponent {
+        Context::emin(self)
+    }
+
+    fn emax(&self) -> Exponent {
+        Context::emax(self)
     }
 }
