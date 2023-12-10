@@ -323,7 +323,7 @@ fn macro_run_err_test() {
     assert_ne!(y1, z);
 
     // sin
-    let s1 = "1.234567890123456789e+77";
+    let s1 = "1.2345678901234e+77";
     let n = BigFloat::parse(
         s1,
         astro_float_num::Radix::Dec,
@@ -336,7 +336,7 @@ fn macro_run_err_test() {
         s1,
         astro_float_num::Radix::Dec,
         320,
-        RoundingMode::None,
+        RoundingMode::ToEven,
         &mut cc,
     );
     let mut y2 = n.sin(320, RoundingMode::None, &mut cc);
