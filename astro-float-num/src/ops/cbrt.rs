@@ -20,9 +20,7 @@ impl BigFloatNumber {
         Self::p_assertion(p)?;
 
         if self.is_zero() {
-            let mut ret = Self::new(p)?;
-            ret.set_sign(self.sign());
-            return Ok(ret);
+            return Self::new2(p, self.sign(), self.inexact());
         }
 
         let (e1, m1_opt) = self.normalize()?;
