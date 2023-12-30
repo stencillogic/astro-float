@@ -65,15 +65,16 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
     return; */
 
     // rounding
+    let e_rng = WORD_BIT_SIZE * 3;
     for _ in 0..run_cnt {
-        let p1 = (random::<usize>() % p_rng + 3) * WORD_BIT_SIZE;
-        let p = p1 - random::<usize>() % WORD_BIT_SIZE;
+        let p1 = (random::<usize>() % p_rng + 1 + e_rng * 2) * WORD_BIT_SIZE;
+        let p = p1 - random::<usize>() % e_rng;
 
         let (rm, rnd) = get_random_rnd_pair();
 
-        let (n1, mut f1) = get_float_pair(p1, 0, 0, &mut cc);
+        let (n1, mut f1) = get_float_pair(p1, -(e_rng as Exponent), e_rng as Exponent, &mut cc);
 
-        let n2 = n1.round(p, rm);
+        let n2 = n1.round((p as Exponent - n1.exponent().unwrap()) as usize, rm);
 
         unsafe {
             mpfr::prec_round(f1.as_raw_mut(), p as mpfr::prec_t, rnd);
