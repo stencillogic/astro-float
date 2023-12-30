@@ -846,12 +846,7 @@ impl Mantissa {
 
     /// Returns true if all digits are equal to 0.
     pub fn is_all_zero(&self) -> bool {
-        for v in (self.m).iter() {
-            if *v != 0 {
-                return false;
-            }
-        }
-        true
+        self.m.all(|&v| v == 0)
     }
 
     /// Returns length of the mantissa in words.
