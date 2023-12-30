@@ -47,7 +47,13 @@ impl BigFloatNumber {
                 } else {
                     // (e^x - e^(-x)) / 2
 
-                    let ex = x.exp(p_x, RoundingMode::None, cc)?;
+                    let ex = match x.exp(p_x, RoundingMode::None, cc) {
+                        Ok(val) => val,
+                        Err(Error::ExponentOverflow(_)) => {
+                            return Err(Error::ExponentOverflow(self.sign()));
+                        }
+                        Err(err) => return Err(err),
+                    };
 
                     let xe = ex.reciprocal(p_x, RoundingMode::None)?;
 
@@ -106,5 +112,19 @@ mod tests {
         assert!(d3.sinh(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
         assert!(zero.sinh(p, rm, &mut cc).unwrap().is_zero());
         assert!(n1.sinh(p, rm, &mut cc).unwrap().cmp(&n1) == 0);
+
+        let mut large_pos = BigFloatNumber::from_word(1, 256).unwrap();
+        large_pos.set_exponent(150);
+        assert_eq!(
+            large_pos.sinh(p, rm, &mut cc).unwrap_err(),
+            Error::ExponentOverflow(Sign::Pos)
+        );
+        let mut large_neg = BigFloatNumber::from_word(1, 256).unwrap();
+        large_neg.set_exponent(150);
+        large_neg.set_sign(Sign::Neg);
+        assert_eq!(
+            large_neg.sinh(p, rm, &mut cc).unwrap_err(),
+            Error::ExponentOverflow(Sign::Neg)
+        );
     }
 }
