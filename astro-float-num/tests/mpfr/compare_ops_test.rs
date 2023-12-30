@@ -338,14 +338,18 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
 
     // n1 = -inf..log2(emax): sinh, cosh, tanh, exp
     assert_eq!(core::mem::size_of::<Exponent>(), 4);
-    for _ in 0..run_cnt {
+    for i in 0..run_cnt {
         let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
 
         let (rm, rnd) = get_random_rnd_pair();
         //println!("{:?}", rm);
 
-        let (n1, f1) = get_float_pair(p1, EXPONENT_MIN, 32, &mut cc);
+        let (n1, f1) = if i % 2 == 0 {
+            get_float_pair(p1, EXPONENT_MIN, 0, &mut cc)
+        } else {
+            get_float_pair(p1, 0, 33, &mut cc)
+        };
 
         //println!("{:?}", n1);
 
