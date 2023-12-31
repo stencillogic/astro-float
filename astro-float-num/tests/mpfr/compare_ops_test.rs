@@ -7,6 +7,7 @@ use crate::mpfr::common::get_prec_rng;
 use crate::mpfr::common::test_astro_op;
 use crate::mpfr::common::test_astro_op_no_cc;
 use crate::mpfr::common::{assert_float_close, get_float_pair, get_random_rnd_pair};
+use astro_float_num::EXPONENT_BIT_SIZE;
 use astro_float_num::Word;
 use astro_float_num::{BigFloat, Consts, Exponent, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE};
 use gmp_mpfr_sys::{gmp::exp_t, mpfr};
@@ -247,7 +248,7 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
 
     // powi
     for _ in 0..run_cnt {
-        let i = random::<usize>();
+        let i = (random::<Exponent>().abs() + 1) as usize >> (random::<usize>() % EXPONENT_BIT_SIZE);
         let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
 
@@ -256,8 +257,8 @@ fn run_compare_ops(run_cnt: usize, p_rng: usize, p_min: usize) {
 
         let (n1, f1) = get_float_pair(
             p1,
-            EXPONENT_MIN / i as Exponent,
-            EXPONENT_MAX / i as Exponent,
+            if i > 1 { EXPONENT_MIN / i as Exponent } else { EXPONENT_MIN },
+            if i > 1 { EXPONENT_MAX / i as Exponent } else { EXPONENT_MAX },
             &mut cc,
         );
 
