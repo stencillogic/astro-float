@@ -90,7 +90,7 @@ pub(crate) fn series_run<T: PolycoeffGen>(
     niter: usize,
     polycoeff_gen: &mut T,
 ) -> Result<BigFloatNumber, Error> {
-    if x_first.is_zero() || x_step.is_zero() {
+    let mut ret = if x_first.is_zero() || x_step.is_zero() {
         series_compute_fast(acc, x_first, polycoeff_gen)
     } else if niter >= RECT_ITER_THRESHOLD {
         series_rectangular(niter, acc, x_first, x_step, polycoeff_gen)
@@ -98,7 +98,11 @@ pub(crate) fn series_run<T: PolycoeffGen>(
         series_linear(acc, x_first, x_step, polycoeff_gen)
     } else {
         series_horner(acc, x_first, x_step, polycoeff_gen)
-    }
+    }?;
+
+    ret.set_inexact(true);
+
+    Ok(ret)
 }
 
 //

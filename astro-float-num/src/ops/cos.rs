@@ -1,6 +1,7 @@
 //! Cosine.
 
 use crate::common::consts::ONE;
+use crate::common::consts::TRIG_EXP_THRES;
 use crate::common::consts::TWO;
 use crate::common::util::calc_add_cost;
 use crate::common::util::calc_mul_cost;
@@ -18,8 +19,6 @@ use crate::ops::series::PolycoeffGen;
 use crate::ops::util::compute_small_exp;
 use crate::Exponent;
 use crate::Sign;
-
-const COS_EXP_THRES: Exponent = -(WORD_BIT_SIZE as Exponent);
 
 // Polynomial coefficient generator.
 struct CosPolycoeffGen {
@@ -117,27 +116,27 @@ impl BigFloatNumber {
             return Ok(ret);
         }
 
-        compute_small_exp!(ONE, self.exponent() as isize * 2 - 1, true, p, rm);
-
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len());
 
-        let mut add_p = (1 - COS_EXP_THRES) as usize;
+        compute_small_exp!(ONE, self.exponent() as isize * 2 - 1, true, p_wrk, p, rm);
+
+        p_wrk += p_inc;
+
+        let mut add_p = (1 - TRIG_EXP_THRES) as usize;
         loop {
             let mut x = self.clone()?;
-            x.set_inexact(false);
 
             let p_x = p_wrk + add_p;
             x.set_precision(p_x, RoundingMode::None)?;
 
             x = x.reduce_trig_arg(cc, RoundingMode::None)?;
 
-            let mut ret = x.cos_series(RoundingMode::None)?;
-
-            let t = ret.exponent().unsigned_abs() as usize + 1; // avoid cancellation when x near pi / 2
-            if add_p < t {
+            let (t, q) = x.trig_arg_pi_proximity(cc, RoundingMode::None)?;
+            if q & 1 == 1 && add_p < t {
                 add_p = t;
             } else {
+                let mut ret = x.cos_series(RoundingMode::None)?;
                 if ret.try_set_precision(p, rm, p_wrk)? {
                     ret.set_inexact(ret.inexact() | self.inexact());
                     break Ok(ret);

@@ -94,14 +94,15 @@ impl BigFloatNumber {
             return Self::new2(p, self.sign(), self.inexact());
         }
 
-        compute_small_exp!(self, self.exponent() as isize * 2 - 1, true, p, rm);
-
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len());
+
+        compute_small_exp!(self, self.exponent() as isize * 2 - 1, true, p_wrk, p, rm);
+
+        p_wrk += p_inc;
 
         loop {
             let mut x = self.clone()?;
-            x.set_inexact(false);
 
             let p_x = p_wrk + 5;
             x.set_precision(p_x, RoundingMode::None)?;

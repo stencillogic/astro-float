@@ -36,7 +36,10 @@ impl BigFloatNumber {
             return Ok(ret);
         }
 
-        compute_small_exp!(self, self.exponent() as isize * 2 - 1, true, p, rm);
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len());
+
+        compute_small_exp!(self, self.exponent() as isize * 2 - 1, true, p_wrk, p, rm);
 
         // (e^(2*x) - 1) / (e^(2*x) + 1)
 
@@ -45,41 +48,22 @@ impl BigFloatNumber {
             additional_prec += self.exponent().unsigned_abs() as usize;
         }
 
-        let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+        p_wrk += p_inc;
 
         let mut x = self.clone()?;
         x.set_inexact(false);
         x.set_sign(Sign::Pos);
+        x.set_exponent(x.exponent() + 1);
 
         loop {
             let p_x = p_wrk + additional_prec;
             x.set_precision(p_x, RoundingMode::None)?;
 
-            x.set_exponent(x.exponent() + 1);
-
             let xexp = match x.exp(p_x, RoundingMode::FromZero, cc) {
                 Ok(v) => Ok(v),
                 Err(e) => match e {
                     Error::ExponentOverflow(_) => {
-                        let rm_mask = if self.is_positive() {
-                            0b1100 // rounding down or to zero
-                        } else {
-                            0b1010 // rounding up or to zero
-                        };
-
-                        let mut ret = if rm as u32 & rm_mask != 0 {
-                            let mut ret = BigFloatNumber::max_value(p)?;
-                            ret.set_sign(self.sign());
-                            ret.set_exponent(0);
-                            ret
-                        } else {
-                            Self::from_i8(self.sign().to_int(), p)?
-                        };
-
-                        ret.set_inexact(true);
-
-                        return Ok(ret);
+                        return self.process_large_exp(p, rm);
                     }
                     Error::DivisionByZero => Err(Error::DivisionByZero),
                     Error::InvalidArgument => Err(Error::InvalidArgument),
@@ -87,8 +71,12 @@ impl BigFloatNumber {
                 },
             }?;
 
-            let d1 = xexp.sub(&ONE, p_x, RoundingMode::Down)?;
-            let d2 = xexp.add(&ONE, p_x, RoundingMode::Up)?;
+            if xexp.exponent() as isize > p_x as isize {
+                return self.process_large_exp(p, rm);
+            }
+
+            let d1 = xexp.sub(&ONE, p_x, RoundingMode::None)?;
+            let d2 = xexp.add(&ONE, p_x, RoundingMode::None)?;
 
             let mut ret = d1.div(&d2, p_x, RoundingMode::None)?;
 
@@ -102,6 +90,27 @@ impl BigFloatNumber {
             p_wrk += p_inc;
             p_inc = round_p(p_wrk / 5);
         }
+    }
+
+    fn process_large_exp(&self, p: usize, rm: RoundingMode) -> Result<Self, Error> {
+        let rm_mask = if self.is_positive() {
+            0b1100 // rounding down or to zero
+        } else {
+            0b1010 // rounding up or to zero
+        };
+
+        let mut ret = if rm as u32 & rm_mask != 0 {
+            let mut ret = BigFloatNumber::max_value(p)?;
+            ret.set_sign(self.sign());
+            ret.set_exponent(0);
+            ret
+        } else {
+            Self::from_i8(self.sign().to_int(), p)?
+        };
+
+        ret.set_inexact(true);
+
+        Ok(ret)
     }
 }
 

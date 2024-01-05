@@ -39,7 +39,10 @@ impl BigFloatNumber {
             return Err(Error::InvalidArgument);
         }
 
-        compute_small_exp!(self, self.exponent() as isize * 2 - 1, false, p, rm);
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len());
+
+        compute_small_exp!(self, self.exponent() as isize * 2 - 1, false, p_wrk, p, rm);
 
         // 0.5 * ln((1 + x) / (1 - x))
 
@@ -50,8 +53,7 @@ impl BigFloatNumber {
             additional_prec += count_leading_ones(self.mantissa().digits());
         }
 
-        let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+        p_wrk += p_inc;
 
         let mut x = self.clone()?;
         x.set_inexact(false);

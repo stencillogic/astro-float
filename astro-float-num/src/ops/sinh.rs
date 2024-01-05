@@ -25,29 +25,40 @@ impl BigFloatNumber {
             return Self::new2(p, self.sign(), self.inexact());
         }
 
-        compute_small_exp!(self, self.exponent() as isize * 2 - 2, false, p, rm);
-
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len());
+
+        compute_small_exp!(self, self.exponent() as isize * 2 - 2, false, p_wrk, p, rm);
+
+        p_wrk += p_inc;
 
         let mut x = self.clone()?;
         x.set_inexact(false);
+        x.set_sign(Sign::Pos);
+
+        let ethres = (x.exponent().unsigned_abs().max(1) as usize - 1) * 2;
 
         loop {
             let p_x = p_wrk + 4;
             x.set_precision(p_x, RoundingMode::None)?;
 
-            x.set_sign(Sign::Pos);
-
-            let mut ret =
-                if (x.exponent() as isize - 1) * 2 > x.mantissa_max_bit_len() as isize + 2 {
+            let mut ret = if x.exponent() <= 0 {
+                Self::sinh_series(x.clone()?, p_x, RoundingMode::None)?
+            } else {
+                let mut val = if ethres > x.mantissa_max_bit_len() + 2 {
                     // e^|x| / 2 * signum(self)
 
                     x.exp(p_x, RoundingMode::None, cc)
                 } else {
                     // (e^x - e^(-x)) / 2
 
-                    let ex = x.exp(p_x, RoundingMode::None, cc)?;
+                    let ex = match x.exp(p_x, RoundingMode::None, cc) {
+                        Ok(val) => val,
+                        Err(Error::ExponentOverflow(_)) => {
+                            return Err(Error::ExponentOverflow(self.sign()));
+                        }
+                        Err(err) => return Err(err),
+                    };
 
                     let xe = ex.reciprocal(p_x, RoundingMode::None)?;
 
@@ -61,7 +72,10 @@ impl BigFloatNumber {
                     }
                 })?;
 
-            ret.div_by_2(RoundingMode::None);
+                val.div_by_2(RoundingMode::None);
+
+                val
+            };
 
             ret.set_sign(self.sign());
 
@@ -106,5 +120,19 @@ mod tests {
         assert!(d3.sinh(p, rm, &mut cc).unwrap().cmp(&d3) == 0);
         assert!(zero.sinh(p, rm, &mut cc).unwrap().is_zero());
         assert!(n1.sinh(p, rm, &mut cc).unwrap().cmp(&n1) == 0);
+
+        let mut large_pos = BigFloatNumber::from_word(1, 256).unwrap();
+        large_pos.set_exponent(150);
+        assert_eq!(
+            large_pos.sinh(p, rm, &mut cc).unwrap_err(),
+            Error::ExponentOverflow(Sign::Pos)
+        );
+        let mut large_neg = BigFloatNumber::from_word(1, 256).unwrap();
+        large_neg.set_exponent(150);
+        large_neg.set_sign(Sign::Neg);
+        assert_eq!(
+            large_neg.sinh(p, rm, &mut cc).unwrap_err(),
+            Error::ExponentOverflow(Sign::Neg)
+        );
     }
 }

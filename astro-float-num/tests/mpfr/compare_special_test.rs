@@ -9,7 +9,7 @@ use crate::mpfr::common::{
 };
 use crate::mpfr::common::{get_prec_rng, test_astro_op};
 use astro_float_num::{
-    BigFloat, Consts, Exponent, Word, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE,
+    BigFloat, Consts, Exponent, Word, EXPONENT_BIT_SIZE, EXPONENT_MAX, EXPONENT_MIN, WORD_BIT_SIZE,
 };
 use gmp_mpfr_sys::{gmp::exp_t, mpfr};
 use rand::random;
@@ -72,6 +72,9 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
         let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p2 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+        let ediv = 1 << (random::<usize>() % (EXPONENT_BIT_SIZE - 1));
+        let emin = EXPONENT_MIN / ediv;
+        let emax = EXPONENT_MAX / ediv;
 
         let (rm, rnd) = get_random_rnd_pair();
 
@@ -84,10 +87,10 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
             BigFloat::min_value(p1),
             BigFloat::min_positive_normal(p1),
             BigFloat::min_positive_normal(p1).neg(),
-            get_oned_zeroed(p1, EXPONENT_MIN, EXPONENT_MAX),
-            get_oned_sides(p1, EXPONENT_MIN, EXPONENT_MAX),
-            get_periodic(p1, EXPONENT_MIN, EXPONENT_MAX),
-            get_last_zero(p1, EXPONENT_MIN, EXPONENT_MAX),
+            get_oned_zeroed(p1, emin, emax),
+            get_oned_sides(p1, emin, emax),
+            get_periodic(p1, emin, emax),
+            get_last_zero(p1, emin, emax),
             get_near_one(p1),
         ];
 
@@ -105,10 +108,10 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
                 BigFloat::min_value(p2),
                 BigFloat::min_positive_normal(p2),
                 BigFloat::min_positive_normal(p2).neg(),
-                get_oned_zeroed(p2, EXPONENT_MIN, EXPONENT_MAX),
-                get_oned_sides(p2, EXPONENT_MIN, EXPONENT_MAX),
-                get_periodic(p2, EXPONENT_MIN, EXPONENT_MAX),
-                get_last_zero(p2, EXPONENT_MIN, EXPONENT_MAX),
+                get_oned_zeroed(p2, emin, emax),
+                get_oned_sides(p2, emin, emax),
+                get_periodic(p2, emin, emax),
+                get_last_zero(p2, emin, emax),
                 get_near_one(p2),
             ];
 
@@ -359,13 +362,14 @@ fn run_compare_special(run_cnt: usize, p_rng: usize, p_min: usize) {
     for _ in 0..run_cnt {
         let p1 = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
         let p = (random::<usize>() % p_rng + p_min) * WORD_BIT_SIZE;
+        let ediv = 1 << (random::<usize>() % (EXPONENT_BIT_SIZE - 1));
 
         let (rm, rnd) = get_random_rnd_pair();
         let (rm2, _) = get_random_rnd_pair();
 
         let mut n = cc.pi(p1, rm2);
-        let e = rand::random::<usize>() % (10 + EXPONENT_MAX as usize);
-        n.set_exponent((EXPONENT_MIN as isize + e as isize) as Exponent);
+        let e = rand::random::<usize>() % (10 + EXPONENT_MAX as usize / ediv);
+        n.set_exponent(((EXPONENT_MIN as usize / ediv) as isize + e as isize) as Exponent);
 
         let f = conv_to_mpfr(p1, &n, &mut cc);
 

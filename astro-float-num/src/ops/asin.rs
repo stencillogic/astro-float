@@ -43,15 +43,17 @@ impl BigFloatNumber {
             return Ok(pi);
         }
 
-        compute_small_exp!(self, self.exponent() as isize * 2 - 2, false, p, rm);
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len());
+
+        compute_small_exp!(self, self.exponent() as isize * 2 - 2, false, p_wrk, p, rm);
 
         let mut additional_prec = 8;
         if self.exponent() == 0 {
             additional_prec += count_leading_ones(self.mantissa().digits());
         }
 
-        let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+        p_wrk += p_inc;
 
         let mut x = self.clone()?;
         x.set_inexact(false);

@@ -1331,7 +1331,7 @@ impl BigFloat {
         exp,
         Self,
         { INF_POS },
-        { INF_NEG },
+        { Self::new(p) },
         p,
         usize
     );
@@ -1431,8 +1431,8 @@ impl BigFloat {
         Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         acosh,
         Self,
-        { BigFloat::new(1) },
-        { BigFloat::new(1) },
+        { INF_POS },
+        { NAN },
         p,
         usize
     );
@@ -1442,8 +1442,8 @@ impl BigFloat {
         Precision is rounded upwards to the word size. The function returns NaN if the precision `p` is incorrect.",
         atanh,
         Self,
-        { BigFloat::new(1) },
-        { BigFloat::new(1) },
+        { NAN },
+        { NAN },
         p,
         usize
     );
@@ -2091,7 +2091,7 @@ mod tests {
             assert!(op(&NAN, rand_p(), rm, &mut cc).is_nan());
         }
 
-        assert!(INF_NEG.exp(rand_p(), rm, &mut cc).is_inf_neg());
+        assert!(INF_NEG.exp(rand_p(), rm, &mut cc).is_zero());
         assert!(INF_POS.exp(rand_p(), rm, &mut cc).is_inf_pos());
         assert!(NAN.exp(rand_p(), rm, &mut cc).is_nan());
 
@@ -2138,12 +2138,12 @@ mod tests {
         assert!(INF_POS.asinh(rand_p(), rm, &mut cc).is_inf_pos());
         assert!(NAN.asinh(rand_p(), rm, &mut cc).is_nan());
 
-        assert!(INF_NEG.acosh(rand_p(), rm, &mut cc).is_zero());
-        assert!(INF_POS.acosh(rand_p(), rm, &mut cc).is_zero());
+        assert!(INF_NEG.acosh(rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_POS.acosh(rand_p(), rm, &mut cc).is_inf_pos());
         assert!(NAN.acosh(rand_p(), rm, &mut cc).is_nan());
 
-        assert!(INF_NEG.atanh(rand_p(), rm, &mut cc).is_zero());
-        assert!(INF_POS.atanh(rand_p(), rm, &mut cc).is_zero());
+        assert!(INF_NEG.atanh(rand_p(), rm, &mut cc).is_nan());
+        assert!(INF_POS.atanh(rand_p(), rm, &mut cc).is_nan());
         assert!(NAN.atanh(rand_p(), rm, &mut cc).is_nan());
 
         assert!(INF_NEG.reciprocal(rand_p(), rm).is_zero());

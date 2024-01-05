@@ -21,7 +21,7 @@ impl BigFloatNumber {
         Self::p_assertion(p)?;
 
         if self.is_zero() {
-            return Self::new(p);
+            return Self::new2(p, self.sign(), self.inexact());
         }
 
         if self.is_negative() {
