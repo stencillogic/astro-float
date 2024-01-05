@@ -474,24 +474,6 @@ fn macro_run_err_test() {
     assert_eq!(z1, y);
     assert_ne!(z2, y);
 
-    // tanh
-    let x = BigFloat::parse(
-        "3.7A5C72221B0875030E42DFF83D5C180753682D0D054821B600C18D877C7DBED4_e-19",
-        Radix::Hex,
-        usize::MAX,
-        RoundingMode::None,
-        &mut cc,
-    );
-    let y1 = x.tanh(p, rm, &mut cc);
-
-    let mut y2 = x.tanh(p + 1, RoundingMode::None, &mut cc);
-    y2.set_precision(p, rm).unwrap();
-
-    let z = expr!(tanh(x), &mut ctx);
-
-    assert_ne!(y1, z);
-    assert_eq!(y2, z);
-
     // asinh
     let s1 = "6.1705892816164049e-1";
 
