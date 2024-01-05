@@ -1331,7 +1331,7 @@ impl BigFloat {
         exp,
         Self,
         { INF_POS },
-        { INF_NEG },
+        { Self::new(p) },
         p,
         usize
     );
@@ -2091,7 +2091,7 @@ mod tests {
             assert!(op(&NAN, rand_p(), rm, &mut cc).is_nan());
         }
 
-        assert!(INF_NEG.exp(rand_p(), rm, &mut cc).is_inf_neg());
+        assert!(INF_NEG.exp(rand_p(), rm, &mut cc).is_zero());
         assert!(INF_POS.exp(rand_p(), rm, &mut cc).is_inf_pos());
         assert!(NAN.exp(rand_p(), rm, &mut cc).is_nan());
 
