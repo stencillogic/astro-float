@@ -25,22 +25,27 @@ impl BigFloatNumber {
             return Self::new2(p, self.sign(), self.inexact());
         }
 
-        compute_small_exp!(self, self.exponent() as isize * 2 - 2, false, p, rm);
-
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len());
+
+        compute_small_exp!(self, self.exponent() as isize * 2 - 2, false, p_wrk, p, rm);
+
+        p_wrk += p_inc;
 
         let mut x = self.clone()?;
         x.set_inexact(false);
+        x.set_sign(Sign::Pos);
+
+        let ethres = (x.exponent().unsigned_abs().max(1) as usize - 1) * 2;
 
         loop {
             let p_x = p_wrk + 4;
             x.set_precision(p_x, RoundingMode::None)?;
 
-            x.set_sign(Sign::Pos);
-
-            let mut ret =
-                if (x.exponent() as isize - 1) * 2 > x.mantissa_max_bit_len() as isize + 2 {
+            let mut ret = if x.exponent() <= 0 {
+                Self::sinh_series(x.clone()?, p_x, RoundingMode::None)?
+            } else {
+                let mut val = if ethres > x.mantissa_max_bit_len() + 2 {
                     // e^|x| / 2 * signum(self)
 
                     x.exp(p_x, RoundingMode::None, cc)
@@ -67,7 +72,10 @@ impl BigFloatNumber {
                     }
                 })?;
 
-            ret.div_by_2(RoundingMode::None);
+                val.div_by_2(RoundingMode::None);
+
+                val
+            };
 
             ret.set_sign(self.sign());
 
