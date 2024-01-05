@@ -17,9 +17,13 @@ impl BigFloatNumber {
     }
 
     /// Determine how close `self` to pi or pi/2
-    pub(crate) fn trig_arg_pi_proximity(&self, cc: &mut Consts, rm: RoundingMode) -> Result<(usize, usize), Error> {
+    pub(crate) fn trig_arg_pi_proximity(
+        &self,
+        cc: &mut Consts,
+        rm: RoundingMode,
+    ) -> Result<(usize, usize), Error> {
         let mut q = 0;
-        
+
         if self.exponent() > 0 {
             let mut pi = cc.pi_num(self.mantissa_max_bit_len() + self.exponent() as usize, rm)?;
             pi.set_sign(self.sign());

@@ -1,10 +1,10 @@
 //! Exponentiation.
 
-use crate::EXPONENT_MIN;
 use crate::common::consts::{FOUR, THREE};
 use crate::common::util::{calc_add_cost, calc_mul_cost, round_p};
 use crate::ops::consts::Consts;
 use crate::ops::util::compute_small_exp;
+use crate::EXPONENT_MIN;
 use crate::{
     common::consts::ONE,
     defs::{Error, WORD_BIT_SIZE, WORD_SIGNIFICANT_BIT},
@@ -540,14 +540,23 @@ impl BigFloatNumber {
                         Error::ExponentOverflow(Sign::Neg) => {
                             return Self::new2(p, Sign::Pos, n.inexact() || ln.inexact());
                         }
-                        Error::ExponentOverflow(Sign::Pos) => Err(Error::ExponentOverflow(Sign::Pos)),
+                        Error::ExponentOverflow(Sign::Pos) => {
+                            Err(Error::ExponentOverflow(Sign::Pos))
+                        }
                         Error::DivisionByZero => Err(Error::DivisionByZero),
                         Error::InvalidArgument => Err(Error::InvalidArgument),
                         Error::MemoryAllocation => Err(Error::MemoryAllocation),
                     },
                 }?;
 
-                compute_small_exp!(ONE, m.exponent() as isize, m.is_negative(), p_ext, p, effective_rm);
+                compute_small_exp!(
+                    ONE,
+                    m.exponent() as isize,
+                    m.is_negative(),
+                    p_ext,
+                    p,
+                    effective_rm
+                );
 
                 let mut ret = if m.is_negative() {
                     m.set_sign(Sign::Pos);
@@ -603,7 +612,7 @@ mod test {
     fn test_power() {
         let mut cc = Consts::new().unwrap();
 
-/*         let n1 =
+        /*         let n1 =
             BigFloatNumber::from_words(&[18446744073709551615], Sign::Neg, 2147483647).unwrap();
         let n2 = BigFloatNumber::from_words(&[1, 18446744073709551615], Sign::Pos, 128).unwrap();
         let ret = n1.pow(&n2, 128, RoundingMode::Up, &mut cc).unwrap();

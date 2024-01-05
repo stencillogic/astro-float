@@ -129,7 +129,7 @@ impl BigFloatNumber {
             x.set_precision(p_x, RoundingMode::None)?;
 
             x = x.reduce_trig_arg(cc, RoundingMode::None)?;
-            
+
             let (t, q) = x.trig_arg_pi_proximity(cc, RoundingMode::None)?;
             if q & 1 == 0 && add_p < t {
                 add_p = t;
