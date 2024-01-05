@@ -31,57 +31,45 @@ impl BigFloatNumber {
             return Err(Error::InvalidArgument);
         }
 
-        if (self.exponent() as isize - 1) / 2 > p.max(self.mantissa_max_bit_len()) as isize + 2 {
-            // acosh(x) = ln(2*x)
-            if self.exponent() == EXPONENT_MAX {
-                // ln(2) + ln(x)
+        let p_max = p.max(self.mantissa_max_bit_len());
 
-                let mut p_inc = WORD_BIT_SIZE;
-                let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+        let mut x = self.clone()?;
+        x.set_inexact(false);
 
-                let mut x = self.clone()?;
-                x.set_inexact(false);
+        let mut p_inc = WORD_BIT_SIZE;
+        let mut p_wrk = p_max + p_inc;
 
-                loop {
-                    let p_x = p_wrk + 3;
-                    x.set_precision(p_x, RoundingMode::None)?;
+        loop {
+            let mut p_x = p_wrk;
 
-                    x = x.ln(p_x, RoundingMode::None, cc)?;
+            let mut ret = if (self.exponent() as isize - 1) / 2 > p_x as isize + 2 {
+                // acosh(x) = ln(2*x)
+                if self.exponent() == EXPONENT_MAX {
+                    // ln(2) + ln(x)
+                    p_x += 2;
+
+                    let lnx = x.ln(p_x, RoundingMode::None, cc)?;
 
                     let ln2 = cc.ln_2_num(p_x, RoundingMode::None)?;
 
-                    let mut ret = ln2.add(&x, p_x, RoundingMode::None)?;
+                    ln2.add(&lnx, p_x, RoundingMode::None)?
+                } else {
+                    x.set_exponent(self.exponent() + 1);
 
-                    if ret.try_set_precision(p, rm, p_wrk)? {
-                        ret.set_inexact(ret.inexact() | self.inexact());
-                        break Ok(ret);
-                    }
+                    let lnx = x.ln(p_x, RoundingMode::None, cc)?;
 
-                    p_wrk += p_inc;
-                    p_inc = round_p(p_wrk / 5);
+                    x.set_exponent(self.exponent());
+
+                    lnx
                 }
             } else {
-                let mut x = self.clone()?;
-                x.set_exponent(x.exponent() + 1);
-                x.ln(p, rm, cc)
-            }
-        } else {
-            // ln(x + sqrt(x*x - 1))
+                // ln(x + sqrt(x*x - 1))
+                let mut additional_prec = 0;
+                if self.exponent() == 1 {
+                    additional_prec = count_leading_zeroes_skip_first(self.mantissa().digits());
+                }
 
-            let mut additional_prec = 0;
-            if self.exponent() == 1 {
-                additional_prec = count_leading_zeroes_skip_first(self.mantissa().digits());
-            }
-
-            let mut p_inc = WORD_BIT_SIZE;
-            let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
-
-            let mut x = self.clone()?;
-            x.set_inexact(false);
-
-            loop {
-                let p_x = p_wrk + 6 + additional_prec;
-                x.set_precision(p_x, RoundingMode::None)?;
+                p_x += 6 + additional_prec;
 
                 let xx = x.mul(&x, p_x, RoundingMode::None)?;
 
@@ -91,16 +79,16 @@ impl BigFloatNumber {
 
                 let d3 = d2.add(&x, p_x, RoundingMode::FromZero)?;
 
-                let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
+                d3.ln(p_x, RoundingMode::None, cc)?
+            };
 
-                if ret.try_set_precision(p, rm, p_wrk)? {
-                    ret.set_inexact(ret.inexact() | self.inexact());
-                    return Ok(ret);
-                }
-
-                p_wrk += p_inc;
-                p_inc = round_p(p_wrk / 5);
+            if ret.try_set_precision(p, rm, p_wrk)? {
+                ret.set_inexact(ret.inexact() | self.inexact());
+                return Ok(ret);
             }
+
+            p_wrk += p_inc;
+            p_inc = round_p(p_wrk / 5);
         }
     }
 }
