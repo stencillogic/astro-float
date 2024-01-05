@@ -2840,12 +2840,8 @@ mod tests {
         )
         .unwrap();
         assert!(!d1.is_odd_int());
-        let d1 = BigFloatNumber::from_words(
-            &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13835058055282163712],
-            Sign::Neg,
-            1,
-        )
-        .unwrap();
+        let d1 = BigFloatNumber::parse("1.1", crate::Radix::Bin, 256, RoundingMode::None, &mut cc)
+            .unwrap();
         assert!(!d1.is_odd_int());
 
         // build from words
