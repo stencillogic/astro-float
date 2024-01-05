@@ -1,10 +1,10 @@
 //! Exponentiation.
 
+use crate::EXPONENT_MIN;
 use crate::common::consts::{FOUR, THREE};
 use crate::common::util::{calc_add_cost, calc_mul_cost, round_p};
 use crate::ops::consts::Consts;
 use crate::ops::util::compute_small_exp;
-use crate::EXPONENT_MIN;
 use crate::{
     common::consts::ONE,
     defs::{Error, WORD_BIT_SIZE, WORD_SIGNIFICANT_BIT},
@@ -101,10 +101,19 @@ impl BigFloatNumber {
             return Ok(ret);
         }
 
-        compute_small_exp!(ONE, self.exponent() as isize, self.is_negative(), p, rm);
-
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len());
+
+        compute_small_exp!(
+            ONE,
+            self.exponent() as isize,
+            self.is_negative(),
+            p_wrk,
+            p,
+            rm
+        );
+
+        p_wrk += p_inc;
 
         loop {
             let p_x = p_wrk + 2;
@@ -185,6 +194,7 @@ impl BigFloatNumber {
     ///  - MemoryAllocation: failed to allocate memory.
     ///  - InvalidArgument: the precision is incorrect.
     ///  - DivisionByZero: `self` is zero and `n` is negative.
+    #[allow(dead_code)] // TODO: consider making public
     pub fn powsi(&self, n: isize, p: usize, rm: RoundingMode) -> Result<Self, Error> {
         if n >= 0 {
             self.powi_internal(n as usize, p, rm, true)
@@ -440,6 +450,7 @@ impl BigFloatNumber {
         rm: RoundingMode,
         cc: &mut Consts,
     ) -> Result<Self, Error> {
+        let nint = n.is_int();
         if n.is_zero() {
             let mut ret = Self::from_word(1, p)?;
             if n.inexact() {
@@ -476,27 +487,8 @@ impl BigFloatNumber {
                     return Err(Error::InvalidArgument);
                 }
             };
-        } else if self.is_negative() {
-            if n.is_int() {
-                let int = n.int_as_usize().map_err(|e| {
-                    if matches!(e, Error::InvalidArgument) {
-                        let sign = if n.is_odd_int() { Sign::Neg } else { Sign::Pos };
-                        Error::ExponentOverflow(sign)
-                    } else {
-                        e
-                    }
-                })?;
-
-                let int = int as isize * n.sign().to_int() as isize;
-
-                let mut ret = self.powsi(int, p, rm)?;
-
-                ret.set_inexact(ret.inexact() || n.inexact());
-
-                return Ok(ret);
-            } else {
-                return Err(Error::InvalidArgument);
-            }
+        } else if self.is_negative() && !nint {
+            return Err(Error::InvalidArgument);
         } else if n.exponent() == 1 && n.abs_cmp(&ONE) == 0 {
             if n.is_positive() {
                 let mut ret = self.clone()?;
@@ -516,60 +508,86 @@ impl BigFloatNumber {
 
         let mut x = self.clone()?;
         let mut y = n.clone()?;
+
+        x.set_sign(Sign::Pos);
+        let ret_sign = if nint && n.is_odd_int() { self.sign() } else { Sign::Pos };
+        let effective_rm = if ret_sign.is_negative() {
+            match rm {
+                RoundingMode::Up => RoundingMode::Down,
+                RoundingMode::Down => RoundingMode::Up,
+                v => v,
+            }
+        } else {
+            rm
+        };
+
         x.set_inexact(false);
         y.set_inexact(false);
 
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = p.max(self.mantissa_max_bit_len().max(y.mantissa_max_bit_len())) + p_inc;
 
-        loop {
-            let p_ext = p_wrk + 2;
-            x.set_precision(p_ext, RoundingMode::None)?;
+        match || -> Result<Self, Error> {
+            loop {
+                let p_ext = p_wrk + 2;
+                x.set_precision(p_ext, RoundingMode::None)?;
 
-            let ln = x.ln(p_ext, RoundingMode::None, cc)?;
+                let ln = x.ln(p_ext, RoundingMode::None, cc)?;
 
-            let mut m = match y.mul(&ln, p_ext, RoundingMode::None) {
-                Ok(v) => Ok(v),
-                Err(e) => match e {
-                    Error::ExponentOverflow(Sign::Neg) => {
-                        return Self::new2(p, Sign::Pos, n.inexact() || ln.inexact());
-                    }
-                    Error::ExponentOverflow(Sign::Pos) => Err(Error::ExponentOverflow(Sign::Pos)),
-                    Error::DivisionByZero => Err(Error::DivisionByZero),
-                    Error::InvalidArgument => Err(Error::InvalidArgument),
-                    Error::MemoryAllocation => Err(Error::MemoryAllocation),
-                },
-            }?;
-
-            compute_small_exp!(ONE, m.exponent() as isize, m.is_negative(), p, rm);
-
-            let mut ret = if m.is_negative() {
-                m.set_sign(Sign::Pos);
-
-                let u = match m.exp(p_ext, RoundingMode::None, cc) {
+                let mut m = match y.mul(&ln, p_ext, RoundingMode::None) {
                     Ok(v) => Ok(v),
                     Err(e) => match e {
-                        Error::ExponentOverflow(sign) => {
-                            return Self::new2(p, sign, self.inexact());
+                        Error::ExponentOverflow(Sign::Neg) => {
+                            return Self::new2(p, Sign::Pos, n.inexact() || ln.inexact());
                         }
+                        Error::ExponentOverflow(Sign::Pos) => Err(Error::ExponentOverflow(Sign::Pos)),
                         Error::DivisionByZero => Err(Error::DivisionByZero),
                         Error::InvalidArgument => Err(Error::InvalidArgument),
                         Error::MemoryAllocation => Err(Error::MemoryAllocation),
                     },
                 }?;
 
-                ONE.div(&u, p_ext, RoundingMode::FromZero)
-            } else {
-                m.exp(p_ext, RoundingMode::None, cc)
-            }?;
+                compute_small_exp!(ONE, m.exponent() as isize, m.is_negative(), p_ext, p, effective_rm);
 
-            if ret.try_set_precision(p, rm, p_wrk)? {
-                ret.set_inexact(ret.inexact() | self.inexact() | n.inexact());
-                return Ok(ret);
+                let mut ret = if m.is_negative() {
+                    m.set_sign(Sign::Pos);
+
+                    let u = match m.exp(p_ext, RoundingMode::None, cc) {
+                        Ok(v) => Ok(v),
+                        Err(e) => match e {
+                            Error::ExponentOverflow(sign) => {
+                                return Self::new2(p, sign, self.inexact());
+                            }
+                            Error::DivisionByZero => Err(Error::DivisionByZero),
+                            Error::InvalidArgument => Err(Error::InvalidArgument),
+                            Error::MemoryAllocation => Err(Error::MemoryAllocation),
+                        },
+                    }?;
+
+                    ONE.div(&u, p_ext, RoundingMode::FromZero)
+                } else {
+                    m.exp(p_ext, RoundingMode::None, cc)
+                }?;
+
+                if ret.try_set_precision(p, effective_rm, p_wrk)? {
+                    ret.set_inexact(ret.inexact() | self.inexact() | n.inexact());
+                    return Ok(ret);
+                }
+
+                p_wrk += p_inc;
+                p_inc = round_p(p_wrk / 5);
             }
-
-            p_wrk += p_inc;
-            p_inc = round_p(p_wrk / 5);
+        }() {
+            Ok(mut v) => {
+                v.set_sign(ret_sign);
+                Ok(v)
+            }
+            Err(e) => match e {
+                Error::ExponentOverflow(_) => Err(Error::ExponentOverflow(ret_sign)),
+                Error::DivisionByZero => Err(Error::DivisionByZero),
+                Error::InvalidArgument => Err(Error::InvalidArgument),
+                Error::MemoryAllocation => Err(Error::MemoryAllocation),
+            },
         }
     }
 }
@@ -585,9 +603,10 @@ mod test {
     fn test_power() {
         let mut cc = Consts::new().unwrap();
 
-        /* let n1 = BigFloatNumber::from_words(&[18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615, 18446744073709551615], Sign::Pos, 2147483647).unwrap();
-        let n2 = BigFloatNumber::from_words(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9223372036854775808], Sign::Neg, -2147483648).unwrap();
-        let ret = n1.pow(&n2, 1024, RoundingMode::Up, &mut cc).unwrap();
+/*         let n1 =
+            BigFloatNumber::from_words(&[18446744073709551615], Sign::Neg, 2147483647).unwrap();
+        let n2 = BigFloatNumber::from_words(&[1, 18446744073709551615], Sign::Pos, 128).unwrap();
+        let ret = n1.pow(&n2, 128, RoundingMode::Up, &mut cc).unwrap();
         println!("{:?}", ret);
         return; */
 
