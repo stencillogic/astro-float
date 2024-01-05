@@ -3,6 +3,7 @@
 use crate::common::consts::FOUR;
 use crate::common::consts::ONE;
 use crate::common::consts::THREE;
+use crate::common::consts::TRIG_EXP_THRES;
 use crate::common::util::calc_add_cost;
 use crate::common::util::calc_mul_cost;
 use crate::common::util::round_p;
@@ -113,29 +114,36 @@ impl BigFloatNumber {
             return Self::new2(p, self.sign(), self.inexact());
         }
 
-        compute_small_exp!(self, self.exponent() as isize * 2 - 2, true, p, rm);
-
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len());
 
+        compute_small_exp!(self, self.exponent() as isize * 2 - 2, true, p_wrk, p, rm);
+
+        p_wrk += p_inc;
+
+        let mut add_p = (3 - TRIG_EXP_THRES) as usize;
         loop {
             let mut x = self.clone()?;
-            x.set_inexact(false);
 
-            let p_x = p_wrk + 3;
+            let p_x = p_wrk + add_p;
             x.set_precision(p_x, RoundingMode::None)?;
 
             x = x.reduce_trig_arg(cc, RoundingMode::None)?;
+            
+            let (t, q) = x.trig_arg_pi_proximity(cc, RoundingMode::None)?;
+            if q & 1 == 0 && add_p < t {
+                add_p = t;
+            } else {
+                let mut ret = x.sin_series(RoundingMode::None)?;
 
-            let mut ret = x.sin_series(RoundingMode::None)?;
+                if ret.try_set_precision(p, rm, p_wrk)? {
+                    ret.set_inexact(ret.inexact() | self.inexact());
+                    break Ok(ret);
+                }
 
-            if ret.try_set_precision(p, rm, p_wrk)? {
-                ret.set_inexact(ret.inexact() | self.inexact());
-                break Ok(ret);
+                p_wrk += p_inc;
+                p_inc = round_p(p_wrk / 5);
             }
-
-            p_wrk += p_inc;
-            p_inc = round_p(p_wrk / 5);
         }
     }
 
