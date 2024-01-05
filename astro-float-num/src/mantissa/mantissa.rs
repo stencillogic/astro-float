@@ -1190,18 +1190,16 @@ impl Mantissa {
     }
 
     /// returns true if `self` represents odd integer.
-    pub fn is_odd_int(&self, n: usize) -> bool {
-        debug_assert!(n < self.max_bit_len() && n > 0);
+    pub fn is_odd_int(&self, e: usize) -> bool {
+        let n = self.max_bit_len() - e;
+        debug_assert!(e > 0);
+
+        if n == 0 {
+            return self.m[0] & 1 > 0;
+        }
 
         if ((self.m[n / WORD_BIT_SIZE]) >> (n % WORD_BIT_SIZE)) & 1 != 0 {
-            let b = (n - 1) % WORD_BIT_SIZE;
-            let i = (n - 1) / WORD_BIT_SIZE;
-
-            if b > 0 && self.m[i] << (WORD_BIT_SIZE - b) != 0 {
-                return false;
-            }
-
-            self.m.iter().take(i).all(|x| *x == 0)
+            self.find_one_from(e).is_none()
         } else {
             false
         }

@@ -1132,8 +1132,8 @@ impl BigFloatNumber {
     /// Returns true if `self` is odd integer number.
     pub(crate) fn is_odd_int(&self) -> bool {
         if self.e > 0 {
-            if (self.e as usize) < self.m.max_bit_len() {
-                self.m.is_odd_int(self.m.max_bit_len() - self.e as usize)
+            if (self.e as usize) <= self.m.max_bit_len() {
+                self.m.is_odd_int(self.e as usize)
             } else {
                 false
             }
@@ -2839,6 +2839,8 @@ mod tests {
             &mut cc,
         )
         .unwrap();
+        assert!(!d1.is_odd_int());
+        let d1 = BigFloatNumber::from_words(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13835058055282163712], Sign::Neg, 1).unwrap();
         assert!(!d1.is_odd_int());
 
         // build from words
