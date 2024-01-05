@@ -31,7 +31,7 @@ impl BigFloatNumber {
             return Err(Error::InvalidArgument);
         }
 
-        if (self.exponent() as isize - 1) / 2 > self.mantissa_max_bit_len() as isize + 2 {
+        if (self.exponent() as isize - 1) / 2 > p.max(self.mantissa_max_bit_len()) as isize + 2 {
             // acosh(x) = ln(2*x)
             if self.exponent() == EXPONENT_MAX {
                 // ln(2) + ln(x)

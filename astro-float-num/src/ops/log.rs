@@ -128,7 +128,6 @@ impl BigFloatNumber {
 
         loop {
             let mut x = m.clone()?;
-            x.set_inexact(false);
 
             let p_x = p_wrk + additional_prec;
             x.set_precision(p_x, RoundingMode::None)?;
