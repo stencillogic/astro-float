@@ -29,7 +29,8 @@ impl BigFloatNumber {
             return Self::new2(p, self.sign(), self.inexact());
         }
 
-        compute_small_exp!(self, self.exponent() as isize * 2 - 2, true, p, rm);
+        let p_max = p.max(self.mantissa_max_bit_len());
+        compute_small_exp!(self, self.exponent() as isize * 2 - 2, true, p_max, p, rm);
 
         let mut x = self.clone()?;
 
@@ -37,60 +38,24 @@ impl BigFloatNumber {
 
         let rm = if self.is_negative() { invert_rm_for_sign(rm) } else { rm };
 
-        let mut ret =
-            if (self.exponent() as isize - 1) / 2 > self.mantissa_max_bit_len() as isize + 2 {
-                // asinh(x) = ln(2 * |x|) * signum(x)
+        let mut ret = if (self.exponent() as isize - 1) / 2 > p_max as isize + 2 {
+            // asinh(x) = ln(2 * |x|) * signum(x)
 
-                if self.exponent() == EXPONENT_MAX {
-                    // ln(2 * |x|) = ln(2) + ln(|x|)
-                    let mut p_inc = WORD_BIT_SIZE;
-                    let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
-
-                    x.set_inexact(false);
-
-                    loop {
-                        let p_x = p_wrk + 2;
-
-                        let lnx = x.ln(p_x, RoundingMode::None, cc)?;
-
-                        let ln2 = cc.ln_2_num(p_x, RoundingMode::None)?;
-
-                        let mut ret = ln2.add(&lnx, p_x, RoundingMode::None)?;
-
-                        if ret.try_set_precision(p, rm, p_wrk)? {
-                            ret.set_inexact(ret.inexact() | self.inexact());
-                            break Ok(ret);
-                        }
-
-                        p_wrk += p_inc;
-                        p_inc = round_p(p_wrk / 5);
-                    }
-                } else {
-                    x.set_exponent(x.exponent() + 1);
-
-                    x.ln(p, rm, cc)
-                }
-            } else {
-                // ln(|x| + sqrt(x*x + 1)) * signum(x)
-
+            if self.exponent() == EXPONENT_MAX {
+                // ln(2 * |x|) = ln(2) + ln(|x|)
                 let mut p_inc = WORD_BIT_SIZE;
-                let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+                let mut p_wrk = p_max + p_inc;
 
                 x.set_inexact(false);
 
                 loop {
-                    let p_x = p_wrk + self.exponent().unsigned_abs() as usize + 5;
-                    x.set_precision(p_x, RoundingMode::None)?;
+                    let p_x = p_wrk + 2;
 
-                    let xx = x.mul(&x, p_x, RoundingMode::None)?;
+                    let lnx = x.ln(p_x, RoundingMode::None, cc)?;
 
-                    let d1 = xx.add(&ONE, p_x, RoundingMode::None)?;
+                    let ln2 = cc.ln_2_num(p_x, RoundingMode::None)?;
 
-                    let d2 = d1.sqrt(p_x, RoundingMode::None)?;
-
-                    let d3 = d2.add(&x, p_x, RoundingMode::FromZero)?;
-
-                    let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
+                    let mut ret = ln2.add(&lnx, p_x, RoundingMode::None)?;
 
                     if ret.try_set_precision(p, rm, p_wrk)? {
                         ret.set_inexact(ret.inexact() | self.inexact());
@@ -100,7 +65,42 @@ impl BigFloatNumber {
                     p_wrk += p_inc;
                     p_inc = round_p(p_wrk / 5);
                 }
-            }?;
+            } else {
+                x.set_exponent(x.exponent() + 1);
+
+                x.ln(p, rm, cc)
+            }
+        } else {
+            // ln(|x| + sqrt(x*x + 1)) * signum(x)
+
+            let mut p_inc = WORD_BIT_SIZE;
+            let mut p_wrk = p_max + p_inc;
+
+            x.set_inexact(false);
+
+            loop {
+                let p_x = p_wrk + self.exponent().unsigned_abs() as usize + 5;
+                x.set_precision(p_x, RoundingMode::None)?;
+
+                let xx = x.mul(&x, p_x, RoundingMode::None)?;
+
+                let d1 = xx.add(&ONE, p_x, RoundingMode::None)?;
+
+                let d2 = d1.sqrt(p_x, RoundingMode::None)?;
+
+                let d3 = d2.add(&x, p_x, RoundingMode::FromZero)?;
+
+                let mut ret = d3.ln(p_x, RoundingMode::None, cc)?;
+
+                if ret.try_set_precision(p, rm, p_wrk)? {
+                    ret.set_inexact(ret.inexact() | self.inexact());
+                    break Ok(ret);
+                }
+
+                p_wrk += p_inc;
+                p_inc = round_p(p_wrk / 5);
+            }
+        }?;
 
         ret.set_sign(self.sign());
 

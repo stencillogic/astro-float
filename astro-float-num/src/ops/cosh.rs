@@ -28,10 +28,12 @@ impl BigFloatNumber {
             return Ok(ret);
         }
 
-        compute_small_exp!(ONE, self.exponent() as isize * 2 - 1, false, p, rm);
-
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = p.max(self.mantissa_max_bit_len()) + p_inc;
+        let mut p_wrk = p.max(self.mantissa_max_bit_len());
+
+        compute_small_exp!(ONE, self.exponent() as isize * 2 - 1, false, p_wrk, p, rm);
+
+        p_wrk += p_inc;
 
         let mut x = self.clone()?;
         x.set_inexact(false);
