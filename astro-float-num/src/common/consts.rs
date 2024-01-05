@@ -1,6 +1,6 @@
 //! Static constants.
 
-use crate::{defs::DEFAULT_P, num::BigFloatNumber};
+use crate::{defs::DEFAULT_P, num::BigFloatNumber, Exponent, WORD_BIT_SIZE};
 use lazy_static::lazy_static;
 
 #[cfg(feature = "std")]
@@ -55,3 +55,5 @@ lazy_static! {
 thread_local! {
     pub static TENPOWERS: RefCell<Consts> = RefCell::new(Consts::new().expect("Failed to initialize thread-local constants cache"));
 }
+
+pub const TRIG_EXP_THRES: Exponent = -(WORD_BIT_SIZE as Exponent);
