@@ -599,7 +599,7 @@ impl BigFloat {
     }
 
     /// Parses a number from the string `s`.
-    /// The function expects `s` to be a number in scientific format in base 10, or +-Inf, or NaN.
+    /// The function expects `s` to be a number in scientific format in radix `rdx`, or +-Inf, or NaN.
     /// if `p` equals to usize::MAX then the precision of the resulting number is determined automatically from the input.
     ///
     /// ## Examples

@@ -199,7 +199,7 @@ fn parse_digits(
         }
     }
 
-    if skip_cnt == len {
+    if !int && skip_cnt == len {
         // just zeroes
         len = 0;
     }
@@ -268,7 +268,7 @@ mod tests {
     #[test]
     pub fn test_parser() {
         // combinations of possible valid components of a number and expected resulting characteristics.
-        let mantissas = ["0.0", "0", ".000", "00.", "00123", "456.", "789.012", ".3456", "0.0078"];
+        let mantissas = ["0.0", "0", ".000", "00.", "000123", "456.", "789.012", ".3456", "0.0078"];
         let expected_mantissas = [
             vec![0],
             vec![],
