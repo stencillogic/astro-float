@@ -144,7 +144,7 @@
 extern crate alloc;
 
 /// Computes an expression with the specified precision and rounding mode.
-/// 
+///
 /// Macro takes into account 2 aspects.
 ///
 /// 1. Code simplification. Macro simplifies code and improves its readability by allowing to specify simple and concise expression
