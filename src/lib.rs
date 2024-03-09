@@ -144,6 +144,7 @@
 extern crate alloc;
 
 /// Computes an expression with the specified precision and rounding mode.
+/// 
 /// Macro takes into account 2 aspects.
 ///
 /// 1. Code simplification. Macro simplifies code and improves its readability by allowing to specify simple and concise expression
@@ -208,7 +209,7 @@ extern crate alloc;
 /// The context determines the precision, the rounding mode of the result, and also contains the cache of constants.
 ///
 /// Also, the macro uses minimum and maximum exponent values from the context to limit possible exponent range of the result and to set the limit of precision required for error compensation.
-/// It is recommended to set the smallest values for the exponent range to increase the performance of computations (the internal precision may be as large as the exponent of a number).
+/// It is recommended to set the smallest exponent range to increase the performance of computations (the internal precision may be as large as the exponent of a number).
 ///
 /// A tuple `(usize, RoundingMode, &mut Consts)`, or `(usize, RoundingMode, &mut Consts, Exponent, Exponent)` can be used as a temporary context (see examples below).
 ///
