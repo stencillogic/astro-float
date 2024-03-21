@@ -1254,6 +1254,7 @@ impl BigFloatNumber {
                     // non zero for directed rounding modes,
                     // non zero for rounding to even/odd when msb of self is the rounding bit
                     *ret.m.digits_mut().last_mut().unwrap() = WORD_SIGNIFICANT_BIT;
+                    ret.m.set_bit_len(ret.mantissa_max_bit_len());
 
                     let e = -(n as isize - 1);
                     if e < EXPONENT_MIN as isize {
@@ -3441,7 +3442,10 @@ mod tests {
             //println!("{:?}", (m1, s, e1, n, rm, m2, e2));
             let d1 = BigFloatNumber::from_words(&m1, s, e1).unwrap();
             let d2 = d1.round(n, rm).unwrap();
-            assert_eq!(d2.mantissa().digits(), m2);
+
+            let m2m = Mantissa::from_words(m2.len() * WORD_BIT_SIZE, &m2).unwrap();
+            assert_eq!(d2.mantissa().digits(), m2m.digits());
+            assert_eq!(d2.mantissa().bit_len(), m2m.bit_len());
             assert_eq!(d2.sign(), s);
             assert_eq!(d2.exponent(), e2);
             assert!(!d1.inexact());
