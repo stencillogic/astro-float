@@ -23,7 +23,7 @@ jobs:
 
   build-and-test-x32:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     env:
       DEP_GMP_LIMB_BITS: 32
