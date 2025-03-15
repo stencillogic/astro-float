@@ -71,7 +71,7 @@ impl Mantissa {
             let mut q = Mantissa::from_word_buf(q);
             let mut r = Mantissa::from_word_buf(r);
 
-            let l2 = l/2;
+            let l2 = l / 2;
 
             if q.is_zero() {
                 let part1 = Self::conv_to_dec(&mut r, l2, tenpowers, p - 1, most_significant)?;
@@ -79,8 +79,7 @@ impl Mantissa {
                 Ok(part1)
             } else {
                 let mut part1 = Self::conv_to_dec(&mut r, l2, tenpowers, p - 1, false)?;
-                let mut part2 =
-                    Self::conv_to_dec(&mut q, l2, tenpowers, p - 1, most_significant)?;
+                let mut part2 = Self::conv_to_dec(&mut q, l2, tenpowers, p - 1, most_significant)?;
 
                 part2.try_reserve_exact(l2)?;
                 if part1.len() < l2 {
