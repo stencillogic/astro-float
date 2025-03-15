@@ -425,7 +425,6 @@ fn compute_cube<T: PolycoeffGen>(
 ) -> Result<BigFloatNumber, Error> {
     if n > 1 {
         let mut acc = BigFloatNumber::new(p)?;
-        let cache_dim_sz = cache_dim_sz;
         // no need to multityply the returned coefficient of the first cube by 1.
         let poly_val = compute_cube(p, n - 1, cache, cache_dim_sz, polycoeff_gen)?;
         acc = acc.add(&poly_val, p, RoundingMode::None)?;

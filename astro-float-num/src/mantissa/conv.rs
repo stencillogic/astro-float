@@ -19,7 +19,7 @@ impl Mantissa {
     /// Convert `self` to an array of decimal digits with divide and conquer algorithm.
     /// `l` is the number of decimal digits in the input ceiled to a power of 10.
     /// `p` is the current depth of `tenpowers` for the given `input`.
-    /// `most_significant` true if `self` contains the most significant part.
+    /// `most_significant` true if `self` contains the most significant part (ignores leading zeroes if ture).
     pub(crate) fn conv_to_dec(
         &mut self,
         l: usize,
@@ -71,16 +71,20 @@ impl Mantissa {
             let mut q = Mantissa::from_word_buf(q);
             let mut r = Mantissa::from_word_buf(r);
 
+            let l2 = l / 2;
+
             if q.is_zero() {
-                let part1 = Self::conv_to_dec(&mut r, l / 2, tenpowers, p - 1, most_significant)?;
+                let part1 = Self::conv_to_dec(&mut r, l2, tenpowers, p - 1, most_significant)?;
 
                 Ok(part1)
             } else {
-                let mut part1 = Self::conv_to_dec(&mut r, l / 2, tenpowers, p - 1, false)?;
-                let mut part2 =
-                    Self::conv_to_dec(&mut q, l / 2, tenpowers, p - 1, most_significant)?;
+                let mut part1 = Self::conv_to_dec(&mut r, l2, tenpowers, p - 1, false)?;
+                let mut part2 = Self::conv_to_dec(&mut q, l2, tenpowers, p - 1, most_significant)?;
 
-                part2.try_reserve_exact(part1.len())?;
+                part2.try_reserve_exact(l2)?;
+                if part1.len() < l2 {
+                    part2.resize(part2.len() + l2 - part1.len(), 0);
+                }
                 part2.append(&mut part1);
 
                 Ok(part2)
@@ -134,7 +138,7 @@ impl Mantissa {
         debug_assert!(input[0] != 0);
 
         let mut chunks = Vec::new();
-        chunks.try_reserve_exact((input.len() + WORD_TENPOWER_LEN - 1) / WORD_TENPOWER_LEN)?;
+        chunks.try_reserve_exact(input.len().div_ceil(WORD_TENPOWER_LEN))?;
 
         let mut word: Word = 0;
         let mut i = 0;
@@ -321,7 +325,7 @@ mod tests {
             assert_eq!(ret, expected);
         };
 
-        /* let tst = [0x9999999999999999, 0x9999999999999999, 0x9999999999999999];
+        /* let tst = [0, 15336237721486753792, 13000820969757097588, 12856862479722330362, 1520271299530698982, 744111004532756610, 13398299208874459061, 17516404478540231373, 3742450158296248731, 2601219928155938017, 8664737567992370843, 17634481686646146565, 12526671041338573227, 4683828805702906964, 8213244418837960360, 17723613685701911250, 13242562882371522762, 6031074778335529103];
         let mut input = WordBuf::new(tst.len()).unwrap();
         input.copy_from_slice(&tst);
         test_input(input);
