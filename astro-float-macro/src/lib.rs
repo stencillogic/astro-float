@@ -450,8 +450,8 @@ fn traverse_expr(expr: &Expr, err: &mut Vec<usize>, cc: &mut Consts) -> Result<T
 
 // Docs for the macro are in the astro-float crate.
 
-///
 #[proc_macro]
+#[allow(missing_docs)]
 pub fn expr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let pmi = syn::parse_macro_input!(input as MacroInput);
 

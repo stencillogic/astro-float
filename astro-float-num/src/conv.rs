@@ -767,6 +767,12 @@ mod tests {
     fn test_conv_num() {
         let mut cc = Consts::new().unwrap();
 
+        /* let z = BigFloatNumber::from_f64(1024, -2.0).unwrap();
+        let d = BigFloatNumber::from_f64(1024, 1.0e-64).unwrap();
+        let r = z.sub(&d, 1024, RoundingMode::None).unwrap();
+        print!("{:?}", r.conv_to_dec(RoundingMode::Down, &mut cc).unwrap());
+        return; */
+
         // basic tests
         let n = BigFloatNumber::from_f64(64, 0.031256789f64).unwrap();
 
