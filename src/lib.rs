@@ -74,6 +74,7 @@
 //! assert_eq!(pi.cmp(&pi_lib), Some(0));
 //!
 //! // Print using decimal radix.
+//! #[cfg(feature="std")]
 //! println!("{}", pi);
 //!
 //! // output: 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458699748e+0
@@ -116,6 +117,7 @@
 //! assert_eq!(pi.cmp(&pi_lib), Some(0));
 //!
 //! // Print using decimal radix.
+//! #[cfg(feature="std")] 
 //! println!("{}", pi);
 //!
 //! // output: 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458699748e+0
@@ -148,10 +150,10 @@ extern crate alloc;
 /// Macro takes into account 2 aspects.
 ///
 /// 1. Code simplification. Macro simplifies code and improves its readability by allowing to specify simple and concise expression
-/// and process input arguments transparently.
+///    and process input arguments transparently.
 ///
 /// 2. Error compensation. Macro compensates error caused by [catastrophic cancellation](https://en.wikipedia.org/wiki/Catastrophic_cancellation)
-/// and some other situations where precision can be lost by automatically increasing the working precision internally.
+///    and some other situations where precision can be lost by automatically increasing the working precision internally.
 ///
 /// The macro does not take care of correct rounding, because the completion of the rounding algorithm in finite time depends on the macro's input.
 ///

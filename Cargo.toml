@@ -11,12 +11,12 @@ readme = "README.md"
 repository = "https://github.com/stencillogic/astro-float"
 
 [dependencies]
-astro-float-num = "0.3.5"
+astro-float-num = { version = "0.3.5", default-features = false }
 astro-float-macro = "0.4.4"
 
 [features]
 default = ["std", "random", "serde"]
-std = []
+std = ["astro-float-num/std"]
 random = ["astro-float-num/random"]
 serde = ["astro-float-num/serde"]
 
