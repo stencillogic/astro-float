@@ -895,15 +895,7 @@ fn test_tanh_atanh() {
 
     let mut cc = Consts::new().unwrap();
 
-    let exp_to;
-    #[cfg(not(target_arch = "x86"))]
-    {
-        exp_to = 5;
-    }
-    #[cfg(target_arch = "x86")]
-    {
-        exp_to = 3;
-    }
+    let exp_to = if cfg!(target_pointer_width = "64") { 5 } else { 3 };
 
     for i in 0..1000 {
         let p1 = (rand::random::<usize>() % prec_rng + 1) * WORD_BIT_SIZE;

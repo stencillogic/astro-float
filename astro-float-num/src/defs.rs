@@ -8,48 +8,44 @@ use std::collections::TryReserveError;
 #[cfg(not(feature = "std"))]
 use alloc::collections::TryReserveError;
 
-/// A word.
-#[cfg(not(target_arch = "x86"))]
-pub type Word = u64;
+cfg_if::cfg_if! {
+    if #[cfg(target_pointer_width = "64")] {
+        /// A word.
+        pub type Word = u64;
 
-/// Doubled word.
-#[cfg(not(target_arch = "x86"))]
-pub type DoubleWord = u128;
+        /// Doubled word.
+        pub type DoubleWord = u128;
 
-/// Word with sign.
-#[cfg(not(target_arch = "x86"))]
-pub type SignedWord = i128;
+        /// Word with sign.
+        pub type SignedWord = i128;
+    } else {
+        /// A word.
+        pub type Word = u32;
 
-/// A word.
-#[cfg(target_arch = "x86")]
-pub type Word = u32;
+        /// Doubled word.
+        pub type DoubleWord = u64;
 
-/// Doubled word.
-#[cfg(target_arch = "x86")]
-pub type DoubleWord = u64;
-
-/// Word with sign.
-#[cfg(target_arch = "x86")]
-pub type SignedWord = i64;
+        /// Word with sign.
+        pub type SignedWord = i64;
+    }
+}
 
 /// An exponent.
 pub type Exponent = i32;
 
 /// Maximum exponent value.
-#[cfg(not(target_arch = "x86"))]
-pub const EXPONENT_MAX: Exponent = Exponent::MAX;
-
-/// Maximum exponent value.
-#[cfg(target_arch = "x86")]
-pub const EXPONENT_MAX: Exponent = Exponent::MAX / 4;
-
-/// Minimum exponent value.
-#[cfg(not(target_arch = "x86"))]
-pub const EXPONENT_MIN: Exponent = Exponent::MIN;
+pub const EXPONENT_MAX: Exponent = if cfg!(target_pointer_width = "64") {
+    Exponent::MAX
+} else {
+    Exponent::MAX / 4
+};
 
 /// Minimum exponent value.
-#[cfg(target_arch = "x86")]
-pub const EXPONENT_MIN: Exponent = Exponent::MIN / 4;
+pub const EXPONENT_MIN: Exponent = if cfg!(target_pointer_width = "64") {
+    Exponent::MIN
+} else {
+    Exponent::MIN / 4
+};
 
 /// Maximum value of a word.
 pub const WORD_MAX: Word = Word::MAX;

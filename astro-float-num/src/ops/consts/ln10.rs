@@ -133,45 +133,26 @@ mod tests {
     use crate::{RoundingMode, Sign};
 
     #[test]
-    #[cfg(target_arch = "x86")]
     fn test_ln10_const() {
         let mut ln10 = Ln10Cache::new().unwrap();
         let c = ln10.for_prec(320, RoundingMode::ToEven).unwrap();
-        //println!("{:?}", c.fp3(crate::Radix::Dec, RoundingMode::None));
-        let r = BigFloatNumber::from_raw_parts(
-            &[
-                2980581469, 2519663319, 32517490, 2210799234, 3663591694, 3801083129, 2194868776,
-                3931559467, 2863180822, 2472381917,
-            ],
-            320,
-            Sign::Pos,
-            2,
-            false,
-        )
-        .unwrap();
-        assert!(c.cmp(&r) == 0);
-    }
 
-    #[test]
-    #[cfg(not(target_arch = "x86"))]
-    fn test_ln10_const() {
-        let mut ln10 = Ln10Cache::new().unwrap();
-        let c = ln10.for_prec(320, RoundingMode::ToEven).unwrap();
-        //println!("{:?}", c);
-        let r = BigFloatNumber::from_raw_parts(
-            &[
-                10821871555016396893,
-                9495310408084368754,
-                16325527732095940878,
-                16885919335239060008,
-                10618799479599967254,
-            ],
-            320,
-            Sign::Pos,
-            2,
-            false,
-        )
-        .unwrap();
+        #[cfg(target_pointer_width = "64")]
+        let words = [
+            10821871555016396893,
+            9495310408084368754,
+            16325527732095940878,
+            16885919335239060008,
+            10618799479599967254,
+        ];
+
+        #[cfg(not(target_pointer_width = "64"))]
+        let words = [
+            2980581469, 2519663319, 32517490, 2210799234, 3663591694, 3801083129, 2194868776,
+            3931559467, 2863180822, 2472381917,
+        ];
+
+        let r = BigFloatNumber::from_raw_parts(&words, 320, Sign::Pos, 2, false).unwrap();
         assert!(c.cmp(&r) == 0);
     }
 }

@@ -2158,16 +2158,10 @@ mod tests {
 
         let d1 = ONE.clone();
         assert!(d1.exponent() == Some(1));
-        let words: &[Word] = {
-            #[cfg(not(target_arch = "x86"))]
-            {
-                &[0, 0x8000000000000000]
-            }
-            #[cfg(target_arch = "x86")]
-            {
-                &[0, 0, 0, 0x80000000]
-            }
-        };
+        #[cfg(target_pointer_width = "64")]
+        let words: &[Word] = &[0, 0x8000000000000000];
+        #[cfg(not(target_pointer_width = "64"))]
+        let words: &[Word] = &[0, 0, 0, 0x80000000];
 
         assert!(d1.mantissa_digits() == Some(words));
         assert!(d1.mantissa_max_bit_len() == Some(DEFAULT_P));
@@ -2473,22 +2467,17 @@ mod rand_tests {
 
     use super::*;
     use crate::defs::EXPONENT_MAX;
+    use crate::defs::EXPONENT_MIN;
 
     #[test]
     fn test_rand() {
         for _ in 0..1000 {
             let p = rand::random::<usize>() % 1000 + DEFAULT_P;
-            let exp_from;
-            #[cfg(not(target_arch = "x86"))]
-            {
-                exp_from = rand::random::<Exponent>().abs();
-            }
-            #[cfg(target_arch = "x86")]
-            {
-                use crate::defs::EXPONENT_MIN;
-                exp_from =
-                    rand::random::<Exponent>().abs() % (EXPONENT_MAX - EXPONENT_MIN) + EXPONENT_MIN;
-            }
+            let exp_from = if cfg!(target_pointer_width = "64") {
+                rand::random::<Exponent>().abs()
+            } else {
+                rand::random::<Exponent>().abs() % (EXPONENT_MAX - EXPONENT_MIN) + EXPONENT_MIN
+            };
             let exp_shift = if EXPONENT_MAX > exp_from {
                 rand::random::<Exponent>().abs()
                     % (EXPONENT_MAX as isize - exp_from as isize) as Exponent

@@ -1,7 +1,7 @@
 //! Auxiliary functions.
 
 use crate::{
-    defs::{Word, WORD_BIT_SIZE, WORD_MAX, WORD_SIGNIFICANT_BIT},
+    defs::{DoubleWord, Word, WORD_BASE, WORD_BIT_SIZE, WORD_MAX, WORD_SIGNIFICANT_BIT},
     RoundingMode,
 };
 
@@ -117,32 +117,28 @@ pub fn calc_sqrt_cost(p: usize, cost_mul: usize, cost_add: usize) -> usize {
 
 #[inline(always)]
 pub fn add_carry(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
+    // Using
     #[cfg(target_arch = "x86_64")]
     {
         // platform-specific operation
-        unsafe { core::arch::x86_64::_addcarry_u64(c as u8, a, b, r) as Word }
+        return unsafe { core::arch::x86_64::_addcarry_u64(c as u8, a, b, r) as Word };
     }
 
     #[cfg(target_arch = "x86")]
     {
         // platform-specific operation
-        unsafe { core::arch::x86::_addcarry_u32(c as u8, a, b, r) as Word }
+        return unsafe { core::arch::x86::_addcarry_u32(c as u8, a, b, r) as Word };
     }
 
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
-    {
-        use crate::defs::DoubleWord;
-        use crate::defs::WORD_BASE;
-
-        let mut s = c as DoubleWord + a as DoubleWord + b as DoubleWord;
-        if s >= WORD_BASE {
-            s -= WORD_BASE;
-            *r = s as Word;
-            1
-        } else {
-            *r = s as Word;
-            0
-        }
+    #[allow(unreachable_code)] // not used on x86
+    let mut s = c as DoubleWord + a as DoubleWord + b as DoubleWord;
+    if s >= WORD_BASE {
+        s -= WORD_BASE;
+        *r = s as Word;
+        1
+    } else {
+        *r = s as Word;
+        0
     }
 }
 
@@ -151,30 +147,25 @@ pub fn sub_borrow(a: Word, b: Word, c: Word, r: &mut Word) -> Word {
     #[cfg(target_arch = "x86_64")]
     {
         // platform-specific operation
-        unsafe { core::arch::x86_64::_subborrow_u64(c as u8, a, b, r) as Word }
+        return unsafe { core::arch::x86_64::_subborrow_u64(c as u8, a, b, r) as Word };
     }
 
     #[cfg(target_arch = "x86")]
     {
         // platform-specific operation
-        unsafe { core::arch::x86::_subborrow_u32(c as u8, a, b, r) as Word }
+        return unsafe { core::arch::x86::_subborrow_u32(c as u8, a, b, r) as Word };
     }
 
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
-    {
-        use crate::defs::DoubleWord;
-        use crate::defs::WORD_BASE;
+    #[allow(unreachable_code)] // not used on x86
+    let v1 = a as DoubleWord;
+    let v2 = b as DoubleWord + c as DoubleWord;
 
-        let v1 = a as DoubleWord;
-        let v2 = b as DoubleWord + c as DoubleWord;
-
-        if v1 < v2 {
-            *r = (v1 + WORD_BASE - v2) as Word;
-            1
-        } else {
-            *r = (v1 - v2) as Word;
-            0
-        }
+    if v1 < v2 {
+        *r = (v1 + WORD_BASE - v2) as Word;
+        1
+    } else {
+        *r = (v1 - v2) as Word;
+        0
     }
 }
 

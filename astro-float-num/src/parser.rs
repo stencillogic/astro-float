@@ -362,28 +362,20 @@ mod tests {
         assert!(e == -0x1f7);
 
         // large exp
-        let numstr;
-        #[cfg(not(target_arch = "x86"))]
-        {
-            numstr = "abc.def09123e_e+7FFFFFFF";
-        }
-        #[cfg(target_arch = "x86")]
-        {
-            numstr = "abc.def09123e_e+1FFFFFFF";
-        }
+        let numstr = if cfg!(target_pointer_width = "64") {
+            "abc.def09123e_e+7FFFFFFF"
+        } else {
+            "abc.def09123e_e+1FFFFFFF"
+        };
         let ps = parse(numstr, Radix::Hex).unwrap();
         assert!(ps.is_inf());
         assert!(ps.sign().is_positive());
 
-        let numstr;
-        #[cfg(not(target_arch = "x86"))]
-        {
-            numstr = "-abc.def09123e_e+7FFFFFFF";
-        }
-        #[cfg(target_arch = "x86")]
-        {
-            numstr = "-abc.def09123e_e+1FFFFFFF";
-        }
+        let numstr = if cfg!(target_pointer_width = "64") {
+            "-abc.def09123e_e+7FFFFFFF"
+        } else {
+            "-abc.def09123e_e+1FFFFFFF"
+        };
         let ps = parse(numstr, Radix::Hex).unwrap();
         assert!(ps.is_inf());
         assert!(!ps.is_nan());
