@@ -11,18 +11,21 @@ readme = "README.md"
 repository = "https://github.com/stencillogic/astro-float"
 
 [dependencies]
-astro-float-num = { version = "0.3.6", default-features = false }
-astro-float-macro = "0.4.5"
+astro-float-num = {path = "astro-float-num",default-features = false } #{ version = "0.3.6", default-features = false }
+astro-float-macro = {path = "astro-float-macro" } #"0.4.5"
 
 [features]
 default = ["std", "random", "serde"]
 std = ["astro-float-num/std"]
 random = ["astro-float-num/random"]
 serde = ["astro-float-num/serde"]
+rkyv = ["astro-float-num/rkyv"]
 
 [dev-dependencies]
+astro-float-num = { path = "astro-float-num",default-features = false , features = [ "rkyv" ] }
 trybuild = "1.0"
 rusty-hook = "0.11.2"
+rkyv = "0.8" #couldn't run tests in astro-num on msvc(mpfr won't build)
 
 [workspace]
 members = [

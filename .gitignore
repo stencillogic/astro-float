@@ -2,3 +2,5 @@
 .vscode/
 /target
 Cargo.lock
+#winmerge
+**/*.bak

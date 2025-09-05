@@ -23,9 +23,11 @@ serde = { version = "1.0.147", optional = true }
 rand = { version = "0.8.5", optional = true }
 lazy_static = { version = "1.4.0", default-features = false, features = [] }
 itertools = { version = "0.10.3", default-features = false, features = [] }
+rkyv = { version = "0.8", features = [ "bytecheck" ] , optional = true } 
 
 [features]
 default = ["std", "random", "serde"]
 std = []
 random = ["dep:rand"]
 serde = ["dep:serde"]
+rkyv = ["dep:rkyv"]

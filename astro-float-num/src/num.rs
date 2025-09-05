@@ -15,8 +15,12 @@ use crate::defs::WORD_BIT_SIZE;
 use crate::defs::WORD_SIGNIFICANT_BIT;
 use crate::mantissa::Mantissa;
 
+#[cfg(feature = "rkyv")]
+use rkyv::{Archive, Serialize, Deserialize};
+
 /// A finite floating point number with mantissa of an arbitrary size, an exponent, and the sign.
 #[derive(Debug, Hash)]
+#[cfg_attr(feature = "rkyv", derive(Archive, Serialize, Deserialize))]
 pub(crate) struct BigFloatNumber {
     e: Exponent,
     s: Sign,

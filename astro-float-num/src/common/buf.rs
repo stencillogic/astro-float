@@ -15,8 +15,12 @@ use crate::common::util::shift_slice_right;
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
+#[cfg(feature = "rkyv")]
+use rkyv::{Archive, Serialize, Deserialize};
+
 /// Buffer for holding mantissa gidits.
 #[derive(Debug, Hash)]
+#[cfg_attr(feature = "rkyv", derive(Archive, Serialize, Deserialize))]
 pub struct WordBuf {
     inner: Vec<Word>,
 }
