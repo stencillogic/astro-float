@@ -10,13 +10,48 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-and-test-x64:
+  build-and-test:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Run tests
       run: cargo test --workspace --release --verbose
     - name: Run no_std tests
       run: cargo test --workspace --release --verbose --no-default-features --features random,serde
+
+  build-wasm32:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Add wasm32 target
+      run: rustup target add wasm32-unknown-unknown
+    - name: Build for wasm32
+      run: cargo build --package astro-float-num --target wasm32-unknown-unknown --no-default-features
+    - name: Build for wasm32 with features
+      run: cargo build --package astro-float-num --target wasm32-unknown-unknown --no-default-features --features serde
+
+  build-i686:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Add i686 target
+      run: rustup target add i686-unknown-linux-gnu
+    - name: Install 32-bit libs
+      run: sudo apt-get update && sudo apt-get install -y gcc-multilib
+    - name: Build for i686
+      run: cargo build --package astro-float-num --target i686-unknown-linux-gnu

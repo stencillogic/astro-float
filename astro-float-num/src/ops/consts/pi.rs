@@ -154,7 +154,7 @@ mod tests {
     use crate::{RoundingMode, Sign};
 
     #[test]
-    #[cfg(target_arch = "x86")]
+    #[cfg(target_pointer_width = "32")]
     fn test_pi_const() {
         let mut pi = PiCache::new().unwrap();
         let c = pi.for_prec(320, RoundingMode::ToEven).unwrap();
@@ -174,7 +174,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(target_arch = "x86"))]
+    #[cfg(not(target_pointer_width = "32"))]
     fn test_pi_const() {
         let mut pi = PiCache::new().unwrap();
         let c = pi.for_prec(320, RoundingMode::ToEven).unwrap();

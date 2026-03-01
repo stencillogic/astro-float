@@ -717,12 +717,12 @@ impl Mantissa {
         let nd = m.len() - size_of::<u64>() / size_of::<Word>();
         m[..nd].fill(0);
 
-        #[cfg(not(target_arch = "x86"))]
+        #[cfg(not(target_pointer_width = "32"))]
         {
             m[nd] = u;
         }
 
-        #[cfg(target_arch = "x86")]
+        #[cfg(target_pointer_width = "32")]
         {
             let mut u = u;
             for v in &mut m[nd..] {
@@ -764,12 +764,12 @@ impl Mantissa {
 
     #[cfg(test)]
     pub fn to_u64(&self) -> u64 {
-        #[cfg(not(target_arch = "x86"))]
+        #[cfg(not(target_pointer_width = "32"))]
         {
             self.m[self.m.len() - 1]
         }
 
-        #[cfg(target_arch = "x86")]
+        #[cfg(target_pointer_width = "32")]
         {
             let mut ret: u64 = 0;
             let nd = size_of::<u64>() / size_of::<Word>();

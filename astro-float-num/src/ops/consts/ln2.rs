@@ -137,7 +137,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[cfg(target_arch = "x86")]
+    #[cfg(target_pointer_width = "32")]
     fn test_ln2_const() {
         let mut ln2 = Ln2Cache::new().unwrap();
         let c = ln2.for_prec(3200, RoundingMode::ToEven).unwrap();
@@ -170,7 +170,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(target_arch = "x86"))]
+    #[cfg(not(target_pointer_width = "32"))]
     fn test_ln2_const() {
         let mut ln2 = Ln2Cache::new().unwrap();
         let c = ln2.for_prec(3200, RoundingMode::ToEven).unwrap();
