@@ -1,5 +1,5 @@
 //! Integration tests.
 
 #[cfg(test)]
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
 mod mpfr;

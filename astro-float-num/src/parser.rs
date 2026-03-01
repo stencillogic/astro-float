@@ -363,11 +363,11 @@ mod tests {
 
         // large exp
         let numstr;
-        #[cfg(not(target_arch = "x86"))]
+        #[cfg(not(target_pointer_width = "32"))]
         {
             numstr = "abc.def09123e_e+7FFFFFFF";
         }
-        #[cfg(target_arch = "x86")]
+        #[cfg(target_pointer_width = "32")]
         {
             numstr = "abc.def09123e_e+1FFFFFFF";
         }
@@ -376,11 +376,11 @@ mod tests {
         assert!(ps.sign().is_positive());
 
         let numstr;
-        #[cfg(not(target_arch = "x86"))]
+        #[cfg(not(target_pointer_width = "32"))]
         {
             numstr = "-abc.def09123e_e+7FFFFFFF";
         }
-        #[cfg(target_arch = "x86")]
+        #[cfg(target_pointer_width = "32")]
         {
             numstr = "-abc.def09123e_e+1FFFFFFF";
         }

@@ -9,46 +9,46 @@ use std::collections::TryReserveError;
 use alloc::collections::TryReserveError;
 
 /// A word.
-#[cfg(not(target_arch = "x86"))]
+#[cfg(not(target_pointer_width = "32"))]
 pub type Word = u64;
 
 /// Doubled word.
-#[cfg(not(target_arch = "x86"))]
+#[cfg(not(target_pointer_width = "32"))]
 pub type DoubleWord = u128;
 
 /// Word with sign.
-#[cfg(not(target_arch = "x86"))]
+#[cfg(not(target_pointer_width = "32"))]
 pub type SignedWord = i128;
 
 /// A word.
-#[cfg(target_arch = "x86")]
+#[cfg(target_pointer_width = "32")]
 pub type Word = u32;
 
 /// Doubled word.
-#[cfg(target_arch = "x86")]
+#[cfg(target_pointer_width = "32")]
 pub type DoubleWord = u64;
 
 /// Word with sign.
-#[cfg(target_arch = "x86")]
+#[cfg(target_pointer_width = "32")]
 pub type SignedWord = i64;
 
 /// An exponent.
 pub type Exponent = i32;
 
 /// Maximum exponent value.
-#[cfg(not(target_arch = "x86"))]
+#[cfg(not(target_pointer_width = "32"))]
 pub const EXPONENT_MAX: Exponent = Exponent::MAX;
 
 /// Maximum exponent value.
-#[cfg(target_arch = "x86")]
+#[cfg(target_pointer_width = "32")]
 pub const EXPONENT_MAX: Exponent = Exponent::MAX / 4;
 
 /// Minimum exponent value.
-#[cfg(not(target_arch = "x86"))]
+#[cfg(not(target_pointer_width = "32"))]
 pub const EXPONENT_MIN: Exponent = Exponent::MIN;
 
 /// Minimum exponent value.
-#[cfg(target_arch = "x86")]
+#[cfg(target_pointer_width = "32")]
 pub const EXPONENT_MIN: Exponent = Exponent::MIN / 4;
 
 /// Maximum value of a word.

@@ -166,12 +166,12 @@ impl BigFloatNumber {
     }
 
     pub(crate) fn from_u64_internal(d: u64, p: usize) -> Result<Self, Error> {
-        #[cfg(not(target_arch = "x86"))]
+        #[cfg(not(target_pointer_width = "32"))]
         {
             Self::from_word(d, p)
         }
 
-        #[cfg(target_arch = "x86")]
+        #[cfg(target_pointer_width = "32")]
         {
             Self::p_assertion(p)?;
 
@@ -551,7 +551,7 @@ impl BigFloatNumber {
         if self.is_subnormal() {
             let (shift, mantissa) = self.m.normilize()?;
 
-            #[cfg(not(target_arch = "x86"))]
+            #[cfg(not(target_pointer_width = "32"))]
             {
                 // checks for the case when usize is larger than exponent
                 debug_assert!((shift as isize) < (isize::MAX / 2 + EXPONENT_MIN as isize));
@@ -673,7 +673,7 @@ impl BigFloatNumber {
 
         d3.inexact |= inexact;
 
-        #[cfg(not(target_arch = "x86"))]
+        #[cfg(not(target_pointer_width = "32"))]
         {
             debug_assert!(shift <= isize::MAX / 2 && e >= isize::MIN / 2);
         }
@@ -845,7 +845,7 @@ impl BigFloatNumber {
         ret.m = m;
         ret.e = exponent - 0b1111111111 - shift as Exponent;
 
-        #[cfg(target_arch = "x86")]
+        #[cfg(target_pointer_width = "32")]
         debug_assert!(ret.e <= EXPONENT_MAX && ret.e >= EXPONENT_MIN);
 
         Ok(ret)
@@ -943,7 +943,7 @@ impl BigFloatNumber {
         let p = m.len() * WORD_BIT_SIZE;
         Self::p_assertion(p)?;
 
-        #[cfg(target_arch = "x86")]
+        #[cfg(target_pointer_width = "32")]
         if e < EXPONENT_MIN || e > EXPONENT_MAX {
             return Err(Error::InvalidArgument);
         }
@@ -989,7 +989,7 @@ impl BigFloatNumber {
         let p = m.len() * WORD_BIT_SIZE;
         Self::p_assertion(p)?;
 
-        #[cfg(target_arch = "x86")]
+        #[cfg(target_pointer_width = "32")]
         if e < EXPONENT_MIN || e > EXPONENT_MAX {
             return Err(Error::InvalidArgument);
         }
@@ -1175,7 +1175,7 @@ impl BigFloatNumber {
     /// Note that if `self` is subnormal, the exponent may not change, but the mantissa will shift instead.
     /// `e` will be clamped to the range from EXPONENT_MIN to EXPONENT_MAX if it's outside of the range.
     pub fn set_exponent(&mut self, e: Exponent) {
-        #[cfg(target_arch = "x86")]
+        #[cfg(target_pointer_width = "32")]
         let e = if e < EXPONENT_MIN {
             EXPONENT_MIN
         } else if e > EXPONENT_MAX {
@@ -1314,7 +1314,7 @@ impl BigFloatNumber {
     pub fn random_normal(p: usize, exp_from: Exponent, exp_to: Exponent) -> Result<Self, Error> {
         Self::p_assertion(p)?;
 
-        #[cfg(target_arch = "x86")]
+        #[cfg(target_pointer_width = "32")]
         if exp_from < EXPONENT_MIN || exp_to > EXPONENT_MAX {
             return Err(Error::InvalidArgument);
         }
@@ -2288,7 +2288,7 @@ mod tests {
             .unwrap();
 
         let words = {
-            #[cfg(not(target_arch = "x86"))]
+            #[cfg(not(target_pointer_width = "32"))]
             {
                 [
                     12297829382473034411,
@@ -2298,7 +2298,7 @@ mod tests {
                     12297829382473034410,
                 ]
             }
-            #[cfg(target_arch = "x86")]
+            #[cfg(target_pointer_width = "32")]
             {
                 [2863311531, 2863311530, 2863311530, 2863311530, 2863311530]
             }
@@ -2312,11 +2312,11 @@ mod tests {
             .unwrap();
 
         let words = {
-            #[cfg(not(target_arch = "x86"))]
+            #[cfg(not(target_pointer_width = "32"))]
             {
                 [12297829382473034411, 12297829382473034410, 12297829382473034410]
             }
-            #[cfg(target_arch = "x86")]
+            #[cfg(target_pointer_width = "32")]
             {
                 [2863311531, 2863311530, 2863311530]
             }
@@ -2328,11 +2328,11 @@ mod tests {
         d3 = d1.div(&d2, WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
 
         let words = {
-            #[cfg(not(target_arch = "x86"))]
+            #[cfg(not(target_pointer_width = "32"))]
             {
                 [12297829382473034411]
             }
-            #[cfg(target_arch = "x86")]
+            #[cfg(target_pointer_width = "32")]
             {
                 [2863311531]
             }
@@ -2405,7 +2405,7 @@ mod tests {
             .unwrap();
 
         let words = {
-            #[cfg(not(target_arch = "x86"))]
+            #[cfg(not(target_pointer_width = "32"))]
             {
                 [
                     12297829382473034411,
@@ -2415,7 +2415,7 @@ mod tests {
                     12297829382473034410,
                 ]
             }
-            #[cfg(target_arch = "x86")]
+            #[cfg(target_pointer_width = "32")]
             {
                 [2863311531, 2863311530, 2863311530, 2863311530, 2863311530]
             }
@@ -2426,11 +2426,11 @@ mod tests {
         d2 = d1.reciprocal(WORD_BIT_SIZE, RoundingMode::ToEven).unwrap();
 
         let words = {
-            #[cfg(not(target_arch = "x86"))]
+            #[cfg(not(target_pointer_width = "32"))]
             {
                 [12297829382473034411]
             }
-            #[cfg(target_arch = "x86")]
+            #[cfg(target_pointer_width = "32")]
             {
                 [2863311531]
             }
@@ -2861,14 +2861,14 @@ mod tests {
         assert_eq!(d1.sign(), Sign::Neg);
 
         let d1 = BigFloatNumber::from_words(&[3, 1], Sign::Pos, EXPONENT_MAX).unwrap();
-        #[cfg(not(target_arch = "x86"))]
+        #[cfg(not(target_pointer_width = "32"))]
         {
             assert_eq!(
                 d1.mantissa().digits(),
                 [0x8000000000000000u64, 0x8000000000000001u64]
             );
         }
-        #[cfg(target_arch = "x86")]
+        #[cfg(target_pointer_width = "32")]
         {
             assert_eq!(d1.mantissa().digits(), [0x80000000u32, 0x80000001u32]);
         }
@@ -2892,11 +2892,11 @@ mod tests {
         assert_eq!(d1.sign(), Sign::Pos);
 
         let words = {
-            #[cfg(not(target_arch = "x86"))]
+            #[cfg(not(target_pointer_width = "32"))]
             {
                 [3, 0x8000000000000000u64]
             }
-            #[cfg(target_arch = "x86")]
+            #[cfg(target_pointer_width = "32")]
             {
                 [3, 0x80000000u32]
             }
@@ -2933,7 +2933,7 @@ mod tests {
         // 1 1001
 
         let mantissas = {
-            #[cfg(not(target_arch = "x86"))]
+            #[cfg(not(target_pointer_width = "32"))]
             {
                 [
                     [0x8000000000000000u64, 0x8000000000000000u64],
@@ -2944,7 +2944,7 @@ mod tests {
                     [0x8000000000000019u64, 0x8000000000000000u64],
                 ]
             }
-            #[cfg(target_arch = "x86")]
+            #[cfg(target_pointer_width = "32")]
             {
                 [
                     [0x80000000u32, 0x80000000u32],
@@ -2958,7 +2958,7 @@ mod tests {
         };
 
         let rounding_results_posnum = {
-            #[cfg(not(target_arch = "x86"))]
+            #[cfg(not(target_pointer_width = "32"))]
             {
                 [
                     (RoundingMode::None, mantissas),
@@ -3030,7 +3030,7 @@ mod tests {
                     ),
                 ]
             }
-            #[cfg(target_arch = "x86")]
+            #[cfg(target_pointer_width = "32")]
             {
                 [
                     (RoundingMode::None, mantissas),
@@ -3105,7 +3105,7 @@ mod tests {
         };
 
         let rounding_results_negnum = {
-            #[cfg(not(target_arch = "x86"))]
+            #[cfg(not(target_pointer_width = "32"))]
             {
                 [
                     (RoundingMode::None, mantissas),
@@ -3177,7 +3177,7 @@ mod tests {
                     ),
                 ]
             }
-            #[cfg(target_arch = "x86")]
+            #[cfg(target_pointer_width = "32")]
             {
                 [
                     (RoundingMode::None, mantissas),

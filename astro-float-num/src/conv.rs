@@ -57,7 +57,7 @@ impl BigFloatNumber {
             }
         }
 
-        #[cfg(target_arch = "x86")]
+        #[cfg(target_pointer_width = "32")]
         if e < EXPONENT_MIN || e > EXPONENT_MAX {
             return Err(Error::InvalidArgument);
         }
@@ -830,7 +830,7 @@ mod tests {
         let n = BigFloatNumber::from_f64(64, -83.591552734375).unwrap();
         assert_eq!(n.cmp(&g), 0);
 
-        #[cfg(target_arch = "x86")]
+        #[cfg(target_pointer_width = "32")]
         {
             let n = BigFloatNumber::from_raw_parts(
                 &[2576980377, 2576980377, 2576980377],
@@ -891,7 +891,7 @@ mod tests {
             assert!(g.cmp(&n) == 0);
         }
 
-        #[cfg(not(target_arch = "x86"))]
+        #[cfg(not(target_pointer_width = "32"))]
         {
             let n = BigFloatNumber::from_raw_parts(
                 &[0x9999999999999999, 0x9999999999999999, 0x9999999999999999],

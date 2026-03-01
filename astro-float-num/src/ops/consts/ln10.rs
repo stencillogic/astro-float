@@ -133,7 +133,7 @@ mod tests {
     use crate::{RoundingMode, Sign};
 
     #[test]
-    #[cfg(target_arch = "x86")]
+    #[cfg(target_pointer_width = "32")]
     fn test_ln10_const() {
         let mut ln10 = Ln10Cache::new().unwrap();
         let c = ln10.for_prec(320, RoundingMode::ToEven).unwrap();
@@ -153,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(target_arch = "x86"))]
+    #[cfg(not(target_pointer_width = "32"))]
     fn test_ln10_const() {
         let mut ln10 = Ln10Cache::new().unwrap();
         let c = ln10.for_prec(320, RoundingMode::ToEven).unwrap();
