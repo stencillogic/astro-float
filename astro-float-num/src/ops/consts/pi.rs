@@ -3,7 +3,7 @@
 use crate::common::util::round_p;
 use crate::defs::{Error, WORD_BIT_SIZE};
 use crate::num::BigFloatNumber;
-use crate::RoundingMode;
+use crate::{RoundingMode, Sign};
 
 fn pqr(a: u64, b: u64) -> Result<(BigFloatNumber, BigFloatNumber, BigFloatNumber), Error> {
     if a == b - 1 {
@@ -110,7 +110,9 @@ impl PiCache {
     /// Return value of PI with precision `k`.
     pub(crate) fn for_prec(&mut self, k: usize, rm: RoundingMode) -> Result<BigFloatNumber, Error> {
         let mut p_inc = WORD_BIT_SIZE;
-        let mut p_wrk = round_p(k) + p_inc;
+        let mut p_wrk = round_p(k)
+            .checked_add(p_inc)
+            .ok_or(Error::ExponentOverflow(Sign::Pos))?;
 
         loop {
             let kext = (k + 46 + WORD_BIT_SIZE) / 47;
@@ -151,7 +153,14 @@ impl PiCache {
 mod tests {
 
     use super::*;
-    use crate::{RoundingMode, Sign};
+    use crate::{Consts, RoundingMode, Sign};
+
+    #[test]
+    fn test_pi_precision_overflow() {
+        let mut cc = Consts::new().expect("Constants cache initialized");
+        let pi = cc.pi(u64::MAX as usize, RoundingMode::None);
+        assert!(pi.is_nan());
+    }
 
     #[test]
     #[cfg(target_pointer_width = "32")]
