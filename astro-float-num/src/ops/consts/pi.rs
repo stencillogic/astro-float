@@ -3,7 +3,7 @@
 use crate::common::util::round_p;
 use crate::defs::{Error, WORD_BIT_SIZE};
 use crate::num::BigFloatNumber;
-use crate::{RoundingMode, Sign};
+use crate::RoundingMode;
 
 fn pqr(a: u64, b: u64) -> Result<(BigFloatNumber, BigFloatNumber, BigFloatNumber), Error> {
     if a == b - 1 {
@@ -112,7 +112,7 @@ impl PiCache {
         let mut p_inc = WORD_BIT_SIZE;
         let mut p_wrk = round_p(k)
             .checked_add(p_inc)
-            .ok_or(Error::ExponentOverflow(Sign::Pos))?;
+            .ok_or(Error::InvalidArgument)?;
 
         loop {
             let kext = (k + 46 + WORD_BIT_SIZE) / 47;
