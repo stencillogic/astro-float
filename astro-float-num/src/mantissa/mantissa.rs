@@ -22,8 +22,12 @@ use crate::mantissa::util::RightShiftedSlice;
 use core::mem::size_of;
 use itertools::izip;
 
+#[cfg(feature = "rkyv")]
+use rkyv::{Archive, Serialize, Deserialize};
+
 /// Mantissa representation.
 #[derive(Debug, Hash)]
+#[cfg_attr(feature = "rkyv", derive(Archive, Serialize, Deserialize))]
 pub struct Mantissa {
     m: WordBuf,
     n: usize, // number of bits, 0 is for number 0

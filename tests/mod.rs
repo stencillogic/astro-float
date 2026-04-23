@@ -1,5 +1,9 @@
 // Additional tests of the library.
 
+#[cfg(feature = "rkyv")]
+#[cfg(test)]
+mod rkyv;
+
 use astro_float_macro::expr;
 use astro_float_num::{
     ctx::Context, BigFloat, Consts, Radix, RoundingMode, Sign, EXPONENT_MAX, EXPONENT_MIN,

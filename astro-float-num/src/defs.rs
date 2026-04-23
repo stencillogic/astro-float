@@ -8,6 +8,9 @@ use std::collections::TryReserveError;
 #[cfg(not(feature = "std"))]
 use alloc::collections::TryReserveError;
 
+#[cfg(feature = "rkyv")]
+use rkyv::{Archive, Serialize, Deserialize};
+
 /// A word.
 #[cfg(not(target_pointer_width = "32"))]
 pub type Word = u64;
@@ -79,6 +82,87 @@ pub enum Sign {
     Pos = 1,
 }
 
+#[cfg(feature = "rkyv")]
+mod rkyv_impl {
+  use super::Sign;
+  use rkyv::{
+    bytecheck::{CheckBytes, InvalidEnumDiscriminantError, Verify},
+    primitive::ArchivedI16,
+    rancor::{fail, Fallible, Source},
+    traits::NoUndef,
+    Archive, Deserialize, Place, Portable, Serialize,
+  };
+  // Hand-written archived enum
+  #[derive(CheckBytes, Portable)]
+  #[bytecheck(crate = rkyv::bytecheck, verify)]
+  #[repr(C)]
+  pub struct ArchivedSign(ArchivedI16);
+
+  // Implementation detail: `ArchivedMyEnum` has no undef bytes
+  unsafe impl NoUndef for ArchivedSign {}
+
+  impl ArchivedSign {
+      // Internal fallible conversion back to the original enum
+      fn try_to_native(&self) -> Option<Sign> {
+          Some(match self.0.to_native() {
+              -1 => Sign::Neg,
+              1 => Sign::Pos,
+              _ => return None,
+          })
+      }
+
+      // Public infallible conversion back to the original enum
+      pub fn to_native(&self) -> Sign {
+          unsafe { self.try_to_native().unwrap_unchecked() }
+      }
+  }
+
+  unsafe impl<C: Fallible + ?Sized> Verify<C> for ArchivedSign
+  where
+      C::Error: Source,
+  {
+      // verify runs after all of the fields have been checked
+      fn verify(&self, _: &mut C) -> Result<(), C::Error> {
+          // Use the internal conversion to try to convert back
+          if self.try_to_native().is_none() {
+              // Return an error if it fails (i.e. the discriminant did not match
+              // any valid discriminants)
+              fail!(InvalidEnumDiscriminantError {
+                  enum_name: "ArchivedSign",
+                  invalid_discriminant: self.0.to_native(),
+              })
+          }
+          Ok(())
+      }
+  }
+
+  impl Archive for Sign {
+      type Archived = ArchivedSign;
+      type Resolver = ();
+
+      fn resolve(&self, _: Self::Resolver, out: Place<Self::Archived>) {
+          // Convert Sign -> i16 -> ArchivedI16 and write to `out`
+          out.write(ArchivedSign((*self as i16).into()));
+      }
+  }
+
+  // Serialization is a no-op because there's no out-of-line data
+  impl<S: Fallible + ?Sized> Serialize<S> for Sign {
+      fn serialize(&self, _: &mut S) -> Result<Self::Resolver, <S as Fallible>::Error> {
+          Ok(())
+      }
+  }
+
+  // Deserialization just calls the public conversion and returns the result
+  impl<D: Fallible + ?Sized> Deserialize<Sign, D> for ArchivedSign {
+      fn deserialize(&self, _: &mut D) -> Result<Sign, <D as Fallible>::Error> {
+          Ok(self.to_native())
+      }
+  }
+}
+#[cfg(feature = "rkyv")]
+pub use rkyv_impl::*;
+
 impl Sign {
     /// Changes the sign to the opposite.
     pub fn invert(&self) -> Self {
@@ -106,6 +190,7 @@ impl Sign {
 
 /// Possible errors.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "rkyv", derive(Archive, Serialize, Deserialize))]
 pub enum Error {
     /// The exponent value becomes greater than the upper limit of the range of exponent values.
     ExponentOverflow(Sign),

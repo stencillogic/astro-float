@@ -13,6 +13,9 @@ use crate::Word;
 use core::num::FpCategory;
 use lazy_static::lazy_static;
 
+#[cfg(feature = "rkyv")]
+use rkyv::{Archive, Serialize, Deserialize};
+
 #[cfg(feature = "std")]
 use core::fmt::Write;
 
@@ -45,11 +48,13 @@ lazy_static! {
 
 /// A floating point number of arbitrary precision.
 #[derive(Debug)]
+#[cfg_attr(feature = "rkyv", derive(Archive, Serialize, Deserialize))]
 pub struct BigFloat {
     inner: Flavor,
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "rkyv", derive(Archive, Serialize, Deserialize))]
 enum Flavor {
     Value(BigFloatNumber),
     NaN(Option<Error>),
