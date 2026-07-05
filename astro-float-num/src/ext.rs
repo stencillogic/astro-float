@@ -1699,6 +1699,18 @@ mod tests {
     use alloc::format;
 
     #[test]
+    fn cmp_orders_nonzero_values_against_zero() {
+        let zero = BigFloat::new(DEFAULT_P);
+        let positive = BigFloat::from_f64(0.25, DEFAULT_P);
+        let negative = BigFloat::from_f64(-0.25, DEFAULT_P);
+
+        assert_eq!(positive.cmp(&zero), Some(1));
+        assert_eq!(zero.cmp(&positive), Some(-1));
+        assert_eq!(negative.cmp(&zero), Some(-1));
+        assert_eq!(zero.cmp(&negative), Some(1));
+    }
+
+    #[test]
     fn test_ext() {
         let rm = RoundingMode::ToOdd;
         let mut cc = Consts::new().unwrap();

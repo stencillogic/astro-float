@@ -770,6 +770,9 @@ impl BigFloatNumber {
                 return -1;
             }
         }
+        if d2.m.is_zero() {
+            return 1;
+        }
 
         let n1 = self.mantissa_max_bit_len() as isize - self.precision() as isize;
 
