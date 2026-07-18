@@ -2504,4 +2504,14 @@ mod rand_tests {
             assert!(n.precision().unwrap() >= p);
         }
     }
+
+    #[test]
+    fn test_format_no_overflow() {
+        let mut cc = Consts::new().unwrap();
+        for p in [1, 8, 24, 53, 64, 128, 256] {
+            let n = BigFloat::parse("1.0", Radix::Dec, p, RoundingMode::ToEven, &mut cc);
+            let s = n.format(Radix::Dec, RoundingMode::ToEven, &mut cc).unwrap();
+            assert!(s.starts_with('1'));
+        }
+    }
 }
