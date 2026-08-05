@@ -1698,6 +1698,21 @@ mod tests {
     #[cfg(not(feature = "std"))]
     use alloc::format;
 
+    #[cfg(target_pointer_width = "32")]
+    #[test]
+    fn test_decimal_formatting_round_trip() {
+        let mut cc = Consts::new().unwrap();
+        let p = 53;
+        let rm = RoundingMode::ToEven;
+        let value = BigFloat::parse("1.0", Radix::Dec, p, rm, &mut cc);
+
+        let formatted = value.format(Radix::Dec, rm, &mut cc).unwrap();
+        assert_eq!(formatted, "1.e+0");
+
+        let reparsed = BigFloat::parse(&formatted, Radix::Dec, p, rm, &mut cc);
+        assert_eq!(reparsed, value);
+    }
+
     #[test]
     fn test_ext() {
         let rm = RoundingMode::ToOdd;

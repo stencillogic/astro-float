@@ -32,6 +32,9 @@ pub type DoubleWord = u64;
 #[cfg(target_pointer_width = "32")]
 pub type SignedWord = i64;
 
+// Word-sized values are used as indices throughout the implementation.
+const _: [(); 1] = [(); (core::mem::size_of::<Word>() <= core::mem::size_of::<usize>()) as usize];
+
 /// An exponent.
 pub type Exponent = i32;
 
