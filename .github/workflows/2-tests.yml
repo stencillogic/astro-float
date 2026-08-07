@@ -49,7 +49,7 @@ jobs:
     - name: Build for wasm32 with features
       run: cargo build --package astro-float-num --target wasm32-unknown-unknown --no-default-features --features serde
 
-  build-i686:
+  test-i686:
     runs-on: ubuntu-latest
 
     steps:
@@ -58,5 +58,7 @@ jobs:
       run: rustup target add i686-unknown-linux-gnu
     - name: Install 32-bit libs
       run: sudo apt-get update && sudo apt-get install -y gcc-multilib
-    - name: Build for i686
-      run: cargo build --package astro-float-num --target i686-unknown-linux-gnu
+    - name: Run tests for i686
+      env:
+        RUSTFLAGS: -C overflow-checks=on
+      run: cargo test --package astro-float-num --lib --release --verbose --target i686-unknown-linux-gnu

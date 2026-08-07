@@ -771,6 +771,10 @@ impl BigFloatNumber {
             }
         }
 
+        if d2.m.is_zero() {
+            return 1;
+        }
+
         let n1 = self.mantissa_max_bit_len() as isize - self.precision() as isize;
 
         let n2 = d2.mantissa_max_bit_len() as isize - d2.precision() as isize;
@@ -1684,6 +1688,15 @@ mod tests {
         d3.inv_sign();
         assert!(d3.cmp(&d1) < 0);
 
+        d1 = BigFloatNumber::from_f64(p, 0.25).unwrap();
+        d2 = BigFloatNumber::from_f64(p, 0.0).unwrap();
+        assert!(d1.cmp(&d2) > 0);
+        assert!(d2.cmp(&d1) < 0);
+        d1.inv_sign();
+        d2.inv_sign();
+        assert!(d1.cmp(&d2) < 0);
+        assert!(d2.cmp(&d1) > 0);
+
         // cmp subnormal
         d1 = BigFloatNumber::from_raw_parts(
             &[1, WORD_MAX, 1],
@@ -1748,6 +1761,15 @@ mod tests {
         assert!(d3.abs_cmp(&d1) == 0);
         d3.inv_sign();
         assert!(d3.abs_cmp(&d1) == 0);
+
+        d1 = BigFloatNumber::from_f64(p, 0.25).unwrap();
+        d2 = BigFloatNumber::from_f64(p, 0.0).unwrap();
+        assert!(d1.abs_cmp(&d2) > 0);
+        assert!(d2.abs_cmp(&d1) < 0);
+        d1.inv_sign();
+        d2.inv_sign();
+        assert!(d1.abs_cmp(&d2) > 0);
+        assert!(d2.abs_cmp(&d1) < 0);
 
         // abs cmp subnormal
         d1 = BigFloatNumber::from_raw_parts(
