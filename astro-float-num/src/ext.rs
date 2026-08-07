@@ -1701,6 +1701,8 @@ mod tests {
     #[cfg(target_pointer_width = "32")]
     #[test]
     fn test_decimal_formatting_round_trip() {
+        // Regression test: on 32-bit targets, decimal formatting must produce a string
+        // that parses back to the original value without losing precision.
         let mut cc = Consts::new().unwrap();
         let p = 53;
         let rm = RoundingMode::ToEven;
